@@ -3,10 +3,9 @@ import os
 from ament_index_python import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, ExecuteProcess
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration
+from launch.substitutions import Command, LaunchConfiguration, FindExecutable
 from launch_ros.actions import Node
 
 def generate_launch_description():
@@ -23,8 +22,11 @@ def generate_launch_description():
         'model', default_value=os.path.join(description_dir, 'urdf/robot.urdf.xacro'),
         description='Full path to robot urdf file')
     use_sim_time_la = DeclareLaunchArgument(
-        'use_sim_time', default_value='False',
+        'use_sim_time', default_value='True',
         description='Use simulation/Gazebo clock')
+    frame_prefix_la = DeclareLaunchArgument(
+        'frame_prefix', default_value='robot/',
+        description='Prefix to publish robot transforms in')
 
     # start nodes and use args to set parameters
     robot_state_publisher_node = Node(
@@ -50,20 +52,33 @@ def generate_launch_description():
         arguments=['-topic', 'robot_description'],
         output='screen')
 
+    # gazebo bridge
+    bridge = ExecuteProcess(
+        cmd=[FindExecutable(name='ros2'),
+            'run ros_gz_bridge parameter_bridge  --ros-args -p config_file:=' + os.path.join(gazebo_dir, 'config/ros_gazebo_bridges.yaml')
+            ],
+        output='screen',
+        shell=True
+    )
+
     # create launch description
     ld = LaunchDescription()
 
     # declare launch args
     ld.add_action(robot_state_publisher_la)
     ld.add_action(use_sim_time_la)
+    ld.add_action(frame_prefix_la)
 
-    # start nodes
+    # start robot_state_publisher_node
     ld.add_action(robot_state_publisher_node)
 
-    # run another launch file
+    # run gazebo launch file
     ld.add_action(gazebo)
 
     # spawn robot in gazebo
     ld.add_action(spawn_entity)
+
+    # setup gazebo bridge
+    ld.add_action(bridge)
 
     return ld
