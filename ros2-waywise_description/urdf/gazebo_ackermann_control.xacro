@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <gazebo>
+      <plugin
+        filename="ignition-gazebo-ackermann-steering-system"
+        name="ignition::gazebo::systems::AckermannSteering">
+
+        <!-- Wheel Information -->
+        <left_joint>left_front_wheel_joint</left_joint>
+        <left_joint>left_rear_wheel_joint</left_joint>
+        <right_joint>right_front_wheel_joint</right_joint>
+        <right_joint>right_rear_wheel_joint</right_joint>
+        <left_steering_joint>left_front_wheel_steering_joint</left_steering_joint>
+        <right_steering_joint>right_front_wheel_steering_joint</right_steering_joint>
+        <kingpin_width>.18</kingpin_width>
+        <steering_limit>0.5</steering_limit>
+        <wheel_base>.33</wheel_base>
+        <wheel_separation>.297</wheel_separation>
+        <wheel_radius>0.055</wheel_radius>
+
+        <!-- Limits -->
+        <min_velocity>-100</min_velocity>
+        <max_velocity>100</max_velocity>
+        <min_acceleration>-5</min_acceleration>
+        <max_acceleration>5</max_acceleration>
+
+        <!-- Input -->
+        <topic>/cmd_vel</topic>
+
+        <!-- Output -->
+        <odom_publish_frequency>100</odom_publish_frequency>
+        <odometry_frame>odom</odometry_frame>
+        <robot_base_frame>base_link</robot_base_frame>
+        <publish_odom>true</publish_odom>
+        <publish_odom_tf>true</publish_odom_tf>
+        <publish_wheel_tf>true</publish_wheel_tf>
+      </plugin>
+    </gazebo>
+
+    <gazebo>
+      <plugin filename="libignition-gazebo-joint-state-publisher-system.so"
+        name="ignition::gazebo::systems::JointStatePublisher">
+        <joint_name>left_front_wheel_joint</joint_name>
+        <joint_name>left_rear_wheel_joint</joint_name>
+        <joint_name>right_front_wheel_joint</joint_name>
+        <joint_name>right_rear_wheel_joint</joint_name>
+        <joint_name>left_front_wheel_steering_joint</joint_name>
+        <joint_name>right_front_wheel_steering_joint</joint_name>
+      </plugin>
+    </gazebo>
+</robot>
