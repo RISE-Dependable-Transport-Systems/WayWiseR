@@ -43,12 +43,12 @@ def generate_launch_description():
     # include launch files
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
-            os.path.join(get_package_share_directory('ros_ign_gazebo'), 'launch', 'ign_gazebo.launch.py')]),
+            os.path.join(get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py')]),
         launch_arguments={
             'gz_args': '-r ' +  os.path.join(gazebo_dir, 'worlds/car_world.sdf')}.items()
     )
 
-    spawn_entity = Node(package='ros_ign_gazebo', executable='create',
+    spawn_entity = Node(package='ros_gz_sim', executable='create',
         arguments=['-topic', 'robot_description'],
         output='screen')
 
