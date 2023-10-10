@@ -17,7 +17,7 @@
   subscriber_queue: 5       # Default 10
   publisher_queue: 6        # Default 10
   lazy: true                # Default "false"
-  direction: BIDIRECTIONAL  # Default "BIDIRECTIONAL" - Bridge both directions
+  direction: GZ_TO_ROS  # Default "BIDIRECTIONAL" - Bridge both directions
                             # "GZ_TO_ROS" - Bridge Ignition topic to ROS
                             # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
@@ -32,14 +32,14 @@
                             # "GZ_TO_ROS" - Bridge Ignition topic to ROS
                             # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
-- ros_topic_name: "scan"
-  gz_topic_name: "/lidar"
+- ros_topic_name: "scan_lidar"
+  gz_topic_name: "/scan_lidar"
   ros_type_name: "sensor_msgs/msg/LaserScan"
   gz_type_name: "ignition.msgs.LaserScan"
   subscriber_queue: 5       # Default 10
   publisher_queue: 6        # Default 10
-  lazy: true                # Default "false"
-  direction: BIDIRECTIONAL  # Default "BIDIRECTIONAL" - Bridge both directions
+  lazy: false                # Default "false"
+  direction: GZ_TO_ROS  # Default "BIDIRECTIONAL" - Bridge both directions
                             # "GZ_TO_ROS" - Bridge Ignition topic to ROS
                             # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
@@ -64,8 +64,9 @@
                             # "GZ_TO_ROS" - Bridge Ignition topic to ROS
                             # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
-- topic_name: "/cmd_vel"                          
+- ros_topic_name: "/cmd_vel_out"                          
   ros_type_name: "geometry_msgs/msg/Twist"
+  gz_topic_name: "/cmd_vel"
   gz_type_name: "ignition.msgs.Twist"
   subscriber_queue: 5       # Default 10
   publisher_queue: 6        # Default 10
