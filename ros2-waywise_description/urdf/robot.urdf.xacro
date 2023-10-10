@@ -10,16 +10,18 @@
 
     <!-- Sensors -->
     <xacro:include filename="lidar.xacro" /> 
-    <xacro:include filename="camera.xacro" />
-<!--    <xacro:include filename="imu.xacro" /> -->
-<!--    <xacro:include filename="depth_camera.xacro" /> -->
+    <!-- <xacro:include filename="camera.xacro" /> -->
+    <!--    <xacro:include filename="imu.xacro" /> -->
+    <!--    <xacro:include filename="depth_camera.xacro" /> -->
 
     <!-- Controller -->
+
     <xacro:if value="$(arg use_ros2_control)">
         <xacro:include filename="ros2_control.xacro" />
     </xacro:if>
-    <xacro:unless value="$(arg use_ros2_control)">
-        <xacro:include filename="gazebo_ackermann_control.xacro" />
-    </xacro:unless>
-    
+    <xacro:if value="$(arg sim_mode)">
+        <xacro:unless value="$(arg use_ros2_control)">
+            <xacro:include filename="gazebo_ackermann_control.xacro" />
+        </xacro:unless>
+    </xacro:if>
 </robot>
