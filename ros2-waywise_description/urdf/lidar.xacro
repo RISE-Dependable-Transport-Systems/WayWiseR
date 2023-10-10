@@ -1,66 +1,91 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" >
 
-  <link name="lidar_frame">
+  <!-- Define lidar constants -->
+  <xacro:property name="lidar_mass" value="0.01"/>
+  <xacro:property name="lidar_support_mass" value="0.01"/>
+  <xacro:property name="lidar_radius" value="0.025"/>
+  <xacro:property name="lidar_length" value="0.03"/>
+  <xacro:property name="lidar_support_breadth" value="0.06"/>
+  <xacro:property name="lidar_support_length" value="0.06"/>
+  <xacro:property name="lidar_support_height" value="0.06"/>
+
+  <link name="lidar_link">
     <visual>
       <geometry>
-        <cylinder radius="0.025" length="0.03"/>
-      </geometry>
-      <material name="black"/>
-    </visual>
-    <visual>
-      <origin xyz="0 0 -0.05"/>
-      <geometry>
-        <cylinder radius="0.01" length="0.1"/>
+        <cylinder radius="${lidar_radius}" length="${lidar_length}"/>
       </geometry>
       <material name="black"/>
     </visual>
     <collision>
       <geometry>
-        <cylinder radius="0.025" length="0.03"/>
+        <cylinder radius="${lidar_radius}" length="${lidar_length}"/>
       </geometry>
     </collision>
-    <xacro:inertial_cylinder mass="0.01" length="0.025" radius="0.03">
+    <xacro:inertial_cylinder mass="${lidar_mass}" length="${lidar_length}" radius="${lidar_radius}">
       <origin xyz="0 0 0" rpy="0 0 0"/>
-    </xacro:inertial_cylinder>
+    </xacro:inertial_cylinder>  
+  </link>
+
+  <link name="lidar_support_link">
+    <visual>
+      <geometry>
+        <box size="${lidar_support_length} ${lidar_support_breadth} ${lidar_support_height}"/>
+      </geometry>
+      <material name="neon_blue"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="${lidar_support_length} ${lidar_support_breadth} ${lidar_support_height}"/>
+      </geometry>
+    </collision>
+    <xacro:inertial_box mass="${lidar_mass}" length="${lidar_support_length}" breadth="${lidar_support_breadth}" height="${lidar_support_height}">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </xacro:inertial_box>  
   </link>
 
   <joint name="lidar_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="lidar_frame"/>
-    <origin xyz="0.11 0 ${base_height/2 + 0.095}" rpy="0 0 ${pi}"/>
+    <parent link="lidar_support_link"/>
+    <child link="lidar_link"/>
+    <origin xyz="0 0 ${lidar_length/2 + lidar_support_height/2}" rpy="0 0 0"/>
   </joint>
 
-  <gazebo reference="lidar_frame">
+  <joint name="lidar_support_joint" type="fixed">
+    <parent link="chassis_link"/>
+    <child link="lidar_support_link"/>
+    <origin xyz="0.12 0 ${chassis_height/2 + lidar_support_height/2}" rpy="0 0 0"/>
+  </joint>
+
+  <gazebo reference="lidar_link">
     <material>Gazebo/Black</material> 
-    <sensor name='lidar' type='gpu_lidar'>"
-      <pose relative_to='lidar_frame'>0 0 0 0 0 0</pose>
-      <topic>lidar</topic>
+    <sensor name='lidar_link' type='gpu_lidar'>"
+      <topic>scan_lidar</topic>
+      <ignition_frame_id>lidar_link</ignition_frame_id>
+      <pose relative_to='lidar_link'>0 0 0 0 0 0</pose>
+      <always_on>true</always_on>
+      <visualize>false</visualize>
       <update_rate>10</update_rate>
       <ray>
         <scan>
           <horizontal>
             <samples>640</samples>
             <resolution>1</resolution>
-            <min_angle>-1.396263</min_angle>
-            <max_angle>1.396263</max_angle>
+            <min_angle>-3.1416</min_angle>
+            <max_angle>3.1416</max_angle>
           </horizontal>
           <vertical>
             <samples>1</samples>
-            <resolution>0.01</resolution>
+            <resolution>0.1</resolution>
             <min_angle>0</min_angle>
             <max_angle>0</max_angle>
           </vertical>
         </scan>
         <range>
-          <min>0.08</min>
+          <min>0.20</min>
           <max>10.0</max>
-          <resolution>0.01</resolution>
+          <resolution>0.1</resolution>
         </range>
       </ray>
-      <alwaysOn>1</alwaysOn>
-      <visualize>true</visualize>
     </sensor>
   </gazebo>
-
 </robot>

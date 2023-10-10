@@ -15,13 +15,13 @@
     </xacro:macro>  
 
 
-    <xacro:macro name="inertial_box" params="mass x y z *origin">
+    <xacro:macro name="inertial_box" params="mass length breadth height *origin">
         <inertial>
             <xacro:insert_block name="origin"/>
             <mass value="${mass}" />
-            <inertia ixx="${(1/12) * mass * (y*y+z*z)}" ixy="0.0" ixz="0.0"
-                    iyy="${(1/12) * mass * (x*x+z*z)}" iyz="0.0"
-                    izz="${(1/12) * mass * (x*x+y*y)}" />
+            <inertia ixx="${(1/12) * mass * (breadth*breadth+height*height)}" ixy="0.0" ixz="0.0"
+                    iyy="${(1/12) * mass * (length*length+height*height)}" iyz="0.0"
+                    izz="${(1/12) * mass * (length*length+breadth*breadth)}" />
         </inertial>
     </xacro:macro>
 
