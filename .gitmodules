@@ -1,3 +1,4 @@
 [submodule "vesc"]
 	path = vesc
 	url = git@github.com:f1tenth/vesc.git
+	branch = ros2
