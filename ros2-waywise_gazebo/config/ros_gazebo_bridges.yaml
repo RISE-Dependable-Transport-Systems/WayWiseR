@@ -11,7 +11,7 @@
                             # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
 - ros_topic_name: "odom"
-  gz_topic_name: "/model/robot/odometry"
+  gz_topic_name: "/odom"
   ros_type_name: "nav_msgs/msg/Odometry"
   gz_type_name: "ignition.msgs.Odometry"
   subscriber_queue: 5       # Default 10
@@ -22,7 +22,7 @@
                             # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
 - ros_topic_name: "tf"
-  gz_topic_name: "/model/robot/tf"
+  gz_topic_name: "/tf"
   ros_type_name: "tf2_msgs/msg/TFMessage"
   gz_type_name: "ignition.msgs.Pose_V"
   subscriber_queue: 5       # Default 10
