@@ -25,7 +25,7 @@ def generate_launch_description():
         'use_sim_time', default_value='True',
         description='Use simulation/Gazebo clock')
     frame_prefix_la = DeclareLaunchArgument(
-        'frame_prefix', default_value='robot/',
+        'frame_prefix', default_value='/',
         description='Prefix to publish robot transforms in')
 
     # start nodes and use args to set parameters
@@ -34,7 +34,7 @@ def generate_launch_description():
         executable='robot_state_publisher',
         name='robot_state_publisher',
         parameters=[{
-            'robot_description': Command(['xacro ', model]),
+            'robot_description': Command(['xacro ', model, ' sim_mode:=', 'True']),
             'use_sim_time': use_sim_time,
             'frame_prefix': frame_prefix,
         }]
