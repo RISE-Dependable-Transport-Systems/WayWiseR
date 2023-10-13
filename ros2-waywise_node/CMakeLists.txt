@@ -12,9 +12,12 @@ find_package(ament_cmake REQUIRED)
 # find_package(<dependency> REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 add_executable(waywise_rover src/waywise_rover.cpp)
-ament_target_dependencies(waywise_rover rclcpp std_msgs)
+ament_target_dependencies(waywise_rover rclcpp std_msgs nav_msgs geometry_msgs tf2_ros)
 
 install(TARGETS
   waywise_rover
