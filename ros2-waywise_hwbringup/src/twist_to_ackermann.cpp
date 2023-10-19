@@ -24,10 +24,10 @@ class TwistToAckermann : public rclcpp::Node
     : Node("twist_to_ackermann")
     {
       subscription_ = this->create_subscription<geometry_msgs::msg::Twist>(
-      "/cmd_vel", 10, std::bind(&TwistToAckermann::topic_callback, this, _1));
-      
+      "/cmd_vel_out", 10, std::bind(&TwistToAckermann::topic_callback, this, _1));
+
       publisher_ = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(
-      "/drive", 10);
+      "/ackermann_cmd", 10);
     }
 
   private:
@@ -35,16 +35,16 @@ class TwistToAckermann : public rclcpp::Node
     // Wheelbase in meters
     float convert_trans_rot_vel_to_steering_angle(float v, float omega, float wheelbase) const
     {
-      if (omega == 0 || v == 0) 
+      if (omega == 0 || v == 0)
         return 0;
-      float radius = v / omega;    
+      float radius = v / omega;
       return atan(wheelbase / radius);
     }
-  
+
     void topic_callback(const geometry_msgs::msg::Twist::SharedPtr twi_msg) const
     {
       //RCLCPP_INFO(this->get_logger(), "\nLinear:\n x: %f""\nAngular:\n z: %f", twi_msg->linear.x, twi_msg->angular.z);
-      
+
       auto ack_msg = ackermann_msgs::msg::AckermannDriveStamped();
       ack_msg.header.stamp.sec = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
       ack_msg.header.stamp.nanosec = duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count();
