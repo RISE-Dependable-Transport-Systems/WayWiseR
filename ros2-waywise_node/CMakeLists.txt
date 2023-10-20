@@ -16,8 +16,32 @@ find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 
-add_executable(waywise_rover src/waywise_rover.cpp)
+# Qt5
+find_package(Qt5 COMPONENTS Core REQUIRED)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+
+add_executable(waywise_rover
+    src/waywise_rover.cpp
+    WayWise/vehicles/objectstate.cpp
+    WayWise/vehicles/carstate.cpp
+    WayWise/vehicles/controller/motorcontroller.h
+    WayWise/vehicles/controller/movementcontroller.cpp
+    WayWise/vehicles/controller/servocontroller.cpp
+    WayWise/vehicles/vehiclestate.cpp
+    WayWise/core/pospoint.cpp
+    WayWise/vehicles/controller/carmovementcontroller.cpp)
+
+target_include_directories(waywise_rover PRIVATE WayWise/)
+
+target_link_libraries(waywise_rover
+    Qt5::Core
+)
+
 ament_target_dependencies(waywise_rover rclcpp std_msgs nav_msgs geometry_msgs tf2_ros)
+
 
 install(TARGETS
   waywise_rover

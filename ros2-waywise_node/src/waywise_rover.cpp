@@ -3,6 +3,10 @@
 #include <memory>
 #include <string>
 
+#include <QCoreApplication>
+#include "WayWise/vehicles/carstate.h"
+#include "WayWise/vehicles/controller/carmovementcontroller.h"
+
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "nav_msgs/msg/odometry.hpp"
@@ -25,14 +29,28 @@ public:
         odom_pub_ = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
         tf_pub_.reset(new tf2_ros::TransformBroadcaster(this));
 
-        timer_ = this->create_wall_timer(100ms, std::bind(&WayWiseRover::timer_callback, this));
+        timer_ = this->create_wall_timer(mUpdateVehicleStatePeriod, std::bind(&WayWiseRover::timer_callback, this));
+
+        // init WayWise
+        mCarState.reset(new CarState);
+
+        // --- Lower-level control setup ---
+        mCarMovementController.reset(new CarMovementController(mCarState));
+
+        mCarMovementController->setDesiredSpeed(3);
+        mCarMovementController->setDesiredSteering(0.5);
+
     }
 
 private:
     void timer_callback() {
-        static double x_ = 0.0;
-        static double y_ = 0.0;
-        static double yaw_ = 0.0;
+//        RCLCPP_INFO(this->get_logger(), "Alive!");
+        mCarState->simulationStep(mUpdateVehicleStatePeriod.count());
+
+        double x_ = mCarState->getPosition().getX();
+        double y_ = mCarState->getPosition().getY();
+        double yawRad_ = mCarState->getPosition().getYaw() * M_PI / 180.0;
+        //qDebug() << x_ << y_ << yaw_;
 
         // -- Prepare Odom
         auto odom = nav_msgs::msg::Odometry();
@@ -45,8 +63,8 @@ private:
         odom.pose.pose.position.y = y_;
         odom.pose.pose.orientation.x = 0.0;
         odom.pose.pose.orientation.y = 0.0;
-        odom.pose.pose.orientation.z = sin(yaw_ / 2.0);
-        odom.pose.pose.orientation.w = cos(yaw_ / 2.0);
+        odom.pose.pose.orientation.z = sin(yawRad_ / 2.0);
+        odom.pose.pose.orientation.w = cos(yawRad_ / 2.0);
 
         // TODO: position uncertainty?
 
@@ -62,17 +80,14 @@ private:
         tf.header.frame_id = odom_frame_;
         tf.child_frame_id = base_frame_;
         tf.header.stamp = now();
-        tf.transform.translation.x = sin(x_);
-        tf.transform.translation.y = cos(y_);
+        tf.transform.translation.x = x_;
+        tf.transform.translation.y = y_;
         tf.transform.translation.z = 0.0;
         tf.transform.rotation = odom.pose.pose.orientation;
 
         // -- Publish
         odom_pub_->publish(odom);
         tf_pub_->sendTransform(tf);
-
-        x_ += 0.05;
-        y_ += 0.05;
     }
 
     // Parameters
@@ -85,11 +100,30 @@ private:
     std::shared_ptr<tf2_ros::TransformBroadcaster> tf_pub_;
 
     rclcpp::TimerBase::SharedPtr timer_;
+
+    // WayWise
+    std::chrono::milliseconds mUpdateVehicleStatePeriod = 100ms;
+    QSharedPointer<CarState> mCarState;
+    QSharedPointer<CarMovementController> mCarMovementController;
 };
 
 int main(int argc, char * argv[]) {
+    QCoreApplication a(argc, argv);
+
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<WayWiseRover>());
+    a.processEvents();
+
+    auto waywiseNode = std::make_shared<WayWiseRover>();
+    rclcpp::executors::MultiThreadedExecutor exec;
+    exec.add_node(waywiseNode);
+
+    while (rclcpp::ok()) {
+            exec.spin_some();
+            a.processEvents();
+    }
+
+    exec.remove_node(waywiseNode);
     rclcpp::shutdown();
+
     return 0;
 }
