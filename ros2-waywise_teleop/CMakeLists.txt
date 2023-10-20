@@ -12,7 +12,7 @@ find_package(ament_cmake REQUIRED)
 # find_package(<dependency> REQUIRED)
 
 find_package(joy REQUIRED)
-find_package(teleop_tools REQUIRED)
+find_package(teleop_twist_joy REQUIRED)
 
 install(
   DIRECTORY launch config
