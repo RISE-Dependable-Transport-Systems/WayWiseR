@@ -6,22 +6,25 @@
     speed_to_erpm_offset: 50.0
 
     # servo value (0 to 1) =  steering_angle_to_servo_gain * steering angle (radians) + steering_angle_to_servo_offset
-    steering_angle_to_servo_gain: -0.9135
-    steering_angle_to_servo_offset: 0.450
+    steering_angle_to_servo_gain: -0.950
+    steering_angle_to_servo_offset: 0.455
 
     port: /dev/sensors/vesc
     duty_cycle_min: 0.0
     duty_cycle_max: 0.0
     current_min: 0.0
-    current_max: 100.0
+    current_max: 30.0
     brake_min: -20000.0
     brake_max: 200000.0
-    speed_min: -23250.0
-    speed_max: 23250.0
+    speed_min: -10000.0
+    speed_max: 10000.0
     position_min: 0.0
     position_max: 0.0
     servo_min: 0.0
-    servo_max: 0.85
+    servo_max: 0.9
+
+    wheelbase: 0.33
+    ack_msg_frame_id: odom
 
 vesc_to_odom_node:
   ros__parameters:
@@ -30,5 +33,8 @@ vesc_to_odom_node:
     # publish odom to base link tf
     publish_tf: true
     use_servo_cmd_to_calc_angular_velocity: true
-    # car wheelbase is about 25cm
-    wheelbase: .25
+    # configurable params for odom pose corrections
+    speed_to_erpm_gain: -4200.0
+    speed_to_erpm_offset: 50.0
+    steering_angle_to_servo_gain: -0.950
+    steering_angle_to_servo_offset: 0.455

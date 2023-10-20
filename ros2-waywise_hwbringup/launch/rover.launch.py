@@ -43,6 +43,8 @@ def generate_launch_description():
         executable="twist_to_ackermann",
         name="twist_to_ackermann",
         output="screen",
+        parameters=[LaunchConfiguration("rover_config")],
+        remappings={("/cmd_vel", "/cmd_vel_out")},
     )
 
     ackermann_to_vesc_node = Node(
