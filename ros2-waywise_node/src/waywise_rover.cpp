@@ -17,38 +17,79 @@ using namespace std::chrono_literals;
 class WayWiseRover : public rclcpp::Node
 {
 public:
-  WayWiseRover() : Node("waywise_rover"), count_(0) {
-    string_pub_ = this->create_publisher<std_msgs::msg::String>("topic", 10);
-    odom_pub_ = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
-    tf_pub_.reset(new tf2_ros::TransformBroadcaster(this));
+    WayWiseRover() : Node("waywise_rover") {
+        // get ROS parameters
+        odom_frame_ = declare_parameter("odom_frame", odom_frame_);
+        base_frame_ = declare_parameter("base_frame", base_frame_);
 
-    timer_ = this->create_wall_timer(500ms, std::bind(&WayWiseRover::timer_callback, this));
-  }
+        odom_pub_ = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
+        tf_pub_.reset(new tf2_ros::TransformBroadcaster(this));
+
+        timer_ = this->create_wall_timer(100ms, std::bind(&WayWiseRover::timer_callback, this));
+    }
 
 private:
-  void timer_callback() {
-    auto message = std_msgs::msg::String();
-    message.data = "Hello, WayWise! " + std::to_string(count_++);
-    RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", message.data.c_str());
+    void timer_callback() {
+        static double x_ = 0.0;
+        static double y_ = 0.0;
+        static double yaw_ = 0.0;
 
-    auto odom = nav_msgs::msg::Odometry();
-    auto tf = geometry_msgs::msg::TransformStamped();
+        // -- Prepare Odom
+        auto odom = nav_msgs::msg::Odometry();
+        odom.header.stamp = now();
+        odom.header.frame_id = odom_frame_;
+        odom.child_frame_id = base_frame_;
 
-    string_pub_->publish(message);
-    odom_pub_->publish(odom);
-    tf_pub_->sendTransform(tf);
-  }
+        // Position in the coordinate frame given by header.frame_id
+        odom.pose.pose.position.x = x_;
+        odom.pose.pose.position.y = y_;
+        odom.pose.pose.orientation.x = 0.0;
+        odom.pose.pose.orientation.y = 0.0;
+        odom.pose.pose.orientation.z = sin(yaw_ / 2.0);
+        odom.pose.pose.orientation.w = cos(yaw_ / 2.0);
 
-  rclcpp::TimerBase::SharedPtr timer_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr string_pub_;
-  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
-  std::shared_ptr<tf2_ros::TransformBroadcaster> tf_pub_;
-  size_t count_;
+        // TODO: position uncertainty?
+
+        // Velocity in the coordinate frame given by child_frame_id
+        odom.twist.twist.linear.x = 0.0;
+        odom.twist.twist.linear.y = 0.0;
+        odom.twist.twist.angular.z = 0.0;
+
+        // TODO: velocity uncertainty?
+
+        // -- Prepare Transform
+        auto tf = geometry_msgs::msg::TransformStamped();
+        tf.header.frame_id = odom_frame_;
+        tf.child_frame_id = base_frame_;
+        tf.header.stamp = now();
+        tf.transform.translation.x = sin(x_);
+        tf.transform.translation.y = cos(y_);
+        tf.transform.translation.z = 0.0;
+        tf.transform.rotation = odom.pose.pose.orientation;
+
+        // -- Publish
+        odom_pub_->publish(odom);
+        tf_pub_->sendTransform(tf);
+
+        x_ += 0.05;
+        y_ += 0.05;
+    }
+
+    // Parameters
+    std::string odom_frame_;
+    std::string base_frame_;
+
+    // Publishers
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr string_pub_;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
+    std::shared_ptr<tf2_ros::TransformBroadcaster> tf_pub_;
+
+    rclcpp::TimerBase::SharedPtr timer_;
 };
 
 int main(int argc, char * argv[]) {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<WayWiseRover>());
-  rclcpp::shutdown();
-  return 0;
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<WayWiseRover>());
+    rclcpp::shutdown();
+    return 0;
 }
