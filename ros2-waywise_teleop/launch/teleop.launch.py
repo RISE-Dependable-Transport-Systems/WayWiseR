@@ -31,7 +31,15 @@ def generate_launch_description():
         executable="teleop_node",
         name="teleop_twist_joy_node",
         parameters=[LaunchConfiguration("joy_config")],
-        remappings={("/cmd_vel", "/cmd_vel_out")},
+        remappings={("/cmd_vel", "/joy_vel")},
+    )
+
+    teleop_gateway_node = Node(
+        package="ros2-waywise_teleop",
+        executable="teleop_gateway",
+        name="teleop_gateway",
+        parameters=[LaunchConfiguration("joy_config")],
+        remappings={("/cmd_vel_in", "/joy_vel")},
     )
 
     # create launch description
@@ -43,5 +51,6 @@ def generate_launch_description():
     # start nodes
     ld.add_action(joy_node)
     ld.add_action(teleop_twist_joy_node)
+    ld.add_action(teleop_gateway_node)
 
     return ld

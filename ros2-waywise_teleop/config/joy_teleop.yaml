@@ -23,3 +23,9 @@ teleop_twist_joy_node:
       yaw: 1.0
     enable_button: 4
     enable_turbo_button: 6
+
+teleop_gateway:
+  ros__parameters:
+    wheelbase: 0.33
+    min_allowed_linear_velocity: 0.05 #m/s
+    min_allowed_angular_velocity: 0.01 #rad/s

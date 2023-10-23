@@ -13,9 +13,19 @@ find_package(ament_cmake REQUIRED)
 
 find_package(joy REQUIRED)
 find_package(teleop_twist_joy REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+
+add_executable(teleop_gateway src/teleop_gateway.cpp)
+ament_target_dependencies(teleop_gateway rclcpp geometry_msgs std_msgs)
+
+install(TARGETS
+  teleop_gateway
+  DESTINATION lib/${PROJECT_NAME})
 
 install(
-  DIRECTORY launch config
+  DIRECTORY src launch config
   DESTINATION share/${PROJECT_NAME}
 )
 
