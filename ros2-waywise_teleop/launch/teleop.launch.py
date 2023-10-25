@@ -39,7 +39,7 @@ def generate_launch_description():
         executable="teleop_gateway",
         name="teleop_gateway",
         parameters=[LaunchConfiguration("joy_config")],
-        remappings={("/cmd_vel_in", "/joy_vel")},
+        remappings={("/joy_vel_corrected", "/cmd_vel_out")},
     )
 
     # create launch description

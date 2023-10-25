@@ -29,3 +29,4 @@ teleop_gateway:
     wheelbase: 0.33
     min_allowed_linear_velocity: 0.05 #m/s
     min_allowed_angular_velocity: 0.01 #rad/s
+    reverse_steer_correction_topics: ["joy_vel"]
