@@ -24,11 +24,21 @@ public:
         emergency_stop_set_joy_button_index_ = this->declare_parameter("emergency_stop_set_joy_button_index", 5);
         emergency_stop_clear_joy_button_index_ = this->declare_parameter("emergency_stop_clear_joy_button_index", 7);
         joy_emergency_stop_timeout_ = this->declare_parameter("joy_emergency_stop_timeout", 1.0);
-        emergency_stop_value_ = false;
+        start_with_emergency_stop_ = this->declare_parameter("start_with_emergency_stop", true);
+        emergency_stop_value_ = start_with_emergency_stop_;
         RCLCPP_INFO(get_logger(), "emergency_stop can be ACTIVATED using button %d and CLEARED using button %d of joystick. It can also be managed by publishing boolean data on /emergency_stop topic.", emergency_stop_set_joy_button_index_, emergency_stop_clear_joy_button_index_);
         RCLCPP_INFO(get_logger(), "To activate emergency_stop from command line: ros2 topic pub --once /emergency_stop std_msgs/msg/Bool \"data: true\"");
         RCLCPP_INFO(get_logger(), "To clear emergency_stop from command line: ros2 topic pub --once /emergency_stop std_msgs/msg/Bool \"data: false\"");
 
+        if (start_with_emergency_stop_)
+        {
+            RCLCPP_WARN(get_logger(), "emergency_stop is ACTIVATED at startup.");
+        }
+        else
+        {
+            RCLCPP_WARN(get_logger(), "emergency_stop is CLEARED at startup.");
+        }
+        
         twist_subscribers_.resize(reverse_steer_correction_topics_.size());
         for (size_t i = 0; i < reverse_steer_correction_topics_.size(); ++i)
         {
@@ -179,7 +189,7 @@ private:
     float wheelbase_, min_allowed_linear_velocity_, min_allowed_angular_velocity_;
     int emergency_stop_set_joy_button_index_, emergency_stop_clear_joy_button_index_;
     float joy_emergency_stop_timeout_;
-    bool emergency_stop_value_;
+    bool emergency_stop_value_, start_with_emergency_stop_;
     bool is_joy_alive_ = false;
     rclcpp::Time last_joy_msg_received_time_ = this->now();
 };
