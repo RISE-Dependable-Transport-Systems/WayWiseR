@@ -6,6 +6,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch.conditions import IfCondition
 
 
 def generate_launch_description():
@@ -24,6 +25,12 @@ def generate_launch_description():
         description="Full path to params file",
     )
 
+    enable_keyboard_la = DeclareLaunchArgument(
+        "enable_keyboard",
+        default_value="false",
+        description="Enable keyboard",
+    )
+
     # start nodes and use args to set parameters
     joy_node = Node(
         package="joy",
@@ -38,6 +45,16 @@ def generate_launch_description():
         name="teleop_twist_joy_node",
         parameters=[LaunchConfiguration("joy_config")],
         remappings={("/cmd_vel", "/joy_vel")},
+    )
+
+    teleop_twist_keyboard_node = Node(
+        package="teleop_twist_keyboard",
+        executable="teleop_twist_keyboard",
+        name="teleop_twist_keyboard_node",
+        output="screen",
+        prefix="xterm -e",
+        condition=IfCondition(LaunchConfiguration("enable_keyboard")),
+        remappings={("/cmd_vel", "/key_vel")},
     )
 
     teleop_gateway_node = Node(
@@ -60,11 +77,13 @@ def generate_launch_description():
     # declare launch args
     ld.add_action(joy_la)
     ld.add_action(twist_mux_la)
+    ld.add_action(enable_keyboard_la)
 
     # start nodes
     ld.add_action(joy_node)
     ld.add_action(teleop_twist_joy_node)
     ld.add_action(teleop_gateway_node)
+    ld.add_action(teleop_twist_keyboard_node)
     ld.add_action(twist_mux_node)
 
     return ld
