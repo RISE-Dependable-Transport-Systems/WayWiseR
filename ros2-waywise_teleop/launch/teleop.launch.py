@@ -69,6 +69,7 @@ def generate_launch_description():
         executable="twist_mux",
         name="twist_mux",
         parameters=[LaunchConfiguration("twist_mux_config")],
+        remappings={("/cmd_vel_out", "/cmd_vel_mux")},
     )
 
     # create launch description

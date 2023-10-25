@@ -30,3 +30,6 @@ teleop_gateway:
     min_allowed_linear_velocity: 0.05 #m/s
     min_allowed_angular_velocity: 0.01 #rad/s
     reverse_steer_correction_topics: ["joy_vel"]
+    emergency_stop_set_joy_button_index: 5
+    emergency_stop_clear_joy_button_index: 7
+    joy_emergency_stop_timeout: 1.0 #seconds
