@@ -15,9 +15,10 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(ackermann_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 
 add_executable(twist_to_ackermann src/twist_to_ackermann.cpp)
-ament_target_dependencies(twist_to_ackermann rclcpp geometry_msgs std_msgs ackermann_msgs)
+ament_target_dependencies(twist_to_ackermann rclcpp geometry_msgs std_msgs ackermann_msgs nav_msgs)
 
 install(TARGETS
   twist_to_ackermann

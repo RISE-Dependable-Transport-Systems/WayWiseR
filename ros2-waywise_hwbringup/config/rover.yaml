@@ -38,3 +38,7 @@ vesc_to_odom_node:
     speed_to_erpm_offset: 50.0
     steering_angle_to_servo_gain: -0.950
     steering_angle_to_servo_offset: 0.455
+
+twist_to_ackermann:
+  ros__parameters:
+      odom_timeout: 1.0 #seconds
