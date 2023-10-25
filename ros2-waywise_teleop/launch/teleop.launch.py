@@ -18,6 +18,12 @@ def generate_launch_description():
         description="Full path to params file",
     )
 
+    twist_mux_la = DeclareLaunchArgument(
+        "twist_mux_config",
+        default_value=os.path.join(teleop_dir, "config/twist_mux.yaml"),
+        description="Full path to params file",
+    )
+
     # start nodes and use args to set parameters
     joy_node = Node(
         package="joy",
@@ -39,7 +45,13 @@ def generate_launch_description():
         executable="teleop_gateway",
         name="teleop_gateway",
         parameters=[LaunchConfiguration("joy_config")],
-        remappings={("/joy_vel_corrected", "/cmd_vel_out")},
+    )
+
+    twist_mux_node = Node(
+        package="twist_mux",
+        executable="twist_mux",
+        name="twist_mux",
+        parameters=[LaunchConfiguration("twist_mux_config")],
     )
 
     # create launch description
@@ -47,10 +59,12 @@ def generate_launch_description():
 
     # declare launch args
     ld.add_action(joy_la)
+    ld.add_action(twist_mux_la)
 
     # start nodes
     ld.add_action(joy_node)
     ld.add_action(teleop_twist_joy_node)
     ld.add_action(teleop_gateway_node)
+    ld.add_action(twist_mux_node)
 
     return ld
