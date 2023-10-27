@@ -1,77 +1,95 @@
 # Full set of configurations
+- ros_topic_name: "/clock"
+  gz_topic_name: "/world/car_world/clock"
+  ros_type_name: "rosgraph_msgs/msg/Clock"
+  gz_type_name: "gz.msgs.Clock"
+  subscriber_queue: 5 # Default 10
+  publisher_queue: 6 # Default 10
+  lazy: false # Default "false"
+  direction:
+    GZ_TO_ROS # Default "BIDIRECTIONAL" - Bridge both directions
+    # "GZ_TO_ROS" - Bridge Ignition topic to ROS
+    # "ROS_TO_GZ" - Bridge ROS topic to Ignition
+
 - ros_topic_name: "joint_states"
-  gz_topic_name: "/world/car_world/model/robot/joint_state"
+  gz_topic_name: "/joint_states"
   ros_type_name: "sensor_msgs/msg/JointState"
-  gz_type_name: "ignition.msgs.Model"
-  subscriber_queue: 5       # Default 10
-  publisher_queue: 6        # Default 10
-  lazy: true                # Default "false"
-  direction: GZ_TO_ROS  # Default "BIDIRECTIONAL" - Bridge both directions
-                            # "GZ_TO_ROS" - Bridge Ignition topic to ROS
-                            # "ROS_TO_GZ" - Bridge ROS topic to Ignition
+  gz_type_name: "gz.msgs.Model"
+  subscriber_queue: 5 # Default 10
+  publisher_queue: 6 # Default 10
+  lazy: true # Default "false"
+  direction:
+    GZ_TO_ROS # Default "BIDIRECTIONAL" - Bridge both directions
+    # "GZ_TO_ROS" - Bridge Ignition topic to ROS
+    # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
 - ros_topic_name: "odom"
   gz_topic_name: "/odom"
   ros_type_name: "nav_msgs/msg/Odometry"
-  gz_type_name: "ignition.msgs.Odometry"
-  subscriber_queue: 5       # Default 10
-  publisher_queue: 6        # Default 10
-  lazy: true                # Default "false"
-  direction: GZ_TO_ROS  # Default "BIDIRECTIONAL" - Bridge both directions
-                            # "GZ_TO_ROS" - Bridge Ignition topic to ROS
-                            # "ROS_TO_GZ" - Bridge ROS topic to Ignition
+  gz_type_name: "gz.msgs.Odometry"
+  subscriber_queue: 5 # Default 10
+  publisher_queue: 6 # Default 10
+  lazy: true # Default "false"
+  direction:
+    GZ_TO_ROS # Default "BIDIRECTIONAL" - Bridge both directions
+    # "GZ_TO_ROS" - Bridge Ignition topic to ROS
+    # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
 - ros_topic_name: "tf"
   gz_topic_name: "/tf"
   ros_type_name: "tf2_msgs/msg/TFMessage"
-  gz_type_name: "ignition.msgs.Pose_V"
-  subscriber_queue: 5       # Default 10
-  publisher_queue: 6        # Default 10
-  lazy: true                # Default "false"
-  direction: GZ_TO_ROS  # Default "BIDIRECTIONAL" - Bridge both directions
-                            # "GZ_TO_ROS" - Bridge Ignition topic to ROS
-                            # "ROS_TO_GZ" - Bridge ROS topic to Ignition
+  gz_type_name: "gz.msgs.Pose_V"
+  subscriber_queue: 5 # Default 10
+  publisher_queue: 6 # Default 10
+  lazy: true # Default "false"
+  direction:
+    BIDIRECTIONAL # Default "BIDIRECTIONAL" - Bridge both directions
+    # "GZ_TO_ROS" - Bridge Ignition topic to ROS
+    # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
 - ros_topic_name: "scan_lidar"
   gz_topic_name: "/scan_lidar"
   ros_type_name: "sensor_msgs/msg/LaserScan"
-  gz_type_name: "ignition.msgs.LaserScan"
-  subscriber_queue: 5       # Default 10
-  publisher_queue: 6        # Default 10
-  lazy: false                # Default "false"
-  direction: GZ_TO_ROS  # Default "BIDIRECTIONAL" - Bridge both directions
-                            # "GZ_TO_ROS" - Bridge Ignition topic to ROS
-                            # "ROS_TO_GZ" - Bridge ROS topic to Ignition
+  gz_type_name: "gz.msgs.LaserScan"
+  subscriber_queue: 5 # Default 10
+  publisher_queue: 6 # Default 10
+  lazy: false # Default "false"
+  direction:
+    GZ_TO_ROS # Default "BIDIRECTIONAL" - Bridge both directions
+    # "GZ_TO_ROS" - Bridge Ignition topic to ROS
+    # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
-- ros_topic_name: "camera"
-  gz_topic_name: "/world/car_world/model/robot/link/base_link/sensor/camera/image"
-  ros_type_name: "sensor_msgs/msg/Image"
-  gz_type_name: "ignition.msgs.Image"
-  subscriber_queue: 5       # Default 10
-  publisher_queue: 6        # Default 10
-  lazy: true                # Default "false"
-  direction: BIDIRECTIONAL  # Default "BIDIRECTIONAL" - Bridge both directions
-                            # "GZ_TO_ROS" - Bridge Ignition topic to ROS
-                            # "ROS_TO_GZ" - Bridge ROS topic to Ignition
+# - ros_topic_name: "camera"
+#   gz_topic_name: "/world/car_world/model/robot/link/base_link/sensor/camera/image"
+#   ros_type_name: "sensor_msgs/msg/Image"
+#   gz_type_name: "gz.msgs.Image"
+#   subscriber_queue: 5       # Default 10
+#   publisher_queue: 6        # Default 10
+#   lazy: true                # Default "false"
+#   direction: BIDIRECTIONAL  # Default "BIDIRECTIONAL" - Bridge both directions
+#                             # "GZ_TO_ROS" - Bridge Ignition topic to ROS
+#                             # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
-- topic_name: "/imu"                          
+- ros_topic_name: "sensors/imu/raw"
+  gz_topic_name: "/imu"
   ros_type_name: "sensor_msgs/msg/Imu"
-  gz_type_name: "ignition.msgs.IMU"
-  subscriber_queue: 5       # Default 10
-  publisher_queue: 6        # Default 10
-  lazy: true                # Default "false"
-  direction: BIDIRECTIONAL  # Default "BIDIRECTIONAL" - Bridge both directions
-                            # "GZ_TO_ROS" - Bridge Ignition topic to ROS
-                            # "ROS_TO_GZ" - Bridge ROS topic to Ignition
+  gz_type_name: "gz.msgs.IMU"
+  subscriber_queue: 5 # Default 10
+  publisher_queue: 6 # Default 10
+  lazy: true # Default "false"
+  direction:
+    GZ_TO_ROS # Default "BIDIRECTIONAL" - Bridge both directions
+    # "GZ_TO_ROS" - Bridge Ignition topic to ROS
+    # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
-- ros_topic_name: "/cmd_vel_out"                          
+- ros_topic_name: "/cmd_vel_out"
   ros_type_name: "geometry_msgs/msg/Twist"
   gz_topic_name: "/cmd_vel"
-  gz_type_name: "ignition.msgs.Twist"
-  subscriber_queue: 5       # Default 10
-  publisher_queue: 6        # Default 10
-  lazy: true                # Default "false"
-  direction: ROS_TO_GZ  # Default "BIDIRECTIONAL" - Bridge both directions
-                            # "GZ_TO_ROS" - Bridge Ignition topic to ROS
-                            # "ROS_TO_GZ" - Bridge ROS topic to Ignition
-                            
+  gz_type_name: "gz.msgs.Twist"
+  subscriber_queue: 5 # Default 10
+  publisher_queue: 6 # Default 10
+  lazy: true # Default "false"
+  direction:
+    ROS_TO_GZ # Default "BIDIRECTIONAL" - Bridge both directions
+    # "GZ_TO_ROS" - Bridge Ignition topic to ROS
+    # "ROS_TO_GZ" - Bridge ROS topic to Ignition
