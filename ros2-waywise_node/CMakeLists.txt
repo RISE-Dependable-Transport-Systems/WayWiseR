@@ -42,7 +42,6 @@ target_link_libraries(waywise_rover
 
 ament_target_dependencies(waywise_rover rclcpp std_msgs nav_msgs geometry_msgs tf2_ros)
 
-
 install(TARGETS
   waywise_rover
   DESTINATION lib/${PROJECT_NAME})

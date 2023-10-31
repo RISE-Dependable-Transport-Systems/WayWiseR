@@ -14,6 +14,7 @@
 #include "tf2_ros/transform_broadcaster.h"
 
 using namespace std::chrono_literals;
+using namespace std::placeholders;
 
 /* This example creates a subclass of Node and uses std::bind() to register a
  * member function as a callback from the timer. */
@@ -22,24 +23,24 @@ class WayWiseRover : public rclcpp::Node
 {
 public:
     WayWiseRover() : Node("waywise_rover") {
+        // -- ROS --
         // get ROS parameters
         odom_frame_ = declare_parameter("odom_frame", odom_frame_);
         base_frame_ = declare_parameter("base_frame", base_frame_);
 
+        // publishers
         odom_pub_ = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
         tf_pub_.reset(new tf2_ros::TransformBroadcaster(this));
-
+        // currently publishing periodically
         timer_ = this->create_wall_timer(mUpdateVehicleStatePeriod, std::bind(&WayWiseRover::timer_callback, this));
 
-        // init WayWise
+        // subscribers
+        twist_sub_ = this->create_subscription<geometry_msgs::msg::Twist>("/cmd_vel", 10, std::bind(&WayWiseRover::twist_callback, this, _1));
+
+        // -- WayWise --
         mCarState.reset(new CarState);
 
-        // --- Lower-level control setup ---
         mCarMovementController.reset(new CarMovementController(mCarState));
-
-        mCarMovementController->setDesiredSpeed(3);
-        mCarMovementController->setDesiredSteering(0.5);
-
     }
 
 private:
@@ -50,7 +51,6 @@ private:
         double x_ = mCarState->getPosition().getX();
         double y_ = mCarState->getPosition().getY();
         double yawRad_ = mCarState->getPosition().getYaw() * M_PI / 180.0;
-        //qDebug() << x_ << y_ << yaw_;
 
         // -- Prepare Odom
         auto odom = nav_msgs::msg::Odometry();
@@ -90,16 +90,24 @@ private:
         tf_pub_->sendTransform(tf);
     }
 
-    // Parameters
+    void twist_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg) {
+        // RCLCPP_INFO(this->get_logger(), "got Twist: linear %f, angular %f", twist_msg->linear.x, twist_msg->angular.z);
+        mCarMovementController->setDesiredSpeed(twist_msg->linear.x);
+        mCarMovementController->setDesiredSteeringCurvature(twist_msg->angular.z / std::abs(twist_msg->linear.x)); // ω = |v|/r => 1/r =  ω/|v|
+    } 
+
+    // parameters
     std::string odom_frame_;
     std::string base_frame_;
 
-    // Publishers
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr string_pub_;
+    // publishers
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
     std::shared_ptr<tf2_ros::TransformBroadcaster> tf_pub_;
 
     rclcpp::TimerBase::SharedPtr timer_;
+
+    // subscribers
+    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr twist_sub_;
 
     // WayWise
     std::chrono::milliseconds mUpdateVehicleStatePeriod = 100ms;
