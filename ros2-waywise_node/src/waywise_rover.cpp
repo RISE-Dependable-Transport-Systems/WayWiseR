@@ -16,9 +16,6 @@
 using namespace std::chrono_literals;
 using namespace std::placeholders;
 
-/* This example creates a subclass of Node and uses std::bind() to register a
- * member function as a callback from the timer. */
-
 class WayWiseRover : public rclcpp::Node
 {
 public:
@@ -45,12 +42,15 @@ public:
 
 private:
     void timer_callback() {
-//        RCLCPP_INFO(this->get_logger(), "Alive!");
-        mCarState->simulationStep(mUpdateVehicleStatePeriod.count());
+        auto thisTimeCalled = std::chrono::high_resolution_clock::now();
+        static auto previousTimeCalled = thisTimeCalled - mUpdateVehicleStatePeriod;
+
+        mCarState->simulationStep(std::chrono::duration_cast<std::chrono::milliseconds>(thisTimeCalled - previousTimeCalled).count());
 
         double x_ = mCarState->getPosition().getX();
         double y_ = mCarState->getPosition().getY();
         double yawRad_ = mCarState->getPosition().getYaw() * M_PI / 180.0;
+        static double previousYawRad_ = yawRad_;
 
         // -- Prepare Odom
         auto odom = nav_msgs::msg::Odometry();
@@ -69,9 +69,9 @@ private:
         // TODO: position uncertainty?
 
         // Velocity in the coordinate frame given by child_frame_id
-        odom.twist.twist.linear.x = 0.0;
+        odom.twist.twist.linear.x = mCarState->getSpeed();
         odom.twist.twist.linear.y = 0.0;
-        odom.twist.twist.angular.z = 0.0;
+        odom.twist.twist.angular.z = (yawRad_ - previousYawRad_) / (std::chrono::duration_cast<std::chrono::milliseconds>(thisTimeCalled - previousTimeCalled).count() / 1000.0);
 
         // TODO: velocity uncertainty?
 
@@ -88,12 +88,16 @@ private:
         // -- Publish
         odom_pub_->publish(odom);
         tf_pub_->sendTransform(tf);
+
+        previousTimeCalled = thisTimeCalled;
+        previousYawRad_ = yawRad_;
     }
 
     void twist_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg) {
         // RCLCPP_INFO(this->get_logger(), "got Twist: linear %f, angular %f", twist_msg->linear.x, twist_msg->angular.z);
         mCarMovementController->setDesiredSpeed(twist_msg->linear.x);
-        mCarMovementController->setDesiredSteeringCurvature(twist_msg->angular.z / std::abs(twist_msg->linear.x)); // ω = |v|/r => 1/r =  ω/|v|
+        // NOTE / TODO: WayWise has a sign error here (curvature in wrong direction)
+        mCarMovementController->setDesiredSteeringCurvature(-(twist_msg->angular.z / std::abs(twist_msg->linear.x))); // ω = |v|/r => 1/r =  ω/|v|
     } 
 
     // parameters
