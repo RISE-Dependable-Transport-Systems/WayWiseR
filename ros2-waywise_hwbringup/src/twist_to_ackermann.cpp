@@ -1,5 +1,6 @@
 /*
- *     Copyright 2021 Rickard Häll      rickard.hall@ri.se
+ *     Adapted from: http://wiki.ros.org/teb_local_planner/Tutorials/Planning%20for%20car-like%20robots
+ *     Modifier: 2022 Rickard Häll      rickard.hall@ri.se
  */
 
 #include <memory>
