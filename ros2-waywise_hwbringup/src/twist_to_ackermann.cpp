@@ -20,45 +20,70 @@ using namespace std::chrono;
 
 class TwistToAckermann : public rclcpp::Node
 {
-  public:
-    TwistToAckermann()
-    : Node("twist_to_ackermann")
-    {
-      subscription_ = this->create_subscription<geometry_msgs::msg::Twist>(
-      "/cmd_vel_out", 10, std::bind(&TwistToAckermann::topic_callback, this, _1));
+public:
+  TwistToAckermann()
+      : Node("twist_to_ackermann")
+  {
+    steering_angle_to_servo_gain_ = this->declare_parameter("steering_angle_to_servo_gain", 0.0);
+    steering_angle_to_servo_offset_ = this->declare_parameter("steering_angle_to_servo_offset", 0.5);
+    servo_min_ = this->declare_parameter("servo_min", 0.0);
+    servo_max_ = this->declare_parameter("servo_max", 1.0);
+    speed_to_erpm_gain_ = this->declare_parameter("speed_to_erpm_gain", 0.0);
+    speed_to_erpm_offset_ = this->declare_parameter("speed_to_erpm_offset", 0.0);
+    erpm_speed_min_ = this->declare_parameter("speed_min", 0.0);
+    erpm_speed_max_ = this->declare_parameter("speed_max", 0.0);
+    wheelbase_ = this->declare_parameter("wheelbase", 0.33);
+    ack_msg_frame_id_ = this->declare_parameter("ack_msg_frame_id", "odom");
 
-      publisher_ = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(
-      "/ackermann_cmd", 10);
-    }
+    subscription_ = this->create_subscription<geometry_msgs::msg::Twist>(
+        "/cmd_vel", 10, std::bind(&TwistToAckermann::topic_callback, this, _1));
 
-  private:
-    // Assumes base_link to be located at the center of rotation
-    // Wheelbase in meters
-    float convert_trans_rot_vel_to_steering_angle(float v, float omega, float wheelbase) const
-    {
-      if (omega == 0 || v == 0)
-        return 0;
-      float radius = v / omega;
-      return atan(wheelbase / radius);
-    }
+    publisher_ = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(
+        "/ackermann_cmd", 10);
+  }
 
-    void topic_callback(const geometry_msgs::msg::Twist::SharedPtr twi_msg) const
-    {
-      //RCLCPP_INFO(this->get_logger(), "\nLinear:\n x: %f""\nAngular:\n z: %f", twi_msg->linear.x, twi_msg->angular.z);
+private:
+  float clip_min_max(float value, float min_value, float max_value) const
+  {
+    return std::min(
+        std::max(
+            value,
+            (min_value + std::numeric_limits<float>::epsilon())),
+        (max_value - std::numeric_limits<float>::epsilon()));
+  }
 
-      auto ack_msg = ackermann_msgs::msg::AckermannDriveStamped();
-      ack_msg.header.stamp.sec = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
-      ack_msg.header.stamp.nanosec = duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count();
-      ack_msg.header.frame_id = "odom";
-      ack_msg.drive.speed = 4*twi_msg->linear.x;
-      ack_msg.drive.steering_angle = convert_trans_rot_vel_to_steering_angle(twi_msg->linear.x, twi_msg->angular.z, 0.33);
-      publisher_->publish(ack_msg);
-    }
-    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr subscription_;
-    rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr publisher_;
+  float convert_trans_rot_vel_to_steering_angle(float linVel, float angVel) const
+  {
+    if (angVel == 0 || linVel == 0)
+      return 0;
+    float turningRadius = linVel / angVel;
+    return atan(wheelbase_ / turningRadius);
+  }
+
+  void topic_callback(const geometry_msgs::msg::Twist::SharedPtr twi_msg) const
+  {
+    auto ack_msg = ackermann_msgs::msg::AckermannDriveStamped();
+    ack_msg.header.stamp.sec = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+    ack_msg.header.stamp.nanosec = duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count();
+    ack_msg.header.frame_id = ack_msg_frame_id_;
+
+    float erpm = speed_to_erpm_gain_ * twi_msg->linear.x + speed_to_erpm_offset_;
+    float linear_vel = (clip_min_max(erpm, erpm_speed_min_, erpm_speed_max_) - speed_to_erpm_offset_) / speed_to_erpm_gain_;
+    float steering_angle_from_twist = convert_trans_rot_vel_to_steering_angle(linear_vel, twi_msg->angular.z);
+    ack_msg.drive.speed = linear_vel;
+    float servo_position = std::abs(steering_angle_to_servo_gain_ * steering_angle_from_twist + steering_angle_to_servo_offset_);
+    ack_msg.drive.steering_angle = (clip_min_max(servo_position, servo_min_, servo_max_) - steering_angle_to_servo_offset_) / steering_angle_to_servo_gain_;
+    publisher_->publish(ack_msg);
+  }
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr subscription_;
+  rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr publisher_;
+  float steering_angle_to_servo_gain_, steering_angle_to_servo_offset_, servo_min_, servo_max_;
+  float speed_to_erpm_gain_, speed_to_erpm_offset_, erpm_speed_min_, erpm_speed_max_;
+  float wheelbase_;
+  std::string ack_msg_frame_id_;
 };
 
-int main(int argc, char * argv[])
+int main(int argc, char *argv[])
 {
   rclcpp::init(argc, argv);
   rclcpp::spin(std::make_shared<TwistToAckermann>());
