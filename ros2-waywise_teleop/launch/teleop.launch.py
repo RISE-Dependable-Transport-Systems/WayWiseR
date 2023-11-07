@@ -31,6 +31,12 @@ def generate_launch_description():
         description="Enable keyboard",
     )
 
+    start_with_emergency_stop_la = DeclareLaunchArgument(
+        "start_with_emergency_stop",
+        default_value="true",
+        description="Switch to activate emergency_stop at startup.",
+    )
+
     # start nodes and use args to set parameters
     joy_node = Node(
         package="joy",
@@ -61,7 +67,10 @@ def generate_launch_description():
         package="ros2-waywise_teleop",
         executable="teleop_gateway",
         name="teleop_gateway",
-        parameters=[LaunchConfiguration("joy_config")],
+        parameters=[
+            LaunchConfiguration("joy_config"),
+            {"start_with_emergency_stop": LaunchConfiguration("start_with_emergency_stop")},
+        ],
     )
 
     twist_mux_node = Node(
@@ -69,6 +78,7 @@ def generate_launch_description():
         executable="twist_mux",
         name="twist_mux",
         parameters=[LaunchConfiguration("twist_mux_config")],
+        remappings={("/cmd_vel_out", "/cmd_vel_mux")},
     )
 
     # create launch description
@@ -78,6 +88,7 @@ def generate_launch_description():
     ld.add_action(joy_la)
     ld.add_action(twist_mux_la)
     ld.add_action(enable_keyboard_la)
+    ld.add_action(start_with_emergency_stop_la)
 
     # start nodes
     ld.add_action(joy_node)

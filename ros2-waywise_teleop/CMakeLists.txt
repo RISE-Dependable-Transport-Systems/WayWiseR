@@ -16,9 +16,10 @@ find_package(teleop_twist_joy REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 add_executable(teleop_gateway src/teleop_gateway.cpp)
-ament_target_dependencies(teleop_gateway rclcpp geometry_msgs std_msgs)
+ament_target_dependencies(teleop_gateway rclcpp geometry_msgs std_msgs sensor_msgs)
 
 install(TARGETS
   teleop_gateway
