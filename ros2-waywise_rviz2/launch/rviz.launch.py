@@ -18,7 +18,7 @@ def generate_launch_description():
     # args that can be set from the command line or a default will be used
     rviz_la = DeclareLaunchArgument(
         "rviz_config",
-        default_value=os.path.join(rviz2_dir, "rviz/rviz_display_config.rviz"),
+        default_value=os.path.join(rviz2_dir, "rviz/odom_reference_frame.rviz"),
         description="Full path to rviz display config file",
     )
     use_sim_time_la = DeclareLaunchArgument(
