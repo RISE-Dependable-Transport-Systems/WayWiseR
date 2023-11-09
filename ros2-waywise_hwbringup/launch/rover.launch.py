@@ -8,6 +8,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, Command
 from launch_ros.actions import Node
+from launch.conditions import IfCondition
 
 
 def generate_launch_description():
@@ -35,6 +36,26 @@ def generate_launch_description():
         "frame_prefix",
         default_value="/",
         description="Prefix to publish robot transforms in",
+    )
+
+    enable_lidar_la = DeclareLaunchArgument(
+        "enable_lidar",
+        default_value="true",
+        description="switch to enable lidar node",
+    )
+
+    lidar_serial_port_la = DeclareLaunchArgument(
+        "lidar_serial_port", default_value="/dev/ttyUSB0"
+    )
+    lidar_serial_baudrate_la = DeclareLaunchArgument(
+        "lidar_serial_baudrate", default_value="256000"
+    )
+    lidar_frame_id_la = DeclareLaunchArgument(
+        "lidar_frame_id", default_value="lidar_link"
+    )
+    lidar_inverted_la = DeclareLaunchArgument("lidar_inverted", default_value="false")
+    lidar_angle_compensate_la = DeclareLaunchArgument(
+        "lidar_angle_compensate", default_value="true"
     )
 
     # start nodes and use args to set parameters
@@ -86,6 +107,24 @@ def generate_launch_description():
         name="joint_state_publisher",
     )
 
+    lidar_node = Node(
+        package="rplidar_ros",
+        executable="rplidar_node",
+        name="rplidar_node",
+        parameters=[
+            {
+                "serial_port": LaunchConfiguration("lidar_serial_port"),
+                "serial_baudrate": LaunchConfiguration("lidar_serial_baudrate"),
+                "frame_id": LaunchConfiguration("lidar_frame_id"),
+                "inverted": LaunchConfiguration("lidar_inverted"),
+                "angle_compensate": LaunchConfiguration("lidar_angle_compensate"),
+            }
+        ],
+        output="screen",
+        condition=IfCondition(LaunchConfiguration("enable_lidar")),
+        remappings=[("/scan", "/scan_lidar")],
+    )
+
     # create launch description
     ld = LaunchDescription()
 
@@ -93,6 +132,12 @@ def generate_launch_description():
     ld.add_action(rover_config_la)
     ld.add_action(robot_state_publisher_la)
     ld.add_action(frame_prefix_la)
+    ld.add_action(enable_lidar_la)
+    ld.add_action(lidar_serial_port_la)
+    ld.add_action(lidar_serial_baudrate_la)
+    ld.add_action(lidar_frame_id_la)
+    ld.add_action(lidar_inverted_la)
+    ld.add_action(lidar_angle_compensate_la)
 
     # start nodes
     ld.add_action(twist_to_ackermann_node)
@@ -101,5 +146,6 @@ def generate_launch_description():
     ld.add_action(vesc_driver_node)
     ld.add_action(robot_state_publisher_node)
     ld.add_action(joint_state_publisher_node)
+    ld.add_action(lidar_node)
 
     return ld
