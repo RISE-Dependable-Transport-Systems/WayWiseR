@@ -11,20 +11,8 @@ find_package(ament_cmake REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-find_package(rclcpp REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(ackermann_msgs REQUIRED)
-
-add_executable(twist_to_ackermann src/twist_to_ackermann.cpp)
-ament_target_dependencies(twist_to_ackermann rclcpp geometry_msgs std_msgs ackermann_msgs)
-
-install(TARGETS
-  twist_to_ackermann
-  DESTINATION lib/${PROJECT_NAME})
-
 install(
-  DIRECTORY src launch config
+  DIRECTORY launch config
   DESTINATION share/${PROJECT_NAME}
 )
 

@@ -1,40 +1,18 @@
-/**:
-  # general parameters shared by all vesc-related nodes
-  ros__parameters:
-    # erpm (electrical rpm) = speed_to_erpm_gain * speed (meters / second) + speed_to_erpm_offset
-    speed_to_erpm_gain: 4200.0
-    speed_to_erpm_offset: 50.0
-
-    # servo value (0 to 1) =  steering_angle_to_servo_gain * steering angle (radians) + steering_angle_to_servo_offset
-    steering_angle_to_servo_gain: -0.950
-    steering_angle_to_servo_offset: 0.455
-
-    port: /dev/sensors/vesc
-    duty_cycle_min: 0.0
-    duty_cycle_max: 0.0
-    current_min: 0.0
-    current_max: 30.0
-    brake_min: -20000.0
-    brake_max: 200000.0
-    speed_min: -10000.0
-    speed_max: 10000.0
-    position_min: 0.0
-    position_max: 0.0
-    servo_min: 0.0
-    servo_max: 0.9
-
-    wheelbase: 0.33
-    ack_msg_frame_id: odom
-
-vesc_to_odom_node:
+waywise_rover_node:
   ros__parameters:
     odom_frame: odom
     base_frame: base_link
-    # publish odom to base link tf
-    publish_tf: true
-    use_servo_cmd_to_calc_angular_velocity: true
-    # configurable params for odom pose corrections
-    speed_to_erpm_gain: -4200.0
-    speed_to_erpm_offset: 50.0
+    erpm_min: -10000.0
+    erpm_max: 10000.0
+    speed_to_erpm_gain: 4200.0
+    servo_min: 0.0
+    servo_max: 0.9
+    servo_offset: 0.45
     steering_angle_to_servo_gain: -0.950
-    steering_angle_to_servo_offset: 0.455
+    invert_servo_output: false
+    # TODO: limit erpm also based on current
+    # current_max: 30.0
+    wheelbase: 0.33
+    min_turning_radius: 0.67
+    publish_odom_to_baselink_tf: true
+    odom_publish_rate: 30 # currently same rate for both odom topic and odom->base_link tf

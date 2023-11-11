@@ -1,7 +1,3 @@
-[submodule "vesc"]
-	path = vesc
-	url = git@github.com:f1tenth/vesc.git
-	branch = ros2
 [submodule "ros2-waywise_node/WayWise"]
 	path = ros2-waywise_node/WayWise
 	url = git@github.com:RISE-Dependable-Transport-Systems/WayWise.git

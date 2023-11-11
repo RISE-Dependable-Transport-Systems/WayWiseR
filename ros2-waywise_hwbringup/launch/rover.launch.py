@@ -40,7 +40,7 @@ def generate_launch_description():
 
     enable_lidar_la = DeclareLaunchArgument(
         "enable_lidar",
-        default_value="true",
+        default_value="false",
         description="switch to enable lidar node",
     )
 
@@ -59,34 +59,13 @@ def generate_launch_description():
     )
 
     # start nodes and use args to set parameters
-    twist_to_ackermann_node = Node(
-        package="ros2-waywise_hwbringup",
-        executable="twist_to_ackermann",
-        name="twist_to_ackermann",
-        output="screen",
+    waywise_node = Node(
+        package="ros2-waywise_node",
+        executable="waywise_rover",
+        name="waywise_rover_node",
         parameters=[LaunchConfiguration("rover_config")],
-        remappings={("/cmd_vel", "/cmd_vel_out")},
-    )
-
-    ackermann_to_vesc_node = Node(
-        package="vesc_ackermann",
-        executable="ackermann_to_vesc_node",
-        name="ackermann_to_vesc_node",
-        parameters=[LaunchConfiguration("rover_config")],
-    )
-
-    vesc_to_odom_node = Node(
-        package="vesc_ackermann",
-        executable="vesc_to_odom_node",
-        name="vesc_to_odom_node",
-        parameters=[LaunchConfiguration("rover_config")],
-    )
-
-    vesc_driver_node = Node(
-        package="vesc_driver",
-        executable="vesc_driver_node",
-        name="vesc_driver_node",
-        parameters=[LaunchConfiguration("rover_config")],
+        remappings=[("/cmd_vel", "/cmd_vel_out")],
+        arguments=["--ros-args", "--log-level", "info"],
     )
 
     robot_state_publisher_node = Node(
@@ -140,10 +119,7 @@ def generate_launch_description():
     ld.add_action(lidar_angle_compensate_la)
 
     # start nodes
-    ld.add_action(twist_to_ackermann_node)
-    ld.add_action(ackermann_to_vesc_node)
-    ld.add_action(vesc_to_odom_node)
-    ld.add_action(vesc_driver_node)
+    ld.add_action(waywise_node)
     ld.add_action(robot_state_publisher_node)
     ld.add_action(joint_state_publisher_node)
     ld.add_action(lidar_node)
