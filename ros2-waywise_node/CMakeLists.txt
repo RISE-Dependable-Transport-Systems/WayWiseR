@@ -17,7 +17,8 @@ find_package(geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 
 # Qt5
-find_package(Qt5 COMPONENTS Core SerialPort REQUIRED)
+find_package(Qt5 COMPONENTS Core SerialPort Network REQUIRED)
+find_package(MAVSDK REQUIRED)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
@@ -36,7 +37,20 @@ add_executable(waywise_rover
     WayWise/vehicles/controller/carmovementcontroller.cpp
     WayWise/vehicles/controller/vescmotorcontroller.cpp
     WayWise/external/vesc/vescpacket.cpp
+    WayWise/autopilot/purepursuitwaypointfollower.cpp
+    WayWise/autopilot/purepursuitwaypointfollower.h
+    WayWise/autopilot/waypointfollower.h
+    WayWise/communication/mavsdkvehicleserver.cpp
+    WayWise/communication/jsonstreamparsertcp.cpp
+    WayWise/communication/vehicleconnections/vehicleconnection.cpp
+    WayWise/communication/mavlinkparameterserver.cpp
+    WayWise/communication/parameterserver.cpp
     WayWise/sensors/imu/imuorientationupdater.cpp
+    WayWise/sensors/gnss/ublox.cpp
+    WayWise/sensors/gnss/ubloxrover.cpp
+    WayWise/sensors/gnss/rtcm3_simple.cpp
+    WayWise/sensors/gnss/rtcmclient.cpp
+    WayWise/sensors/camera/gimbal.h
     WayWise/logger/logger.cpp
     )
 
@@ -45,6 +59,8 @@ target_include_directories(waywise_rover PRIVATE WayWise/)
 target_link_libraries(waywise_rover
     Qt5::Core
     Qt5::SerialPort
+    Qt5::Network
+    MAVSDK::mavsdk
 )
 
 ament_target_dependencies(waywise_rover rclcpp std_msgs nav_msgs geometry_msgs tf2_ros)

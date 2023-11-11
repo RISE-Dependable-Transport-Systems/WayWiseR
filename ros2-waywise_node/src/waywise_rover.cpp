@@ -8,7 +8,12 @@
 #include "WayWise/vehicles/controller/carmovementcontroller.h"
 #include "WayWise/vehicles/controller/vescmotorcontroller.h"
 #include "WayWise/sensors/imu/imuorientationupdater.h"
+#include "WayWise/sensors/gnss/ubloxrover.h"
 #include "WayWise/logger/logger.h"
+#include "WayWise/autopilot/waypointfollower.h"
+#include "WayWise/autopilot/purepursuitwaypointfollower.h"
+#include "WayWise/communication/mavsdkvehicleserver.h"
+#include "WayWise/communication/parameterserver.h"
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -41,6 +46,8 @@ public:
         min_turning_radius_ = this->declare_parameter("min_turning_radius", 0.67);
         odom_publish_rate_ = this->declare_parameter("odom_publish_rate", 30);
         publish_odom_to_baselink_tf_ = this->declare_parameter("publish_odom_to_baselink_tf", true);
+        enable_autopilot_on_vehicle_ = this->declare_parameter("enable_autopilot_on_vehicle", true);
+        enable_mavsdkVehicleServer_ = this->declare_parameter("enable_mavsdkVehicleServer", true);
 
         // publishers
         odom_pub_ = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
@@ -55,7 +62,6 @@ public:
 
         // -- WayWise --
         mCarState.reset(new CarState);
-        
         // --- Lower-level control setup ---
         mCarMovementController.reset(new CarMovementController(mCarState));
         mCarMovementController->setSpeedToRPMFactor(speed_to_erpm_gain_);
@@ -83,11 +89,31 @@ public:
             servoController->setServoCenter(servo_offset_);
             mCarMovementController->setServoController(servoController);
             is_in_simulation_mode_ = false;
+            posType_ = PosType::odom;
         }
         else
         {
             is_in_simulation_mode_ = true;
             RCLCPP_INFO(get_logger(), "VESCMotorController is not connected. Waywise_rover is in simulation mode!");
+        }
+
+        // Setup MAVLINK communication towards ControlTower
+        if (enable_mavsdkVehicleServer_)
+        {
+            mavsdkVehicleServer_shared_ptr = std::make_shared<MavsdkVehicleServer>(mCarState);
+            mavsdkVehicleServer_shared_ptr->setMovementController(mCarMovementController);
+        }
+
+        // --- Autopilot ---
+        if (enable_autopilot_on_vehicle_)
+        {
+            mWaypointFollower.reset(new PurepursuitWaypointFollower(mCarMovementController));
+            mWaypointFollower->setPurePursuitRadius(1.0);
+            mWaypointFollower->setRepeatRoute(false);
+            mWaypointFollower->setAdaptivePurePursuitRadiusActive(true);
+
+            if (enable_mavsdkVehicleServer_)
+                mavsdkVehicleServer_shared_ptr->setWaypointFollower(mWaypointFollower);
         }
     }
 
@@ -101,6 +127,10 @@ private:
         {
             mCarState->simulationStep(std::chrono::duration_cast<std::chrono::milliseconds>(thisTimeCalled - previousTimeCalled).count(), posType_);
         }
+
+        PosPoint currentPosition = mCarState->getPosition(posType_);
+        currentPosition.setType(PosType::fused);
+        mCarState->setPosition(currentPosition);
 
         double x_ = mCarState->getPosition(posType_).getX();
         double y_ = mCarState->getPosition(posType_).getY();
@@ -173,7 +203,7 @@ private:
             (max_value - std::numeric_limits<float>::epsilon()));
     }
 
-    // parameters
+    // ROS parameters
     std::string odom_frame_;
     std::string base_frame_;
     float servo_min_, servo_max_, servo_offset_, steering_angle_to_servo_gain_;
@@ -181,10 +211,11 @@ private:
     float wheelbase_, min_turning_radius_;
     bool invert_servo_output_, publish_odom_to_baselink_tf_;
     int odom_publish_rate_;
-    PosType posType_ = PosType::fused;
+    bool enable_autopilot_on_vehicle_, enable_mavsdkVehicleServer_;
 
     // internal variables
     bool is_in_simulation_mode_ = true;
+    PosType posType_ = PosType::simulated;
 
     // publishers
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
@@ -200,6 +231,8 @@ private:
     QSharedPointer<CarState> mCarState;
     QSharedPointer<CarMovementController> mCarMovementController;
     QSharedPointer<VESCMotorController> mVESCMotorController;
+    QSharedPointer<PurepursuitWaypointFollower> mWaypointFollower;
+    std::shared_ptr<MavsdkVehicleServer> mavsdkVehicleServer_shared_ptr;
 };
 
 int main(int argc, char *argv[])

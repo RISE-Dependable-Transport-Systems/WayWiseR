@@ -16,3 +16,5 @@ waywise_rover_node:
     min_turning_radius: 0.67
     publish_odom_to_baselink_tf: true
     odom_publish_rate: 30 # currently same rate for both odom topic and odom->base_link tf
+    enable_autopilot_on_vehicle: false
+    enable_mavsdkVehicleServer: false
