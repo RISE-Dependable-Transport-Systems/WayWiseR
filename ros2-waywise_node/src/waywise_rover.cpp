@@ -31,7 +31,7 @@ class WayWiseRover : public QObject, public rclcpp::Node
     Q_OBJECT
 
 public:
-    WayWiseRover() : Node("waywise_rover")
+    WayWiseRover() : QObject(), Node("waywise_rover")
     {
         // -- ROS --
         // get ROS parameters
@@ -51,8 +51,10 @@ public:
         min_turning_radius_ = this->declare_parameter("min_turning_radius", 0.67);
         odom_publish_rate_ = this->declare_parameter("odom_publish_rate", 30);
         publish_odom_to_baselink_tf_ = this->declare_parameter("publish_odom_to_baselink_tf", true);
-        enable_autopilot_on_vehicle_ = this->declare_parameter("enable_autopilot_on_vehicle", true);
-        enable_mavsdkVehicleServer_ = this->declare_parameter("enable_mavsdkVehicleServer", true);
+        enable_imu_for_odom_ = this->declare_parameter("enable_imu_for_odom", true);
+
+        enable_autopilot_on_vehicle_ = this->declare_parameter("enable_autopilot_on_vehicle", false);
+        enable_mavsdkVehicleServer_ = this->declare_parameter("enable_mavsdkVehicleServer", false);
 
         // publishers
         odom_pub_ = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
@@ -66,6 +68,7 @@ public:
 
         // -- WayWise --
         mCarState.reset(new CarState);
+
         // --- Lower-level control setup ---
         mCarMovementController.reset(new CarMovementController(mCarState));
         mCarMovementController->setSpeedToRPMFactor(speed_to_erpm_factor_);
@@ -110,6 +113,25 @@ public:
             RCLCPP_INFO(get_logger(), "VESCMotorController is not connected. waywise_rover is in simulation mode!");
         }
 
+        // IMU
+        if (enable_imu_for_odom_)
+        {
+            // TODO: support for BNO055
+            // mIMUOrientationUpdater.reset(new BNO055OrientationUpdater(mCarState, "/dev/i2c-1"));
+
+            if (mVESCMotorController->isSerialConnected())
+            {
+                mIMUOrientationUpdater = mVESCMotorController->getIMUOrientationUpdater(mCarState);
+                waywise_posType_used_ = PosType::fused;
+                QObject::connect(mIMUOrientationUpdater.get(), &IMUOrientationUpdater::updatedIMUOrientation, this, &WayWiseRover::updated_waywise_imuPos_callback);
+            }
+            else
+            {
+               RCLCPP_INFO(get_logger(), "IMU support is enabled but VESCMotorController is not connected.");
+               enable_imu_for_odom_ = false;
+            }
+        }
+
         // Setup MAVLINK communication towards ControlTower
         if (enable_mavsdkVehicleServer_)
         {
@@ -148,29 +170,78 @@ private:
     }
 
     void updated_waywise_odomPos_callback(QSharedPointer<VehicleState> vehicleState, double distanceDriven)
-   {
+    {
         // suppress 'unused' warnings
-        (void) vehicleState;
-        (void) distanceDriven;
+        (void)vehicleState;
 
         auto thisTimeCalled = std::chrono::high_resolution_clock::now();
         static auto previousTimeCalled = thisTimeCalled - mUpdateVehicleStatePeriod;
         double timePassed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(thisTimeCalled - previousTimeCalled).count();
 
+        // When IMU is enabled, odom is calculated using its yaw and distance from motorcontroller. Saved in 'fused' position type
+        if (enable_imu_for_odom_)
+        {
+            PosPoint posFused = vehicleState->getPosition(PosType::fused);
+
+            double yawRad = posFused.getYaw() / (180.0 / M_PI);
+            posFused.setXY(posFused.getX() + cos(yawRad) * distanceDriven,
+                           posFused.getY() + sin(yawRad) * distanceDriven);
+
+            posFused.setTime(QTime::currentTime().addSecs(-QDateTime::currentDateTime().offsetFromUtc()));
+            vehicleState->setPosition(posFused);
+        }
+
         publish_odom_and_tf(timePassed_ms);
 
         previousTimeCalled = thisTimeCalled;
-   }
+    }
+
+    void updated_waywise_imuPos_callback(QSharedPointer<VehicleState> vehicleState)
+    {
+        static bool standstillAtLastCall = false;
+        static double yawWhenStopping = 0.0;
+        static double yawDriftSinceStandstill = 0.0;
+
+        // --- correct relative/raw IMU yaw with external offset
+        PosPoint posIMU = vehicleState->getPosition(PosType::IMU);
+        PosPoint posFused = vehicleState->getPosition(PosType::fused);
+
+        // 1. handle drift at standstill and update offset
+        if (fabs(vehicleState->getSpeed()) < 0.05) {
+            if (!standstillAtLastCall)
+                yawWhenStopping = posIMU.getYaw();
+
+            standstillAtLastCall = true;
+            yawDriftSinceStandstill = yawWhenStopping - posIMU.getYaw();
+            posIMU.setYaw(yawWhenStopping); // lock yaw during standstill
+        } else {
+            if (standstillAtLastCall)
+                mPosIMUyawOffset += yawDriftSinceStandstill;
+
+            standstillAtLastCall = false;
+        }
+
+        // 2. apply offset & normalize
+        double yawResult = posIMU.getYaw() + mPosIMUyawOffset;
+        while (yawResult < -180.0)
+            yawResult += 360.0;
+        while (yawResult >= 180.0)
+            yawResult -= 360.0;
+        posFused.setYaw(yawResult);
+
+        posFused.setTime(QTime::currentTime().addSecs(-QDateTime::currentDateTime().offsetFromUtc()));
+        vehicleState->setPosition(posFused);
+    }
 
     void publish_odom_and_tf(double timePassed_ms)
     {
         PosPoint currentPosition = mCarState->getPosition(waywise_posType_used_);
-        currentPosition.setType(PosType::fused);
+        currentPosition.setType(PosType::fused); // the 'fused' position type is communicated to topics & potentially MAVLINK
         mCarState->setPosition(currentPosition);
 
-        double x_ = mCarState->getPosition(waywise_posType_used_).getX();
-        double y_ = mCarState->getPosition(waywise_posType_used_).getY();
-        double yawRad_ = mCarState->getPosition(waywise_posType_used_).getYaw() * M_PI / 180.0;
+        double x_ = currentPosition.getX();
+        double y_ = currentPosition.getY();
+        double yawRad_ = currentPosition.getYaw() * M_PI / 180.0;
         static double previousYawRad_ = yawRad_;
 
         // -- Prepare Odom
@@ -231,11 +302,7 @@ private:
 
     float clip_min_max(float value, float min_value, float max_value) const
     {
-        return std::min(
-            std::max(
-                value,
-                (min_value + std::numeric_limits<float>::epsilon())),
-            (max_value - std::numeric_limits<float>::epsilon()));
+        return std::min(std::max(value, (min_value + std::numeric_limits<float>::epsilon())), (max_value - std::numeric_limits<float>::epsilon()));
     }
 
     // ROS parameters
@@ -251,6 +318,7 @@ private:
 
     bool publish_odom_to_baselink_tf_;
     int odom_publish_rate_;
+    bool enable_imu_for_odom_;
 
     bool enable_autopilot_on_vehicle_, enable_mavsdkVehicleServer_;
 
@@ -272,8 +340,10 @@ private:
     QSharedPointer<CarState> mCarState;
     QSharedPointer<CarMovementController> mCarMovementController;
     QSharedPointer<VESCMotorController> mVESCMotorController;
+    QSharedPointer<IMUOrientationUpdater> mIMUOrientationUpdater;
     QSharedPointer<PurepursuitWaypointFollower> mWaypointFollower;
     QSharedPointer<MavsdkVehicleServer> mMavsdkVehicleServer;
+    double mPosIMUyawOffset = 0.0;
 };
 
 int main(int argc, char *argv[])
