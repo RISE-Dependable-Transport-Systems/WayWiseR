@@ -34,14 +34,16 @@ public:
         // get ROS parameters
         odom_frame_ = declare_parameter("odom_frame", "odom");
         base_frame_ = declare_parameter("base_frame", "base_link");
+
         erpm_min_ = this->declare_parameter("erpm_min", 0.0);
         erpm_max_ = this->declare_parameter("erpm_max", 0.0);
-        speed_to_erpm_gain_ = this->declare_parameter("speed_to_erpm_gain", 0.0);
+        speed_to_erpm_factor_ = this->declare_parameter("speed_to_erpm_factor", 0.0);
+
+        invert_servo_output_ = this->declare_parameter("invert_servo_output", false);
         servo_offset_ = this->declare_parameter("servo_offset", 0.5);
         servo_min_ = this->declare_parameter("servo_min", 0.0);
         servo_max_ = this->declare_parameter("servo_max", 1.0);
-        steering_angle_to_servo_gain_ = this->declare_parameter("steering_angle_to_servo_gain", 0.0);
-        invert_servo_output_ = this->declare_parameter("invert_servo_output", false);
+
         wheelbase_ = this->declare_parameter("wheelbase", 0.33);
         min_turning_radius_ = this->declare_parameter("min_turning_radius", 0.67);
         odom_publish_rate_ = this->declare_parameter("odom_publish_rate", 30);
@@ -64,7 +66,7 @@ public:
         mCarState.reset(new CarState);
         // --- Lower-level control setup ---
         mCarMovementController.reset(new CarMovementController(mCarState));
-        mCarMovementController->setSpeedToRPMFactor(speed_to_erpm_gain_);
+        mCarMovementController->setSpeedToRPMFactor(speed_to_erpm_factor_);
         mCarState->setAxisDistance(wheelbase_);
         mCarState->setMaxSteeringAngle(atan(mCarState->getAxisDistance() / min_turning_radius_));
 
@@ -94,14 +96,14 @@ public:
         else
         {
             is_in_simulation_mode_ = true;
-            RCLCPP_INFO(get_logger(), "VESCMotorController is not connected. Waywise_rover is in simulation mode!");
+            RCLCPP_INFO(get_logger(), "VESCMotorController is not connected. waywise_rover is in simulation mode!");
         }
 
         // Setup MAVLINK communication towards ControlTower
         if (enable_mavsdkVehicleServer_)
         {
-            mavsdkVehicleServer_shared_ptr = std::make_shared<MavsdkVehicleServer>(mCarState);
-            mavsdkVehicleServer_shared_ptr->setMovementController(mCarMovementController);
+            mMavsdkVehicleServer.reset(new MavsdkVehicleServer(mCarState));
+            mMavsdkVehicleServer->setMovementController(mCarMovementController);
         }
 
         // --- Autopilot ---
@@ -112,8 +114,8 @@ public:
             mWaypointFollower->setRepeatRoute(false);
             mWaypointFollower->setAdaptivePurePursuitRadiusActive(true);
 
-            if (enable_mavsdkVehicleServer_)
-                mavsdkVehicleServer_shared_ptr->setWaypointFollower(mWaypointFollower);
+            if (mMavsdkVehicleServer)
+                mMavsdkVehicleServer->setWaypointFollower(mWaypointFollower);
         }
     }
 
@@ -186,7 +188,7 @@ private:
     void twist_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg)
     {
         // RCLCPP_INFO(this->get_logger(), "got Twist: linear %f, angular %f", twist_msg->linear.x, twist_msg->angular.z);
-        float clipped_linear_velocity = (speed_to_erpm_gain_ > 0) ? clip_min_max(speed_to_erpm_gain_ * twist_msg->linear.x, erpm_min_, erpm_max_) / speed_to_erpm_gain_ : 0.0;
+        float clipped_linear_velocity = (speed_to_erpm_factor_ > 0) ? clip_min_max(speed_to_erpm_factor_ * twist_msg->linear.x, erpm_min_, erpm_max_) / speed_to_erpm_factor_ : 0.0;
         mCarMovementController->setDesiredSpeed(clipped_linear_velocity);
 
         // NOTE / TODO: WayWise has a sign error here (curvature in wrong direction)
@@ -206,11 +208,17 @@ private:
     // ROS parameters
     std::string odom_frame_;
     std::string base_frame_;
-    float servo_min_, servo_max_, servo_offset_, steering_angle_to_servo_gain_;
-    float erpm_min_, erpm_max_, speed_to_erpm_gain_;
+
+    float erpm_min_, erpm_max_, speed_to_erpm_factor_;
+
+    bool invert_servo_output_;
+    float servo_min_, servo_max_, servo_offset_;
+
     float wheelbase_, min_turning_radius_;
-    bool invert_servo_output_, publish_odom_to_baselink_tf_;
+
+    bool publish_odom_to_baselink_tf_;
     int odom_publish_rate_;
+
     bool enable_autopilot_on_vehicle_, enable_mavsdkVehicleServer_;
 
     // internal variables
@@ -232,7 +240,7 @@ private:
     QSharedPointer<CarMovementController> mCarMovementController;
     QSharedPointer<VESCMotorController> mVESCMotorController;
     QSharedPointer<PurepursuitWaypointFollower> mWaypointFollower;
-    std::shared_ptr<MavsdkVehicleServer> mavsdkVehicleServer_shared_ptr;
+    QSharedPointer<MavsdkVehicleServer> mMavsdkVehicleServer;
 };
 
 int main(int argc, char *argv[])

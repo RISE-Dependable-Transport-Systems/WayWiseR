@@ -4,11 +4,11 @@ waywise_rover_node:
     base_frame: base_link
     erpm_min: -10000.0
     erpm_max: 10000.0
-    speed_to_erpm_gain: 4200.0
+    speed_to_erpm_factor: 4200.0
     servo_min: 0.0
     servo_max: 0.9
     servo_offset: 0.45
-    steering_angle_to_servo_gain: -0.950
+    #steering_angle_to_servo_gain: -0.950
     invert_servo_output: false
     # TODO: limit erpm also based on current
     # current_max: 30.0
