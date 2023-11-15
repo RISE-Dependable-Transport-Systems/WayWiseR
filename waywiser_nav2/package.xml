@@ -3,7 +3,7 @@
 <package format="3">
   <name>waywiser_nav2</name>
   <version>0.0.0</version>
-  <description>Modified files from the NAV2 repo at https://github.com/ros-planning/navigation2</description>
+  <description>Modified files from the NAV2 repo at https://github.com/ros-planning/navigation2/tree/humble</description>
   <maintainer email="rickard.hall@ri.se">ubuntu</maintainer>
   <license>TODO: License declaration</license>
 
