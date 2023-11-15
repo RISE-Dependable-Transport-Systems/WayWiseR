@@ -4,6 +4,7 @@
 #include <string>
 
 #include <QCoreApplication>
+#include <QObject>
 #include "WayWise/vehicles/carstate.h"
 #include "WayWise/vehicles/controller/carmovementcontroller.h"
 #include "WayWise/vehicles/controller/vescmotorcontroller.h"
@@ -25,8 +26,10 @@
 using namespace std::chrono_literals;
 using namespace std::placeholders;
 
-class WayWiseRover : public rclcpp::Node
+class WayWiseRover : public QObject, public rclcpp::Node
 {
+    Q_OBJECT
+
 public:
     WayWiseRover() : Node("waywise_rover")
     {
@@ -55,9 +58,8 @@ public:
         odom_pub_ = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
         if (publish_odom_to_baselink_tf_)
             tf_pub_.reset(new tf2_ros::TransformBroadcaster(this));
-        // currently publishing periodically
+
         mUpdateVehicleStatePeriod = std::chrono::milliseconds((int)std::round(1000.0 / odom_publish_rate_));
-        timer_ = this->create_wall_timer(mUpdateVehicleStatePeriod, std::bind(&WayWiseRover::timer_callback, this));
 
         // subscribers
         twist_sub_ = this->create_subscription<geometry_msgs::msg::Twist>("/cmd_vel", 10, std::bind(&WayWiseRover::twist_callback, this, _1));
@@ -80,9 +82,11 @@ public:
                 RCLCPP_INFO(get_logger(), "VESCMotorController connected to: %s", portInfo.systemLocation().toLocal8Bit().data());
             }
         }
+
         if (mVESCMotorController->isSerialConnected())
         {
             mCarMovementController->setMotorController(mVESCMotorController);
+            mVESCMotorController->setPollValuesPeriod(mUpdateVehicleStatePeriod.count());
 
             // VESC is a special case that can also control the servo
             const auto servoController = mVESCMotorController->getServoController();
@@ -90,12 +94,19 @@ public:
             servoController->setServoRange(servo_max_ - servo_min_);
             servoController->setServoCenter(servo_offset_);
             mCarMovementController->setServoController(servoController);
+
+            // publish on motorcontroller callback when connected
             is_in_simulation_mode_ = false;
-            posType_ = PosType::odom;
+            waywise_posType_used_ = PosType::odom;
+            QObject::connect(mCarMovementController.get(), &CarMovementController::updatedOdomPositionAndYaw, this, &WayWiseRover::updated_waywise_odomPos_callback);
         }
         else
         {
+            // publish periodically with timer when no motorcontroller connected (simulation)
             is_in_simulation_mode_ = true;
+            waywise_posType_used_ = PosType::simulated;
+            simulation_timer_ = this->create_wall_timer(mUpdateVehicleStatePeriod, std::bind(&WayWiseRover::simulation_timer_callback, this));
+
             RCLCPP_INFO(get_logger(), "VESCMotorController is not connected. waywise_rover is in simulation mode!");
         }
 
@@ -120,23 +131,46 @@ public:
     }
 
 private:
-    void timer_callback()
+    void simulation_timer_callback()
     {
         auto thisTimeCalled = std::chrono::high_resolution_clock::now();
         static auto previousTimeCalled = thisTimeCalled - mUpdateVehicleStatePeriod;
+        double timePassed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(thisTimeCalled - previousTimeCalled).count();
 
         if (is_in_simulation_mode_)
         {
-            mCarState->simulationStep(std::chrono::duration_cast<std::chrono::milliseconds>(thisTimeCalled - previousTimeCalled).count(), posType_);
+            mCarState->simulationStep(timePassed_ms, waywise_posType_used_);
         }
 
-        PosPoint currentPosition = mCarState->getPosition(posType_);
+        publish_odom_and_tf(timePassed_ms);
+
+        previousTimeCalled = thisTimeCalled;
+    }
+
+    void updated_waywise_odomPos_callback(QSharedPointer<VehicleState> vehicleState, double distanceDriven)
+   {
+        // suppress 'unused' warnings
+        (void) vehicleState;
+        (void) distanceDriven;
+
+        auto thisTimeCalled = std::chrono::high_resolution_clock::now();
+        static auto previousTimeCalled = thisTimeCalled - mUpdateVehicleStatePeriod;
+        double timePassed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(thisTimeCalled - previousTimeCalled).count();
+
+        publish_odom_and_tf(timePassed_ms);
+
+        previousTimeCalled = thisTimeCalled;
+   }
+
+    void publish_odom_and_tf(double timePassed_ms)
+    {
+        PosPoint currentPosition = mCarState->getPosition(waywise_posType_used_);
         currentPosition.setType(PosType::fused);
         mCarState->setPosition(currentPosition);
 
-        double x_ = mCarState->getPosition(posType_).getX();
-        double y_ = mCarState->getPosition(posType_).getY();
-        double yawRad_ = mCarState->getPosition(posType_).getYaw() * M_PI / 180.0;
+        double x_ = mCarState->getPosition(waywise_posType_used_).getX();
+        double y_ = mCarState->getPosition(waywise_posType_used_).getY();
+        double yawRad_ = mCarState->getPosition(waywise_posType_used_).getYaw() * M_PI / 180.0;
         static double previousYawRad_ = yawRad_;
 
         // -- Prepare Odom
@@ -158,7 +192,7 @@ private:
         // Velocity in the coordinate frame given by child_frame_id
         odom.twist.twist.linear.x = mCarState->getSpeed();
         odom.twist.twist.linear.y = 0.0;
-        odom.twist.twist.angular.z = (yawRad_ - previousYawRad_) / (std::chrono::duration_cast<std::chrono::milliseconds>(thisTimeCalled - previousTimeCalled).count() / 1000.0);
+        odom.twist.twist.angular.z = (yawRad_ - previousYawRad_) / (timePassed_ms / 1000.0);
 
         // TODO: velocity uncertainty?
 
@@ -181,7 +215,6 @@ private:
         // -- Publish Odom
         odom_pub_->publish(odom);
 
-        previousTimeCalled = thisTimeCalled;
         previousYawRad_ = yawRad_;
     }
 
@@ -223,13 +256,13 @@ private:
 
     // internal variables
     bool is_in_simulation_mode_ = true;
-    PosType posType_ = PosType::simulated;
+    PosType waywise_posType_used_ = PosType::simulated;
 
     // publishers
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
     std::shared_ptr<tf2_ros::TransformBroadcaster> tf_pub_;
 
-    rclcpp::TimerBase::SharedPtr timer_;
+    rclcpp::TimerBase::SharedPtr simulation_timer_;
 
     // subscribers
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr twist_sub_;
@@ -265,3 +298,5 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
+#include "waywise_rover.moc"
