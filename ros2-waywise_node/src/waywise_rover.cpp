@@ -348,9 +348,9 @@ private:
 
 int main(int argc, char *argv[])
 {
+    rclcpp::init(argc, argv);
     QCoreApplication a(argc, argv);
 
-    rclcpp::init(argc, argv);
     a.processEvents();
 
     auto waywiseNode = std::make_shared<WayWiseRover>();
