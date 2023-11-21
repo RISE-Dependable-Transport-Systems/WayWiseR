@@ -292,12 +292,13 @@ private:
     void twist_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg)
     {
         // RCLCPP_INFO(this->get_logger(), "got Twist: linear %f, angular %f", twist_msg->linear.x, twist_msg->angular.z);
-        float clipped_linear_velocity = (speed_to_erpm_factor_ > 0) ? clip_min_max(speed_to_erpm_factor_ * twist_msg->linear.x, erpm_min_, erpm_max_) / speed_to_erpm_factor_ : 0.0;
+        float clipped_linear_velocity = (speed_to_erpm_factor_ > 0.0) ? clip_min_max(speed_to_erpm_factor_ * twist_msg->linear.x, erpm_min_, erpm_max_) / speed_to_erpm_factor_ : 0.0;
         mCarMovementController->setDesiredSpeed(clipped_linear_velocity);
 
         // NOTE / TODO: WayWise has a sign error here (curvature in wrong direction)
-        float desired_steering_curvature = (clipped_linear_velocity > 0) ? -(twist_msg->angular.z / twist_msg->linear.x) : std::numeric_limits<double>::infinity(); // ω = |v|/r => 1/r =  ω/|v|
+        float desired_steering_curvature = (clipped_linear_velocity != 0.0) ? -(twist_msg->angular.z / twist_msg->linear.x) : std::numeric_limits<double>::infinity(); // ω = |v|/r => 1/r =  ω/|v|
         mCarMovementController->setDesiredSteeringCurvature(desired_steering_curvature);
+        // RCLCPP_INFO(this->get_logger(), "clipped_linear_velocity %f, desired_steering_curvature %f", clipped_linear_velocity, desired_steering_curvature);
     }
 
     float clip_min_max(float value, float min_value, float max_value) const
