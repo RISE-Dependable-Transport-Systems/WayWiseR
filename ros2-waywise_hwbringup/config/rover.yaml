@@ -4,7 +4,7 @@ waywise_rover_node:
     base_frame: base_link
     erpm_min: -10000.0
     erpm_max: 10000.0
-    speed_to_erpm_factor: 4200.0
+    speed_to_erpm_factor: 5200.0
     servo_min: 0.0
     servo_max: 0.9
     servo_offset: 0.45
