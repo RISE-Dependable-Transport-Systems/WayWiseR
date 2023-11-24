@@ -56,6 +56,8 @@ public:
         enable_autopilot_on_vehicle_ = this->declare_parameter("enable_autopilot_on_vehicle", false);
         enable_mavsdkVehicleServer_ = this->declare_parameter("enable_mavsdkVehicleServer", false);
 
+        waywise_control_tower_address_ = this->declare_parameter("waywise_control_tower_address", "127.0.0.1");
+
         // publishers
         odom_pub_ = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
         if (publish_odom_to_baselink_tf_)
@@ -127,15 +129,15 @@ public:
             }
             else
             {
-               RCLCPP_INFO(get_logger(), "IMU support is enabled but VESCMotorController is not connected.");
-               enable_imu_for_odom_ = false;
+                RCLCPP_INFO(get_logger(), "IMU support is enabled but VESCMotorController is not connected.");
+                enable_imu_for_odom_ = false;
             }
         }
 
         // Setup MAVLINK communication towards ControlTower
         if (enable_mavsdkVehicleServer_)
         {
-            mMavsdkVehicleServer.reset(new MavsdkVehicleServer(mCarState));
+            mMavsdkVehicleServer.reset(new MavsdkVehicleServer(mCarState, QHostAddress(QString::fromStdString(waywise_control_tower_address_))));
             mMavsdkVehicleServer->setMovementController(mCarMovementController);
         }
 
@@ -207,14 +209,17 @@ private:
         PosPoint posFused = vehicleState->getPosition(PosType::fused);
 
         // 1. handle drift at standstill and update offset
-        if (fabs(vehicleState->getSpeed()) < 0.05) {
+        if (fabs(vehicleState->getSpeed()) < 0.05)
+        {
             if (!standstillAtLastCall)
                 yawWhenStopping = posIMU.getYaw();
 
             standstillAtLastCall = true;
             yawDriftSinceStandstill = yawWhenStopping - posIMU.getYaw();
             posIMU.setYaw(yawWhenStopping); // lock yaw during standstill
-        } else {
+        }
+        else
+        {
             if (standstillAtLastCall)
                 mPosIMUyawOffset += yawDriftSinceStandstill;
 
@@ -322,6 +327,8 @@ private:
     bool enable_imu_for_odom_;
 
     bool enable_autopilot_on_vehicle_, enable_mavsdkVehicleServer_;
+
+    std::string waywise_control_tower_address_;
 
     // internal variables
     bool is_in_simulation_mode_ = true;

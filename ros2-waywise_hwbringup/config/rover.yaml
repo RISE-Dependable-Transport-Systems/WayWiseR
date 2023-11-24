@@ -19,3 +19,4 @@ waywise_rover_node:
     enable_imu_for_odom: true
     enable_autopilot_on_vehicle: false
     enable_mavsdkVehicleServer: false
+    waywise_control_tower_address: "127.0.0.1"
