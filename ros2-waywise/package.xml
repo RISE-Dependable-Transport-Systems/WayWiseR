@@ -3,9 +3,21 @@
 <package format="3">
   <name>ros2-waywise</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+
+  <description>The package provides ROS2 compatibility for WayWise</description>
+
+  <author>Marvin Damshen</author>
+  <author>Rickard Häll</author>
+  <author>Ramana Avula</author>
+
   <maintainer email="marvin.damschen@ri.se">marvinda</maintainer>
+  <maintainer email="rickard.hall@ri.se">Rickard Häll</maintainer>
+  <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
+  
   <license>TODO: License declaration</license>
+
+  <url type="website">https://github.com/RISE-Dependable-Transport-Systems/WayWise</url>
+  <url type="website">https://docs.ros.org/en/humble/index.html</url>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

@@ -3,9 +3,17 @@
 <package format="3">
   <name>ros2-waywise_rviz2</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="marvin.damschen@ri.se">marvinda</maintainer>
+  
+  <description>3D visualization tool for ROS2</description>
+
+  <author>Ramana Avula</author>
+  
+  <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
+  
   <license>TODO: License declaration</license>
+
+  <url type="website">https://wiki.ros.org/rviz</url>
+  <url type="website">https://github.com/ros2/rviz/tree/humble</url>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

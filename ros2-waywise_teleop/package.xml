@@ -3,9 +3,18 @@
 <package format="3">
   <name>ros2-waywise_teleop</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="ramana.reddy.avula@ri.se">avula</maintainer>
+  
+  <description>Package that processes keyboard and joystick inputs</description>
+
+  <author>Ramana Avula</author>
+  
+  <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
+  
   <license>TODO: License declaration</license>
+
+  <url type="website">https://github.com/ros2/teleop_twist_keyboard/</url>
+  <url type="website">https://github.com/ros2/teleop_twist_joy/tree/humble</url>
+  <url type="website">http://wiki.ros.org/twist_mux</url>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
