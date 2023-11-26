@@ -64,27 +64,12 @@ public:
     }
 
 private:
-    float correct_angular_velocity_for_reverse(float linVel, float angVel) const
-    {
-        if (std::abs(angVel) < min_allowed_angular_velocity_)
-            return 0;
-        if (linVel < 0)
-            angVel = -angVel;
-        return angVel;
-    }
-
     void twist_subscriber_callback(const geometry_msgs::msg::Twist::SharedPtr twi_msg_in, const std::string &topic_name)
     {
-        auto twi_msg_out = geometry_msgs::msg::Twist();
-        float linVel = twi_msg_in->linear.x;
-        float angVel = 0.0;
-        if (std::abs(linVel) < min_allowed_linear_velocity_)
-            linVel = 0.0;
-        else
-            angVel = correct_angular_velocity_for_reverse(linVel, twi_msg_in->angular.z);
-        twi_msg_out.linear.x = linVel;
-        twi_msg_out.angular.z = angVel;
-        twist_publishers_[topic_name]->publish(twi_msg_out);
+        // Correct angular velocity direction for reverse driving
+        if (twi_msg_in->linear.x < 0)
+            twi_msg_in->angular.z = -twi_msg_in->angular.z;
+        twist_publishers_[topic_name]->publish(*twi_msg_in);
     }
 
     void joy_callback(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
@@ -138,6 +123,10 @@ private:
         }
         else
         {
+            // Ensure linear and angular velocities are above the minimum allowed values, else set to zero
+            twi_msg_in->linear.x = (std::abs(twi_msg_in->linear.x) < min_allowed_linear_velocity_) ? 0.0 : twi_msg_in->linear.x;
+            twi_msg_in->angular.z = (std::abs(twi_msg_in->angular.z) < min_allowed_angular_velocity_) ? 0.0 : twi_msg_in->angular.z;
+
             gateway_publisher_->publish(*twi_msg_in);
         }
     }
