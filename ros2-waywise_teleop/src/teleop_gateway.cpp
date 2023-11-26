@@ -38,18 +38,18 @@ public:
         {
             RCLCPP_WARN(get_logger(), "emergency_stop is CLEARED at startup.");
         }
-        
-        twist_subscribers_.resize(reverse_steer_correction_topics_.size());
+
+        reverse_steer_correction_subscribers_.resize(reverse_steer_correction_topics_.size());
         for (size_t i = 0; i < reverse_steer_correction_topics_.size(); ++i)
         {
             auto topic_name = reverse_steer_correction_topics_[i];
-            twist_subscribers_[i] = this->create_subscription<geometry_msgs::msg::Twist>(
+            reverse_steer_correction_subscribers_[i] = this->create_subscription<geometry_msgs::msg::Twist>(
                 topic_name, 10,
-                [this, topic_name_ = topic_name](const geometry_msgs::msg::Twist::SharedPtr twist_msg_in)
+                [this, topic_name_ = topic_name](const geometry_msgs::msg::Twist::SharedPtr twist_msg)
                 {
-                    twist_subscriber_callback(twist_msg_in, topic_name_);
+                    reverse_steer_correction_subscriber_callback(twist_msg, topic_name_);
                 });
-            twist_publishers_[topic_name] = this->create_publisher<geometry_msgs::msg::Twist>(topic_name + "_corrected", 10);
+            reverse_steer_correction_publishers_[topic_name] = this->create_publisher<geometry_msgs::msg::Twist>(topic_name + "_corrected", 10);
         }
         joy_subscriber_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "/joy", 10, std::bind(&TeleopGateway::joy_callback, this, std::placeholders::_1));
@@ -64,12 +64,12 @@ public:
     }
 
 private:
-    void twist_subscriber_callback(const geometry_msgs::msg::Twist::SharedPtr twi_msg_in, const std::string &topic_name)
+    void reverse_steer_correction_subscriber_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg, const std::string &topic_name)
     {
         // Correct angular velocity direction for reverse driving
-        if (twi_msg_in->linear.x < 0)
-            twi_msg_in->angular.z = -twi_msg_in->angular.z;
-        twist_publishers_[topic_name]->publish(*twi_msg_in);
+        if (twist_msg->linear.x < 0)
+            twist_msg->angular.z = -twist_msg->angular.z;
+        reverse_steer_correction_publishers_[topic_name]->publish(*twist_msg);
     }
 
     void joy_callback(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
@@ -115,7 +115,7 @@ private:
         }
     }
 
-    void mux_callback(const geometry_msgs::msg::Twist::SharedPtr twi_msg_in)
+    void mux_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg)
     {
         if (emergency_stop_value_)
         {
@@ -124,10 +124,10 @@ private:
         else
         {
             // Ensure linear and angular velocities are above the minimum allowed values, else set to zero
-            twi_msg_in->linear.x = (std::abs(twi_msg_in->linear.x) < min_allowed_linear_velocity_) ? 0.0 : twi_msg_in->linear.x;
-            twi_msg_in->angular.z = (std::abs(twi_msg_in->angular.z) < min_allowed_angular_velocity_) ? 0.0 : twi_msg_in->angular.z;
+            twist_msg->linear.x = (std::abs(twist_msg->linear.x) < min_allowed_linear_velocity_) ? 0.0 : twist_msg->linear.x;
+            twist_msg->angular.z = (std::abs(twist_msg->angular.z) < min_allowed_angular_velocity_) ? 0.0 : twist_msg->angular.z;
 
-            gateway_publisher_->publish(*twi_msg_in);
+            gateway_publisher_->publish(*twist_msg);
         }
     }
 
@@ -166,8 +166,8 @@ private:
         }
     }
 
-    std::vector<rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr> twist_subscribers_;
-    std::map<std::string, rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr> twist_publishers_;
+    std::vector<rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr> reverse_steer_correction_subscribers_;
+    std::map<std::string, rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr> reverse_steer_correction_publishers_;
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_subscriber_;
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr emergency_stop_subscriber_;
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr mux_subscriber_;
