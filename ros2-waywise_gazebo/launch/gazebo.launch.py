@@ -71,18 +71,32 @@ def generate_launch_description():
         package="ros_gz_sim",
         executable="create",
         arguments=["-topic", "robot_description"],
+        parameters=[
+            {
+                "use_sim_time": use_sim_time,
+            }
+        ],
         output="screen",
     )
 
     # gazebo bridge
-    bridge = ExecuteProcess(
-        cmd=[
-            FindExecutable(name="ros2"),
-            "run ros_gz_bridge parameter_bridge  --ros-args -p config_file:="
-            + os.path.join(gazebo_dir, "config/ros_gazebo_bridges.yaml"),
-        ],
+    ros_gz_bridge_node = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
         output="screen",
-        shell=True,
+        arguments=[
+            "--ros-args",
+            "-p",
+            [
+                "config_file:=",
+                os.path.join(gazebo_dir, "config/ros_gazebo_bridges.yaml"),
+            ],
+        ],
+        parameters=[
+            {
+                "use_sim_time": use_sim_time,
+            }
+        ],
     )
 
     # create launch description
@@ -103,6 +117,6 @@ def generate_launch_description():
     ld.add_action(spawn_entity)
 
     # setup gazebo bridge
-    ld.add_action(bridge)
+    ld.add_action(ros_gz_bridge_node)
 
     return ld
