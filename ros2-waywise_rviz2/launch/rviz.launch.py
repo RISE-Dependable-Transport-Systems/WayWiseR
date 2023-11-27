@@ -11,10 +11,6 @@ from launch_ros.actions import Node
 def generate_launch_description():
     rviz2_dir = get_package_share_directory("ros2-waywise_rviz2")
 
-    # args that can be set from the command line
-    rviz_config = LaunchConfiguration("rviz_config")
-    use_sim_time = LaunchConfiguration("use_sim_time")
-
     # args that can be set from the command line or a default will be used
     rviz_la = DeclareLaunchArgument(
         "rviz_config",
@@ -22,7 +18,9 @@ def generate_launch_description():
         description="Full path to rviz display config file",
     )
     use_sim_time_la = DeclareLaunchArgument(
-        "use_sim_time", default_value="False", description="Use simulation/Gazebo clock"
+        "use_sim_time",
+        default_value="False",
+        description="Use simulation/Gazebo clock"
     )
 
     # start nodes and use args to set parameters
@@ -31,12 +29,10 @@ def generate_launch_description():
         executable="rviz2",
         name="rviz2",
         output="screen",
-        arguments=["-d", rviz_config],
-        parameters=[
-            {
-                "use_sim_time": use_sim_time,
-            }
-        ],
+        arguments=["-d", LaunchConfiguration("rviz_config")],
+        parameters=[{
+            "use_sim_time": LaunchConfiguration("use_sim_time"),
+        }],
     )
 
     # create launch description
