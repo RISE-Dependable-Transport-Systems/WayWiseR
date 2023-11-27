@@ -26,6 +26,18 @@ def generate_launch_description():
         description="Full path to params file of rover",
     )
 
+    lidar_config_la = DeclareLaunchArgument(
+        "lidar_config",
+        default_value=os.path.join(hw_bringup_dir, "config/lidar.yaml"),
+        description="Full path to params file of lidar",
+    )
+
+    enable_lidar_la = DeclareLaunchArgument(
+        "enable_lidar",
+        default_value="false",
+        description="switch to enable lidar node",
+    )
+
     robot_state_publisher_la = DeclareLaunchArgument(
         "model",
         default_value=os.path.join(description_dir, "urdf/robot.urdf.xacro"),
@@ -36,26 +48,6 @@ def generate_launch_description():
         "frame_prefix",
         default_value="/",
         description="Prefix to publish robot transforms in",
-    )
-
-    enable_lidar_la = DeclareLaunchArgument(
-        "enable_lidar",
-        default_value="false",
-        description="switch to enable lidar node",
-    )
-
-    lidar_serial_port_la = DeclareLaunchArgument(
-        "lidar_serial_port", default_value="/dev/ttyUSB0"
-    )
-    lidar_serial_baudrate_la = DeclareLaunchArgument(
-        "lidar_serial_baudrate", default_value="256000"
-    )
-    lidar_frame_id_la = DeclareLaunchArgument(
-        "lidar_frame_id", default_value="lidar_link"
-    )
-    lidar_inverted_la = DeclareLaunchArgument("lidar_inverted", default_value="false")
-    lidar_angle_compensate_la = DeclareLaunchArgument(
-        "lidar_angle_compensate", default_value="true"
     )
 
     # start nodes and use args to set parameters
@@ -90,15 +82,7 @@ def generate_launch_description():
         package="rplidar_ros",
         executable="rplidar_node",
         name="rplidar_node",
-        parameters=[
-            {
-                "serial_port": LaunchConfiguration("lidar_serial_port"),
-                "serial_baudrate": LaunchConfiguration("lidar_serial_baudrate"),
-                "frame_id": LaunchConfiguration("lidar_frame_id"),
-                "inverted": LaunchConfiguration("lidar_inverted"),
-                "angle_compensate": LaunchConfiguration("lidar_angle_compensate"),
-            }
-        ],
+        parameters=[LaunchConfiguration("lidar_config")],
         output="screen",
         condition=IfCondition(LaunchConfiguration("enable_lidar")),
         remappings=[("/scan", "/scan_lidar")],
@@ -109,14 +93,10 @@ def generate_launch_description():
 
     # declare launch arg
     ld.add_action(rover_config_la)
+    ld.add_action(lidar_config_la)
     ld.add_action(robot_state_publisher_la)
     ld.add_action(frame_prefix_la)
     ld.add_action(enable_lidar_la)
-    ld.add_action(lidar_serial_port_la)
-    ld.add_action(lidar_serial_baudrate_la)
-    ld.add_action(lidar_frame_id_la)
-    ld.add_action(lidar_inverted_la)
-    ld.add_action(lidar_angle_compensate_la)
 
     # start nodes
     ld.add_action(waywise_node)
