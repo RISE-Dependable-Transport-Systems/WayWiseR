@@ -13,15 +13,9 @@ def generate_launch_description():
     teleop_dir = get_package_share_directory("ros2-waywise_teleop")
 
     # args that can be set from the command line or a default will be used
-    joy_la = DeclareLaunchArgument(
-        "joy_config",
-        default_value=os.path.join(teleop_dir, "config/joy_teleop.yaml"),
-        description="Full path to params file",
-    )
-
-    twist_mux_la = DeclareLaunchArgument(
-        "twist_mux_config",
-        default_value=os.path.join(teleop_dir, "config/twist_mux.yaml"),
+    teleop_la = DeclareLaunchArgument(
+        "teleop_config",
+        default_value=os.path.join(teleop_dir, "config/teleop.yaml"),
         description="Full path to params file",
     )
 
@@ -31,32 +25,26 @@ def generate_launch_description():
         description="Enable keyboard",
     )
 
-    start_with_emergency_stop_la = DeclareLaunchArgument(
-        "start_with_emergency_stop",
-        default_value="true",
-        description="Switch to activate emergency_stop at startup.",
-    )
-
     # start nodes and use args to set parameters
     joy_node = Node(
         package="joy",
         executable="joy_node",
         name="joy",
-        parameters=[LaunchConfiguration("joy_config")],
+        parameters=[LaunchConfiguration("teleop_config")],
     )
 
     teleop_twist_joy_node = Node(
         package="teleop_twist_joy",
         executable="teleop_node",
-        name="teleop_twist_joy_node",
-        parameters=[LaunchConfiguration("joy_config")],
+        name="teleop_twist_joy",
+        parameters=[LaunchConfiguration("teleop_config")],
         remappings={("/cmd_vel", "/joy_vel")},
     )
 
     teleop_twist_keyboard_node = Node(
         package="teleop_twist_keyboard",
         executable="teleop_twist_keyboard",
-        name="teleop_twist_keyboard_node",
+        name="teleop_twist_keyboard",
         output="screen",
         prefix="xterm -e",
         condition=IfCondition(LaunchConfiguration("enable_keyboard")),
@@ -67,17 +55,14 @@ def generate_launch_description():
         package="ros2-waywise_teleop",
         executable="teleop_gateway",
         name="teleop_gateway",
-        parameters=[
-            LaunchConfiguration("joy_config"),
-            {"start_with_emergency_stop": LaunchConfiguration("start_with_emergency_stop")},
-        ],
+        parameters=[LaunchConfiguration("teleop_config")],
     )
 
     twist_mux_node = Node(
         package="twist_mux",
         executable="twist_mux",
         name="twist_mux",
-        parameters=[LaunchConfiguration("twist_mux_config")],
+        parameters=[LaunchConfiguration("teleop_config")],
         remappings={("/cmd_vel_out", "/cmd_vel_mux")},
     )
 
@@ -85,10 +70,8 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # declare launch args
-    ld.add_action(joy_la)
-    ld.add_action(twist_mux_la)
+    ld.add_action(teleop_la)
     ld.add_action(enable_keyboard_la)
-    ld.add_action(start_with_emergency_stop_la)
 
     # start nodes
     ld.add_action(joy_node)

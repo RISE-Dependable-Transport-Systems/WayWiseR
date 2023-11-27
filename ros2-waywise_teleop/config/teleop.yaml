@@ -7,7 +7,7 @@ joy:
     autorepeat_rate: 20.0
     coalesce_interval: 0.01
 
-teleop_twist_joy_node:
+teleop_twist_joy:
   ros__parameters:
     axis_linear: # Forward/Back
       x: 1
@@ -33,3 +33,16 @@ teleop_gateway:
     emergency_stop_set_joy_button_index: 5
     emergency_stop_clear_joy_button_index: 7
     joy_emergency_stop_timeout: 1.0 #seconds
+    start_with_emergency_stop: true
+
+twist_mux:
+  ros__parameters:
+    topics:
+      joystick:
+        topic   : joy_vel_corrected
+        timeout : 0.5
+        priority: 100
+      keyboard:
+        topic   : key_vel
+        timeout : 0.5
+        priority: 90
