@@ -15,10 +15,6 @@ def generate_launch_description():
     hw_bringup_dir = get_package_share_directory("ros2-waywise_hwbringup")
     description_dir = get_package_share_directory("ros2-waywise_description")
 
-    # args that can be set from the command line
-    model = LaunchConfiguration("model")
-    frame_prefix = LaunchConfiguration("frame_prefix")
-
     # args that can be set from the command line or a default will be used
     rover_config_la = DeclareLaunchArgument(
         "rover_config",
@@ -64,12 +60,10 @@ def generate_launch_description():
         package="robot_state_publisher",
         executable="robot_state_publisher",
         name="robot_state_publisher",
-        parameters=[
-            {
-                "robot_description": Command(["xacro ", model, " sim_mode:=", "False"]),
-                "frame_prefix": frame_prefix,
-            }
-        ],
+        parameters=[{
+            "robot_description": Command(["xacro ", LaunchConfiguration("model"), " sim_mode:=", "False"]),
+            "frame_prefix": LaunchConfiguration("frame_prefix"),
+        }],
     )
 
     joint_state_publisher_node = Node(
