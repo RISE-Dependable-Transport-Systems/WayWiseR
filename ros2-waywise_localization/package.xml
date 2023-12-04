@@ -4,10 +4,13 @@
   <name>ros2-waywise_localization</name>
   <version>0.0.0</version>
   <description>Modified files from the robot_localization repo at https://github.com/cra-ros-pkg/robot_localization/tree/humble-devel</description>
-  <maintainer email="rickard.hall@ri.se">ubuntu</maintainer>
+  <maintainer email="rickard.hall@ri.se">Rickard Häll</maintainer>
+  <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  
+  <exec_depend>robot_localization</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
