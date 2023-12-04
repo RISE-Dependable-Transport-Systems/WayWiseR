@@ -3,9 +3,9 @@ import os
 from ament_index_python import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, ExecuteProcess
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration, FindExecutable
+from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
 
 
@@ -21,7 +21,7 @@ def generate_launch_description():
     )
     gazebo_la = DeclareLaunchArgument(
         "world",
-        default_value=os.path.join("-r ", gazebo_dir, "worlds/car_world.sdf"),
+        default_value=os.path.join(gazebo_dir, "worlds/car_world.sdf"),
         description="Full path to gazebo sdf file",
     )
     gazebo_bridge_la = DeclareLaunchArgument(
@@ -68,7 +68,7 @@ def generate_launch_description():
         executable="parameter_bridge",
         output="screen",
         arguments=[
-            "--ros-args", "-p", ["config_file:=",LaunchConfiguration("gazebo_bridge")]
+            "--ros-args", "-p", ["config_file:=", LaunchConfiguration("gazebo_bridge")]
         ],
         parameters=[{
             "use_sim_time": LaunchConfiguration("use_sim_time"),
@@ -81,7 +81,7 @@ def generate_launch_description():
             os.path.join(get_package_share_directory("ros_gz_sim"), "launch", "gz_sim.launch.py",)
         ]),
         launch_arguments={
-            "gz_args": LaunchConfiguration("world")
+            "gz_args": ["-r ", LaunchConfiguration("world")]
         }.items(),
     )
 
