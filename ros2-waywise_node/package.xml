@@ -6,9 +6,9 @@
   
   <description>Package wraps WayWise in a ROS2 node</description>
 
-  <author>Marvin Damshen</author>
+  <author>Marvin Damschen</author>
   
-  <maintainer email="marvin.damschen@ri.se">marvinda</maintainer>
+  <maintainer email="marvin.damschen@ri.se">Marvin Damschen</maintainer>
   
   <license>TODO: License declaration</license>
 
