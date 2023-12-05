@@ -3,9 +3,20 @@
 <package format="3">
   <name>ros2-waywise_gazebo</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="marvin.damschen@ri.se">marvinda</maintainer>
+  
+  <description>Initiates Gazebo world, generates robot and establishes communication link between ROS2 and Gazebo</description>
+
+  <author>Rickard Häll</author>
+  <author>Ramana Avula</author>
+  
+  <maintainer email="rickard.hall@ri.se">Rickard Häll</maintainer>
+  <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
+  
   <license>TODO: License declaration</license>
+
+  <url type="website">https://gazebosim.org/docs/fortress/install</url>
+  <url type="website">https://gazebosim.org/docs/fortress/tutorials</url>
+  <url type="website">http://sdformat.org/</url>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   
