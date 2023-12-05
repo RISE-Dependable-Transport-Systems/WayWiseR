@@ -6,11 +6,11 @@
 
   <description>The package provides ROS2 compatibility for WayWise</description>
 
-  <author>Marvin Damshen</author>
+  <author>Marvin Damschen</author>
   <author>Rickard Häll</author>
   <author>Ramana Avula</author>
 
-  <maintainer email="marvin.damschen@ri.se">marvinda</maintainer>
+  <maintainer email="marvin.damschen@ri.se">Marvin Damschen</maintainer>
   <maintainer email="rickard.hall@ri.se">Rickard Häll</maintainer>
   <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
   
