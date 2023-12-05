@@ -12,9 +12,10 @@
         <right_joint>right_rear_wheel_joint</right_joint>
         <left_steering_joint>left_front_wheel_steering_joint</left_steering_joint>
         <right_steering_joint>right_front_wheel_steering_joint</right_steering_joint>
-        <wheel_separation>.297</wheel_separation>
-        <kingpin_width>.28</kingpin_width>
+        <wheel_separation>.21</wheel_separation>
+        <kingpin_width>.17</kingpin_width>
         <steering_limit>0.5</steering_limit>
+        <steer_p_gain>1.0</steer_p_gain>
         <wheel_base>.33</wheel_base>
         <wheel_radius>0.055</wheel_radius>
 
@@ -28,11 +29,11 @@
         <topic>/cmd_vel</topic>
 
         <!-- Output -->
-        <odom_publish_frequency>30</odom_publish_frequency>
+        <odom_publish_frequency>50</odom_publish_frequency>
         <odom_topic>/odom</odom_topic>
         <tf_topic>/tf</tf_topic>
-        <frame_id>/odom</frame_id>
-        <child_frame_id>/base_link</child_frame_id>
+        <frame_id>odom</frame_id>
+        <child_frame_id>base_link</child_frame_id>
       </plugin>
     </gazebo>
 
@@ -45,6 +46,7 @@
         <joint_name>right_rear_wheel_joint</joint_name>
         <joint_name>left_front_wheel_steering_joint</joint_name>
         <joint_name>right_front_wheel_steering_joint</joint_name>
+        <topic>/joint_states</topic>
       </plugin>
     </gazebo>
 </robot>
