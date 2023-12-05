@@ -7,8 +7,10 @@
   <description>Package wraps WayWise in a ROS2 node</description>
 
   <author>Marvin Damschen</author>
+  <author>Ramana Avula</author>
   
   <maintainer email="marvin.damschen@ri.se">Marvin Damschen</maintainer>
+  <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
   
   <license>TODO: License declaration</license>
 
