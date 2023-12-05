@@ -62,9 +62,9 @@
       <topic>scan_lidar</topic>
       <ignition_frame_id>lidar_link</ignition_frame_id>
       <pose relative_to='lidar_link'>0 0 0 0 0 0</pose>
-      <always_on>true</always_on>
-      <visualize>false</visualize>
-      <update_rate>10</update_rate>
+      <always_on>1</always_on>
+      <visualize>0</visualize>
+      <update_rate>30</update_rate>
       <ray>
         <scan>
           <horizontal>
