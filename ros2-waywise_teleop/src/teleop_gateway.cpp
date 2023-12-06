@@ -125,7 +125,7 @@ private:
         {
             // Ensure linear and angular velocities are above the minimum allowed values, else set to zero
             twist_msg->linear.x = (std::abs(twist_msg->linear.x) < min_allowed_linear_velocity_) ? 0.0 : twist_msg->linear.x;
-            twist_msg->angular.z = (std::abs(twist_msg->angular.z) < min_allowed_angular_velocity_) ? 0.0 : twist_msg->angular.z;
+            twist_msg->angular.z = (std::abs(twist_msg->angular.z) < min_allowed_angular_velocity_ || twist_msg->linear.x == 0.0) ? 0.0 : twist_msg->angular.z;
 
             gateway_publisher_->publish(*twist_msg);
         }
