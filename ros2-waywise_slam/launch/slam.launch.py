@@ -10,7 +10,6 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     slam_dir = get_package_share_directory("ros2-waywise_slam")
-    slam_toolbox_dir = get_package_share_directory("slam_toolbox")
 
     # args that can be set from the command line or a default will be used
     slam_config_la = DeclareLaunchArgument(
