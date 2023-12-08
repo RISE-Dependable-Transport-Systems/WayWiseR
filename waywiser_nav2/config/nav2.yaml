@@ -47,10 +47,11 @@ bt_navigator:
     odom_topic: /odom
     bt_loop_duration: 10
     default_server_timeout: 20
-    # 'default_nav_through_poses_bt_xml' and 'default_nav_to_pose_bt_xml' are use defaults:
+    # If 'default_nav_to_pose_bt_xml' and 'default_nav_through_poses_bt_xml' are not set, defaults are used:
     # nav2_bt_navigator/navigate_to_pose_w_replanning_and_recovery.xml
     # nav2_bt_navigator/navigate_through_poses_w_replanning_and_recovery.xml
-    # They can be set here or via a RewrittenYaml remap from a parent launch file to Nav2.
+    default_nav_to_pose_bt_xml: $(find-pkg-share waywiser_nav2)/behaviour_trees/navigate_to_pose_w_replan_recover.xml
+    default_nav_through_poses_bt_xml: $(find-pkg-share waywiser_nav2)/behaviour_trees/navigate_through_poses_w_replan_recover.xml
     plugin_lib_names:
       - nav2_compute_path_to_pose_action_bt_node
       - nav2_compute_path_through_poses_action_bt_node
@@ -108,10 +109,10 @@ bt_navigator_navigate_to_pose_rclcpp_node:
 controller_server:
   ros__parameters:
     use_sim_time: False
-    controller_frequency: 20.0
-    min_x_velocity_threshold: 0.001
-    min_y_velocity_threshold: 0.5
-    min_theta_velocity_threshold: 0.001
+    controller_frequency: 30.0
+    min_x_velocity_threshold: 0.05
+    min_y_velocity_threshold: 0.05
+    min_theta_velocity_threshold: 0.01
     failure_tolerance: 0.3
     progress_checker_plugin: "progress_checker"
     goal_checker_plugins: ["general_goal_checker"] # "precise_goal_checker"
@@ -120,7 +121,7 @@ controller_server:
     # Progress checker parameters
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
-      required_movement_radius: 0.5
+      required_movement_radius: 0.05
       movement_time_allowance: 10.0
     # Goal checker parameters
     #precise_goal_checker:
@@ -132,34 +133,35 @@ controller_server:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.25
-      yaw_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.5
     # Regulated Pure Persuit parameters
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      desired_linear_vel: 0.3
-      lookahead_dist: 0.9
-      min_lookahead_dist: 0.3
-      max_lookahead_dist: 0.9
+      allow_reversing: true
+      desired_linear_vel: 0.5
+      lookahead_dist: 0.5
+      min_lookahead_dist: 0.5
+      max_lookahead_dist: 1.5
       lookahead_time: 1.5
       rotate_to_heading_angular_vel: 0.6
       transform_tolerance: 0.1
-      use_velocity_scaled_lookahead_dist: false
-      min_approach_linear_velocity: 0.05
+      use_velocity_scaled_lookahead_dist: true
+      min_approach_linear_velocity: 0.4
       use_approach_linear_velocity_scaling: true
       approach_velocity_scaling_dist: 1.0
       max_allowed_time_to_collision_up_to_carrot: 1.0
       use_regulated_linear_velocity_scaling: true
-      use_cost_regulated_linear_velocity_scaling: false # This is recommended to be set to true when not working in constantly high-cost spaces.
-      regulated_linear_scaling_min_radius: 0.9
-      regulated_linear_scaling_min_speed: 0.25
+      use_cost_regulated_linear_velocity_scaling: true # This is recommended to be set to true when not working in constantly high-cost spaces.
+      regulated_linear_scaling_min_radius: 0.8
+      regulated_linear_scaling_min_speed: 0.4
       use_rotate_to_heading: false # Cant be used for ackermann
       rotate_to_heading_min_angle: 0.785
-      max_angular_accel: 2.2
+      max_angular_accel: 2.0
       max_robot_pose_search_dist: 10.0 # This is set by default to the maximum costmap extent, so it shouldn't be set manually
-      use_interpolation: true # Set this to false for a potential performance boost, at the expense of smooth control.
-      cost_scaling_dist: 0.3
-      cost_scaling_gain: 1.0
-      inflation_cost_scaling_factor: 3.0
+      use_interpolation: false # Set this to false for a potential performance boost, at the expense of smooth control.
+      cost_scaling_dist: 0.5
+      cost_scaling_gain: 0.3
+      inflation_cost_scaling_factor: 1.5
 #    # DWB parameters
 #    FollowPath:
 #      plugin: "dwb_core::DWBLocalPlanner"
@@ -207,8 +209,8 @@ local_costmap:
   local_costmap:
     ros__parameters:
       update_frequency: 5.0
-      publish_frequency: 2.0
-      global_frame: odom
+      publish_frequency: 5.0
+      global_frame: map # Ideally, should be 'odom', but temporarily changing to 'map' until EKF localisation is implemented
       robot_base_frame: base_link
       use_sim_time: False
       rolling_window: true
@@ -216,12 +218,13 @@ local_costmap:
       height: 3
       resolution: 0.05
       robot_radius: 0.22
-      plugins: ["voxel_layer", "inflation_layer"]
+      plugins:
+        ["voxel_layer_lidar_scan", "voxel_layer_pointcloud", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.55
-      voxel_layer:
+        cost_scaling_factor: 1.5
+        inflation_radius: 0.35
+      voxel_layer_lidar_scan:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: True
         publish_voxel_map: True
@@ -232,7 +235,7 @@ local_costmap:
         mark_threshold: 0
         observation_sources: scan
         scan:
-          topic: /scan
+          topic: /scan_lidar
           max_obstacle_height: 2.0
           clearing: True
           marking: True
@@ -241,6 +244,26 @@ local_costmap:
           raytrace_min_range: 0.0
           obstacle_max_range: 2.5
           obstacle_min_range: 0.0
+      voxel_layer_pointcloud:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: True
+        publish_voxel_map: True
+        origin_z: 0.0
+        z_resolution: 0.05
+        z_voxels: 16
+        max_obstacle_height: 2.0
+        mark_threshold: 0
+        observation_sources: pointcloud
+        pointcloud:
+          topic: sensors/camera/depth/points
+          max_obstacle_height: 2.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          clearing: True
+          marking: True
+          data_type: "PointCloud2"
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
@@ -249,12 +272,16 @@ local_costmap:
 global_costmap:
   global_costmap:
     ros__parameters:
-      update_frequency: 1.0
-      publish_frequency: 1.0
+      width: 10
+      height: 10
+      update_frequency: 5.0
+      publish_frequency: 5.0
+      map_topic: /map
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: False
       robot_radius: 0.22
+      rolling_window: True
       resolution: 0.05
       track_unknown_space: true
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
@@ -263,7 +290,7 @@ global_costmap:
         enabled: True
         observation_sources: scan
         scan:
-          topic: /scan
+          topic: /scan_lidar
           max_obstacle_height: 2.0
           clearing: True
           marking: True
@@ -275,11 +302,15 @@ global_costmap:
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
+        transform_tolerance: 0.5
+        subscribe_to_updates: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.55
-      always_send_full_costmap: True
+        cost_scaling_factor: 1.5
+        inflation_radius: 0.35
+        inflate_unknown: false
+        inflate_around_unknown: false
+      always_send_full_costmap: False
 
 map_server:
   ros__parameters:
@@ -310,6 +341,7 @@ map_saver:
 # Planner for Ackermann vehicle
 planner_server:
   ros__parameters:
+    expected_planner_frequency: 10.0
     planner_plugins: ["GridBased"]
     use_sim_time: False
 
@@ -322,21 +354,21 @@ planner_server:
       max_iterations: 1000000 # maximum total iterations to search for before failing (in case unreachable), set to -1 to disable
       max_on_approach_iterations: 1000 # maximum number of iterations to attempt to reach goal once in tolerance, 2D only
       max_planning_time: 3.5 # max time in s for planner to plan, smooth, and upsample. Will scale maximum smoothing and upsampling times based on remaining time after planning.
-      motion_model_for_search: "DUBIN" # For Hybrid Dubin, Redds-Shepp
+      motion_model_for_search: "REEDS_SHEPP" # For Hybrid: DUBIN, REEDS_SHEPP
       cost_travel_multiplier: 2.0 # For 2D: Cost multiplier to apply to search to steer away from high cost areas. Larger values will place in the center of aisles more exactly (if non-`FREE` cost potential field exists) but take slightly longer to compute. To optimize for speed, a value of 1.0 is reasonable. A reasonable tradeoff value is 2.0. A value of 0.0 effective disables steering away from obstacles and acts like a naive binary search A*.
-      angle_quantization_bins: 64 # For Hybrid nodes: Number of angle bins for search, must be 1 for 2D node (no angle search)
+      angle_quantization_bins: 100 # For Hybrid nodes: Number of angle bins for search, must be 1 for 2D node (no angle search)
       analytic_expansion_ratio: 3.5 # For Hybrid/Lattice nodes: The ratio to attempt analytic expansions during search for final approach.
       analytic_expansion_max_length: 3.0 # For Hybrid/Lattice nodes: The maximum length of the analytic expansion to be considered valid to prevent unsafe shortcutting (in meters). This should be scaled with minimum turning radius and be no less than 4-5x the minimum radius
-      minimum_turning_radius: 0.40 # For Hybrid/Lattice nodes: minimum turning radius in m of path / vehicle
-      reverse_penalty: 2.1 # For Reeds-Shepp model: penalty to apply if motion is reversing, must be => 1
-      change_penalty: 0.0 # For Hybrid nodes: penalty to apply if motion is changing directions, must be >= 0
-      non_straight_penalty: 1.20 # For Hybrid nodes: penalty to apply if motion is non-straight, must be => 1
+      minimum_turning_radius: 0.80 # For Hybrid/Lattice nodes: minimum turning radius in m of path / vehicle
+      reverse_penalty: 0.1 # For Reeds-Shepp model: penalty to apply if motion is reversing, must be => 1
+      change_penalty: 5.1 # For Hybrid nodes: penalty to apply if motion is changing directions, must be >= 0
+      non_straight_penalty: 1.00 # For Hybrid nodes: penalty to apply if motion is non-straight, must be => 1
       cost_penalty: 2.0 # For Hybrid nodes: penalty to apply to higher cost areas when adding into the obstacle map dynamic programming distance expansion heuristic. This drives the robot more towards the center of passages. A value between 1.3 - 3.5 is reasonable.
       retrospective_penalty: 0.025 # For Hybrid/Lattice nodes: penalty to prefer later maneuvers before earlier along the path. Saves search time since earlier nodes are not expanded until it is necessary. Must be >= 0.0 and <= 1.0
       rotation_penalty: 5.0 # For Lattice node: Penalty to apply only to pure rotate in place commands when using minimum control sets containing rotate in place primitives. This should always be set sufficiently high to weight against this action unless strictly necessary for obstacle avoidance or there may be frequent discontinuities in the plan where it requests the robot to rotate in place to short-cut an otherwise smooth path for marginal path distance savings.
-      lookup_table_size: 20.0 # For Hybrid nodes: Size of the dubin/reeds-sheep distance window to cache, in meters.
+      lookup_table_size: 10.0 # For Hybrid nodes: Size of the dubin/reeds-sheep distance window to cache, in meters.
       cache_obstacle_heuristic: True # For Hybrid nodes: Cache the obstacle map dynamic programming distance expansion heuristic between subsiquent replannings of the same goal location. Dramatically speeds up replanning performance (40x) if costmap is largely static.
-      allow_reverse_expansion: False # For Lattice nodes: Whether to expand state lattice graph in forward primitives or reverse as well, will double the branching factor at each step.
+      allow_reverse_expansion: True # For Lattice nodes: Whether to expand state lattice graph in forward primitives or reverse as well, will double the branching factor at each step.
       smooth_path: True # For Lattice/Hybrid nodes: Whether or not to smooth the path, always true for 2D nodes.
       smoother:
         max_iterations: 1000
@@ -360,7 +392,7 @@ behavior_server:
     costmap_topic: local_costmap/costmap_raw
     footprint_topic: local_costmap/published_footprint
     cycle_frequency: 10.0
-    behavior_plugins: ["spin", "backup", "drive_on_heading", "wait"]
+    behavior_plugins: ["backup", "wait"]
     spin:
       plugin: "nav2_behaviors/Spin"
     backup:
@@ -369,7 +401,7 @@ behavior_server:
       plugin: "nav2_behaviors/DriveOnHeading"
     wait:
       plugin: "nav2_behaviors/Wait"
-    global_frame: odom
+    global_frame: map # Ideally, should be 'odom', but temporarily changing to 'map' until EKF localisation is implemented
     robot_base_frame: base_link
     transform_tolerance: 0.1
     use_sim_time: False
@@ -391,19 +423,19 @@ waypoint_follower:
     wait_at_waypoint:
       plugin: "nav2_waypoint_follower::WaitAtWaypoint"
       enabled: True
-      waypoint_pause_duration: 200
+      waypoint_pause_duration: 1000 # in milliseconds
 
 velocity_smoother:
   ros__parameters:
     use_sim_time: False
-    smoothing_frequency: 20.0
+    smoothing_frequency: 30.0
     scale_velocities: False
     feedback: "OPEN_LOOP"
-    max_velocity: [0.26, 0.0, 1.0]
-    min_velocity: [-0.26, 0.0, -1.0]
-    max_accel: [2.5, 0.0, 3.2]
-    max_decel: [-2.5, 0.0, -3.2]
+    max_velocity: [0.5, 0.0, 1.0]
+    min_velocity: [-0.5, 0.0, -1.0]
+    max_accel: [2.5, 0.0, 2.0]
+    max_decel: [-2.5, 0.0, -2.0]
     odom_topic: "odom"
     odom_duration: 0.1
-    deadband_velocity: [0.0, 0.0, 0.0]
+    deadband_velocity: [0.05, 0.0, 0.01]
     velocity_timeout: 1.0
