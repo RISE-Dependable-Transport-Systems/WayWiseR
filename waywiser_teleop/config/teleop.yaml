@@ -55,3 +55,7 @@ teleop_twist_mux:
         topic: key_vel
         timeout: 0.5
         priority: 90
+      teleop_nav2:
+        topic: teleop_nav2_vel
+        timeout: 0.5
+        priority: 50
