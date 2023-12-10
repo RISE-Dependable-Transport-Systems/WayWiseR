@@ -5,10 +5,11 @@ import os
 from ament_index_python import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration, Command
 from launch_ros.actions import Node
 from launch.conditions import IfCondition
+import yaml
 
 
 def generate_launch_description():
@@ -26,12 +27,6 @@ def generate_launch_description():
         "lidar_config",
         default_value=os.path.join(hw_bringup_dir, "config/lidar.yaml"),
         description="Full path to params file of lidar",
-    )
-
-    enable_lidar_la = DeclareLaunchArgument(
-        "enable_lidar",
-        default_value="false",
-        description="switch to enable lidar node",
     )
 
     robot_state_publisher_la = DeclareLaunchArgument(
@@ -71,16 +66,8 @@ def generate_launch_description():
         executable="joint_state_publisher",
         name="joint_state_publisher",
     )
-
-    lidar_node = Node(
-        package="rplidar_ros",
-        executable="rplidar_node",
-        name="rplidar_node",
-        parameters=[LaunchConfiguration("lidar_config")],
-        output="screen",
-        condition=IfCondition(LaunchConfiguration("enable_lidar")),
-        remappings=[("/scan", "/scan_lidar")],
-    )
+    
+    lidar_conditional_launch_action = OpaqueFunction(function = lidar_conditional_launch)   
 
     # create launch description
     ld = LaunchDescription()
@@ -90,12 +77,31 @@ def generate_launch_description():
     ld.add_action(lidar_config_la)
     ld.add_action(robot_state_publisher_la)
     ld.add_action(frame_prefix_la)
-    ld.add_action(enable_lidar_la)
 
     # start nodes
     ld.add_action(waywise_node)
     ld.add_action(robot_state_publisher_node)
     ld.add_action(joint_state_publisher_node)
-    ld.add_action(lidar_node)
+    ld.add_action(lidar_conditional_launch_action)
 
     return ld
+
+def lidar_conditional_launch(context):
+    enable_lidar = False
+    with open(LaunchConfiguration("rover_config").perform(context)) as f:
+        config_data = yaml.safe_load(f)      
+        waywise_rover_node_params_dict = config_data["waywise_rover_node"]["ros__parameters"]        
+        if 'enable_lidar' in waywise_rover_node_params_dict:
+            enable_lidar = waywise_rover_node_params_dict["enable_lidar"]
+        
+    lidar_node = Node(
+        package="rplidar_ros",
+        executable="rplidar_node",
+        name="rplidar_node",
+        parameters=[LaunchConfiguration("lidar_config")],
+        output="screen",
+        condition=IfCondition(str(enable_lidar)),
+        remappings=[("/scan", "/scan_lidar")],
+    )
+
+    return [lidar_node]
