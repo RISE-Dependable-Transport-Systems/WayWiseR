@@ -3,11 +3,20 @@
 <package format="3">
   <name>waywiser_nav2</name>
   <version>0.0.0</version>
-  <description>Modified files from the NAV2 repo at https://github.com/ros-planning/navigation2/tree/humble</description>
+
+  <description>Package that provides dynamic path planning for waywiser using Nav2</description>
+
   <maintainer email="rickard.hall@ri.se">Rickard Häll</maintainer>
+  <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
+
   <license>TODO: License declaration</license>
 
+  <url type="website">https://github.com/ros-planning/navigation2/tree/humble</url>
+
   <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>navigation2</exec_depend>
+  <exec_depend>nav2_bringup</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
