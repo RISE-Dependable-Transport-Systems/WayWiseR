@@ -1,5 +1,5 @@
 import os
-
+import yaml
 from ament_index_python import get_package_share_directory
 
 from launch import LaunchDescription
@@ -8,21 +8,24 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch.conditions import IfCondition
 
-
 def generate_launch_description():
-    teleop_dir = get_package_share_directory("ros2-waywise_teleop")
+
+    # filepath to configuration file
+    teleop_config_path = os.path.join(
+        get_package_share_directory("ros2-waywise_teleop"),
+        "config/teleop.yaml"
+    )
+
+    # retrieve a parameter from configuration file
+    with open(teleop_config_path, 'r') as f:
+        parameters = yaml.safe_load(f)
+        use_keyboard = f'{parameters["teleop_twist_keyboard_node"]["ros__parameters"]["use_keyboard"]}'
 
     # args that can be set from the command line or a default will be used
     teleop_la = DeclareLaunchArgument(
         "teleop_config",
-        default_value=os.path.join(teleop_dir, "config/teleop.yaml"),
+        default_value=teleop_config_path,
         description="Full path to params file",
-    )
-
-    enable_keyboard_la = DeclareLaunchArgument(
-        "enable_keyboard",
-        default_value="false",
-        description="Enable keyboard",
     )
 
     # start nodes and use args to set parameters
@@ -47,7 +50,7 @@ def generate_launch_description():
         name="teleop_twist_keyboard",
         output="screen",
         prefix="xterm -e",
-        condition=IfCondition(LaunchConfiguration("enable_keyboard")),
+        condition=IfCondition(use_keyboard),
         remappings={("/cmd_vel", "/key_vel")},
     )
 
@@ -71,7 +74,6 @@ def generate_launch_description():
 
     # declare launch args
     ld.add_action(teleop_la)
-    ld.add_action(enable_keyboard_la)
 
     # start nodes
     ld.add_action(joy_node)

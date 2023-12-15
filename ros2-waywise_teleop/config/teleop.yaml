@@ -46,3 +46,7 @@ twist_mux:
         topic   : key_vel
         timeout : 0.5
         priority: 90
+
+teleop_twist_keyboard_node:
+  ros__parameters:
+    use_keyboard: false
