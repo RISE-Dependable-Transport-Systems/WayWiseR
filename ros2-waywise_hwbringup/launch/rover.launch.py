@@ -1,6 +1,7 @@
 # launch file to bring up rover nodes
 
 import os
+import yaml
 
 from ament_index_python import get_package_share_directory
 
@@ -15,6 +16,17 @@ def generate_launch_description():
     hw_bringup_dir = get_package_share_directory("ros2-waywise_hwbringup")
     description_dir = get_package_share_directory("ros2-waywise_description")
 
+    # filepath to configuration file
+    lidar_config_path = os.path.join(
+        hw_bringup_dir,
+        "config/lidar.yaml"
+    )
+
+    # retrieve a parameter from configuration file
+    with open(lidar_config_path, 'r') as f:
+        parameters = yaml.safe_load(f)
+        enable_lidar = f'{parameters["rplidar_node"]["ros__parameters"]["enable_lidar"]}'
+
     # args that can be set from the command line or a default will be used
     rover_config_la = DeclareLaunchArgument(
         "rover_config",
@@ -26,12 +38,6 @@ def generate_launch_description():
         "lidar_config",
         default_value=os.path.join(hw_bringup_dir, "config/lidar.yaml"),
         description="Full path to params file of lidar",
-    )
-
-    enable_lidar_la = DeclareLaunchArgument(
-        "enable_lidar",
-        default_value="false",
-        description="switch to enable lidar node",
     )
 
     robot_state_publisher_la = DeclareLaunchArgument(
@@ -78,7 +84,7 @@ def generate_launch_description():
         name="rplidar_node",
         parameters=[LaunchConfiguration("lidar_config")],
         output="screen",
-        condition=IfCondition(LaunchConfiguration("enable_lidar")),
+        condition=IfCondition(enable_lidar),
         remappings=[("/scan", "/scan_lidar")],
     )
 
@@ -90,7 +96,6 @@ def generate_launch_description():
     ld.add_action(lidar_config_la)
     ld.add_action(robot_state_publisher_la)
     ld.add_action(frame_prefix_la)
-    ld.add_action(enable_lidar_la)
 
     # start nodes
     ld.add_action(waywise_node)

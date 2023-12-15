@@ -5,3 +5,4 @@ rplidar_node:
     frame_id: lidar_link
     inverted: false
     angle_compensate: true
+    enable_lidar: false
