@@ -1,9 +1,9 @@
 import os
 
 from ament_index_python import get_package_share_directory
-
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.actions import DeclareLaunchArgument
+from launch.actions import OpaqueFunction
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -20,19 +20,33 @@ def generate_launch_description():
         description='Full path to params file',
     )
 
+    use_sim_time_la = DeclareLaunchArgument(
+        'use_sim_time', default_value='True', description='Use simulation/Gazebo clock'
+    )
+
     # start nodes and use args to set parameters
     joy_node = Node(
         package='joy',
         executable='joy_node',
         name='joy',
-        parameters=[LaunchConfiguration('teleop_config')],
+        parameters=[
+            LaunchConfiguration('teleop_config'),
+            {
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+            },
+        ],
     )
 
     teleop_twist_joy_node = Node(
         package='teleop_twist_joy',
         executable='teleop_node',
         name='teleop_twist_joy',
-        parameters=[LaunchConfiguration('teleop_config')],
+        parameters=[
+            LaunchConfiguration('teleop_config'),
+            {
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+            },
+        ],
         remappings={('/cmd_vel', '/joy_vel')},
     )
 
@@ -40,25 +54,37 @@ def generate_launch_description():
         package='waywiser_teleop',
         executable='teleop_gateway',
         name='teleop_gateway',
-        parameters=[LaunchConfiguration('teleop_config')],
+        parameters=[
+            LaunchConfiguration('teleop_config'),
+            {
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+            },
+        ],
     )
 
     twist_mux_node = Node(
         package='twist_mux',
         executable='twist_mux',
         name='twist_mux',
-        parameters=[LaunchConfiguration('teleop_config')],
+        parameters=[
+            LaunchConfiguration('teleop_config'),
+            {
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+            },
+        ],
         remappings={('/cmd_vel_out', '/cmd_vel_mux')},
     )
 
     twist_keyboard_conditional_launch_action = OpaqueFunction(
-        function=twist_keyboard_conditional_launch)
+        function=twist_keyboard_conditional_launch
+    )
 
     # create launch description
     ld = LaunchDescription()
 
     # declare launch args
     ld.add_action(teleop_la)
+    ld.add_action(use_sim_time_la)
 
     # start nodes
     ld.add_action(joy_node)
@@ -85,6 +111,7 @@ def twist_keyboard_conditional_launch(context):
         output='screen',
         prefix='xterm -e',
         condition=IfCondition(str(enable_keyboard)),
+        parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
         remappings={('/cmd_vel', '/key_vel')},
     )
 
