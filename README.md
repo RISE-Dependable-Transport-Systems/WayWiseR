@@ -1,5 +1,6 @@
 # WayWiseR ﹘ [WayWise](https://github.com/RISE-Dependable-Transport-Systems/WayWise) ❤️ [ROS2](https://docs.ros.org/)
-WayWise**R** is the integration of WayWise, the rapid prototyping library for connected, autonomous vehicles developed at the RISE Dependable Transport Systems group, with ROS2.  
+WayWise**R** is the integration of WayWise, the rapid prototyping library for connected, autonomous vehicles developed at the RISE Dependable Transport Systems group, with ROS2.
+Both WayWise and WayWiseR are focused on our research projects.  
 Broadly speaking, there are two main use cases:
 1. **Accelerating bringup of ROS2-powered vehicles.**  
    In this case, the main functionality of the vehicle implemented using ROS2 packages and nodes, e.g., [Nav2](https://github.com/ros-planning/navigation2) or any other package you like.
@@ -24,27 +25,33 @@ Main authors are (firstname.lastname@ri.se):
 - Ramana Reddy Avula
 
 ## How to use it and what to expect
-TODO
+This ROS2 package is meant to be cloned into a ROS2 workspace.
+We do not do releases (for the time being) and do not promise a stable API but stick to standard ROS messages wherever possible.
+In general, our development resources are scarce and dedicated to fulfill use cases of research projects we are part of. We do our best to avoid it, but things will break from time to time.
+
+### How to install and build
+_TODO_
 
 ### Current state
-TODO
+The current state presents a foundation that our research projects [AGRARSENSE](https://www.ri.se/en/what-we-do/projects/agrarsense) and [SUNRISE](https://www.ri.se/en/what-we-do/projects/safety-assurance-framework-for-connected-automated-mobility-systems) will build upon during 2024 to investigate safety-critical situational awareness in the forestry and road vehicle contexts, respectively.
 
 ## Organization
-- **waywiser**: ...
-- **waywiser_description**: ...
-- **waywiser_gazebo**: ...
-- **waywiser_hwbringup**: ...
-- **waywiser_node**: ...
-- **waywiser_rviz2**: ...
-- **waywiser_slam**: ...
-- **waywiser_teleop**: ...
+WayWiseR is divided into several ROS2 packages. Make sure to have a look into the respecitve package.xml files.
+- **waywiser**: A meta package that depends on all packages below to be able to refer to WayWiseR as a whole.
+- **waywiser_description**: Contains vehicle descriptions in the form of [xacro](https://docs.ros.org/en/humble/Tutorials/Intermediate/URDF/Using-Xacro-to-Clean-Up-a-URDF-File.html) files. Currently a single vehicle is available that corresponds to a [Traxxas](https://traxxas.com/) Slash incl. camera, depth camera, LiDAR and IMU.
+- **waywiser_gazebo**: Everything related to simulation using [Gazebo](https://gazebosim.org).
+- **waywiser_hwbringup**: Configuration and launch files to get real (not simulated) vehicles running.
+- **waywiser_node**: Wraps [WayWise](https://github.com/RISE-Dependable-Transport-Systems/WayWise) into ROS2 nodes (currently a single node).
+- **waywiser_rviz2**: Configuration and launch files for RViz2.
+- **waywiser_slam**: Configuration and launch files for [SLAM Toolbox](https://github.com/SteveMacenski/slam_toolbox).
+- **waywiser_teleop**: Configuration and launch files for teleop packages (handling keyboard or gamepad input) and a node to arbitrate between them.
 
 ## Examples
-Use case 1:
+Use case 1 ﹘ Nav2 on top of WayWise:
 
 https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/assets/2404625/99751b42-a983-4826-a795-4b80ddd2bc28
 
-Use case 2:
+Use case 2 ﹘ WayWise autopilot driving in Gazebo:
 
 https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/assets/2404625/c936d089-d462-4c81-a0ff-e2c9cdb1e4ab
 
