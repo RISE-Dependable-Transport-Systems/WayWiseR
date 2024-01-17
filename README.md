@@ -29,8 +29,24 @@ This ROS2 package is meant to be cloned into a ROS2 workspace.
 We do not do releases (for the time being) and do not promise a stable API but stick to standard ROS messages wherever possible.
 In general, our development resources are scarce and dedicated to fulfill use cases of research projects we are part of. We do our best to avoid it, but things will break from time to time.
 
-### How to install and build
-_TODO_
+### How to install and build (on Ubuntu 22.04)
+* [Install ROS2 Humble](https://docs.ros.org/en/humble/Installation.html)
+* [Creating a ROS2 workspace](https://docs.ros.org/en/humble/Tutorials/Beginner-Client-Libraries/Colcon-Tutorial.html)
+* [Install Gazebo](https://gazebosim.org/docs/fortress/install_ubuntu)
+
+MAVSDK 2.0 or newer is required and pre-built releases can be found at https://github.com/mavlink/MAVSDK/releases. To instead build MAVSDK from source, simple [scripts can be found in the WayWise repository](https://github.com/RISE-Dependable-Transport-Systems/WayWise/tree/main/tools/build_MAVSDK).
+ 
+    sudo dpkg -i libmavsdk-dev*.deb
+    sudo apt install git build-essential cmake libqt5serialport5-dev
+    
+    mkdir -p ~/waywiser_ws/src
+    cd ~/waywiser_ws/src
+    git clone --recurse-submodules git@github.com:RISE-Dependable-Transport-Systems/WayWiseR.git
+    cd ..
+    rosdep install -i --from-path src --rosdistro humble -y
+    colcon build
+
+Before sourcing the overlay, it is very important that you open a new terminal, separate from the one where you built the workspace. Sourcing an overlay in the same terminal where you built, or likewise building where an overlay is sourced, may create complex issues.
 
 ### Current state
 The current state presents a foundation that our research projects [AGRARSENSE](https://www.ri.se/en/what-we-do/projects/agrarsense) and [SUNRISE](https://www.ri.se/en/what-we-do/projects/safety-assurance-framework-for-connected-automated-mobility-systems) will build upon during 2024 to investigate safety-critical situational awareness in the forestry and road vehicle contexts, respectively.
