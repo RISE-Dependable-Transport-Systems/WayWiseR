@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>waywiser</name>
+  <version>0.0.0</version>
+
+  <description>The package provides ROS2 compatibility for WayWise</description>
+
+  <author>Marvin Damschen</author>
+  <author>Rickard Häll</author>
+  <author>Ramana Avula</author>
+
+  <maintainer email="marvin.damschen@ri.se">Marvin Damschen</maintainer>
+  <maintainer email="rickard.hall@ri.se">Rickard Häll</maintainer>
+  <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
+  
+  <license>TODO: License declaration</license>
+
+  <url type="website">https://github.com/RISE-Dependable-Transport-Systems/WayWise</url>
+  <url type="website">https://docs.ros.org/en/humble/index.html</url>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <exec_depend>waywiser_description</exec_depend>  
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
