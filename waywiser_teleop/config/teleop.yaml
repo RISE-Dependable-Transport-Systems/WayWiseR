@@ -28,10 +28,6 @@ teleop_twist_keyboard:
   ros__parameters:
     enable_keyboard: false
 
-emergency_stop_monitor:
-  ros__parameters:
-    start_with_emergency_stop: true
-
 joy_emergency_stop:
   ros__parameters:
     emergency_stop_set_joy_button_index: 5

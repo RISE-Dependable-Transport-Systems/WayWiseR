@@ -1,0 +1,3 @@
+emergency_stop_monitor:
+  ros__parameters:
+    start_with_emergency_stop: true
