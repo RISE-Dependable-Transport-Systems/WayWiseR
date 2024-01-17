@@ -49,7 +49,3 @@ teleop_twist_mux:
         topic: key_vel
         timeout: 0.5
         priority: 90
-      waywise:
-        topic: waywise_vel
-        timeout: 0.5
-        priority: 60

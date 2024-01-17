@@ -32,7 +32,20 @@ def generate_launch_description():
                 'use_sim_time': LaunchConfiguration('use_sim_time'),
             },
         ],
-        remappings={('/cmd_vel_in', '/teleop_mux_vel')},
+        remappings={('/cmd_vel_in', '/onboard_mux_vel')},
+    )
+
+    onboard_twist_mux_node = Node(
+        package='twist_mux',
+        executable='twist_mux',
+        name='onboard_twist_mux',
+        parameters=[
+            LaunchConfiguration('command_control_config'),
+            {
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+            },
+        ],
+        remappings={('/cmd_vel_out', '/onboard_mux_vel')},
     )
 
     # create launch description
@@ -44,5 +57,6 @@ def generate_launch_description():
 
     # start nodes
     ld.add_action(emergency_stop_monitor_node)
+    ld.add_action(onboard_twist_mux_node)
 
     return ld

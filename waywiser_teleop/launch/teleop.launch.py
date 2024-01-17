@@ -84,7 +84,7 @@ def generate_launch_description():
                 'use_sim_time': LaunchConfiguration('use_sim_time'),
             },
         ],
-        remappings={('/cmd_vel_out', '/cmd_vel_mux')},
+        remappings={('/cmd_vel_out', '/teleop_mux_vel')},
     )
 
     twist_keyboard_conditional_launch_action = OpaqueFunction(
