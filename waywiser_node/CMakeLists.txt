@@ -42,6 +42,7 @@ add_executable(waywise_rover
     WayWise/autopilot/waypointfollower.h
     WayWise/communication/mavsdkvehicleserver.cpp
     WayWise/communication/jsonstreamparsertcp.cpp
+    WayWise/communication/vehicleserver.h
     WayWise/communication/vehicleconnections/vehicleconnection.cpp
     WayWise/communication/mavlinkparameterserver.cpp
     WayWise/communication/parameterserver.cpp
