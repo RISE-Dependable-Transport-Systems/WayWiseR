@@ -20,3 +20,4 @@ waywise_rover_node:
     enable_autopilot_on_vehicle: false
     enable_mavsdkVehicleServer: false
     waywise_control_tower_address: "127.0.0.1"
+    enable_lidar: false

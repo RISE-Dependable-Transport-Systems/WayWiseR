@@ -34,6 +34,7 @@ teleop_gateway:
     emergency_stop_clear_joy_button_index: 7
     joy_emergency_stop_timeout: 1.0 #seconds
     start_with_emergency_stop: true
+    enable_keyboard: false
 
 twist_mux:
   ros__parameters:
