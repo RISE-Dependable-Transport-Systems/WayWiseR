@@ -3,11 +3,11 @@
 <package format="3">
   <name>waywiser_teleop</name>
   <version>0.0.0</version>
-  
+
   <description>Package that processes keyboard and joystick inputs</description>
-  
+
   <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
-  
+
   <license>GPLv3</license>
 
   <url type="website">https://github.com/ros2/teleop_twist_keyboard/</url>
@@ -24,11 +24,11 @@
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
 
-  <depend>joy</depend> 
-  <depend>teleop_twist_joy</depend> 
-  <depend>twist_mux</depend> 
-  <depend>teleop_twist_keyboard</depend> 
-  <depend>xterm</depend> 
+  <depend>joy</depend>
+  <depend>teleop_twist_joy</depend>
+  <depend>twist_mux</depend>
+  <depend>teleop_twist_keyboard</depend>
+  <depend>xterm</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

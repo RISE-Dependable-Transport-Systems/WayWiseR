@@ -50,10 +50,35 @@ def generate_launch_description():
         remappings={('/cmd_vel', '/joy_vel')},
     )
 
-    teleop_gateway_node = Node(
+    twist_angular_correction_node = Node(
         package='waywiser_teleop',
-        executable='teleop_gateway',
-        name='teleop_gateway',
+        executable='twist_angular_correction',
+        name='twist_angular_correction',
+        parameters=[
+            LaunchConfiguration('teleop_config'),
+            {
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+            },
+        ],
+    )
+
+    emergency_stop_monitor_node = Node(
+        package='waywiser_hwbringup',
+        executable='emergency_stop_monitor',
+        name='emergency_stop_monitor',
+        parameters=[
+            LaunchConfiguration('command_control_config'),
+            {
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+            },
+        ],
+        remappings={('/cmd_vel_in', '/teleop_mux_vel')},
+    )
+
+    joy_emergency_stop_node = Node(
+        package='waywiser_teleop',
+        executable='joy_emergency_stop',
+        name='joy_emergency_stop',
         parameters=[
             LaunchConfiguration('teleop_config'),
             {
@@ -89,7 +114,9 @@ def generate_launch_description():
     # start nodes
     ld.add_action(joy_node)
     ld.add_action(teleop_twist_joy_node)
-    ld.add_action(teleop_gateway_node)
+    ld.add_action(emergency_stop_monitor_node)
+    ld.add_action(joy_emergency_stop_node)
+    ld.add_action(twist_angular_correction_node)
     ld.add_action(twist_keyboard_conditional_launch_action)
     ld.add_action(teleop_twist_mux_node)
 

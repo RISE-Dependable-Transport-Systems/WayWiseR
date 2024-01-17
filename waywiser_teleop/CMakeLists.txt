@@ -7,10 +7,6 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
-
 find_package(joy REQUIRED)
 find_package(teleop_twist_joy REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -18,26 +14,43 @@ find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 
-add_executable(teleop_gateway src/teleop_gateway.cpp)
-ament_target_dependencies(teleop_gateway rclcpp geometry_msgs std_msgs sensor_msgs)
+include_directories(include)
 
-install(TARGETS
-  teleop_gateway
-  DESTINATION lib/${PROJECT_NAME})
+add_library(emergency_stop_monitor_core SHARED src/rclcpp_components/emergency_stop_monitor_core.cpp)
+ament_target_dependencies(emergency_stop_monitor_core geometry_msgs rclcpp sensor_msgs std_msgs)
+rclcpp_components_register_nodes(emergency_stop_monitor_core waywiser_teleop::EmergencyStopMonitor)
+
+add_executable(emergency_stop_monitor src/emergency_stop_monitor.cpp)
+target_link_libraries(emergency_stop_monitor emergency_stop_monitor)
+
+add_executable(joy_emergency_stop src/joy_emergency_stop.cpp)
+ament_target_dependencies(joy_emergency_stop rclcpp sensor_msgs std_msgs)
+
+add_executable(twist_angular_correction src/twist_angular_correction.cpp)
+ament_target_dependencies(twist_angular_correction geometry_msgs rclcpp sensor_msgs std_msgs)
 
 install(
-  DIRECTORY src launch config
-  DESTINATION share/${PROJECT_NAME}
-)
+  TARGETS emergency_stop_monitor_core
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin)
+
+install(TARGETS emergency_stop_monitor RUNTIME DESTINATION lib/${PROJECT_NAME})
+install(TARGETS joy_emergency_stop RUNTIME DESTINATION lib/${PROJECT_NAME})
+install(TARGETS twist_angular_correction RUNTIME DESTINATION lib/${PROJECT_NAME})
+
+install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
+
+  # the following line skips the linter which checks for copyrights comment the
+  # line when a copyright and license is added to all source files
   set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
+
+  # the following line skips cpplint (only works in a git repo) comment the line
+  # when this package is in a git repo and when a copyright and license is added
+  # to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
