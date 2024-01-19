@@ -71,3 +71,8 @@ Use case 2 ﹘ WayWise autopilot driving in Gazebo:
 
 https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/assets/2404625/c936d089-d462-4c81-a0ff-e2c9cdb1e4ab
 
+## Funded by
+<img src="https://user-images.githubusercontent.com/2404625/202213271-a4006999-49d5-4e61-9f3d-867a469238d1.png" width="120" height="81" align="left" alt="EU logo" />
+This project has received funding from the European Union’s Horizon Europe research and innovation programme under grant agreement nº 101095835 and nº 101069573. The results reflect only the authors' view and the Agency is not responsible
+for any use that may be made of the information it contains.
+
