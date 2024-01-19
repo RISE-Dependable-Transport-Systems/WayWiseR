@@ -3,9 +3,9 @@ WayWise**R** is the integration of WayWise, the rapid prototyping library for co
 Both WayWise and WayWiseR are focused on our research projects.  
 Broadly speaking, there are two main use cases:
 1. **Accelerating bringup of ROS2-powered vehicles.**  
-   In this case, the main functionality of the vehicle implemented using ROS2 packages and nodes, e.g., [Nav2](https://github.com/ros-planning/navigation2) or any other package you like.
+   In this case, the main functionality of the vehicle is implemented using ROS2 packages and nodes, e.g., [Nav2](https://github.com/ros-planning/navigation2) or any other package you like.
    WayWise is used for the low-level functionality like talking to motor controller, servo, IMU and GNSS (optional) to publish Odom messages and subscribe to Twist messages through WayWiseR.  
-   The main purpose of WayWiseR here is to make it easy to control WayWise-powered vehicles using ROS2.
+   The main purpose of WayWiseR here is to make it easy to bringup ROS2-powered vehicles using Waywise.
    <img width="1465" alt="Use Case 1" src="https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/assets/2404625/468456d0-2130-4602-a803-2553a65fd220">
 
 2. **Extended functionality for WayWise-powered vehicles.**  
@@ -43,8 +43,8 @@ MAVSDK 2.0 or newer is required and pre-built releases can be found at https://g
     cd ~/waywiser_ws/src
     git clone --recurse-submodules git@github.com:RISE-Dependable-Transport-Systems/WayWiseR.git
     cd ..
-    rosdep install -i --from-path src --rosdistro humble -y
-    colcon build
+    rosdep install -i --from-path src --rosdistro humble -r -y
+    colcon build --symlink-install
 
 Before sourcing the overlay, it is very important that you open a new terminal, separate from the one where you built the workspace. Sourcing an overlay in the same terminal where you built, or likewise building where an overlay is sourced, may create complex issues.
 
