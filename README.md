@@ -33,14 +33,30 @@ We do not do releases (for the time being) and do not promise a stable API but s
 In general, our development resources are scarce and dedicated to fulfill use cases of research projects we are part of. We do our best to avoid it, but things will break from time to time.
 
 ### How to install and build (on Ubuntu 22.04)
-* [Install ROS2 Humble](https://docs.ros.org/en/humble/Installation.html)
-* [Creating a ROS2 workspace](https://docs.ros.org/en/humble/Tutorials/Beginner-Client-Libraries/Colcon-Tutorial.html)
+Install ROS2 (required):
+
+* [Install ROS2 Humble](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html)
+
+Install MAVSDK 2.0 or newer (required):
+
+* [Download MAVSDK pre-built releses](https://github.com/mavlink/MAVSDK/releases)
+
+    `sudo dpkg -i libmavsdk-dev*.deb`
+
+To instead build MAVSDK from source (optional):
+* [Scripts can be found in the WayWise repository](https://github.com/RISE-Dependable-Transport-Systems/WayWise/tree/main/tools/build_MAVSDK)
+    
+Gazebo simulator can be installed on dektop (optional):
+
 * [Install Gazebo](https://gazebosim.org/docs/fortress/install_ubuntu)
 
-MAVSDK 2.0 or newer is required and pre-built releases can be found at https://github.com/mavlink/MAVSDK/releases. To instead build MAVSDK from source, simple [scripts can be found in the WayWise repository](https://github.com/RISE-Dependable-Transport-Systems/WayWise/tree/main/tools/build_MAVSDK).
- 
-    sudo dpkg -i libmavsdk-dev*.deb
-    sudo apt install git build-essential cmake libqt5serialport5-dev
+To automatically source the ROS2 environment when a new terminal is opened:    
+
+  `echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc`
+
+Setup workspace and build our package:
+    
+    sudo apt update && sudo apt install -y libunwind-dev libqt5serialport5-dev ros-humble-slam-toolbox ros-humble-xacro git build-essential cmake python3-colcon-common-extensions
     
     mkdir -p ~/waywiser_ws/src
     cd ~/waywiser_ws/src
@@ -48,8 +64,11 @@ MAVSDK 2.0 or newer is required and pre-built releases can be found at https://g
     cd ..
     rosdep install -i --from-path src --rosdistro humble -r -y
     colcon build --symlink-install
+    colcon test
 
 Before sourcing the overlay, it is very important that you open a new terminal, separate from the one where you built the workspace. Sourcing an overlay in the same terminal where you built, or likewise building where an overlay is sourced, may create complex issues.
+
+  `source install/local_setup.bash`
 
 ### Current state
 The current state presents a foundation that our research projects [AGRARSENSE](https://www.ri.se/en/what-we-do/projects/agrarsense) and [SUNRISE](https://www.ri.se/en/what-we-do/projects/safety-assurance-framework-for-connected-automated-mobility-systems) will build upon during 2024 to investigate safety-critical situational awareness in the forestry and road vehicle contexts, respectively.
