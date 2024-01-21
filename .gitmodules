@@ -1,3 +1,3 @@
 [submodule "waywiser_node/WayWise"]
 	path = waywiser_node/WayWise
-	url = git@github.com:RISE-Dependable-Transport-Systems/WayWise.git
+	url = https://github.com/RISE-Dependable-Transport-Systems/WayWise.git

@@ -6,10 +6,6 @@
 
   <description>The package provides ROS2 compatibility for WayWise</description>
 
-  <author>Marvin Damschen</author>
-  <author>Rickard Häll</author>
-  <author>Ramana Avula</author>
-
   <maintainer email="marvin.damschen@ri.se">Marvin Damschen</maintainer>
   <maintainer email="rickard.hall@ri.se">Rickard Häll</maintainer>
   <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
@@ -24,7 +20,7 @@
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
-  <exec_depend>waywiser_description</exec_depend>  
+  <depend>waywiser_description</depend>  
 
   <export>
     <build_type>ament_cmake</build_type>
