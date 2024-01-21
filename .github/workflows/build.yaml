@@ -1,4 +1,4 @@
-name: Build packages
+name: Build Packages
 
 on:
   pull_request:
