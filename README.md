@@ -56,7 +56,7 @@ To automatically source the ROS2 environment when a new terminal is opened:
 
 Setup workspace and build our package:
     
-    sudo apt update && sudo apt install -y libunwind-dev libqt5serialport5-dev ros-humble-slam-toolbox ros-humble-xacro git build-essential cmake python3-colcon-common-extensions
+    sudo apt update && sudo apt install -y libunwind-dev libqt5serialport5-dev git build-essential cmake python3-colcon-common-extensions
     
     mkdir -p ~/waywiser_ws/src
     cd ~/waywiser_ws/src
