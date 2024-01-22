@@ -9,31 +9,31 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    slam_dir = get_package_share_directory("waywiser_slam")
+    slam_dir = get_package_share_directory('waywiser_slam')
 
     # args that can be set from the command line or a default will be used
     slam_config_la = DeclareLaunchArgument(
-        "slam_config",
-        default_value=os.path.join(slam_dir, "config/slam.yaml"),
-        description="Full path to params file for slam toolbox",
+        'slam_config',
+        default_value=os.path.join(slam_dir, 'config/slam.yaml'),
+        description='Full path to params file for slam toolbox',
     )
     use_sim_time_la = DeclareLaunchArgument(
-        "use_sim_time", default_value="True", description="Use simulation/Gazebo clock"
+        'use_sim_time', default_value='True', description='Use simulation/Gazebo clock'
     )
 
     # start nodes and use args to set parameters
     slam_toolbox_node = Node(
-        package="slam_toolbox",
-        executable="async_slam_toolbox_node",
-        name="slam_toolbox",
-        output="screen",
+        package='slam_toolbox',
+        executable='async_slam_toolbox_node',
+        name='slam_toolbox',
+        output='screen',
         parameters=[
-            LaunchConfiguration("slam_config"),
+            LaunchConfiguration('slam_config'),
             {
-                "use_sim_time": LaunchConfiguration("use_sim_time"),
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
             },
         ],
-        remappings={("/pose", "/visual_pose")},
+        remappings={('/pose', '/visual_pose')},
     )
 
     # create launch description

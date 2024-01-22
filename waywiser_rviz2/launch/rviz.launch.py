@@ -9,29 +9,29 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    rviz2_dir = get_package_share_directory("waywiser_rviz2")
+    rviz2_dir = get_package_share_directory('waywiser_rviz2')
 
     # args that can be set from the command line or a default will be used
     rviz_la = DeclareLaunchArgument(
-        "rviz_config",
-        default_value=os.path.join(rviz2_dir, "rviz/odom_reference_frame.rviz"),
-        description="Full path to rviz display config file",
+        'rviz_config',
+        default_value=os.path.join(rviz2_dir, 'rviz/odom_reference_frame.rviz'),
+        description='Full path to rviz display config file',
     )
     use_sim_time_la = DeclareLaunchArgument(
-        "use_sim_time",
-        default_value="True",
-        description="Use simulation/Gazebo clock",
+        'use_sim_time',
+        default_value='True',
+        description='Use simulation/Gazebo clock',
     )
 
     # start nodes and use args to set parameters
     rviz_node = Node(
-        package="rviz2",
-        executable="rviz2",
-        name="rviz2",
-        output="screen",
-        arguments=["-d", LaunchConfiguration("rviz_config")],
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        output='screen',
+        arguments=['-d', LaunchConfiguration('rviz_config')],
         parameters=[{
-            "use_sim_time": LaunchConfiguration("use_sim_time"),
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
         }],
     )
 

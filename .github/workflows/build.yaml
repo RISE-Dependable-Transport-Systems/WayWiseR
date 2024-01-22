@@ -1,0 +1,31 @@
+name: Build Packages
+
+on:
+  pull_request:
+    branches:
+      - humble
+  push:
+    branches:
+      - humble
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Setup ROS 2
+      uses: ros-tooling/setup-ros@0.7.1
+      with:
+        required-ros-distributions: humble
+
+    - name: Install dependencies
+      run: sudo apt update && sudo apt install -y libunwind-dev libqt5serialport5-dev
+
+    - name: Install MAVSDK
+      run: wget https://github.com/mavlink/MAVSDK/releases/download/v2.0.1/libmavsdk-dev_2.0.1_ubuntu22.04_amd64.deb && sudo dpkg --install libmavsdk-dev_2.0.1_ubuntu22.04_amd64.deb
+
+    - name: Run Tests
+      uses: ros-tooling/action-ros-ci@0.3.5
+      with:
+        package-name: waywiser waywiser_description waywiser_gazebo waywiser_hwbringup waywiser_node waywiser_rviz2 waywiser_slam waywiser_teleop
+        target-ros2-distro: humble

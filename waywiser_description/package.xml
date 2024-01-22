@@ -5,9 +5,6 @@
   <version>0.0.0</version>
   
   <description>Robot models and sensors are defined by URDF files</description>
-
-  <author>Rickard Häll</author>
-  <author>Ramana Avula</author>
   
   <maintainer email="rickard.hall@ri.se">Rickard Häll</maintainer>
   <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
@@ -22,7 +19,7 @@
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
-  <exec_depend>xacro</exec_depend>
+  <depend>xacro</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
