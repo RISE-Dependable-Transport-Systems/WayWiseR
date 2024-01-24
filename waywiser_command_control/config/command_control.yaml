@@ -13,3 +13,63 @@ onboard_twist_mux:
         topic: waywise_vel
         timeout: 0.5
         priority: 60
+
+collision_monitor:
+  # Adapted from the config file:
+  # https://github.com/ros-planning/navigation2/blob/humble/nav2_collision_monitor/params/collision_monitor_params.yaml
+  ros__parameters:
+    base_frame_id: "base_link"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "onboard_mux_vel"
+    cmd_vel_out_topic: "collision_monitor_vel"
+    transform_tolerance: 0.5
+    source_timeout: 5.0
+    base_shift_correction: True
+    # Whether to correct source data towards to base frame movement, considering the difference
+    # between current time and latest source time. If enabled, produces more accurate sources
+    # positioning in the robot base frame, at the cost of slower performance. This will cause
+    # average delays for ~1/(2*odom_rate) per each cmd_vel calculation cycle. However,
+    # disabling this option for better performance is not recommended for the fast moving
+    # robots, where during the typical rate of data sources, robot could move unacceptably
+    # far. Thus reasonable odometry rates are recommended (~100 hz).
+    stop_pub_timeout: 2.0
+    polygons: ["PolygonStop", "PolygonSlow", "FootprintApproach"]
+    # Polygons represent zone around the robot for "stop" and "slowdown" action types,
+    # and robot footprint for "approach" action type.
+    # Footprint could be "polygon" type with dynamically set footprint from footprint_topic
+    # or "circle" type with static footprint set by radius. "footprint_topic" parameter
+    # to be ignored in circular case.
+    PolygonStop:
+      type: "polygon"
+      points: [0.3, 0.2, 0.3, -0.2, -0.3, -0.2, -0.3, 0.2]
+      action_type: "stop"
+      max_points: 3
+      visualize: True
+      polygon_pub_topic: "polygon_stop"
+    PolygonSlow:
+      type: "polygon"
+      points: [0.5, 0.25, 0.5, -0.25, -0.5, -0.25, -0.5, 0.25]
+      action_type: "slowdown"
+      max_points: 3
+      slowdown_ratio: 0.3
+      visualize: True
+      polygon_pub_topic: "polygon_slowdown"
+    FootprintApproach:
+      type: "polygon"
+      footprint_topic: "/polygon_stop"
+      # type: "circle"
+      # radius: 0.3
+      action_type: "approach"
+      time_before_collision: 1.0
+      simulation_time_step: 0.1
+      max_points: 5
+      visualize: False
+    observation_sources: ["scan", "pointcloud"]
+    scan:
+      type: "scan"
+      topic: "/scan_lidar"
+    pointcloud:
+      type: "pointcloud"
+      topic: "/sensors/camera/depth/points"
+      min_height: 0.1
+      max_height: 0.5

@@ -4,8 +4,17 @@
   <name>waywiser_command_control</name>
   <version>0.0.0</version>
 
-  <description>Package that manages twist commands to vehicle from different sources, including
-    emergency stop monitoring</description>
+  <description>Package that manages twist commands to vehicle from different sources using
+    twist_mux, nav2 collision monitoring, and emergency stop monitoring. The onboard_twist_mux node
+    subscribes to topics configured in command_control_config file, e.g., teleop_mux_vel,
+    waywise_vel etc., and publishes to "onboard_mux_vel" by multiplexing between sunscribed topics
+    according to their priorities. Nav2 collision_monitor node performs several collision avoidance
+    related tasks using incoming data from the sensors and prevents potential collisions by reducing
+    the linear speed and even setting it to zero to stop the vehicle. Upon receiving a boolean
+    'true' data on the "/emergency_stop" topic, the emergency_stop_monitor node suspends its input
+    twist commands and publishes a zero-velocity twist command on its output topic. When a boolean
+    'false' data is received on the "/emergency_stop" topic, the emergency stop is deactivated,
+    allowing the commands to pass through from the input to the output twist topics.</description>
 
   <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
 
@@ -21,6 +30,10 @@
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>twist_mux</depend>
+  <depend>nav2_collision_monitor</depend>
+  <depend>nav2_lifecycle_manager</depend>
+
+  <url type="website">https://github.com/ros-planning/navigation2/tree/humble/nav2_collision_monitor</url>
 
   <export>
     <build_type>ament_cmake</build_type>
