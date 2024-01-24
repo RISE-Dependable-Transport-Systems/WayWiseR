@@ -22,6 +22,7 @@ waywise_rover_node:
     odom_publish_rate: 30 # currently same rate for both odom topic and odom->base_link tf
     enable_imu_for_odom: true
     enable_lidar: false
+    enable_camera: false
 
 waywise_autopilot_node:
   ros__parameters:

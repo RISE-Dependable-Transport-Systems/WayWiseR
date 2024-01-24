@@ -1,3 +1,13 @@
+## HW specific dependencies
+
+### Slamtech lidars
+
+    sudo apt-get install ros-humble-rplidar-ros
+
+### Intel realsense camera
+
+    sudo apt-get install librealsense2-utils librealsense2-dev ros-humble-realsense2-camera ros-humble-realsense2-camera-msgs
+
 ## Examples
 
     ros2 launch waywiser_hwbringup rover.launch.py

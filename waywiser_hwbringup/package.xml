@@ -8,7 +8,7 @@
 
   <maintainer email="rickard.hall@ri.se">Rickard Häll</maintainer>
   <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
-  
+
   <license>TODO: License declaration</license>
 
   <url type="website">https://github.com/RISE-Dependable-Transport-Systems/WayWise</url>
@@ -17,7 +17,6 @@
 
   <depend>joint_state_publisher</depend>
   <depend>robot_state_publisher</depend>
-  <depend>rplidar_ros</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
