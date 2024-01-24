@@ -3,12 +3,13 @@
 <package format="3">
   <name>waywiser_gazebo</name>
   <version>0.0.0</version>
-  
-  <description>Initiates Gazebo world, generates robot and establishes communication link between ROS2 and Gazebo</description>
-  
+
+  <description>Initiates Gazebo world, generates robot and establishes communication link between
+    ROS2 and Gazebo</description>
+
   <maintainer email="rickard.hall@ri.se">Rickard Häll</maintainer>
   <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
-  
+
   <license>TODO: License declaration</license>
 
   <url type="website">https://gazebosim.org/docs/fortress/install</url>
@@ -16,10 +17,11 @@
   <url type="website">http://sdformat.org/</url>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
-  
+
   <depend>robot_state_publisher</depend>
   <depend>ros_gz_sim</depend>
   <depend>ros_gz_bridge</depend>
+  <depend>waywiser_description</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
