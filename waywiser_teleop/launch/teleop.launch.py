@@ -14,7 +14,7 @@ def generate_launch_description():
     teleop_dir = get_package_share_directory('waywiser_teleop')
 
     # args that can be set from the command line or a default will be used
-    teleop_la = DeclareLaunchArgument(
+    teleop_config_la = DeclareLaunchArgument(
         'teleop_config',
         default_value=os.path.join(teleop_dir, 'config/teleop.yaml'),
         description='Full path to params file',
@@ -62,10 +62,10 @@ def generate_launch_description():
         ],
     )
 
-    twist_mux_node = Node(
+    teleop_twist_mux_node = Node(
         package='twist_mux',
         executable='twist_mux',
-        name='twist_mux',
+        name='teleop_twist_mux',
         parameters=[
             LaunchConfiguration('teleop_config'),
             {
@@ -83,7 +83,7 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # declare launch args
-    ld.add_action(teleop_la)
+    ld.add_action(teleop_config_la)
     ld.add_action(use_sim_time_la)
 
     # start nodes
@@ -91,7 +91,7 @@ def generate_launch_description():
     ld.add_action(teleop_twist_joy_node)
     ld.add_action(teleop_gateway_node)
     ld.add_action(twist_keyboard_conditional_launch_action)
-    ld.add_action(twist_mux_node)
+    ld.add_action(teleop_twist_mux_node)
 
     return ld
 
@@ -100,9 +100,9 @@ def twist_keyboard_conditional_launch(context):
     enable_keyboard = False
     with open(LaunchConfiguration('teleop_config').perform(context)) as f:
         config_data = yaml.safe_load(f)
-        teleop_gateway_params_dict = config_data['teleop_gateway']['ros__parameters']
-        if 'enable_keyboard' in teleop_gateway_params_dict:
-            enable_keyboard = teleop_gateway_params_dict['enable_keyboard']
+        teleop_twist_keyboard_params_dict = config_data['teleop_twist_keyboard']['ros__parameters']
+        if 'enable_keyboard' in teleop_twist_keyboard_params_dict:
+            enable_keyboard = teleop_twist_keyboard_params_dict['enable_keyboard']
 
     teleop_twist_keyboard_node = Node(
         package='teleop_twist_keyboard',

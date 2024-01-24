@@ -24,6 +24,10 @@ teleop_twist_joy:
     enable_button: 4
     enable_turbo_button: 6
 
+teleop_twist_keyboard:
+  ros__parameters:
+    enable_keyboard: false
+
 teleop_gateway:
   ros__parameters:
     wheelbase: 0.33
@@ -34,9 +38,8 @@ teleop_gateway:
     emergency_stop_clear_joy_button_index: 7
     joy_emergency_stop_timeout: 1.0 #seconds
     start_with_emergency_stop: true
-    enable_keyboard: false
 
-twist_mux:
+teleop_twist_mux:
   ros__parameters:
     topics:
       joystick:
