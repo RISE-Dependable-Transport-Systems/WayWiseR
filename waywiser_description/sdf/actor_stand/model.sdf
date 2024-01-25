@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+    <!-- Adapted from the original file:
+    https://app.gazebosim.org/Mingfei/fuel/models/actor_stand -->
+    <actor name="actor">
+        <skin>
+            <filename>model://actor_stand/stand.dae</filename>
+            <scale>1.0</scale>
+        </skin>
+        <pose>5.5 1.0 0 0 0 3.14159</pose>
+        <animation name="stand">
+            <filename>model://actor_stand/stand.dae</filename>
+            <scale>1.000000</scale>
+            <interpolate_x>true</interpolate_x>
+        </animation>
+        <script>
+            <loop>true</loop>
+            <delay_start>0.000000</delay_start>
+            <auto_start>true</auto_start>
+        </script>
+    </actor>
+</sdf>
