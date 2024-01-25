@@ -1,0 +1,10 @@
+yolov8_node:
+    ros__parameters:
+        model_file_path: "~/workspaces/waywiser_ws/resources/yolov8s-seg.engine"
+        device: "cuda:0" # cuda:x/cpu
+        confidence_threshold: 0.25 # Detection confidence threshold
+        prediction_verbose: True
+        color_image_topic: "/sensors/camera/color/image"
+        publish_annotated_image: True
+        annotated_color_image_topic: "/sensors/camera/color/yolov8_annotated_image"
+        camera_base_frame: "camera_link"
