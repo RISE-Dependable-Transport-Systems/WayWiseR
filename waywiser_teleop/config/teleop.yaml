@@ -24,9 +24,15 @@ teleop_twist_joy:
     enable_button: 4
     enable_turbo_button: 6
 
-teleop_twist_keyboard:
+twist_keyboard:
   ros__parameters:
-    enable_keyboard: false
+    enable: false
+    max_linear_speed: 2.0
+    max_angular_speed: 2.0
+    startup_linear_speed: 0.5
+    startup_angular_speed: 1.0
+    speed_control_rate: 10.0
+    publish_rate: 10.0
 
 joy_emergency_stop:
   ros__parameters:

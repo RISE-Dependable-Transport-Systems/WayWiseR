@@ -27,8 +27,7 @@
   <depend>joy</depend>
   <depend>teleop_twist_joy</depend>
   <depend>twist_mux</depend>
-  <depend>teleop_twist_keyboard</depend>
-  <depend>xterm</depend>
+  <depend>rclpy</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
