@@ -5,7 +5,6 @@
 
 #include "emergency_stop_monitor.hpp"
 
-using namespace std::chrono;
 using std::placeholders::_1;
 
 namespace waywiser_command_control
