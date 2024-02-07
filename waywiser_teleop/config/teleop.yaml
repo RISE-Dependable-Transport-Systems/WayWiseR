@@ -24,19 +24,21 @@ teleop_twist_joy:
     enable_button: 4
     enable_turbo_button: 6
 
-teleop_gateway:
+teleop_twist_keyboard:
   ros__parameters:
-    wheelbase: 0.33
-    min_allowed_linear_velocity: 0.05 #m/s
-    min_allowed_angular_velocity: 0.01 #rad/s
-    reverse_steer_correction_topics: ["joy_vel"]
+    enable_keyboard: false
+
+joy_emergency_stop:
+  ros__parameters:
     emergency_stop_set_joy_button_index: 5
     emergency_stop_clear_joy_button_index: 7
     joy_emergency_stop_timeout: 1.0 #seconds
-    start_with_emergency_stop: true
-    enable_keyboard: false
 
-twist_mux:
+twist_angular_correction:
+  ros__parameters:
+    topic_names: ["joy_vel"]
+
+teleop_twist_mux:
   ros__parameters:
     topics:
       joystick:
@@ -47,7 +49,3 @@ twist_mux:
         topic: key_vel
         timeout: 0.5
         priority: 90
-      waywise:
-        topic: waywise_vel
-        timeout: 0.5
-        priority: 60

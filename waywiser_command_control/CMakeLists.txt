@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(waywiser_teleop)
+project(waywiser_command_control)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -7,21 +7,30 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(joy REQUIRED)
-find_package(teleop_twist_joy REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(rclcpp_components REQUIRED)
 
-add_executable(joy_emergency_stop src/joy_emergency_stop.cpp)
-ament_target_dependencies(joy_emergency_stop rclcpp sensor_msgs std_msgs)
+include_directories(include)
 
-add_executable(twist_angular_correction src/twist_angular_correction.cpp)
-ament_target_dependencies(twist_angular_correction geometry_msgs rclcpp sensor_msgs std_msgs)
+add_library(emergency_stop_monitor_core SHARED src/rclcpp_components/emergency_stop_monitor_core.cpp)
+ament_target_dependencies(emergency_stop_monitor_core geometry_msgs rclcpp rclcpp_components sensor_msgs std_msgs)
+rclcpp_components_register_nodes(emergency_stop_monitor_core waywiser_command_control::EmergencyStopMonitor)
 
-install(TARGETS joy_emergency_stop RUNTIME DESTINATION lib/${PROJECT_NAME})
-install(TARGETS twist_angular_correction RUNTIME DESTINATION lib/${PROJECT_NAME})
+add_executable(emergency_stop_monitor src/emergency_stop_monitor.cpp)
+target_link_libraries(emergency_stop_monitor emergency_stop_monitor_core)
+
+install(
+  TARGETS emergency_stop_monitor_core
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin)
+
+install(TARGETS emergency_stop_monitor RUNTIME DESTINATION lib/${PROJECT_NAME})
+
+install(DIRECTORY include/ DESTINATION include/)
 
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
 
