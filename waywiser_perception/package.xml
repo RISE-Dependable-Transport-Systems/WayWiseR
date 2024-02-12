@@ -20,6 +20,8 @@
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>nav2_common</depend>
+  <depend>image_proc</depend>
+  <depend>depth_image_proc</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

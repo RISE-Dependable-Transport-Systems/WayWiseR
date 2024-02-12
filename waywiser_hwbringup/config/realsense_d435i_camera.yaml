@@ -14,7 +14,7 @@ enable_accel: false
 pointcloud.enable: true
 colorizer.enable: false
 enable_sync: true
-publish_tf: false
+publish_tf: true
 tf_publish_rate: 30.0
 pointcloud_tranformation:
   enable: true
