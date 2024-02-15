@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(waywiser_command_control)
+project(waywiser_twist_safety)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -17,7 +17,7 @@ include_directories(include)
 
 add_library(emergency_stop_monitor_core SHARED src/rclcpp_components/emergency_stop_monitor_core.cpp)
 ament_target_dependencies(emergency_stop_monitor_core geometry_msgs rclcpp rclcpp_components sensor_msgs std_msgs)
-rclcpp_components_register_nodes(emergency_stop_monitor_core waywiser_command_control::EmergencyStopMonitor)
+rclcpp_components_register_nodes(emergency_stop_monitor_core waywiser_twist_safety::EmergencyStopMonitor)
 
 add_executable(emergency_stop_monitor src/emergency_stop_monitor.cpp)
 target_link_libraries(emergency_stop_monitor emergency_stop_monitor_core)

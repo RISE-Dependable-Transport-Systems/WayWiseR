@@ -9,12 +9,12 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    hw_bringup_dir = get_package_share_directory('waywiser_command_control')
+    hw_bringup_dir = get_package_share_directory('waywiser_twist_safety')
 
     # args that can be set from the command line or a default will be used
-    command_control_config_la = DeclareLaunchArgument(
-        'command_control_config',
-        default_value=os.path.join(hw_bringup_dir, 'config/command_control.yaml'),
+    twist_safety_config_la = DeclareLaunchArgument(
+        'twist_safety_config',
+        default_value=os.path.join(hw_bringup_dir, 'config/twist_safety.yaml'),
         description='Full path to params file',
     )
 
@@ -34,7 +34,7 @@ def generate_launch_description():
         executable='twist_mux',
         name='onboard_twist_mux',
         parameters=[
-            LaunchConfiguration('command_control_config'),
+            LaunchConfiguration('twist_safety_config'),
             {
                 'use_sim_time': LaunchConfiguration('use_sim_time'),
             },
@@ -48,7 +48,7 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # declare launch args
-    ld.add_action(command_control_config_la)
+    ld.add_action(twist_safety_config_la)
     ld.add_action(use_sim_time_la)
     ld.add_action(enable_collision_monitor_la)
 
@@ -74,7 +74,7 @@ def conditional_launch_setup(context):
             output='screen',
             emulate_tty=True,  # https://github.com/ros2/launch/issues/188
             parameters=[
-                LaunchConfiguration('command_control_config'),
+                LaunchConfiguration('twist_safety_config'),
                 {'use_sim_time': LaunchConfiguration('use_sim_time')},
             ],
             remappings={('/bond', '/bond_collision_monitor')},
@@ -95,11 +95,11 @@ def conditional_launch_setup(context):
         )
 
         emergency_stop_monitor_node = Node(
-            package='waywiser_command_control',
+            package='waywiser_twist_safety',
             executable='emergency_stop_monitor',
             name='emergency_stop_monitor',
             parameters=[
-                LaunchConfiguration('command_control_config'),
+                LaunchConfiguration('twist_safety_config'),
                 {
                     'use_sim_time': LaunchConfiguration('use_sim_time'),
                 },
@@ -111,11 +111,11 @@ def conditional_launch_setup(context):
         )
     else:
         emergency_stop_monitor_node = Node(
-            package='waywiser_command_control',
+            package='waywiser_twist_safety',
             executable='emergency_stop_monitor',
             name='emergency_stop_monitor',
             parameters=[
-                LaunchConfiguration('command_control_config'),
+                LaunchConfiguration('twist_safety_config'),
                 {
                     'use_sim_time': LaunchConfiguration('use_sim_time'),
                 },

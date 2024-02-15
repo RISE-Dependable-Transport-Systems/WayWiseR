@@ -7,7 +7,7 @@
 
 using std::placeholders::_1;
 
-namespace waywiser_command_control
+namespace waywiser_twist_safety
 {
 EmergencyStopMonitor::EmergencyStopMonitor(const rclcpp::NodeOptions & options)
 : Node("emergency_stop_monitor", options)
@@ -65,8 +65,8 @@ void EmergencyStopMonitor::twist_callback(const geometry_msgs::msg::Twist::Share
   }
   twist_publisher_->publish(*twist_msg);
 }
-}  // namespace waywiser_command_control
+}  // namespace waywiser_twist_safety
 
 // Register EmergencyStopMonitor as a component
 #include "rclcpp_components/register_node_macro.hpp"
-RCLCPP_COMPONENTS_REGISTER_NODE(waywiser_command_control::EmergencyStopMonitor)
+RCLCPP_COMPONENTS_REGISTER_NODE(waywiser_twist_safety::EmergencyStopMonitor)
