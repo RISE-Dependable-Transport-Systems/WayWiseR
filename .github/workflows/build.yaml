@@ -22,7 +22,7 @@ jobs:
       run: sudo apt update && sudo apt install -y libunwind-dev libqt5serialport5-dev
 
     - name: Install MAVSDK
-      run: wget https://github.com/mavlink/MAVSDK/releases/download/v2.0.1/libmavsdk-dev_2.0.1_ubuntu22.04_amd64.deb && sudo dpkg --install libmavsdk-dev_2.0.1_ubuntu22.04_amd64.deb
+      run: wget https://github.com/mavlink/MAVSDK/releases/download/v2.2.0/libmavsdk-dev_2.2.0_ubuntu22.04_amd64.deb && sudo dpkg --install libmavsdk-*.deb
 
     - name: Run Tests
       uses: ros-tooling/action-ros-ci@0.3.5
