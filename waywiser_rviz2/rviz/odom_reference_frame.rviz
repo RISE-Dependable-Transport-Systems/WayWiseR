@@ -428,6 +428,18 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: false
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: false
+      Name: 3D bounding box markers
+      Namespaces:
+        "": true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /sensors/camera/color/bbox_3d_markers
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
