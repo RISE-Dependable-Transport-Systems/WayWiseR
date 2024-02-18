@@ -12,3 +12,4 @@
 3. **emergency_stop_monitor**: Upon receiving a boolean 'true' data on the "/emergency_stop" topic, it suspends the input twist commands and publishes a zero-velocity twist command on its output topic. When a boolean 'false' data is received on the "/emergency_stop" topic, the emergency stop is deactivated, allowing the commands to pass through from the input to the output twist topics.
 
 A typical node graph would look as follows:
+![collision_monitor](https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/assets/58977950/620268c8-0dbb-4b35-8ac6-01fc6797b0b3)
