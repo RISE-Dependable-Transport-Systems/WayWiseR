@@ -74,12 +74,27 @@ class TwistKeyboard(Node):
         # Define the font and its size
         self.pygame_font = pygame.font.SysFont('Arial', 16)
 
+        # Define a flag to track if the quit event has occurred
+        self.shutdown_requested = False
+
+        # Set up Pygame event handlers
+        pygame.event.set_allowed(None)  # Disable all events
+        pygame.event.set_allowed(pygame.QUIT)  # Enable quit event
+
     def capture_pressed_keys(self):
         keys = pygame.key.get_pressed()
 
+        # Check for quit event
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.shutdown_requested = True
+
         pygame.event.pump()
 
-        return keys
+        if self.shutdown_requested:
+            return None
+        else:
+            return keys
 
     def process_speed_control_keys(self):
         # Get the state of all keys
@@ -224,7 +239,8 @@ def main():
     node = TwistKeyboard()
 
     try:
-        rclpy.spin(node)
+        while rclpy.ok() and not node.shutdown_requested:
+            rclpy.spin_once(node)
     finally:
         node.destroy_node()
         rclpy.shutdown()
