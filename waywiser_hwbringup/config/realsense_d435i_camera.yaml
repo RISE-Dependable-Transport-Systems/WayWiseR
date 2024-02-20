@@ -1,0 +1,26 @@
+enable_color: true
+rgb_camera.profile: 640x480x5
+rgb_camera.color_format: "RGB8"
+enable_depth: true
+depth_module.profile: 640x480x5
+depth_module.depth_format: "Z16"
+align_depth.enable: true
+enable_infra: false
+enable_infra1: false
+enable_infra2: false
+enable_rgbd: false
+enable_gyro: false
+enable_accel: false
+pointcloud.enable: true
+colorizer.enable: false
+enable_sync: true
+publish_tf: false
+tf_publish_rate: 30.0
+pointcloud_tranformation:
+  enable: true
+  output_frame: "camera_link"
+  static_tranformation: true # correspond to realsense d435i camera
+  static_translation_xyz: [0.0, -0.06, 0.0]
+  static_rotation_xyzw: [-0.5, 0.5, -0.5, 0.5]
+  input_point_cloud_topic: "/sensors/camera/depth/points_raw"
+  output_point_cloud_topic: "/sensors/camera/depth/points"

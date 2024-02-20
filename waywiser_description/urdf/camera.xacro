@@ -1,30 +1,32 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro" >
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <link name="camera_link">
     <visual>
       <geometry>
-        <box size="0.025 0.125 0.03"/>
+        <box size="0.025 0.125 0.03" />
       </geometry>
-      <material name="silver"/>
+      <material name="silver" />
     </visual>
     <xacro:inertial_box mass="0.1" length="0.025" breadth="0.125" height="0.03">
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-    </xacro:inertial_box>  
+      <origin xyz="0 0 0" rpy="0 0 0" />
+    </xacro:inertial_box>
   </link>
   <joint name="camera_joint" type="fixed">
-    <parent link="chassis_link"/>
-    <child link="camera_link"/>
-    <origin xyz="0.155 0 ${chassis_height/2 + 0.015}" rpy="0 0 0"/>
+    <parent link="chassis_link" />
+    <child link="camera_link" />
+    <origin xyz="0.155 0 ${chassis_height/2 + 0.015}" rpy="0 0 0" />
   </joint>
 
   <gazebo reference="camera_link">
     <material>Gazebo/Silver</material>
     <sensor name="camera" type="camera">
-      <pose> 0 0 0 0 0 0 </pose>
-      <visualize>true</visualize>
-      <update_rate>10</update_rate>
-      <topic>camera</topic>
+      <always_on>1</always_on>
+      <visualize>0</visualize>
+      <update_rate>30</update_rate>
+      <topic>sensors/camera/image</topic>
+      <ignition_frame_id>camera_link</ignition_frame_id>
+      <pose relative_to='camera_link'>0 0 0 0 0 0</pose>
       <camera>
         <horizontal_fov>1.089</horizontal_fov>
         <image>
@@ -34,7 +36,7 @@
         </image>
         <clip>
           <near>0.05</near>
-          <far>8.0</far>
+          <far>30.0</far>
         </clip>
       </camera>
     </sensor>

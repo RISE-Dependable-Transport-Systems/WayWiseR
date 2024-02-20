@@ -4,7 +4,6 @@ from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import OpaqueFunction
-from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import yaml
@@ -110,22 +109,23 @@ def generate_launch_description():
 
 
 def twist_keyboard_conditional_launch(context):
-    enable_keyboard = False
     with open(LaunchConfiguration('teleop_config').perform(context)) as f:
         config_data = yaml.safe_load(f)
-        teleop_twist_keyboard_params_dict = config_data['teleop_twist_keyboard']['ros__parameters']
-        if 'enable_keyboard' in teleop_twist_keyboard_params_dict:
-            enable_keyboard = teleop_twist_keyboard_params_dict['enable_keyboard']
+        if 'twist_keyboard' in config_data:
+            twist_keyboard_params = config_data['twist_keyboard']['ros__parameters']
+            enable_twist_keyboard = twist_keyboard_params['enable']
+            if enable_twist_keyboard:
+                twist_keyboard_node = Node(
+                    package='waywiser_teleop',
+                    executable='twist_keyboard.py',
+                    name='twist_keyboard',
+                    output='screen',
+                    parameters=[
+                        twist_keyboard_params,
+                        {'use_sim_time': LaunchConfiguration('use_sim_time')},
+                    ],
+                    remappings={('/cmd_vel', '/key_vel')},
+                )
+                return [twist_keyboard_node]
 
-    teleop_twist_keyboard_node = Node(
-        package='teleop_twist_keyboard',
-        executable='teleop_twist_keyboard',
-        name='teleop_twist_keyboard',
-        output='screen',
-        prefix='xterm -e',
-        condition=IfCondition(str(enable_keyboard)),
-        parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
-        remappings={('/cmd_vel', '/key_vel')},
-    )
-
-    return [teleop_twist_keyboard_node]
+    return []

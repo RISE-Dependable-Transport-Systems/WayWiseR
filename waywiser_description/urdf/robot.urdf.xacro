@@ -12,7 +12,8 @@
     <xacro:include filename="lidar.xacro" />
     <xacro:include filename="imu.xacro" />
     <!-- <xacro:include filename="camera.xacro" /> -->
-    <!--    <xacro:include filename="depth_camera.xacro" /> -->
+    <!-- <xacro:include filename="depth_camera.xacro" /> -->
+    <xacro:include filename="realsense_d435i_camera.xacro" />
 
     <!-- Controller -->
 

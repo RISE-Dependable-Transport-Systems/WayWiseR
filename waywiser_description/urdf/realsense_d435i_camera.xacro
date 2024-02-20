@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!-- Adapted from the original sdf file:
+  https://app.gazebosim.org/OpenRobotics/fuel/models/Intel%20RealSense%20D435 -->
+
+  <link name="camera_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 1.570795" />
+      <mass value="0.0615752" />
+      <inertia ixx="9.108e-05" ixy="0.0" ixz="0.0"
+        iyy="2.51e-06" iyz="0.0"
+        izz="8.931e-05" />
+    </inertial>
+    <collision name="collision">
+      <origin xyz="0 0 0" rpy="0 0 1.570795" />
+      <geometry>
+        <mesh
+          filename="package://waywiser_description/sdf/realsense_d435i_camera/meshes/realsense.dae">
+        </mesh>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <origin xyz="0 0 0" rpy="0 0 1.570795" />
+      <geometry>
+        <mesh
+          filename="package://waywiser_description/sdf/realsense_d435i_camera/meshes/realsense.dae">
+          <submesh>
+            <name>RealSense</name>
+            <center>false</center>
+          </submesh>
+        </mesh>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="camera_joint" type="fixed">
+    <parent link="chassis_link" />
+    <child link="camera_link" />
+    <origin xyz="0.15 0 ${chassis_height/2 + 0.045}" rpy="0 0 0" />
+  </joint>
+
+  <gazebo reference="camera_link">
+    <visual name="visual">
+      <material>
+        <diffuse>1.0 1.0 1.0</diffuse>
+        <specular>1.0 1.0 1.0</specular>
+        <pbr>
+          <metal>
+            <albedo_map>model://realsense_d435i_camera/materials/textures/RealSense_Albedo.png</albedo_map>
+            <normal_map>model://realsense_d435i_camera/materials/textures/RealSense_Normal.png</normal_map>
+            <metalness_map>
+              model://realsense_d435i_camera/materials/textures/RealSense_Metalness.png</metalness_map>
+            <roughness_map>
+              model://realsense_d435i_camera/materials/textures/RealSense_Roughness.png</roughness_map>
+          </metal>
+        </pbr>
+        <!-- fallback to script if no PBR support-->
+        <script>
+          <uri>model://realsense_d435i_camera/materials/scripts/</uri>
+          <uri>model://realsense_d435i_camera/materials/textures/</uri>
+          <name>UrbanTile/RealSense_Diffuse</name>
+        </script>
+      </material>
+    </visual>
+    <sensor name="camera_sensor" type="rgbd_camera">
+      <always_on>1</always_on>
+      <visualize>0</visualize>
+      <update_rate>30</update_rate>
+      <pose relative_to='camera_link'>0 0 0 0 0 0</pose>
+      <ignition_frame_id>camera_link</ignition_frame_id>
+      <topic>sensors/camera</topic>
+      <camera>
+        <horizontal_fov>1.089</horizontal_fov>
+        <lens>
+          <intrinsics>
+            <!-- fx = fy = width / ( 2 * tan (hfov / 2 ) ) -->
+            <fx>554.25469</fx>
+            <fy>554.25469</fy>
+            <!-- cx = ( width + 1 ) / 2 -->
+            <cx>320.5</cx>
+            <!-- cy = ( height + 1 ) / 2 -->
+            <cy>240.5</cy>
+            <s>0</s>
+          </intrinsics>
+        </lens>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.01</near>
+          <far>30</far>
+        </clip>
+        <depth_camera>
+          <clip>
+            <near>0.05</near>
+            <far>10</far>
+          </clip>
+        </depth_camera>
+        <noise>
+          <type>gaussian</type>
+          <mean>0</mean>
+          <stddev>0.007</stddev>
+        </noise>
+      </camera>
+    </sensor>
+  </gazebo>
+</robot>

@@ -1,5 +1,5 @@
-#ifndef WAYWISER_COMMAND_CONTROL_EMERGENCY_STOP_MONITOR_HPP_
-#define WAYWISER_COMMAND_CONTROL_EMERGENCY_STOP_MONITOR_HPP_
+#ifndef WAYWISER_TWIST_SAFETY_EMERGENCY_STOP_MONITOR_HPP_
+#define WAYWISER_TWIST_SAFETY_EMERGENCY_STOP_MONITOR_HPP_
 
 #include <chrono>
 #include <cmath>
@@ -14,7 +14,7 @@
 using std::placeholders::_1;
 using namespace std::chrono;
 
-namespace waywiser_command_control
+namespace waywiser_twist_safety
 {
 class EmergencyStopMonitor : public rclcpp::Node
 {
@@ -31,5 +31,5 @@ private:
 
   bool emergency_stop_value_;
 };
-}  // namespace waywiser_command_control
-#endif  // WAYWISER_COMMAND_CONTROL_EMERGENCY_STOP_MONITOR_HPP_
+}  // namespace waywiser_twist_safety
+#endif  // WAYWISER_TWIST_SAFETY_EMERGENCY_STOP_MONITOR_HPP_
