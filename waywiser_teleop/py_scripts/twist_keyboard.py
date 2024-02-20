@@ -4,6 +4,7 @@ from geometry_msgs.msg import Twist
 import pygame
 import rclpy
 from rclpy.node import Node
+from std_msgs.msg import Bool
 
 
 class TwistKeyboard(Node):
@@ -11,7 +12,12 @@ class TwistKeyboard(Node):
 
     def __init__(self):
         super().__init__('twist_keyboard')
-        self.publisher_ = self.create_publisher(Twist, 'cmd_vel', 10)
+        self.twist_publisher = self.create_publisher(Twist, 'cmd_vel', 10)
+        self.emergency_stop_publisher = self.create_publisher(Bool, 'emergency_stop', 10)
+
+        # Initialize emergency_stop_msg
+        self.emergency_stop_msg = Bool()
+        self.emergency_stop_msg.data = False
 
         # Set up keybindings
         self.forward_key = pygame.K_w
@@ -23,6 +29,7 @@ class TwistKeyboard(Node):
         self.decrease_linear_speed_key = pygame.K_k
         self.increase_angular_speed_key = pygame.K_o
         self.decrease_angular_speed_key = pygame.K_l
+        self.emergency_stop_key = pygame.K_e  # set with Ctrl+e, clear with Ctrl+Shift+e
 
         self.declare_parameter('max_linear_speed', 2.0)
         self.declare_parameter('max_angular_speed', 2.0)
@@ -67,83 +74,124 @@ class TwistKeyboard(Node):
         # Define the font and its size
         self.pygame_font = pygame.font.SysFont('Arial', 16)
 
-    def process_speed_control_keys(self):
-        # Get the state of all keys
+    def capture_pressed_keys(self):
         keys = pygame.key.get_pressed()
-
-        # Check if the key associated with increasing linear speed is pressed
-        if keys[self.increase_linear_speed_key]:
-            # Increase linear speed by 10%
-            self.linear_speed *= 1.1
-            # Ensure linear speed does not exceed the maximum value
-            self.linear_speed = min(self.linear_speed, self.max_linear_speed)
-
-        # Check if the key associated with decreasing linear speed is pressed
-        if keys[self.decrease_linear_speed_key]:
-            # Decrease linear speed by 10%
-            self.linear_speed /= 1.1
-
-        # Check if the key associated with increasing angular speed is pressed
-        if keys[self.increase_angular_speed_key]:
-            # Increase angular speed by 10%
-            self.angular_speed *= 1.1
-            # Ensure angular speed does not exceed the maximum value
-            self.angular_speed = min(self.angular_speed, self.max_angular_speed)
-
-        # Check if the key associated with decreasing angular speed is pressed
-        if keys[self.decrease_angular_speed_key]:
-            # Decrease angular speed by 10%
-            self.angular_speed /= 1.1
 
         pygame.event.pump()
 
-    def publish_twist(self):
+        return keys
+
+    def process_speed_control_keys(self):
         # Get the state of all keys
-        keys = pygame.key.get_pressed()
+        keys = self.capture_pressed_keys()
 
-        # Publish the Twist message
+        if keys:
+            # Process emergency stop set/clear event
+            emergency_stop_event_registered = self.process_emergency_stop_keys(keys)
+
+            if not emergency_stop_event_registered:
+                # Check if the key associated with increasing linear speed is pressed
+                if keys[self.increase_linear_speed_key]:
+                    # Increase linear speed by 10%
+                    self.linear_speed *= 1.1
+                    # Ensure linear speed does not exceed the maximum value
+                    self.linear_speed = min(self.linear_speed, self.max_linear_speed)
+
+                # Check if the key associated with decreasing linear speed is pressed
+                if keys[self.decrease_linear_speed_key]:
+                    # Decrease linear speed by 10%
+                    self.linear_speed /= 1.1
+
+                # Check if the key associated with increasing angular speed is pressed
+                if keys[self.increase_angular_speed_key]:
+                    # Increase angular speed by 10%
+                    self.angular_speed *= 1.1
+                    # Ensure angular speed does not exceed the maximum value
+                    self.angular_speed = min(self.angular_speed, self.max_angular_speed)
+
+                # Check if the key associated with decreasing angular speed is pressed
+                if keys[self.decrease_angular_speed_key]:
+                    # Decrease angular speed by 10%
+                    self.angular_speed /= 1.1
+
+    def publish_twist(self):
+        # Prepare the Twist message
         twist = Twist()
-        twist.linear.x = twist.linear.y = twist.linear.z = 0.0
-        twist.angular.x = twist.angular.y = twist.angular.z = 0.0
 
-        if not keys[self.stop_key]:
-            if keys[self.forward_key]:
-                twist.linear.x += self.linear_speed
-            if keys[self.backward_key]:
-                twist.linear.x += -self.linear_speed
-            if keys[self.left_key]:
-                if twist.linear.x > 0:
-                    twist.angular.z += self.angular_speed
-                else:
-                    twist.angular.z += -self.angular_speed
-            if keys[self.right_key]:
-                if twist.linear.x > 0:
-                    twist.angular.z += -self.angular_speed
-                else:
-                    twist.angular.z += self.angular_speed
+        # Get the state of all keys
+        keys = self.capture_pressed_keys()
 
-        # Publish the Twist message
-        self.publisher_.publish(twist)
+        if keys:
+            # Process emergency stop set/clear event
+            self.process_emergency_stop_keys(keys)
+
+            if not self.emergency_stop_msg.data:
+                # Process actuation keys
+                if not keys[self.stop_key]:
+                    if keys[self.forward_key]:
+                        twist.linear.x += self.linear_speed
+                    if keys[self.backward_key]:
+                        twist.linear.x += -self.linear_speed
+                    if keys[self.left_key]:
+                        if twist.linear.x > 0:
+                            twist.angular.z += self.angular_speed
+                        else:
+                            twist.angular.z += -self.angular_speed
+                    if keys[self.right_key]:
+                        if twist.linear.x > 0:
+                            twist.angular.z += -self.angular_speed
+                        else:
+                            twist.angular.z += self.angular_speed
+
+            # Publish the Twist message
+            self.twist_publisher.publish(twist)
 
         # Display information in the terminal
         self.display_information(twist)
 
-        pygame.event.pump()
+    def process_emergency_stop_keys(self, keys):
+        emergency_stop_event_registered = keys[self.emergency_stop_key] and (
+            keys[pygame.K_LCTRL] or keys[pygame.K_RCTRL]
+        )
+
+        # Check if emergency stop key is pressed
+        if emergency_stop_event_registered:
+            if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                if self.emergency_stop_msg.data:
+                    # Clear emergency stop signal
+                    self.emergency_stop_msg.data = False
+                    self.get_logger().warn('Emergency stop CLEARED from keyboard.')
+            else:
+                if not self.emergency_stop_msg.data:
+                    # Set emergency stop signal
+                    self.emergency_stop_msg.data = True
+                    self.get_logger().warn('Emergency stop ACTIVATED from keyboard.')
+                    self.twist_publisher.publish(Twist())
+
+            self.emergency_stop_publisher.publish(self.emergency_stop_msg)
+
+        return emergency_stop_event_registered
 
     def display_information(self, twist):
         # Fill the screen with black
         self.screen.fill(pygame.Color('black'))
 
         text = (
+            '************************* Usage Guide **************************\n\n'
             'Publishing twist messages using keypresses from the keyboard.\n\n'
             'Moving around:\n'
             '        w                 (Forward)\n'
             '   a   s    d   (Left   Stop   Right)\n'
             '        x                 (Reverse)\n\n'
             'i / k : increase/decrease linear speed by 10%\n'
-            'o / l : increase/decrease angular speed by 10%\n\n'
-            f'Configured : Linear - {self.linear_speed:.2f}; Angular - {self.angular_speed:.2f}\n\n'  # noqa
-            f'Publishing : Linear - {twist.linear.x:.2f}; Angular - {twist.angular.z:.2f}\n\n'
+            'o / l : increase/decrease angular speed by 10%\n'
+            'Ctrl + e : activate emergency stop\n'
+            'Ctrl + Shift + e : clear emergency stop\n\n'
+            '************************** Status *********************************\n\n'
+            f'Configured speeds: Linear - {self.linear_speed:.2f}; Angular - {self.angular_speed:.2f}\n\n'  # noqa
+            f'Publishing speeds: Linear - {twist.linear.x:.2f}; Angular - {twist.angular.z:.2f}\n\n'  # noqa
+            f'Emergency stop: {"ACTIVATED" if self.emergency_stop_msg.data else "CLEARED"}\n\n'
+            '*********************************************************************\n\n'
         )
 
         self.blit_text(text, (20, 20))
