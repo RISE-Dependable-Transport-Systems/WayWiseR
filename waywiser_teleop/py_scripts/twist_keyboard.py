@@ -31,6 +31,15 @@ class TwistKeyboard(Node):
         self.decrease_angular_speed_key = pygame.K_l
         self.emergency_stop_key = pygame.K_e  # set with Ctrl+e, clear with Ctrl+Shift+e
 
+        self.actuation_keys = [
+            self.forward_key,
+            self.backward_key,
+            self.left_key,
+            self.right_key,
+            self.stop_key,
+        ]
+        self.is_actuation_requested = False
+
         self.declare_parameter('max_linear_speed', 2.0)
         self.declare_parameter('max_angular_speed', 2.0)
         self.declare_parameter('startup_linear_speed', 0.5)
@@ -140,26 +149,36 @@ class TwistKeyboard(Node):
             # Process emergency stop set/clear event
             self.process_emergency_stop_keys(keys)
 
-            if not self.emergency_stop_msg.data:
-                # Process actuation keys
-                if not keys[self.stop_key]:
-                    if keys[self.forward_key]:
-                        twist.linear.x += self.linear_speed
-                    if keys[self.backward_key]:
-                        twist.linear.x += -self.linear_speed
-                    if keys[self.left_key]:
-                        if twist.linear.x > 0:
-                            twist.angular.z += self.angular_speed
-                        else:
-                            twist.angular.z += -self.angular_speed
-                    if keys[self.right_key]:
-                        if twist.linear.x > 0:
-                            twist.angular.z += -self.angular_speed
-                        else:
-                            twist.angular.z += self.angular_speed
+            # Check if any of the actuation keys are pressed now
+            is_actuation_requested_now = any(keys[i] for i in self.actuation_keys)
 
-            # Publish the Twist message
-            self.twist_publisher.publish(twist)
+            if self.is_actuation_requested:
+                if not is_actuation_requested_now:
+                    # Publish zero velocity twist message
+                    self.twist_publisher.publish(twist)
+
+                elif not self.emergency_stop_msg.data:
+                    # Process actuation keys
+                    if not keys[self.stop_key]:
+                        if keys[self.forward_key]:
+                            twist.linear.x += self.linear_speed
+                        if keys[self.backward_key]:
+                            twist.linear.x += -self.linear_speed
+                        if keys[self.left_key]:
+                            if twist.linear.x > 0:
+                                twist.angular.z += self.angular_speed
+                            else:
+                                twist.angular.z += -self.angular_speed
+                        if keys[self.right_key]:
+                            if twist.linear.x > 0:
+                                twist.angular.z += -self.angular_speed
+                            else:
+                                twist.angular.z += self.angular_speed
+
+                    # Publish the Twist message
+                    self.twist_publisher.publish(twist)
+
+            self.is_actuation_requested = is_actuation_requested_now
 
         # Display information in the terminal
         self.display_information(twist)
