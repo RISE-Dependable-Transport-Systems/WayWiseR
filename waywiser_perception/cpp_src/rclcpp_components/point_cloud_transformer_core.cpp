@@ -5,7 +5,7 @@
 
 #include "point_cloud_transformer.hpp"
 
-namespace waywiser_hwbringup
+namespace waywiser_perception
 {
 PointCloudTransformer::PointCloudTransformer(const rclcpp::NodeOptions & options)
 : Node("point_cloud_transformer", options)
@@ -78,8 +78,8 @@ void PointCloudTransformer::pointCloudCallback(const sensor_msgs::msg::PointClou
     RCLCPP_ERROR(this->get_logger(), "Transform failure: %s", ex.what());
   }
 }
-}  // namespace waywiser_hwbringup
+}  // namespace waywiser_perception
 
 // Register the PointCloudTransformer as a plugin
 #include "rclcpp_components/register_node_macro.hpp"
-RCLCPP_COMPONENTS_REGISTER_NODE(waywiser_hwbringup::PointCloudTransformer)
+RCLCPP_COMPONENTS_REGISTER_NODE(waywiser_perception::PointCloudTransformer)

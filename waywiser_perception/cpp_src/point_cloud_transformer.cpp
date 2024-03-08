@@ -5,7 +5,7 @@
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<waywiser_hwbringup::PointCloudTransformer>();
+  auto node = std::make_shared<waywiser_perception::PointCloudTransformer>();
   rclcpp::spin(node->get_node_base_interface());
   rclcpp::shutdown();
   return 0;

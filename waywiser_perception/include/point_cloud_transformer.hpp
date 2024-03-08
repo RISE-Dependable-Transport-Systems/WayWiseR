@@ -1,5 +1,5 @@
-#ifndef WAYWISER_HWBRINGUP_POINT_CLOUD_TRANSFORMER_HPP_
-#define WAYWISER_HWBRINGUP_POINT_CLOUD_TRANSFORMER_HPP_
+#ifndef WAYWISER_PERCEPTION_POINT_CLOUD_TRANSFORMER_HPP_
+#define WAYWISER_PERCEPTION_POINT_CLOUD_TRANSFORMER_HPP_
 
 #include <chrono>
 #include <functional>
@@ -15,7 +15,7 @@
 #include "tf2/exceptions.h"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 
-namespace waywiser_hwbringup
+namespace waywiser_perception
 {
 class PointCloudTransformer : public rclcpp::Node
 {
@@ -43,5 +43,5 @@ private:
   sensor_msgs::msg::PointCloud2 transformed_pointCloud;
   geometry_msgs::msg::TransformStamped transform_stamped;
 };
-}  // namespace waywiser_hwbringup
-#endif  // WAYWISER_HWBRINGUP_POINT_CLOUD_TRANSFORMER_HPP_
+}  // namespace waywiser_perception
+#endif  // WAYWISER_PERCEPTION_POINT_CLOUD_TRANSFORMER_HPP_
