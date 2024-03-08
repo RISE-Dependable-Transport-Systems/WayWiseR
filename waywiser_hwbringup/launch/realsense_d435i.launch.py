@@ -70,6 +70,7 @@ def camera_launch(context):
     camera_params_dict = {}
     # Fix frame_id for depth camera point cloud: https://github.com/IntelRealSense/realsense-ros/tree/ros2-development?tab=readme-ov-file#ros2robot-vs-opticalcamera-coordination-systems # noqa
     enable_pointcloud_tranformation = False
+    publish_color_pointcloud = False
     pointcloud_tranformation_params_dict = {}
 
     with open(LaunchConfiguration('camera_config').perform(context)) as f:
@@ -78,6 +79,8 @@ def camera_launch(context):
             pointcloud_tranformation_params_dict = camera_params_dict['pointcloud_tranformation']
             if 'enable' in pointcloud_tranformation_params_dict:
                 enable_pointcloud_tranformation = pointcloud_tranformation_params_dict['enable']
+        if 'publish_color_pointcloud' in camera_params_dict:
+            publish_color_pointcloud = camera_params_dict['publish_color_pointcloud']
 
     composable_nodes = [
         ComposableNode(
@@ -138,6 +141,7 @@ def camera_launch(context):
             plugin='depth_image_proc::PointCloudXyzrgbNode',
             name='point_cloud_xyzrgb_node',
             namespace=LaunchConfiguration('namespace'),
+            condition=IfCondition(str(publish_color_pointcloud)),
             remappings=[
                 ('rgb/camera_info', 'color/camera_info'),
                 ('rgb/image_rect_color', 'color/image_rect'),
