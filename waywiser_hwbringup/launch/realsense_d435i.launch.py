@@ -1,14 +1,22 @@
+import os
+
+from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.actions import OpaqueFunction
+from launch.conditions import IfCondition
 from launch.conditions import LaunchConfigurationEquals
 from launch.conditions import LaunchConfigurationNotEquals
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.actions import LoadComposableNodes
 from launch_ros.descriptions import ComposableNode
+import yaml
 
 
 def generate_launch_description():
+    hw_bringup_dir = get_package_share_directory('waywiser_hwbringup')
+
     # args that can be set from the command line or a default will be used
     namespace_la = DeclareLaunchArgument(
         'namespace',
@@ -24,6 +32,12 @@ def generate_launch_description():
         'log_level', default_value='info', description='Log level'
     )
 
+    camera_config_la = DeclareLaunchArgument(
+        'camera_config',
+        default_value=os.path.join(hw_bringup_dir, 'config/realsense_d435i_camera.yaml'),
+        description='Full path to params file of camera',
+    )
+
     container_la = DeclareLaunchArgument(
         name='container',
         default_value='',
@@ -33,19 +47,67 @@ def generate_launch_description():
         ),
     )
 
-    # start nodes and use args to set parameters
+    # use context to start nodes
+    camera_launch_action = OpaqueFunction(function=camera_launch)
+
+    # create launch description
+    ld = LaunchDescription()
+
+    # declare launch arg
+    ld.add_action(namespace_la)
+    ld.add_action(use_sim_time_la)
+    ld.add_action(log_level_la)
+    ld.add_action(camera_config_la)
+    ld.add_action(container_la)
+
+    # start nodes
+    ld.add_action(camera_launch_action)
+
+    return ld
+
+
+def camera_launch(context):
+    camera_params_dict = {}
+    # Fix frame_id for depth camera point cloud: https://github.com/IntelRealSense/realsense-ros/tree/ros2-development?tab=readme-ov-file#ros2robot-vs-opticalcamera-coordination-systems # noqa
+    enable_pointcloud_tranformation = False
+    pointcloud_tranformation_params_dict = {}
+
+    with open(LaunchConfiguration('camera_config').perform(context)) as f:
+        camera_params_dict = yaml.safe_load(f)
+        if 'pointcloud_tranformation' in camera_params_dict:
+            pointcloud_tranformation_params_dict = camera_params_dict['pointcloud_tranformation']
+            if 'enable' in pointcloud_tranformation_params_dict:
+                enable_pointcloud_tranformation = pointcloud_tranformation_params_dict['enable']
+
     composable_nodes = [
+        ComposableNode(
+            package='realsense2_camera',
+            plugin='realsense2_camera::RealSenseNodeFactory',
+            name='camera_node',
+            namespace=LaunchConfiguration('namespace'),
+            parameters=[camera_params_dict],
+            remappings=[
+                (
+                    'depth/color/points',
+                    'depth/points_raw',
+                ),
+            ],
+            extra_arguments=[{'use_intra_process_comms': True}],
+        ),
+        ComposableNode(
+            package='waywiser_perception',
+            plugin='waywiser_perception::PointCloudTransformer',
+            name='point_cloud_transformer_node',
+            condition=IfCondition(str(enable_pointcloud_tranformation)),
+            parameters=[pointcloud_tranformation_params_dict],
+            extra_arguments=[{'use_intra_process_comms': True}],
+        ),
         ComposableNode(
             package='image_proc',
             plugin='image_proc::DebayerNode',
             name='debayer_node',
             namespace=[LaunchConfiguration('namespace'), '/color'],
             extra_arguments=[{'use_intra_process_comms': True}],
-            parameters=[
-                {
-                    'use_sim_time': LaunchConfiguration('use_sim_time'),
-                }
-            ],
             remappings=[
                 ('image_color', 'image'),
             ],
@@ -56,11 +118,6 @@ def generate_launch_description():
             name='rectify_node',
             namespace=[LaunchConfiguration('namespace'), '/color'],
             extra_arguments=[{'use_intra_process_comms': True}],
-            parameters=[
-                {
-                    'use_sim_time': LaunchConfiguration('use_sim_time'),
-                }
-            ],
         ),
         ComposableNode(
             package='depth_image_proc',
@@ -68,11 +125,6 @@ def generate_launch_description():
             name='convert_metric_node',
             namespace=[LaunchConfiguration('namespace'), '/aligned_depth_to_color'],
             extra_arguments=[{'use_intra_process_comms': True}],
-            parameters=[
-                {
-                    'use_sim_time': LaunchConfiguration('use_sim_time'),
-                }
-            ],
         ),
         ComposableNode(
             package='image_proc',
@@ -80,11 +132,6 @@ def generate_launch_description():
             name='rectify_node',
             namespace=[LaunchConfiguration('namespace'), '/aligned_depth_to_color'],
             extra_arguments=[{'use_intra_process_comms': True}],
-            parameters=[
-                {
-                    'use_sim_time': LaunchConfiguration('use_sim_time'),
-                }
-            ],
         ),
         ComposableNode(
             package='depth_image_proc',
@@ -98,11 +145,6 @@ def generate_launch_description():
                 ('points', 'color/points'),
             ],
             extra_arguments=[{'use_intra_process_comms': True}],
-            parameters=[
-                {
-                    'use_sim_time': LaunchConfiguration('use_sim_time'),
-                }
-            ],
         ),
     ]
 
@@ -131,17 +173,9 @@ def generate_launch_description():
         target_container=LaunchConfiguration('container'),
     )
 
-    # create launch description
-    ld = LaunchDescription()
+    return [image_processing_container, load_composable_nodes]
 
-    # declare launch arg
-    ld.add_action(namespace_la)
-    ld.add_action(use_sim_time_la)
-    ld.add_action(log_level_la)
-    ld.add_action(container_la)
 
-    # start nodes
-    ld.add_action(image_processing_container)
-    ld.add_action(load_composable_nodes)
-
-    return ld
+def yaml_to_dict(path_to_yaml):
+    with open(path_to_yaml, 'r') as f:
+        return yaml.load(f, Loader=yaml.SafeLoader)

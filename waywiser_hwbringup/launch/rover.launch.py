@@ -5,15 +5,13 @@ import os
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.actions import GroupAction
+from launch.actions import IncludeLaunchDescription
 from launch.actions import OpaqueFunction
 from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import ComposableNodeContainer
 from launch_ros.actions import Node
-from launch_ros.actions import PushRosNamespace
-from launch_ros.descriptions import ComposableNode
 from launch_ros.descriptions import ParameterValue
 import yaml
 
@@ -33,12 +31,6 @@ def generate_launch_description():
         'lidar_config',
         default_value=os.path.join(hw_bringup_dir, 'config/lidar.yaml'),
         description='Full path to params file of lidar',
-    )
-
-    camera_config_la = DeclareLaunchArgument(
-        'camera_config',
-        default_value=os.path.join(hw_bringup_dir, 'config/realsense_d435i_camera.yaml'),
-        description='Full path to params file of camera',
     )
 
     robot_state_publisher_la = DeclareLaunchArgument(
@@ -93,7 +85,6 @@ def generate_launch_description():
     # declare launch arg
     ld.add_action(rover_config_la)
     ld.add_action(lidar_config_la)
-    ld.add_action(camera_config_la)
     ld.add_action(robot_state_publisher_la)
     ld.add_action(frame_prefix_la)
 
@@ -137,62 +128,23 @@ def camera_conditional_launch(context):
         if 'enable_camera' in waywise_rover_node_params_dict:
             enable_camera = waywise_rover_node_params_dict['enable_camera']
 
-    camera_params_dict = {}
-    # Fix frame_id for depth camera point cloud: https://github.com/IntelRealSense/realsense-ros/tree/ros2-development?tab=readme-ov-file#ros2robot-vs-opticalcamera-coordination-systems # noqa
-    enable_pointcloud_tranformation = False
-    pointcloud_tranformation_params_dict = {}
+    camera_launch_acton = []
     if enable_camera:
-        with open(LaunchConfiguration('camera_config').perform(context)) as f:
-            camera_params_dict = yaml.safe_load(f)
-            if 'pointcloud_tranformation' in camera_params_dict:
-                pointcloud_tranformation_params_dict = camera_params_dict[
-                    'pointcloud_tranformation'
-                ]
-                if 'enable' in pointcloud_tranformation_params_dict:
-                    enable_pointcloud_tranformation = pointcloud_tranformation_params_dict[
-                        'enable'
+        camera_launch_acton = [
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            get_package_share_directory('waywiser_hwbringup'),
+                            'launch',
+                            'realsense_d435i.launch.py',
+                        )
                     ]
-
-    camera_container = GroupAction(
-        actions=[
-            PushRosNamespace('/sensors/camera'),
-            ComposableNodeContainer(
-                name='camera_container',
-                namespace='',
-                package='rclcpp_components',
-                executable='component_container_isolated',
-                parameters=[{'autostart': 'True'}],
-                arguments=['--ros-args', '--log-level', 'info'],
-                condition=IfCondition(str(enable_camera)),
-                output='screen',
-                composable_node_descriptions=[
-                    ComposableNode(
-                        package='realsense2_camera',
-                        plugin='realsense2_camera::RealSenseNodeFactory',
-                        name='camera_node',
-                        parameters=[camera_params_dict],
-                        remappings=[
-                            (
-                                '/sensors/camera/depth/color/points',
-                                '/sensors/camera/depth/points_raw',
-                            ),
-                        ],
-                        extra_arguments=[{'use_intra_process_comms': True}],
-                    ),
-                    ComposableNode(
-                        package='waywiser_hwbringup',
-                        plugin='waywiser_hwbringup::PointCloudTransformer',
-                        name='point_cloud_transformer_node',
-                        condition=IfCondition(str(enable_pointcloud_tranformation)),
-                        parameters=[pointcloud_tranformation_params_dict],
-                        extra_arguments=[{'use_intra_process_comms': True}],
-                    ),
-                ],
-            ),
+                ),
+            )
         ]
-    )
 
-    return [camera_container]
+    return camera_launch_acton
 
 
 def yaml_to_dict(path_to_yaml):
