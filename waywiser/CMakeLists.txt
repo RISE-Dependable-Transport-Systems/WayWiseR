@@ -13,6 +13,12 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
+file(GLOB DISCOVERY_SETUP_FILES "discovery/*.sh")
+install(
+  FILES ${DISCOVERY_SETUP_FILES}
+  DESTINATION discovery
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
 

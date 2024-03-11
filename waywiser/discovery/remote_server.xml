@@ -1,0 +1,197 @@
+<dds>
+    <profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+        <transport_descriptors>
+            <!--
+                UDP transport for PDP and EDP
+            -->
+            <transport_descriptor>
+                <transport_id>udp_transport</transport_id>
+                <type>UDPv4</type>
+                <listening_ports>
+                    <port>11810</port>                    <!-- multicast for PDP -->
+                    <port>11812</port>                    <!-- unicast for EDP -->
+                </listening_ports>
+            </transport_descriptor>
+
+            <!--
+                TCP transport for EDP and User Data
+            -->
+            <transport_descriptor>
+                <transport_id>tcp_transport</transport_id>
+                <type>TCPv4</type>
+                <listening_ports>
+                    <port>11813</port>
+                </listening_ports>
+            </transport_descriptor>
+
+            <!--
+                SHM transport for User Data
+            -->
+            <transport_descriptor>
+                <transport_id>shm_transport</transport_id>
+                <type>SHM</type>
+                <port_queue_capacity>1024</port_queue_capacity>
+                <segment_size>1048576</segment_size>                <!-- 1024*1024 -->
+            </transport_descriptor>
+        </transport_descriptors>
+
+        <participant profile_name="server" is_default_profile="true">
+            <domainId>0</domainId>
+            <rtps>
+                <!-- prefix: 44.53.<server-id-in-hex>.5f.45.50.52.4f.53.49.4d.41 -->
+                <prefix>44.53.01.5f.45.50.52.4f.53.49.4d.41</prefix>
+
+                <!--
+                    Set participant transports
+                -->
+                <useBuiltinTransports>false</useBuiltinTransports>
+                <userTransports>
+                    <transport_id>udp_transport</transport_id>
+                    <transport_id>tcp_transport</transport_id>
+                    <transport_id>shm_transport</transport_id>
+                </userTransports>
+
+                <builtin>
+                    <initialPeersList>
+                        <locator>
+                            <udpv4>
+                                <address>127.0.0.1</address>
+                                <port>11811</port>
+                            </udpv4>
+                        </locator>
+
+                        <locator>
+                            <udpv4>
+                                <address>127.0.0.1</address>
+                            </udpv4>
+                        </locator>
+
+                        <locator>
+                            <tcpv4>
+                                <address _marker="server">10.8.0.1</address>
+                            </tcpv4>
+                        </locator>
+                    </initialPeersList>
+
+                    <!--
+                        Discovery configuration
+                    -->
+                    <discovery_config>
+                        <!-- Set participant as SERVER -->
+                        <discoveryProtocol>SERVER</discoveryProtocol>
+
+                        <discoveryServersList>
+                            <RemoteServer prefix="44.53.00.5f.45.50.52.4f.53.49.4d.41">
+                                <!-- Set SERVER's listening locator for EDP over UDP -->
+                                <metatrafficUnicastLocatorList>
+                                    <locator>
+                                        <udpv4>
+                                            <address>127.0.0.1</address>
+                                            <port>11811</port>
+                                        </udpv4>
+                                    </locator>
+                                </metatrafficUnicastLocatorList>
+                            </RemoteServer>
+                        </discoveryServersList>
+                    </discovery_config>
+
+                    <!--
+                        PDP over UDP multicast
+                    -->
+                    <metatrafficMulticastLocatorList>
+                        <locator>
+                            <udpv4>
+                                <address _marker="server">10.8.0.1</address>
+                                <port>11810</port>
+                            </udpv4>
+                        </locator>
+                    </metatrafficMulticastLocatorList>
+
+                    <!--
+                        EDP over TCP
+                    -->
+                    <metatrafficUnicastLocatorList>
+                        <locator>
+                            <udpv4>
+                                <address>127.0.0.1</address>
+                                <port>11812</port>
+                            </udpv4>
+                        </locator>
+
+                        <locator>
+                            <udpv4>
+                                <address _marker="server">10.8.0.1</address>
+                                <port>11812</port>
+                            </udpv4>
+                        </locator>
+
+                        <locator>
+                            <tcpv4>
+                                <address _marker="server">10.8.0.1</address>
+                                <port>11813</port>
+                                <physical_port>11813</physical_port>
+                            </tcpv4>
+                        </locator>
+                    </metatrafficUnicastLocatorList>
+                </builtin>
+            </rtps>
+        </participant>
+
+        <!-- Default publisher profile -->
+        <publisher profile_name="default_publisher" is_default_profile="true">
+            <qos>
+                <publishMode>
+                    <kind>SYNCHRONOUS</kind>
+                </publishMode>
+                <data_sharing>
+                    <kind>AUTOMATIC</kind>
+                </data_sharing>
+            </qos>
+            <historyMemoryPolicy>DYNAMIC_REUSABLE</historyMemoryPolicy>
+        </publisher>
+
+        <!-- Default subscriber profile -->
+        <subscriber profile_name="default_subscriber" is_default_profile="true">
+            <qos>
+                <data_sharing>
+                    <kind>AUTOMATIC</kind>
+                </data_sharing>
+            </qos>
+            <historyMemoryPolicy>DYNAMIC_REUSABLE</historyMemoryPolicy>
+        </subscriber>
+
+        <!-- service publisher is SYNC -->
+        <publisher profile_name="service">
+            <qos>
+                <publishMode>
+                    <kind>SYNCHRONOUS</kind>
+                </publishMode>
+            </qos>
+            <historyMemoryPolicy>DYNAMIC_REUSABLE</historyMemoryPolicy>
+        </publisher>
+
+        <!-- client publisher is ASYNC -->
+        <publisher profile_name="client">
+            <qos>
+                <publishMode>
+                    <kind>ASYNCHRONOUS</kind>
+                </publishMode>
+            </qos>
+            <historyMemoryPolicy>DYNAMIC_REUSABLE</historyMemoryPolicy>
+        </publisher>
+
+        <!-- Default writer profile -->
+        <data_writer profile_name="default_writer_profile" is_default_profile="true">
+            <historyMemoryPolicy>DYNAMIC_REUSABLE</historyMemoryPolicy>
+        </data_writer>
+
+        <!-- Default reader profile -->
+        <data_reader profile_name="default_subscriber_profile" is_default_profile="true">
+            <historyMemoryPolicy>DYNAMIC_REUSABLE</historyMemoryPolicy>
+        </data_reader>
+    </profiles>
+
+    <library_settings>
+        <intraprocess_delivery>FULL</intraprocess_delivery>        <!-- OFF | USER_DATA_ONLY | FULL -->
+    </library_settings>
+</dds>
