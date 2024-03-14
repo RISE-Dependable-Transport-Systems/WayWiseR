@@ -25,9 +25,9 @@ Considering the modularity of ROS2 and WayWise, a project could also do somethin
 
 Main authors are (firstname.lastname@ri.se):
 
-- Marvin Damschen
-- Rickard Häll
 - Ramana Reddy Avula
+- Rickard Häll
+- Marvin Damschen
 
 ## How to use it and what to expect
 
