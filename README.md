@@ -89,6 +89,7 @@ WayWiseR is divided into several ROS2 packages. Make sure to have a look into th
 - **waywiser_gazebo**: Everything related to simulation using [Gazebo](https://gazebosim.org).
 - **waywiser_hwbringup**: Configuration and launch files to get real (not simulated) vehicles running.
 - **waywiser_node**: Wraps [WayWise](https://github.com/RISE-Dependable-Transport-Systems/WayWise) into ROS2 nodes (currently a single node).
+- **waywiser_perception**: Provides image-processing and computer vision functionalities using [YOLOv8](https://docs.ultralytics.com/).
 - **waywiser_rviz2**: Configuration and launch files for RViz2.
 - **waywiser_slam**: Configuration and launch files for [SLAM Toolbox](https://github.com/SteveMacenski/slam_toolbox).
 - **waywiser_teleop**: Configuration and launch files for teleop packages (handling keyboard or gamepad input) and a node to arbitrate between them.

@@ -14,7 +14,7 @@ enable_accel: false
 pointcloud.enable: true
 colorizer.enable: false
 enable_sync: true
-publish_tf: false
+publish_tf: true
 tf_publish_rate: 30.0
 pointcloud_tranformation:
   enable: true
@@ -24,3 +24,4 @@ pointcloud_tranformation:
   static_rotation_xyzw: [-0.5, 0.5, -0.5, 0.5]
   input_point_cloud_topic: "/sensors/camera/depth/points_raw"
   output_point_cloud_topic: "/sensors/camera/depth/points"
+publish_color_pointcloud: true

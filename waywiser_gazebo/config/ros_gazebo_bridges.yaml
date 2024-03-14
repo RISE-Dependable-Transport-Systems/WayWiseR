@@ -54,16 +54,39 @@
                             # "GZ_TO_ROS" - Bridge Ignition topic to ROS
                             # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
-- ros_topic_name: "sensors/camera/color/image"
+- ros_topic_name: "sensors/camera/color/image_rect"
   gz_topic_name: "sensors/camera/image"
   ros_type_name: "sensor_msgs/msg/Image"
   gz_type_name: "gz.msgs.Image"
   subscriber_queue: 5       # Default 10
   publisher_queue: 6        # Default 10
   lazy: true                # Default "false"
-  direction: GZ_TO_ROS  # Default "BIDIRECTIONAL" - Bridge both directions
+  direction: GZ_TO_ROS      # Default "BIDIRECTIONAL" - Bridge both directions
                             # "GZ_TO_ROS" - Bridge Ignition topic to ROS
                             # "ROS_TO_GZ" - Bridge ROS topic to Ignition
+
+- ros_topic_name: "sensors/camera/aligned_depth_to_color/image_rect"
+  gz_topic_name: "sensors/camera/depth_image"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  subscriber_queue: 5       # Default 10
+  publisher_queue: 6        # Default 10
+  lazy: true                # Default "false"
+  direction: GZ_TO_ROS      # Default "BIDIRECTIONAL" - Bridge both directions
+                            # "GZ_TO_ROS" - Bridge Ignition topic to ROS
+                            # "ROS_TO_GZ" - Bridge ROS topic to Ignition
+
+- ros_topic_name: "sensors/camera/aligned_depth_to_color/camera_info"
+  gz_topic_name: "sensors/camera/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  subscriber_queue: 5       # Default 10
+  publisher_queue: 6        # Default 10
+  lazy: true                # Default "false"
+  direction: GZ_TO_ROS      # Default "BIDIRECTIONAL" - Bridge both directions
+                            # "GZ_TO_ROS" - Bridge Ignition topic to ROS
+                            # "ROS_TO_GZ" - Bridge ROS topic to Ignition
+
 
 - ros_topic_name: "sensors/camera/depth/points"
   gz_topic_name: "sensors/camera/points"
@@ -72,7 +95,18 @@
   subscriber_queue: 5       # Default 10
   publisher_queue: 6        # Default 10
   lazy: true                # Default "false"
-  direction: GZ_TO_ROS  # Default "BIDIRECTIONAL" - Bridge both directions
+  direction: GZ_TO_ROS      # Default "BIDIRECTIONAL" - Bridge both directions
+                            # "GZ_TO_ROS" - Bridge Ignition topic to ROS
+                            # "ROS_TO_GZ" - Bridge ROS topic to Ignition
+
+- ros_topic_name: "sensors/camera/color/points"
+  gz_topic_name: "sensors/camera/points"
+  ros_type_name: "sensor_msgs/msg/PointCloud2"
+  gz_type_name: "gz.msgs.PointCloudPacked"
+  subscriber_queue: 5       # Default 10
+  publisher_queue: 6        # Default 10
+  lazy: true                # Default "false"
+  direction: GZ_TO_ROS      # Default "BIDIRECTIONAL" - Bridge both directions
                             # "GZ_TO_ROS" - Bridge Ignition topic to ROS
                             # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 

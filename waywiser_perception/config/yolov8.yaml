@@ -1,0 +1,17 @@
+yolov8_node:
+    ros__parameters:
+        model_file_path: "~/workspaces/waywiser_ws/resources/yolov8s-seg.engine"
+        device: "cuda:0" # cuda:x/cpu
+        confidence_threshold: 0.25 # Detection confidence threshold
+        prediction_verbose: True
+        color_image_topic: "/sensors/camera/color/image_rect"
+        publish_annotated_image: True
+        annotated_color_image_topic: "/sensors/camera/color/yolov8_annotated_image"
+        camera_base_frame: "camera_link"
+
+        depth_image_topic: "/sensors/camera/aligned_depth_to_color/image_rect"
+        depth_camerainfo_topic: "/sensors/camera/aligned_depth_to_color/camera_info"
+        maximum_object_depth_size: 0.5
+
+        publish_bbox_3d_markers: True
+        rviz_3d_visualization_markers_topic: "/sensors/camera/color/bbox_3d_markers"
