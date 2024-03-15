@@ -34,7 +34,7 @@ def generate_launch_description():
 
     camera_config_la = DeclareLaunchArgument(
         'camera_config',
-        default_value=os.path.join(hw_bringup_dir, 'config/realsense_d435i_camera.yaml'),
+        default_value=os.path.join(hw_bringup_dir, 'config/realsense_d435i.yaml'),
         description='Full path to params file of camera',
     )
 
