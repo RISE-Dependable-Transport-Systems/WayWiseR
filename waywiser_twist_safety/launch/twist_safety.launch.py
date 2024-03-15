@@ -9,12 +9,12 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    hw_bringup_dir = get_package_share_directory('waywiser_twist_safety')
+    waywiser_twist_safety_dir = get_package_share_directory('waywiser_twist_safety')
 
     # args that can be set from the command line or a default will be used
     twist_safety_config_la = DeclareLaunchArgument(
         'twist_safety_config',
-        default_value=os.path.join(hw_bringup_dir, 'config/twist_safety.yaml'),
+        default_value=os.path.join(waywiser_twist_safety_dir, 'config/twist_safety.yaml'),
         description='Full path to params file',
     )
 
