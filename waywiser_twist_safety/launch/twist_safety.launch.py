@@ -3,6 +3,7 @@ import os
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.actions import GroupAction
 from launch.actions import OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -67,31 +68,36 @@ def conditional_launch_setup(context):
     launch_actions = []
 
     if enable_collision_monitor:
-        collision_monitor_node = Node(
-            package='nav2_collision_monitor',
-            executable='collision_monitor',
-            name='collision_monitor',
-            output='screen',
-            emulate_tty=True,  # https://github.com/ros2/launch/issues/188
-            parameters=[
-                LaunchConfiguration('twist_safety_config'),
-                {'use_sim_time': LaunchConfiguration('use_sim_time')},
+        collision_monitor = GroupAction(
+            actions=[
+                Node(
+                    package='nav2_collision_monitor',
+                    executable='collision_monitor',
+                    name='collision_monitor',
+                    output='screen',
+                    emulate_tty=True,  # https://github.com/ros2/launch/issues/188
+                    parameters=[
+                        LaunchConfiguration('twist_safety_config'),
+                        {'use_sim_time': LaunchConfiguration('use_sim_time')},
+                    ],
+                    remappings={('/bond', '/bond_nav2')},
+                ),
+                Node(
+                    package='nav2_lifecycle_manager',
+                    executable='lifecycle_manager',
+                    name='lifecycle_manager_collision_monitor',
+                    output='screen',
+                    emulate_tty=True,  # https://github.com/ros2/launch/issues/188
+                    parameters=[
+                        {
+                            'use_sim_time': LaunchConfiguration('use_sim_time'),
+                            'autostart': True,
+                            'node_names': ['collision_monitor'],
+                        }
+                    ],
+                    remappings={('/bond', '/bond_collision_monitor')},
+                ),
             ],
-            remappings={('/bond', '/bond_collision_monitor')},
-        )
-
-        lifecycle_manager_node = Node(
-            package='nav2_lifecycle_manager',
-            executable='lifecycle_manager',
-            name='lifecycle_manager_collision_monitor',
-            output='screen',
-            emulate_tty=True,  # https://github.com/ros2/launch/issues/188
-            parameters=[
-                {'use_sim_time': LaunchConfiguration('use_sim_time')},
-                {'autostart': True},
-                {'node_names': ['collision_monitor']},
-            ],
-            remappings={('/bond', '/bond_collision_monitor')},
         )
 
         emergency_stop_monitor_node = Node(
@@ -106,9 +112,7 @@ def conditional_launch_setup(context):
             ],
             remappings={('/cmd_vel_in', '/collision_monitor_vel')},
         )
-        launch_actions.extend(
-            [lifecycle_manager_node, collision_monitor_node, emergency_stop_monitor_node]
-        )
+        launch_actions.extend([collision_monitor, emergency_stop_monitor_node])
     else:
         emergency_stop_monitor_node = Node(
             package='waywiser_twist_safety',
