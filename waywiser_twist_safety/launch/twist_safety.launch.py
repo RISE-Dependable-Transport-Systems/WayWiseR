@@ -93,6 +93,7 @@ def conditional_launch_setup(context):
                             'use_sim_time': LaunchConfiguration('use_sim_time'),
                             'autostart': True,
                             'node_names': ['collision_monitor'],
+                            'bond_timeout': 0.0,
                         }
                     ],
                     remappings={('/bond', '/bond_collision_monitor')},
