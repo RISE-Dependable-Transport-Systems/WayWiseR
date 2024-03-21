@@ -67,7 +67,7 @@ remote_client=false
 is_super_client=0
 server_ip=""
 client_ip=""
-domain_id=0
+domain_id_input=-1
 
 # Parse options
 while getopts "hers:c:d:" opt; do
@@ -88,7 +88,7 @@ while getopts "hers:c:d:" opt; do
     c) client_ip="$OPTARG" ;;
     d) # Check if domain_id is valid
         if [[ $OPTARG =~ ^[0-9]+$ ]] && ((OPTARG >= 0 && OPTARG < 200)); then
-            domain_id="$OPTARG"
+            domain_id_input="$OPTARG"
         else
             echo "Error: Invalid domain_id. It must be an integer >= 0 and < 200." >&2
             display_usage
@@ -126,13 +126,17 @@ if $remote_client; then
     fi
 
     configured_client_ip=$(grep -oP -m 1 '(?<=<address _marker="client">)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(?=</address>)' $config_fullfilepath)
-    if [ -n "$client_ip" ]; then
-        client_ip=$client_ip
-    else
+    if [ -z "$client_ip" ]; then
         client_ip=$configured_client_ip
     fi
 
     configured_domain_id=$(grep -oP -m 1 '(?<=<domainId>)[0-9]+(?=</domainId>)' $config_fullfilepath)
+    if (($domain_id_input < 0)); then
+        domain_id=$configured_domain_id
+    else
+        domain_id=$domain_id_input
+    fi
+
     configured_discovery_protocol=$(grep -oP '(?<=<discoveryProtocol>).*?(?=</discoveryProtocol>)' $config_fullfilepath)
 
     # Check if server_ip and client_ip are valid IP addresses
@@ -170,6 +174,12 @@ else
     config_fullfilepath=$(get_full_file_path $local_client_config_file)
 
     configured_domain_id=$(grep -oP -m 1 '(?<=<domainId>)[0-9]+(?=</domainId>)' $config_fullfilepath)
+    if (($domain_id_input < 0)); then
+        domain_id=$configured_domain_id
+    else
+        domain_id=$domain_id_input
+    fi
+
     configured_discovery_protocol=$(grep -oP '(?<=<discoveryProtocol>).*?(?=</discoveryProtocol>)' $config_fullfilepath)
 
     if [ "$configured_domain_id" != "$domain_id" ] || [ "$configured_discovery_protocol" != "$discovery_protocol" ]; then
