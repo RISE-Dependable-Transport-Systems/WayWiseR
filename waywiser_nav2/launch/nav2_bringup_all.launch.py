@@ -56,7 +56,7 @@ def generate_launch_description():
         'planner_server',
         'behavior_server',
         'bt_navigator',
-        'waypoint_follower',
+        'waypoint_navigator',
         'velocity_smoother',
     ]
 
@@ -181,7 +181,7 @@ def generate_launch_description():
             Node(
                 package='nav2_waypoint_follower',
                 executable='waypoint_follower',
-                name='waypoint_follower',
+                name='waypoint_navigator',
                 output='screen',
                 respawn=use_respawn,
                 respawn_delay=2.0,
@@ -264,7 +264,7 @@ def generate_launch_description():
         ComposableNode(
             package='nav2_waypoint_follower',
             plugin='nav2_waypoint_follower::WaypointFollower',
-            name='waypoint_follower',
+            name='waypoint_navigator',
             parameters=[configured_params],
             remappings=remappings,
             extra_arguments=[{'use_intra_process_comms': True}],

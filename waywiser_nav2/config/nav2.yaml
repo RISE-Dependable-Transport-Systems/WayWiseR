@@ -414,7 +414,7 @@ robot_state_publisher:
   ros__parameters:
     use_sim_time: False
 
-waypoint_follower:
+waypoint_navigator:
   ros__parameters:
     use_sim_time: False
     loop_rate: 20
