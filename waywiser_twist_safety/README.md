@@ -5,6 +5,20 @@
     ros2 launch waywiser_twist_safety twist_safety.launch.py enable_collision_monitor:=true
     ros2 launch waywiser_twist_safety twist_safety.launch.py twist_safety_config:=./src/WayWiseR/waywiser_twist_safety/config/twist_safety.yaml
 
+## Set/clear emergency_stop from command line
+
+- To set emergency_stop:
+
+  ```
+  ros2 topic pub --once /emergency_stop std_msgs/msg/Bool "data: true"
+  ```
+
+- To clear emergency_stop
+
+  ```
+  ros2 topic pub --once /emergency_stop std_msgs/msg/Bool "data: false"
+  ```
+
 ## Nodes launched by twist_safety.launch.py
 
 1. **onboard_twist_mux**: node that subscribes to topics configured in twist_safety_config file, e.g., teleop_mux_vel, waywise_vel etc., and publishes to onboard_mux_vel by multiplexing between sunscribed topics according to their priorities.
