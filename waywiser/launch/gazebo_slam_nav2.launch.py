@@ -83,7 +83,7 @@ def generate_launch_description():
                 os.path.join(
                     waywiser_nav2_dir,
                     'launch',
-                    'nav2.launch.py',
+                    'nav2_bringup_all.launch.py',
                 )
             ]
         ),
