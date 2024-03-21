@@ -74,7 +74,7 @@ mkdir -p $tmp_dir
 edit_config=false
 start_remote=false
 server_ip=""
-domain_id=0
+domain_id_input=-1
 
 # Parse options
 while getopts "hers:d:" opt; do
@@ -88,7 +88,7 @@ while getopts "hers:d:" opt; do
     s) server_ip="$OPTARG" ;;
     d) # Check if domain_id is valid
         if [[ $OPTARG =~ ^[0-9]+$ ]] && ((OPTARG >= 0 && OPTARG < 200)); then
-            domain_id="$OPTARG"
+            domain_id_input="$OPTARG"
         else
             echo "Error: Invalid domain_id. It must be an integer >= 0 and < 200." >&2
             display_usage
@@ -112,13 +112,16 @@ shift $((OPTIND - 1))
 # Clean shm zombies
 fastdds shm clean >/dev/null 2>&1
 
-# Echo domain id
-echo "Configured DOMAIN_ID : $domain_id"
-
 # Configure local server
 server_id=0
 config_fullfilepath=$(get_full_file_path $local_server_config_file)
 configured_domain_id=$(grep -oP -m 1 '(?<=<domainId>)[0-9]+(?=</domainId>)' $config_fullfilepath)
+if (($domain_id_input < 0)); then
+    domain_id=$configured_domain_id
+else
+    domain_id=$domain_id_input
+fi
+
 if [ "$configured_domain_id" -ne "$domain_id" ]; then
     if ! $edit_config; then
         # Copy the configuration file to the tmp_dir and replace the domain_id in the file
@@ -148,6 +151,11 @@ if $start_remote; then
     fi
 
     configured_domain_id=$(grep -oP -m 1 '(?<=<domainId>)[0-9]+(?=</domainId>)' $config_fullfilepath)
+    if (($domain_id_input < 0)); then
+        domain_id=$configured_domain_id
+    else
+        domain_id=$domain_id_input
+    fi
 
     # Check if server_ip is a valid IP address
     if is_valid_ip "$server_ip"; then
@@ -178,6 +186,8 @@ if $start_remote; then
     fi
 fi
 
+# Echo domain id
+echo "Configured DOMAIN_ID : $domain_id"
 ########################################################################
 
 # Wait for background processes to finish
