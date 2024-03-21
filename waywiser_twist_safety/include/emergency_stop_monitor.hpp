@@ -24,12 +24,17 @@ public:
 private:
   void emergency_stop_callback(const std_msgs::msg::Bool::SharedPtr emergency_stop_msg);
   void twist_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg);
+  void twist_watchdog_callback();
 
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr emergency_stop_subscriber_;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr twist_subscriber_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr twist_publisher_;
 
   bool emergency_stop_value_;
+  float cmd_vel_in_timeout_;
+
+  // Timer
+  rclcpp::TimerBase::SharedPtr twist_watchdog_timer_;
 };
 }  // namespace waywiser_twist_safety
 #endif  // WAYWISER_TWIST_SAFETY_EMERGENCY_STOP_MONITOR_HPP_

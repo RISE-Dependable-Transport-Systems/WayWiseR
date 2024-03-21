@@ -1,6 +1,7 @@
 emergency_stop_monitor:
   ros__parameters:
     start_with_emergency_stop: true
+    cmd_vel_in_timeout: 0.5
 
 onboard_twist_mux:
   ros__parameters:
