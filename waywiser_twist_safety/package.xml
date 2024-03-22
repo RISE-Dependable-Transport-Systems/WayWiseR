@@ -20,6 +20,8 @@
 
   <license>GPLv3</license>
 
+  <url type="website">https://github.com/ros-planning/navigation2/tree/humble/nav2_collision_monitor</url>
+
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <test_depend>ament_lint_auto</test_depend>
@@ -32,8 +34,6 @@
   <depend>twist_mux</depend>
   <depend>nav2_collision_monitor</depend>
   <depend>nav2_lifecycle_manager</depend>
-
-  <url type="website">https://github.com/ros-planning/navigation2/tree/humble/nav2_collision_monitor</url>
 
   <export>
     <build_type>ament_cmake</build_type>
