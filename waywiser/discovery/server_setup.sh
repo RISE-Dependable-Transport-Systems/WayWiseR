@@ -68,7 +68,7 @@ has_ip_in_interfaces() {
 # Default values
 local_server_config_file="local_server.xml"
 remote_server_config_file="remote_server.xml"
-tmp_dir="/tmp/waywiser/discovery/"
+tmp_dir="$HOME/.waywiser/discovery/"
 mkdir -p $tmp_dir
 
 edit_config=false
@@ -129,11 +129,13 @@ if [ "$configured_domain_id" -ne "$domain_id" ]; then
         cp $config_fullfilepath $tmp_config_fullfilepath
 
         config_fullfilepath=$tmp_config_fullfilepath
+
+        echo "[server $server_id] Using the config_file: $config_fullfilepath to create the local server with domain id $domain_id."
+    else
+        echo "[server $server_id] Edited the default config_file: $config_fullfilepath to create the local server with domain id $domain_id."
     fi
 
     sed -i "s|<domainId>$configured_domain_id</domainId>|<domainId>$domain_id</domainId>|g" "$config_fullfilepath"
-
-    echo "[server $server_id] Edited the config_file: $config_fullfilepath to create the local server with domain id $domain_id."
 fi
 
 # Start local server
@@ -168,12 +170,15 @@ if $start_remote; then
                     cp $config_fullfilepath $tmp_config_fullfilepath
 
                     config_fullfilepath=$tmp_config_fullfilepath
+
+                    echo "[server $server_id] Using the config_file: $config_fullfilepath to create the remote server $server_ip with domain id $domain_id."
+                else
+                    echo "[server $server_id] Edited the default config_file: $config_fullfilepath to create the remote server $server_ip with domain id $domain_id."
                 fi
 
                 sed -i "s|<address _marker=\"server\">$configured_server_ip</address>|<address _marker=\"server\">$server_ip</address>|g" "$config_fullfilepath"
                 sed -i "s|<domainId>$configured_domain_id</domainId>|<domainId>$domain_id</domainId>|g" "$config_fullfilepath"
 
-                echo "[server $server_id] Edited the config_file: $config_fullfilepath to create the remote server $server_ip with domain id $domain_id."
             fi
 
             # Start remote server

@@ -59,7 +59,7 @@ has_ip_in_interfaces() {
 # Default values
 local_client_config_file="local_client.xml"
 remote_client_config_file="remote_client.xml"
-tmp_dir="/tmp/waywiser/discovery/"
+tmp_dir="$HOME/.waywiser/discovery/"
 mkdir -p $tmp_dir
 
 edit_config=false
@@ -150,14 +150,15 @@ if $remote_client; then
                     cp $config_fullfilepath $tmp_config_fullfilepath
 
                     config_fullfilepath=$tmp_config_fullfilepath
+                    echo "Using the config_file: $config_fullfilepath to access the remote server $server_ip from the client $client_ip with domain id $domain_id and $discovery_protocol protocol."
+                else
+                    echo "Edited the default config_file: $config_fullfilepath to access the remote server $server_ip from the client $client_ip with domain id $domain_id and $discovery_protocol protocol."
                 fi
 
                 sed -i "s|<address _marker=\"server\">$configured_server_ip</address>|<address _marker=\"server\">$server_ip</address>|g" "$config_fullfilepath"
                 sed -i "s|<address _marker=\"client\">$configured_client_ip</address>|<address _marker=\"client\">$client_ip</address>|g" "$config_fullfilepath"
                 sed -i "s|<domainId>$configured_domain_id</domainId>|<domainId>$domain_id</domainId>|g" "$config_fullfilepath"
                 sed -i "s|<discoveryProtocol>$configured_discovery_protocol</discoveryProtocol>|<discoveryProtocol>$discovery_protocol</discoveryProtocol>|g" $config_fullfilepath
-
-                echo "Edited the config_file: $config_fullfilepath to access the remote server $server_ip from the client $client_ip with domain id $domain_id and $discovery_protocol protocol."
             fi
         else
             echo "Error: The system does not have the client ip $client_ip in any of its interfaces."
@@ -189,12 +190,14 @@ else
             cp $config_fullfilepath $tmp_config_fullfilepath
 
             config_fullfilepath=$tmp_config_fullfilepath
+
+            echo "Using the config_file: $config_fullfilepath to access the local server with domain id $domain_id and $discovery_protocol protocol."
+        else
+            echo "Edited the default config_file: $config_fullfilepath to access the local server with domain id $domain_id and $discovery_protocol protocol."
         fi
 
         sed -i "s|<domainId>$configured_domain_id</domainId>|<domainId>$domain_id</domainId>|g" "$config_fullfilepath"
         sed -i "s|<discoveryProtocol>$configured_discovery_protocol</discoveryProtocol>|<discoveryProtocol>$discovery_protocol</discoveryProtocol>|g" $config_fullfilepath
-
-        echo "Edited the config_file: $config_fullfilepath to access the local server with domain id $domain_id and $discovery_protocol protocol."
     fi
 
     export ROS_DISCOVERY_SERVER="UDPv4:[127.0.0.1]:11811;UDPv4:[127.0.0.1]:11812"
