@@ -1,0 +1,80 @@
+<dds>
+    <profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+        <transport_descriptors>
+            <!--
+                UDP transport for EDP
+            -->
+            <transport_descriptor>
+                <transport_id>udp_transport</transport_id>
+                <type>UDPv4</type>
+                <listening_ports>
+                    <port>11811</port>
+                </listening_ports>
+            </transport_descriptor>
+
+            <!--
+                SHM transport for User Data
+            -->
+            <transport_descriptor>
+                <transport_id>shm_transport</transport_id>
+                <type>SHM</type>
+                <port_queue_capacity>1024</port_queue_capacity>
+                <segment_size>1048576</segment_size>                <!-- 1024*1024 -->
+            </transport_descriptor>
+        </transport_descriptors>
+
+        <participant profile_name="server" is_default_profile="true">
+            <domainId>0</domainId>
+            <rtps>
+                <!-- prefix: 44.53.<server-id-in-hex>.5f.45.50.52.4f.53.49.4d.41 -->
+                <prefix>44.53.00.5f.45.50.52.4f.53.49.4d.41</prefix>
+
+                <!--
+                    Set participant transports
+                -->
+                <useBuiltinTransports>false</useBuiltinTransports>
+                <userTransports>
+                    <transport_id>udp_transport</transport_id>
+                    <transport_id>shm_transport</transport_id>
+                </userTransports>
+
+                <builtin>
+                    <initialPeersList>
+                        <locator>
+                            <udpv4>
+                                <address>127.0.0.1</address>
+                                <port>11812</port>
+                            </udpv4>
+                        </locator>
+
+                        <locator>
+                            <udpv4>
+                                <address>127.0.0.1</address>
+                            </udpv4>
+                        </locator>
+                    </initialPeersList>
+
+                    <!--
+                        Discovery configuration
+                    -->
+                    <discovery_config>
+                        <!-- Set participant as SERVER -->
+                        <discoveryProtocol>SERVER</discoveryProtocol>
+                    </discovery_config>
+
+                    <!--
+                        EDP over UDP unicast and TCP
+                    -->
+                    <metatrafficUnicastLocatorList>
+                        <locator>
+                            <udpv4>
+                                <address>127.0.0.1</address>
+                                <port>11811</port>
+                            </udpv4>
+                        </locator>
+                    </metatrafficUnicastLocatorList>
+                </builtin>
+            </rtps>
+        </participant>
+    </profiles>
+</dds>

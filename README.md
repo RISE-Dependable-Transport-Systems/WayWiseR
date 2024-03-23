@@ -83,8 +83,7 @@ The current state presents a foundation that our research projects [AGRARSENSE](
 
 WayWiseR is divided into several ROS2 packages. Make sure to have a look into the respecitve package.xml files.
 
-- **waywiser**: A meta package that depends on all packages below to be able to refer to WayWiseR as a whole.
-- **waywiser_twist_safety**: Contains configuration and launch files to manage twist commands to vehicle from different sources. It also includes a composable node for emergency stop monitoring.
+- **waywiser**: A meta package that depends on all packages below to be able to refer to WayWiseR as a whole. It contains configuration files to optionally setup fastdds discovery server.
 - **waywiser_description**: Contains vehicle descriptions in the form of [xacro](https://docs.ros.org/en/humble/Tutorials/Intermediate/URDF/Using-Xacro-to-Clean-Up-a-URDF-File.html) files. Currently a single vehicle is available that corresponds to a [Traxxas](https://traxxas.com/) Slash incl. camera, depth camera, LiDAR and IMU.
 - **waywiser_gazebo**: Everything related to simulation using [Gazebo](https://gazebosim.org).
 - **waywiser_hwbringup**: Configuration and launch files to get real (not simulated) vehicles running.
@@ -93,6 +92,7 @@ WayWiseR is divided into several ROS2 packages. Make sure to have a look into th
 - **waywiser_rviz2**: Configuration and launch files for RViz2.
 - **waywiser_slam**: Configuration and launch files for [SLAM Toolbox](https://github.com/SteveMacenski/slam_toolbox).
 - **waywiser_teleop**: Configuration and launch files for teleop packages (handling keyboard or gamepad input) and a node to arbitrate between them.
+- **waywiser_twist_safety**: Contains configuration and launch files to manage twist commands to vehicle from different sources. It also includes a composable node for emergency stop monitoring.
 
 ## Examples
 
