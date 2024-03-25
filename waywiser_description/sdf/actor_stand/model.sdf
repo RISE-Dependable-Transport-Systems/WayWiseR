@@ -2,7 +2,7 @@
 <sdf version="1.6">
     <!-- Adapted from the original file:
     https://app.gazebosim.org/Mingfei/fuel/models/actor_stand -->
-    <actor name="actor">
+    <actor name="standing_actor">
         <skin>
             <filename>model://actor_stand/stand.dae</filename>
             <scale>1.0</scale>
