@@ -57,6 +57,9 @@ public:
       "waywise_control_tower_address",
       "127.0.0.1");
 
+    max_angular_velocity_ = this->declare_parameter("max_angular_velocity", 0.5);
+    standstill_velocity_threshold_ = this->declare_parameter("standstill_velocity_threshold", 0.05);
+
     // publishers
     odom_pub_ = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
     if (publish_odom_to_baselink_tf_) {
@@ -207,7 +210,7 @@ private:
     PosPoint posFused = vehicleState->getPosition(PosType::fused);
 
     // 1. handle drift at standstill and update offset
-    if (fabs(vehicleState->getSpeed()) < 0.05) {
+    if (fabs(vehicleState->getSpeed()) < standstill_velocity_threshold_) {
       if (!standstillAtLastCall) {
         yawWhenStopping = posIMU.getYaw();
       }
@@ -303,15 +306,31 @@ private:
       speed_to_erpm_factor_ * twist_msg->linear.x, erpm_min_,
       erpm_max_) / speed_to_erpm_factor_ :
       0.0;
+    clipped_linear_velocity =
+      (fabs(clipped_linear_velocity) >=
+      standstill_velocity_threshold_) ? clipped_linear_velocity : 0.0;
     mCarMovementController->setDesiredSpeed(clipped_linear_velocity);
 
-    // NOTE / TODO: WayWise has a sign error here (curvature in wrong direction)
-    float desired_steering_curvature =
-      (clipped_linear_velocity != 0.0) ? -(twist_msg->angular.z / twist_msg->linear.x) : 0.0;    // ω = v/r => 1/r = ω/v
-    mCarMovementController->setDesiredSteeringCurvature(desired_steering_curvature);
-    // RCLCPP_INFO(this->get_logger(), "clipped_linear_velocity %f,
-    // desired_steering_curvature %f", clipped_linear_velocity,
-    // desired_steering_curvature);
+    float clipped_angular_velocity = clip_min_max(
+      twist_msg->angular.z, -max_angular_velocity_,
+      max_angular_velocity_);
+    if (fabs(clipped_linear_velocity) >= standstill_velocity_threshold_) {
+      // NOTE / TODO: WayWise has a sign error here (curvature in wrong direction)
+      float desired_steering_curvature = -(clipped_angular_velocity / twist_msg->linear.x);  // ω = v/r => 1/r = ω/v
+      mCarMovementController->setDesiredSteeringCurvature(desired_steering_curvature);
+      // RCLCPP_INFO(this->get_logger(), "clipped_linear_velocity %f,
+      // desired_steering_curvature %f", clipped_linear_velocity,
+      // desired_steering_curvature);
+    } else {
+      // NOTE / TODO: WayWise has a sign error here (steering in wrong direction)
+      float desired_steering =
+        (fabs(clipped_angular_velocity) >=
+        0.01) ? -(clipped_angular_velocity / max_angular_velocity_) : 0.0;
+      mCarMovementController->setDesiredSteering(desired_steering);
+      // RCLCPP_INFO(
+      //   this->get_logger(), "clipped_angular_velocity %f, desired_steering %f", twist_msg->angular.z, clipped_angular_velocity,
+      //   desired_steering);
+    }
   }
 
   float clip_min_max(float value, float min_value, float max_value) const
@@ -339,6 +358,11 @@ private:
   bool enable_autopilot_on_vehicle_, enable_mavsdkVehicleServer_;
 
   std::string waywise_control_tower_address_;
+
+  float odom_translation_gain_;
+
+  float standstill_velocity_threshold_;
+  float max_angular_velocity_;
 
   // internal variables
   bool is_in_simulation_mode_ = true;
