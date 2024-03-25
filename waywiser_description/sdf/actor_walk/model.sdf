@@ -1,0 +1,49 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Adapted from the original file:
+    https://app.gazebosim.org/Mingfei/fuel/models/actor_walk -->
+    <actor name="walking_actor">
+        <skin>
+            <filename>model://actor_walk/walk.dae</filename>
+            <scale>1.0</scale>
+        </skin>
+        <pose>0 0 1.0 0 0 0</pose>
+        <animation name="walk">
+            <filename>model://actor_walk/walk.dae</filename>
+            <scale>1.000000</scale>
+            <interpolate_x>true</interpolate_x>
+        </animation>
+        <script>
+            <loop>true</loop>
+            <delay_start>0.000000</delay_start>
+            <auto_start>true</auto_start>
+            <trajectory id="0" type="walk">
+                <waypoint>
+                    <time>0.000000</time>
+                    <pose>9.500000 0.000000 0.000000 0.000000 0.000000 1.570795</pose>                    <!-- Spawn -->
+                </waypoint>
+                <waypoint>
+                    <time>5.000000</time>
+                    <pose>9.500000 3.000000 0.000000 0.000000 0.000000 1.570795</pose>                    <!-- walk 3m in 5s -->
+                </waypoint>
+                <waypoint>
+                    <time>6.000000</time>
+                    <pose>9.500000 3.000000 0.000000 0.000000 0.000000 -1.570795</pose>                    <!-- Turn around -->
+                </waypoint>
+                <waypoint>
+                    <time>16.000000</time>
+                    <pose>9.500000 -3.000000 0.000000 0.000000 0.000000 -1.570795</pose>                    <!-- walk 6m in 10s -->
+                </waypoint>
+                <waypoint>
+                    <time>17.000000</time>
+                    <pose>9.500000 -3.000000 0.000000 0.000000 0.000000 1.570795</pose>                    <!-- Turn around -->
+                </waypoint>
+                <waypoint>
+                    <time>22.000000</time>
+                    <pose>9.500000 0.000000 0.000000 0.000000 0.000000 1.570795</pose>                    <!-- walk 3m in 5s-->
+                </waypoint>
+            </trajectory>
+
+        </script>
+    </actor>
+</sdf>
