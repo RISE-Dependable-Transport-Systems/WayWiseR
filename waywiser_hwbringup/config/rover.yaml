@@ -8,6 +8,8 @@
     speed_to_erpm_factor: 5200.0
     wheelbase: 0.33
     min_turning_radius: 0.67
+    max_angular_velocity: 0.5
+    standstill_velocity_threshold: 0.05
 
 waywise_rover_node:
   ros__parameters:
