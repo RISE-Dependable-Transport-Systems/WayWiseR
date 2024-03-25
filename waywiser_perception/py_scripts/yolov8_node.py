@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -24,6 +25,7 @@ from ultralytics.trackers import BYTETracker
 from ultralytics.utils import IterableSimpleNamespace
 from ultralytics.utils import yaml_load
 from ultralytics.utils.checks import check_yaml
+from ultralytics.utils.plotting import Annotator
 from ultralytics.utils.plotting import Colors
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
@@ -216,6 +218,12 @@ class Yolov8Node(Node):
             if self.publish_bbox_3d_markers:
                 visualization_marker_array = MarkerArray()
 
+            if self.publish_annotated_image:
+                annotator = Annotator(
+                    deepcopy(results.orig_img),
+                    line_width=2,
+                )
+
             for index, box_data in enumerate(results.boxes):
                 detection = Detection()
                 detection.class_id = int(box_data.cls)
@@ -257,18 +265,87 @@ class Yolov8Node(Node):
 
                 detection_array.detections.append(detection)
 
+                if self.publish_annotated_image:
+                    if results.masks:
+                        self.annotate_seg_bbox(
+                            annotator,
+                            box_data,
+                            results.masks.xy[index],
+                            results.names,
+                        )
+                    else:
+                        self.annotate_bbox(
+                            annotator,
+                            box_data,
+                            results.names,
+                        )
+
             self.detection_array_pub.publish(detection_array)
 
             if self.publish_bbox_3d_markers:
                 self.rviz_3d_visualization_markers_pub.publish(visualization_marker_array)
 
         if self.publish_annotated_image:
-            annotated_image = results.plot(
-                conf=True, boxes=True, labels=True, masks=True, probs=True
-            )
-            annotated_image_msg = self.cv_bridge.cv2_to_imgmsg(annotated_image, encoding='rgb8')
-            annotated_image_msg.header = msg.header
+            if results.boxes:
+                annotated_image = annotator.result()
+                annotated_image_msg = self.cv_bridge.cv2_to_imgmsg(
+                    annotated_image, encoding='rgb8'
+                )
+                annotated_image_msg.header = msg.header
+            else:
+                annotated_image_msg = msg
+
             self.processed_image_pub.publish(annotated_image_msg)
+
+    def annotate_bbox(self, annotator, box_data, cls_names, txt_color=(255, 255, 255)):
+        object_color = self.plot_colors(int(box_data.cls), True)
+        box = box_data.xyxy.squeeze()
+        p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
+        cv2.rectangle(
+            annotator.im, p1, p2, object_color, thickness=annotator.lw, lineType=cv2.LINE_AA
+        )
+
+        self.annotate_bbox_label(annotator, box_data, object_color, cls_names)
+
+    def annotate_seg_bbox(
+        self, annotator, box_data, seg_mask_xy, cls_names, txt_color=(255, 255, 255)
+    ):
+        object_color = self.plot_colors(int(box_data.cls), True)
+        cv2.polylines(
+            annotator.im,
+            [np.int32([seg_mask_xy])],
+            isClosed=True,
+            color=object_color,
+            thickness=annotator.lw,
+        )
+
+        self.annotate_bbox_label(annotator, box_data, object_color, cls_names)
+
+    def annotate_bbox_label(
+        self, annotator, box_data, object_color, cls_names, txt_color=(255, 255, 255)
+    ):
+        label = f'{cls_names[int(box_data.cls)]}({float(box_data.conf[0].numpy()):.2f})'
+        if box_data.is_track:
+            label = label + f' ID:{int(box_data.id[0].numpy())}'
+
+        box = box_data.xyxy.squeeze()
+        p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
+        w, h = cv2.getTextSize(label, 0, fontScale=annotator.sf, thickness=annotator.tf)[
+            0
+        ]  # text width, height
+        outside = p1[1] - h >= 3
+        p2 = p1[0] + w, p1[1] - h - 3 if outside else p1[1] + h + 3
+        cv2.rectangle(annotator.im, p1, p2, object_color, -1, cv2.LINE_AA)  # filled
+        cv2.putText(
+            annotator.im,
+            label,
+            (p1[0], p1[1] - 2 if outside else p1[1] + h + 2),
+            0,
+            annotator.sf,
+            txt_color,
+            thickness=annotator.tf,
+            lineType=cv2.LINE_AA,
+        )
 
     def depth_image_callback(self, msg: Image) -> None:
         depth_image = np.array(self.cv_bridge.imgmsg_to_cv2(msg), dtype=float)
