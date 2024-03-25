@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from builtin_interfaces.msg import Duration
 import cv2
 from cv_bridge import CvBridge
 from geometry_msgs.msg import Quaternion
@@ -18,6 +19,11 @@ from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
 from ultralytics.engine.results import Results
 from ultralytics.models.yolo.model import YOLO
+from ultralytics.trackers import BOTSORT
+from ultralytics.trackers import BYTETracker
+from ultralytics.utils import IterableSimpleNamespace
+from ultralytics.utils import yaml_load
+from ultralytics.utils.checks import check_yaml
 from ultralytics.utils.plotting import Colors
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
@@ -46,6 +52,9 @@ class Yolov8Node(Node):
         self.declare_parameter('maximum_object_depth_size', 0.5)
         self.declare_parameter('publish_bbox_3d_markers', False)
         self.declare_parameter('rviz_3d_visualization_markers_topic', 'bbox_3d_markers')
+        self.declare_parameter('use_tracker', False)
+        self.declare_parameter('color_image_topic_as_stream', False)
+        self.declare_parameter('tracker_config_filepath', '')
 
         self.model_name = self.get_parameter('model_file_path').get_parameter_value().string_value
         self.model = YOLO(self.model_name)
@@ -60,6 +69,9 @@ class Yolov8Node(Node):
         )
         self.prediction_verbose = (
             self.get_parameter('prediction_verbose').get_parameter_value().bool_value
+        )
+        self.color_image_topic_as_stream = (
+            self.get_parameter('color_image_topic_as_stream').get_parameter_value().bool_value
         )
 
         self.cv_bridge = CvBridge()
@@ -116,10 +128,32 @@ class Yolov8Node(Node):
                 )
                 self.depth_camera_intrinsics: Optional[CameraIntrinsics] = None
 
+        self.use_tracker = self.get_parameter('use_tracker').get_parameter_value().bool_value
+        if self.use_tracker:
+            tracker_config_filepath = check_yaml(
+                (self.get_parameter('tracker_config_filepath').get_parameter_value().string_value)
+            )
+            tracker_config = IterableSimpleNamespace(**yaml_load(tracker_config_filepath))
+
+            if tracker_config.tracker_type == 'bytetrack':
+                self.tracker = BYTETracker(args=tracker_config, frame_rate=1)
+            elif tracker_config.tracker_type == 'botsort':
+                self.tracker = BOTSORT(args=tracker_config, frame_rate=1)
+            else:
+                raise AssertionError(
+                    f"Only 'bytetrack' and 'botsort' are supported for now, but got '{tracker_config.tracker_type}'"
+                )
+
         self.publish_bbox_3d_markers = (
             self.get_parameter('publish_bbox_3d_markers').get_parameter_value().bool_value
         )
         if self.publish_bbox_3d_markers:
+            if not self.use_tracker:
+                raise AssertionError(
+                    'publish_bbox_3d_markers parameter is set to True but use_tracker is set to False.'
+                    ' 3d_marker unique ID management without object tracking is not implemented yet.'
+                )
+
             self.rviz_3d_visualization_markers_pub = self.create_publisher(
                 MarkerArray,
                 self.get_parameter('rviz_3d_visualization_markers_topic')
@@ -153,13 +187,24 @@ class Yolov8Node(Node):
         else:
             object_mask = None
 
-        results = self.model.predict(
-            source=cv_image,
-            verbose=self.prediction_verbose,
-            stream=False,
-            conf=self.confidence_threshold,
-            device=self.device,
-        )
+        if self.use_tracker:
+            results = self.model.track(
+                source=cv_image,
+                verbose=self.prediction_verbose,
+                stream=self.color_image_topic_as_stream,
+                persist=True,
+                conf=self.confidence_threshold,
+                device=self.device,
+            )
+            results = list(results)
+        else:
+            results = self.model.predict(
+                source=cv_image,
+                verbose=self.prediction_verbose,
+                stream=self.color_image_topic_as_stream,
+                conf=self.confidence_threshold,
+                device=self.device,
+            )
 
         results: Results = results[0].cpu()
 
@@ -184,6 +229,9 @@ class Yolov8Node(Node):
                     x=0.0, y=0.0, z=0.0, w=1.0
                 )
 
+                if box_data.is_track:
+                    detection.track_id = int(box_data.id)
+
                 if self.depth_image is not None and self.depth_camera_intrinsics is not None:
                     object_mask_clone = np.copy(object_mask)
                     if results.masks:
@@ -203,7 +251,7 @@ class Yolov8Node(Node):
                                 detection.bbox_3d,
                                 msg.header,
                                 self.plot_colors(detection.class_id, True),
-                                detection.class_id,
+                                detection.track_id,
                             )
                         )
 
@@ -341,6 +389,9 @@ class Yolov8Node(Node):
         visualization_marker.type = Marker.CUBE
         visualization_marker.id = object_id
         visualization_marker.header.frame_id = self.camera_base_frame
+        visualization_marker.lifetime = Duration(
+            sec=1,
+        )
 
         # Set the pose of the marker
         visualization_marker.pose = bbox_3d.geometric_center_pose
