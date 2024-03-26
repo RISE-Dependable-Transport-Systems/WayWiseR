@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro" >
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <!-- Define lidar constants -->
   <xacro:property name="lidar_mass" value="0.01"/>
@@ -24,7 +24,7 @@
     </collision>
     <xacro:inertial_cylinder mass="${lidar_mass}" length="${lidar_length}" radius="${lidar_radius}">
       <origin xyz="0 0 0" rpy="0 0 0"/>
-    </xacro:inertial_cylinder>  
+    </xacro:inertial_cylinder>
   </link>
 
   <link name="lidar_support_link">
@@ -41,7 +41,7 @@
     </collision>
     <xacro:inertial_box mass="${lidar_mass}" length="${lidar_support_length}" breadth="${lidar_support_breadth}" height="${lidar_support_height}">
       <origin xyz="0 0 0" rpy="0 0 0"/>
-    </xacro:inertial_box>  
+    </xacro:inertial_box>
   </link>
 
   <joint name="lidar_joint" type="fixed">
@@ -57,14 +57,14 @@
   </joint>
 
   <gazebo reference="lidar_link">
-    <material>Gazebo/Black</material> 
+    <material>Gazebo/Black</material>
     <sensor name='lidar_link' type='gpu_lidar'>"
       <topic>scan_lidar</topic>
       <ignition_frame_id>lidar_link</ignition_frame_id>
       <pose relative_to='lidar_link'>0 0 0 0 0 0</pose>
       <always_on>1</always_on>
       <visualize>0</visualize>
-      <update_rate>30</update_rate>
+      <update_rate>10</update_rate>
       <ray>
         <scan>
           <horizontal>

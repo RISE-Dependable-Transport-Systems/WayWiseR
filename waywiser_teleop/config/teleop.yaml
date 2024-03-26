@@ -20,7 +20,7 @@ teleop_twist_joy:
     scale_angular:
       yaw: 0.5
     scale_angular_turbo:
-      yaw: 1.0
+      yaw: 0.5
     enable_button: 4
     enable_turbo_button: 6
 
@@ -55,3 +55,7 @@ teleop_twist_mux:
         topic: key_vel
         timeout: 0.5
         priority: 90
+      teleop_nav2:
+        topic: teleop_nav2_vel
+        timeout: 0.5
+        priority: 50

@@ -14,6 +14,10 @@ onboard_twist_mux:
         topic: waywise_vel
         timeout: 0.5
         priority: 60
+      nav2:
+        topic: nav2_vel
+        timeout: 0.5
+        priority: 50
 
 collision_monitor:
   # Adapted from the config file:
@@ -52,7 +56,7 @@ collision_monitor:
       points: [0.5, 0.25, 0.5, -0.25, -0.5, -0.25, -0.5, 0.25]
       action_type: "slowdown"
       max_points: 3
-      slowdown_ratio: 0.3
+      slowdown_ratio: 0.5
       visualize: True
       polygon_pub_topic: "polygon_slowdown"
     FootprintApproach:

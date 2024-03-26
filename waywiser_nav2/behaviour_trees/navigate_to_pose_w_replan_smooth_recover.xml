@@ -1,0 +1,40 @@
+<!--
+This Behavior Tree replans the global path periodically at 1 Hz and it also has
+recovery actions.
+-->
+<root main_tree_to_execute="MainTree">
+    <BehaviorTree ID="MainTree">
+        <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+            <PipelineSequence name="NavigateWithReplanning">
+                <RateController hz="1.0">
+                    <RecoveryNode number_of_retries="1" name="ComputePathToPose">
+                        <GoalUpdater input_goal="{goal}" output_goal="{updated_goal}">
+                            <Sequence name="ComputePathAndSmooth">
+                                <ComputePathToPose goal="{updated_goal}" path="{path}" planner_id="GridBased" />
+                                <SmoothPath unsmoothed_path="{path}" smoothed_path="{smoothed_path}" max_smoothing_duration="3.0" />
+                            </Sequence>
+                        </GoalUpdater>
+                        <ReactiveFallback name="ComputePathToPoseRecoveryFallback">
+                            <GoalUpdated />
+                            <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap" />
+                        </ReactiveFallback>
+                    </RecoveryNode>
+                </RateController>
+                <RecoveryNode number_of_retries="1" name="FollowPath">
+                    <FollowPath path="{smoothed_path}" controller_id="FollowPath" />
+                    <ReactiveFallback name="FollowPathRecoveryFallback">
+                        <GoalUpdated />
+                        <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap" />
+                    </ReactiveFallback>
+                </RecoveryNode>
+            </PipelineSequence>
+            <ReactiveFallback name="RecoveryFallback">
+                <GoalUpdated />
+                <SequenceStar name="RecoveryActions">
+                    <Wait wait_duration="1.0" />
+                    <BackUp backup_dist="-0.2" backup_speed="0.3" />
+                </SequenceStar>
+            </ReactiveFallback>
+        </RecoveryNode>
+    </BehaviorTree>
+</root>
