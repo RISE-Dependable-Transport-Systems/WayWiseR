@@ -87,7 +87,7 @@ WayWiseR is divided into several ROS2 packages. Make sure to have a look into th
 - **waywiser_description**: Contains vehicle descriptions in the form of [xacro](https://docs.ros.org/en/humble/Tutorials/Intermediate/URDF/Using-Xacro-to-Clean-Up-a-URDF-File.html) files. Currently a single vehicle is available that corresponds to a [Traxxas](https://traxxas.com/) Slash incl. camera, depth camera, LiDAR and IMU.
 - **waywiser_gazebo**: Everything related to simulation using [Gazebo](https://gazebosim.org).
 - **waywiser_hwbringup**: Configuration and launch files to get real (not simulated) vehicles running.
-- **waywiser_nav2**: Package that provides dynamic path planning using Nav2.
+- **waywiser_nav2**: Package that provides dynamic path planning using [Nav2](https://navigation.ros.org/).
 - **waywiser_node**: Wraps [WayWise](https://github.com/RISE-Dependable-Transport-Systems/WayWise) into ROS2 nodes (currently a single node).
 - **waywiser_perception**: Provides image-processing and computer vision functionalities using [YOLOv8](https://docs.ultralytics.com/).
 - **waywiser_rviz2**: Configuration and launch files for RViz2.
