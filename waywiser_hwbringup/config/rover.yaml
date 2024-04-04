@@ -5,9 +5,11 @@
     base_frame: base_link
     erpm_min: -10000.0
     erpm_max: 10000.0
-    speed_to_erpm_factor: 5200.0
+    speed_to_erpm_factor: 4500.0
     wheelbase: 0.33
-    min_turning_radius: 0.67
+    min_turning_radius: 0.92
+    max_angular_velocity: 0.5
+    standstill_velocity_threshold: 0.05
 
 waywise_rover_node:
   ros__parameters:
@@ -20,7 +22,7 @@ waywise_rover_node:
     # current_max: 30.0
     publish_odom_to_baselink_tf: true
     odom_publish_rate: 30 # currently same rate for both odom topic and odom->base_link tf
-    enable_imu_for_odom: true
+    enable_imu_for_odom: false
     enable_lidar: false
     enable_camera: false
 

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(waywiser)
+project(waywiser_nav2)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -8,14 +8,8 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 
-file(GLOB DISCOVERY_SETUP_FILES "discovery/*.sh")
 install(
-  FILES ${DISCOVERY_SETUP_FILES}
-  DESTINATION discovery
-)
-
-install(
-  DIRECTORY launch
+  DIRECTORY launch config behaviour_trees
   DESTINATION share/${PROJECT_NAME}
 )
 
