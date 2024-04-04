@@ -1,3 +1,6 @@
 [submodule "waywiser_node/WayWise"]
 	path = waywiser_node/WayWise
 	url = ../WayWise.git
+[submodule "waywiser_node/isoObject"]
+	path = waywiser_node/isoObject
+	url = git@github.com:RI-SE/isoObject.git
