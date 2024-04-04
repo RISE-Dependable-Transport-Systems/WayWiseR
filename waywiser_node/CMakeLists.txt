@@ -5,6 +5,9 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+set(ISOOBJECT_LIBRARY ISO_object)
+set(ISO22133_TARGET ISO22133)
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -24,6 +27,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
+
+add_subdirectory(isoObject)
 
 add_executable(
   waywise_rover
@@ -75,16 +80,52 @@ add_executable(
   WayWise/sensors/camera/gimbal.h
   WayWise/logger/logger.cpp)
 
+  add_executable(
+    waywise_iso22133_autopilot
+    src/waywise_iso22133_autopilot.cpp
+    src/waywise_autopilot.cpp
+    WayWise/core/pospoint.cpp
+    WayWise/core/vbytearray.cpp
+    WayWise/vehicles/objectstate.cpp
+    WayWise/vehicles/vehiclestate.cpp
+    WayWise/vehicles/carstate.cpp
+    WayWise/vehicles/controller/motorcontroller.h
+    WayWise/vehicles/controller/movementcontroller.cpp
+    WayWise/vehicles/controller/servocontroller.cpp
+    WayWise/vehicles/controller/carmovementcontroller.cpp
+    WayWise/autopilot/purepursuitwaypointfollower.cpp
+    WayWise/autopilot/purepursuitwaypointfollower.h
+    WayWise/autopilot/waypointfollower.h
+    WayWise/communication/mavsdkvehicleserver.cpp
+    WayWise/communication/jsonstreamparsertcp.cpp
+    WayWise/communication/iso22133vehicleserver.cpp
+    WayWise/communication/iso22133vehicleserver.h
+    WayWise/communication/vehicleserver.h
+    WayWise/communication/vehicleconnections/vehicleconnection.cpp
+    WayWise/communication/mavlinkparameterserver.cpp
+    WayWise/communication/parameterserver.cpp
+    WayWise/sensors/gnss/ublox.cpp
+    WayWise/sensors/gnss/ubloxrover.cpp
+    WayWise/sensors/gnss/rtcm3_simple.cpp
+    WayWise/sensors/gnss/rtcmclient.cpp
+    WayWise/sensors/camera/gimbal.h
+    WayWise/logger/logger.cpp)
+
 target_include_directories(waywise_rover PRIVATE WayWise/)
 target_include_directories(waywise_autopilot PRIVATE WayWise/)
+target_include_directories(waywise_iso22133_autopilot PRIVATE WayWise/)
 
 target_link_libraries(waywise_rover Qt5::Core Qt5::SerialPort Qt5::Network)
 
 target_link_libraries(waywise_autopilot Qt5::Core Qt5::SerialPort Qt5::Network
                       MAVSDK::mavsdk)
 
+target_link_libraries(waywise_iso22133_autopilot Qt5::Core Qt5::SerialPort Qt5::Network
+                      MAVSDK::mavsdk ${ISOOBJECT_LIBRARY})
+
 ament_target_dependencies(waywise_rover rclcpp std_msgs nav_msgs geometry_msgs
                           tf2_ros)
+
 ament_target_dependencies(
   waywise_autopilot
   rclcpp
@@ -94,8 +135,19 @@ ament_target_dependencies(
   tf2_ros
   tf2_geometry_msgs)
 
+  ament_target_dependencies(
+    waywise_iso22133_autopilot
+    rclcpp
+    std_msgs
+    nav_msgs
+    geometry_msgs
+    tf2_ros
+    tf2_geometry_msgs)
+
 install(TARGETS waywise_rover DESTINATION lib/${PROJECT_NAME})
 
 install(TARGETS waywise_autopilot DESTINATION lib/${PROJECT_NAME})
+
+install(TARGETS waywise_iso22133_autopilot DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
