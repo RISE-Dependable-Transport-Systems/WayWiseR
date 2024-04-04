@@ -359,8 +359,6 @@ private:
 
   std::string waywise_control_tower_address_;
 
-  float odom_translation_gain_;
-
   float standstill_velocity_threshold_;
   float max_angular_velocity_;
 
