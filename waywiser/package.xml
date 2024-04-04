@@ -9,7 +9,7 @@
   <maintainer email="marvin.damschen@ri.se">Marvin Damschen</maintainer>
   <maintainer email="rickard.hall@ri.se">Rickard Häll</maintainer>
   <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
-  
+
   <license>GPLv3</license>
 
   <url type="website">https://github.com/RISE-Dependable-Transport-Systems/WayWise</url>
@@ -20,7 +20,7 @@
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
-  <depend>waywiser_description</depend>  
+  <depend>waywiser_description</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
