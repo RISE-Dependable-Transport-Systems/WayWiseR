@@ -9,6 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(iso_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
@@ -131,6 +132,7 @@ ament_target_dependencies(
     waywise_iso22133_autopilot
     rclcpp
     std_msgs
+    iso_msgs
     nav_msgs
     geometry_msgs
     tf2_ros
