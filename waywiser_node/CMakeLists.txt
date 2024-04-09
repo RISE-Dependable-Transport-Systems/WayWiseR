@@ -5,9 +5,6 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-set(ISOOBJECT_LIBRARY ISO_object)
-set(ISO22133_TARGET ISO22133)
-
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -27,8 +24,6 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
-
-add_subdirectory(isoObject)
 
 add_executable(
   waywise_rover
@@ -83,7 +78,6 @@ add_executable(
   add_executable(
     waywise_iso22133_autopilot
     src/waywise_iso22133_autopilot.cpp
-    src/waywise_autopilot.cpp
     WayWise/core/pospoint.cpp
     WayWise/core/vbytearray.cpp
     WayWise/vehicles/objectstate.cpp
@@ -98,8 +92,6 @@ add_executable(
     WayWise/autopilot/waypointfollower.h
     WayWise/communication/mavsdkvehicleserver.cpp
     WayWise/communication/jsonstreamparsertcp.cpp
-    WayWise/communication/iso22133vehicleserver.cpp
-    WayWise/communication/iso22133vehicleserver.h
     WayWise/communication/vehicleserver.h
     WayWise/communication/vehicleconnections/vehicleconnection.cpp
     WayWise/communication/mavlinkparameterserver.cpp
@@ -121,7 +113,7 @@ target_link_libraries(waywise_autopilot Qt5::Core Qt5::SerialPort Qt5::Network
                       MAVSDK::mavsdk)
 
 target_link_libraries(waywise_iso22133_autopilot Qt5::Core Qt5::SerialPort Qt5::Network
-                      MAVSDK::mavsdk ${ISOOBJECT_LIBRARY})
+                      MAVSDK::mavsdk)
 
 ament_target_dependencies(waywise_rover rclcpp std_msgs nav_msgs geometry_msgs
                           tf2_ros)
