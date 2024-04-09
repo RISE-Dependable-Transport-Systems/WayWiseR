@@ -13,13 +13,6 @@ public:
             "iso-ip",
             "0.0.0.0");
 
-        iso22133VehicleServer iso22133VehicleServer(mCarState, iso22133Ip);
-        QSharedPointer<UbloxRover> mUbloxRover(new UbloxRover(mCarState));
-        // Setup communication towards ATOS
-        iso22133VehicleServer.setMovementController(mCarMovementController);
-        iso22133VehicleServer.setUbloxRover(mUbloxRover);
-        iso22133VehicleServer.setWaypointFollower(mWaypointFollower);
-
     }
 
 };
