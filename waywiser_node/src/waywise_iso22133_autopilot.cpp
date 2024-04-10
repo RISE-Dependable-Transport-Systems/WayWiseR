@@ -2,6 +2,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <QDebug>
 
 #include "WayWise/autopilot/purepursuitwaypointfollower.h"
 #include "WayWise/autopilot/waypointfollower.h"
@@ -16,6 +17,8 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "iso_msgs/msg/cartesian_trajectory.hpp"
+#include "iso_msgs/msg/abort.hpp"
+#include "iso_msgs/msg/start.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -45,8 +48,14 @@ public:
       "waywise_control_tower_address",
       "127.0.0.1");
 
+    abort_sub_ = this->create_subscription<iso_msgs::msg::Abort>(
+      "/abort", 10, std::bind(&WayWiseISO22133AutoPilot::abort_callback, this, _1));
+    start_sub_ = this->create_subscription<iso_msgs::msg::Start>(
+      "/start", 10, std::bind(&WayWiseISO22133AutoPilot::start_callback, this, _1));
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
       "/odom", 10, std::bind(&WayWiseISO22133AutoPilot::odom_callback, this, _1));
+    traj_sub_ = this->create_subscription<iso_msgs::msg::CartesianTrajectory>(
+      "/trajectory", 10, std::bind(&WayWiseISO22133AutoPilot::traj_callback, this, _1));
     twist_pub_ = create_publisher<geometry_msgs::msg::Twist>("/waywise_vel", 10);
     autopilot_timer_ =
       this->create_wall_timer(
@@ -112,6 +121,41 @@ private:
     mCarState->setPosition(currentPosition);
   }
 
+  void traj_callback(const iso_msgs::msg::CartesianTrajectory::SharedPtr traj_msg)
+  {
+    //qDebug() << "Got traj message";
+    QList<PosPoint> route;
+    PosPoint newTrajPoint;
+
+    if (!mWaypointFollower.isNull()) {
+      mWaypointFollower->clearRoute();
+      for (const auto &point : traj_msg->points)
+      {
+        // TODO: Populate the route correctly, what do we need to populate?
+        newTrajPoint.setX(point.pose.position.x);
+        newTrajPoint.setY(point.pose.position.y);
+        newTrajPoint.setHeight(point.pose.position.z);
+        newTrajPoint.setSpeed(1);
+
+        route.append(newTrajPoint);
+      }
+      mWaypointFollower->addRoute(route);
+    } else {
+      qDebug() << "iso22133VehicleServer: got new mission but no "
+                        "WaypointFollower is set to receive it.";
+    }
+  }
+
+  void abort_callback(const iso_msgs::msg::Abort::SharedPtr abort_msg)
+  {
+    // TODO
+  }
+
+  void start_callback(const iso_msgs::msg::Start::SharedPtr start_msg)
+  {
+    // TODO
+  }
+
   // ROS parameters
   float speed_to_rpm_factor_;
 
@@ -130,7 +174,10 @@ private:
   rclcpp::TimerBase::SharedPtr autopilot_timer_;
 
   // subscribers
+  rclcpp::Subscription<iso_msgs::msg::Abort>::SharedPtr abort_sub_;
+  rclcpp::Subscription<iso_msgs::msg::Start>::SharedPtr start_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+  rclcpp::Subscription<iso_msgs::msg::CartesianTrajectory>::SharedPtr traj_sub_;
 
   // WayWise
   QSharedPointer<CarState> mCarState;

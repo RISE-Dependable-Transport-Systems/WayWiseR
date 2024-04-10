@@ -76,33 +76,33 @@ add_executable(
   WayWise/sensors/camera/gimbal.h
   WayWise/logger/logger.cpp)
 
-  add_executable(
-    waywise_iso22133_autopilot
-    src/waywise_iso22133_autopilot.cpp
-    WayWise/core/pospoint.cpp
-    WayWise/core/vbytearray.cpp
-    WayWise/vehicles/objectstate.cpp
-    WayWise/vehicles/vehiclestate.cpp
-    WayWise/vehicles/carstate.cpp
-    WayWise/vehicles/controller/motorcontroller.h
-    WayWise/vehicles/controller/movementcontroller.cpp
-    WayWise/vehicles/controller/servocontroller.cpp
-    WayWise/vehicles/controller/carmovementcontroller.cpp
-    WayWise/autopilot/purepursuitwaypointfollower.cpp
-    WayWise/autopilot/purepursuitwaypointfollower.h
-    WayWise/autopilot/waypointfollower.h
-    WayWise/communication/mavsdkvehicleserver.cpp
-    WayWise/communication/jsonstreamparsertcp.cpp
-    WayWise/communication/vehicleserver.h
-    WayWise/communication/vehicleconnections/vehicleconnection.cpp
-    WayWise/communication/mavlinkparameterserver.cpp
-    WayWise/communication/parameterserver.cpp
-    WayWise/sensors/gnss/ublox.cpp
-    WayWise/sensors/gnss/ubloxrover.cpp
-    WayWise/sensors/gnss/rtcm3_simple.cpp
-    WayWise/sensors/gnss/rtcmclient.cpp
-    WayWise/sensors/camera/gimbal.h
-    WayWise/logger/logger.cpp)
+add_executable(
+  waywise_iso22133_autopilot
+  src/waywise_iso22133_autopilot.cpp
+  WayWise/core/pospoint.cpp
+  WayWise/core/vbytearray.cpp
+  WayWise/vehicles/objectstate.cpp
+  WayWise/vehicles/vehiclestate.cpp
+  WayWise/vehicles/carstate.cpp
+  WayWise/vehicles/controller/motorcontroller.h
+  WayWise/vehicles/controller/movementcontroller.cpp
+  WayWise/vehicles/controller/servocontroller.cpp
+  WayWise/vehicles/controller/carmovementcontroller.cpp
+  WayWise/autopilot/purepursuitwaypointfollower.cpp
+  WayWise/autopilot/purepursuitwaypointfollower.h
+  WayWise/autopilot/waypointfollower.h
+  WayWise/communication/mavsdkvehicleserver.cpp
+  WayWise/communication/jsonstreamparsertcp.cpp
+  WayWise/communication/vehicleserver.h
+  WayWise/communication/vehicleconnections/vehicleconnection.cpp
+  WayWise/communication/mavlinkparameterserver.cpp
+  WayWise/communication/parameterserver.cpp
+  WayWise/sensors/gnss/ublox.cpp
+  WayWise/sensors/gnss/ubloxrover.cpp
+  WayWise/sensors/gnss/rtcm3_simple.cpp
+  WayWise/sensors/gnss/rtcmclient.cpp
+  WayWise/sensors/camera/gimbal.h
+  WayWise/logger/logger.cpp)
 
 target_include_directories(waywise_rover PRIVATE WayWise/)
 target_include_directories(waywise_autopilot PRIVATE WayWise/)
@@ -128,15 +128,15 @@ ament_target_dependencies(
   tf2_ros
   tf2_geometry_msgs)
 
-  ament_target_dependencies(
-    waywise_iso22133_autopilot
-    rclcpp
-    std_msgs
-    iso_msgs
-    nav_msgs
-    geometry_msgs
-    tf2_ros
-    tf2_geometry_msgs)
+ament_target_dependencies(
+  waywise_iso22133_autopilot
+  rclcpp
+  std_msgs
+  iso_msgs
+  nav_msgs
+  geometry_msgs
+  tf2_ros
+  tf2_geometry_msgs)
 
 install(TARGETS waywise_rover DESTINATION lib/${PROJECT_NAME})
 
