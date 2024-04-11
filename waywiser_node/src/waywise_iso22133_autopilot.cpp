@@ -48,10 +48,12 @@ public:
       "waywise_control_tower_address",
       "127.0.0.1");
 
+    abort_topic_ = iso_msgs::msg::Abort::TOPIC_NAME;
     abort_sub_ = this->create_subscription<iso_msgs::msg::Abort>(
-      "/abort", 10, std::bind(&WayWiseISO22133AutoPilot::abort_callback, this, _1));
+      abortTopic_, 10, std::bind(&WayWiseISO22133AutoPilot::abort_callback, this, _1));
+    start_topic_ = iso_msgs::msg::Start::TOPIC_NAME;
     start_sub_ = this->create_subscription<iso_msgs::msg::Start>(
-      "/start", 10, std::bind(&WayWiseISO22133AutoPilot::start_callback, this, _1));
+      start_topic_, 10, std::bind(&WayWiseISO22133AutoPilot::start_callback, this, _1));
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
       "/odom", 10, std::bind(&WayWiseISO22133AutoPilot::odom_callback, this, _1));
     traj_sub_ = this->create_subscription<iso_msgs::msg::CartesianTrajectory>(
