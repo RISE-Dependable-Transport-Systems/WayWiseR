@@ -135,7 +135,8 @@ private:
         newTrajPoint.setX(point.pose.position.x);
         newTrajPoint.setY(point.pose.position.y);
         newTrajPoint.setHeight(point.pose.position.z);
-        newTrajPoint.setSpeed(1);
+        auto speed = sqrt(pow(point.twist.linear.x, 2) + pow(point.twist.linear.y, 2));
+        newTrajPoint.setSpeed(speed);
 
         route.append(newTrajPoint);
       }
@@ -148,12 +149,23 @@ private:
 
   void abort_callback(const iso_msgs::msg::Abort::SharedPtr abort_msg)
   {
-    // TODO
+    qDebug() << "iso22133VehicleServer: Abort recived!";
+    if (mWaypointFollower) {
+        mWaypointFollower->stop();
+    }
+
+    if (mCarMovementController) {
+        mCarMovementController->setDesiredSteering(0.0);
+        mCarMovementController->setDesiredSpeed(0.0);
+    }
+    mWaypointFollower->resetState();
   }
 
   void start_callback(const iso_msgs::msg::Start::SharedPtr start_msg)
   {
-    // TODO
+    qDebug() << "Object Starting";
+    mCarState->setFlightMode(VehicleState::FlightMode::Mission);
+    mWaypointFollower->startFollowingRoute(false);
   }
 
   // ROS parameters
