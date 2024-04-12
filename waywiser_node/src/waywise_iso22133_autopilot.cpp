@@ -48,12 +48,12 @@ public:
       "waywise_control_tower_address",
       "127.0.0.1");
 
-    abort_topic_ = iso_msgs::msg::Abort::TOPIC_NAME;
+    auto abort_topic = iso_msgs::msg::Abort::TOPIC_NAME;
     abort_sub_ = this->create_subscription<iso_msgs::msg::Abort>(
-      abortTopic_, 10, std::bind(&WayWiseISO22133AutoPilot::abort_callback, this, _1));
-    start_topic_ = iso_msgs::msg::Start::TOPIC_NAME;
+      abort_topic, 10, std::bind(&WayWiseISO22133AutoPilot::abort_callback, this, _1));
+    auto start_topic = iso_msgs::msg::Start::TOPIC_NAME;
     start_sub_ = this->create_subscription<iso_msgs::msg::Start>(
-      start_topic_, 10, std::bind(&WayWiseISO22133AutoPilot::start_callback, this, _1));
+      start_topic, 10, std::bind(&WayWiseISO22133AutoPilot::start_callback, this, _1));
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
       "/odom", 10, std::bind(&WayWiseISO22133AutoPilot::odom_callback, this, _1));
     traj_sub_ = this->create_subscription<iso_msgs::msg::CartesianTrajectory>(
@@ -144,14 +144,14 @@ private:
       }
       mWaypointFollower->addRoute(route);
     } else {
-      qDebug() << "iso22133VehicleServer: got new mission but no "
+      qDebug() << "WaywiseISO22133autopilot: got new mission but no "
                         "WaypointFollower is set to receive it.";
     }
   }
 
   void abort_callback(const iso_msgs::msg::Abort::SharedPtr abort_msg)
   {
-    qDebug() << "iso22133VehicleServer: Abort recived!";
+    qDebug() << "WaywiseISO22133autopilot: Abort received!";
     if (mWaypointFollower) {
         mWaypointFollower->stop();
     }
