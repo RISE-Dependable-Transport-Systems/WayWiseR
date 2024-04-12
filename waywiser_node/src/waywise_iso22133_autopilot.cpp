@@ -91,6 +91,9 @@ public:
 private:
   void autopilot_timer_callback()
   {
+    if (mCarState->getFlightMode() != VehicleState::FlightMode::Mission) {
+      return;
+    }
     double mDesiredSpeed = mCarMovementController->getDesiredSpeed();        // [m/s]
     double mDesiredSteering = mCarMovementController->getDesiredSteering();  // [-1.0:1.0]
     double steeringAngle_rad = mDesiredSteering * mCarState->getMaxSteeringAngle();
