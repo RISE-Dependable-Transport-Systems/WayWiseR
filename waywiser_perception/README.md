@@ -41,6 +41,6 @@
 ## Examples
 
     ros2 launch waywiser_perception yolov8.launch.py
-    ros2 launch waywiser_perception yolov8.launch.py use_sim_time:=false
+    ros2 launch waywiser_perception yolov8.launch.py use_sim_time:=true
     ros2 launch waywiser_perception yolov8.launch.py yolov8_config:=./src/WayWiseR/waywiser_perception/config/yolov8.yaml
     ros2 launch waywiser_perception yolov8.launch.py yolov8_config:=config_file_of_your_choice
