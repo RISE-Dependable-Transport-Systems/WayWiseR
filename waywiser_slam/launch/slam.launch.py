@@ -1,7 +1,6 @@
 import os
 
 from ament_index_python import get_package_share_directory
-
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
@@ -18,7 +17,7 @@ def generate_launch_description():
         description='Full path to params file for slam toolbox',
     )
     use_sim_time_la = DeclareLaunchArgument(
-        'use_sim_time', default_value='True', description='Use simulation/Gazebo clock'
+        'use_sim_time', default_value='False', description='Use simulation/Gazebo clock'
     )
 
     # start nodes and use args to set parameters

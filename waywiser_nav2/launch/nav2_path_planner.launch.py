@@ -22,7 +22,7 @@ def generate_launch_description():
     )
 
     use_sim_time_la = DeclareLaunchArgument(
-        'use_sim_time', default_value='True', description='Use simulation/Gazebo clock'
+        'use_sim_time', default_value='False', description='Use simulation/Gazebo clock'
     )
 
     enable_smoother_server_la = DeclareLaunchArgument(
