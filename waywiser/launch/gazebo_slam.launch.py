@@ -12,6 +12,7 @@ def generate_launch_description():
     waywiser_gazebo_dir = get_package_share_directory('waywiser_gazebo')
     waywiser_twist_safety_dir = get_package_share_directory('waywiser_twist_safety')
     waywiser_slam_dir = get_package_share_directory('waywiser_slam')
+    waywiser_rviz2_dir = get_package_share_directory('waywiser_rviz2')
 
     # args that can be set from the command line or a default will be used
     use_sim_time_la = DeclareLaunchArgument(
@@ -26,6 +27,11 @@ def generate_launch_description():
         'enable_collision_monitor',
         default_value='True',
         description='Use Nav2 collision monitoring',
+    )
+    rviz_config_la = DeclareLaunchArgument(
+        'rviz_config',
+        default_value=os.path.join(waywiser_rviz2_dir, 'rviz/map_reference_frame_slam.rviz'),
+        description='Full path of rviz display config file or path to their directory',
     )
 
     # include launch files
@@ -76,6 +82,23 @@ def generate_launch_description():
         }.items(),
     )
 
+    # include launch files
+    teleop_rviz2 = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(
+                    get_package_share_directory('waywiser'),
+                    'launch',
+                    'teleop_rviz2.launch.py',
+                )
+            ]
+        ),
+        launch_arguments={
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'rviz_config': LaunchConfiguration('rviz_config'),
+        }.items(),
+    )
+
     # create launch description
     ld = LaunchDescription()
 
@@ -83,10 +106,12 @@ def generate_launch_description():
     ld.add_action(use_sim_time_la)
     ld.add_action(gazebo_world_la)
     ld.add_action(enable_collision_monitor_la)
+    ld.add_action(rviz_config_la)
 
     # start nodes
     ld.add_action(gazebo)
     ld.add_action(twist_safety)
     ld.add_action(slam)
+    ld.add_action(teleop_rviz2)
 
     return ld
