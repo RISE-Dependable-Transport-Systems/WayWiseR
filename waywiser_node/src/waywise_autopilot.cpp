@@ -10,6 +10,7 @@
 #include "WayWise/logger/logger.h"
 #include "WayWise/vehicles/carstate.h"
 #include "WayWise/vehicles/controller/carmovementcontroller.h"
+#include "WayWise/autopilot/followpoint.h"
 #include <QCoreApplication>
 #include <QObject>
 
@@ -43,9 +44,10 @@ public:
     waywise_control_tower_address_ = this->declare_parameter(
       "waywise_control_tower_address",
       "127.0.0.1");
+    odom_topic_ = this->declare_parameter("odom_topic", "/odom");
 
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-      "/odom", 10, std::bind(&WayWiseAutoPilot::odom_callback, this, _1));
+      odom_topic_, 10, std::bind(&WayWiseAutoPilot::odom_callback, this, _1));
     twist_pub_ = create_publisher<geometry_msgs::msg::Twist>("/waywise_vel", 10);
     autopilot_timer_ =
       this->create_wall_timer(
@@ -60,6 +62,7 @@ public:
     mCarMovementController->setSpeedToRPMFactor(speed_to_erpm_factor_);
     mCarState->setAxisDistance(wheelbase_);
     mCarState->setMaxSteeringAngle(atan(mCarState->getAxisDistance() / min_turning_radius_));
+    mFollowPoint.reset(new FollowPoint(mCarMovementController));
 
     // Setup MAVLINK communication towards ControlTower
     mMavsdkVehicleServer.reset(
@@ -118,7 +121,7 @@ private:
 
   int autopilot_cmd_publish_rate_;
 
-  std::string waywise_control_tower_address_;
+  std::string waywise_control_tower_address_, odom_topic_;
 
   // internal variables
   PosType waywise_posType_used_ = PosType::simulated;
@@ -136,6 +139,7 @@ private:
   QSharedPointer<CarMovementController> mCarMovementController;
   QSharedPointer<PurepursuitWaypointFollower> mWaypointFollower;
   QSharedPointer<MavsdkVehicleServer> mMavsdkVehicleServer;
+  QSharedPointer<FollowPoint> mFollowPoint;
 };
 
 int main(int argc, char * argv[])

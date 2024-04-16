@@ -62,6 +62,7 @@ add_executable(
   WayWise/autopilot/purepursuitwaypointfollower.cpp
   WayWise/autopilot/purepursuitwaypointfollower.h
   WayWise/autopilot/waypointfollower.h
+  WayWise/autopilot/followpoint.cpp
   WayWise/communication/mavsdkvehicleserver.cpp
   WayWise/communication/jsonstreamparsertcp.cpp
   WayWise/communication/vehicleserver.h
@@ -81,10 +82,10 @@ target_include_directories(waywise_autopilot PRIVATE WayWise/)
 target_link_libraries(waywise_rover Qt5::Core Qt5::SerialPort Qt5::Network)
 
 target_link_libraries(waywise_autopilot Qt5::Core Qt5::SerialPort Qt5::Network
-                      MAVSDK::mavsdk)
+  MAVSDK::mavsdk)
 
 ament_target_dependencies(waywise_rover rclcpp std_msgs nav_msgs geometry_msgs
-                          tf2_ros)
+  tf2_ros)
 ament_target_dependencies(
   waywise_autopilot
   rclcpp
