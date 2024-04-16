@@ -19,7 +19,7 @@ ament_target_dependencies(map_to_odom_tf_publisher rclcpp tf2_ros tf2_geometry_m
 install(TARGETS map_to_odom_tf_publisher RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 install(
-  DIRECTORY launch
+  DIRECTORY launch config
   DESTINATION share/${PROJECT_NAME}
 )
 

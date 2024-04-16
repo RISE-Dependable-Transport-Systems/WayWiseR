@@ -1,0 +1,26 @@
+/**:
+  # general parameters shared by all carla nodes
+  ros__parameters:
+    ego_vehicle_role_name: truck
+    role_name: truck
+
+carla_ros_bridge:
+  ros__parameters:
+    host: localhost
+    port: 2000
+    timeout: 2
+    passive: true
+    synchronous_mode: true
+    synchronous_mode_wait_for_vehicle_control_command: false
+    fixed_delta_seconds: 0.01
+    town: Town10HD_Opt
+    register_all_sensors: true
+
+carla_spawn_objects:
+  ros__parameters:
+    spawn_point_truck: "-41.49,-104.94,0.1,0,0,90"
+    spawn_point_semitrailer: "-41.49,-111.94,0.1,0,0,90"
+
+carla_initial_pose:
+  ros__parameters:
+    control_id: control

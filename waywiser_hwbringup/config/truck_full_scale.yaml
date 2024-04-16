@@ -1,0 +1,18 @@
+/**:
+  # general parameters shared by all waywise-related nodes
+  ros__parameters:
+    odom_frame: truck
+    base_frame: truck
+    erpm_min: -30000.0
+    erpm_max: 30000.0
+    speed_to_erpm_factor: 4500.0
+    wheelbase: 3.1
+    min_turning_radius: 2.54 # wheelbase/tan(max_steering_angle)
+    max_angular_velocity: 0.5 # rad/s
+    standstill_velocity_threshold: 0.05
+    odom_topic: "/carla/truck/odometry"
+
+waywise_autopilot_node:
+  ros__parameters:
+    autopilot_cmd_publish_rate: 30
+    waywise_control_tower_address: "127.0.0.1"
