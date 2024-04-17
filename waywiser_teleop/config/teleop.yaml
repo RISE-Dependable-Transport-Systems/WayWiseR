@@ -30,7 +30,7 @@ twist_keyboard:
     max_linear_speed: 2.0
     max_angular_speed: 2.0
     startup_linear_speed: 0.5
-    startup_angular_speed: 1.0
+    startup_angular_speed: 0.5
     speed_control_rate: 10.0
     publish_rate: 10.0
 
