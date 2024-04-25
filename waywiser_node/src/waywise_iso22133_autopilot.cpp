@@ -40,8 +40,8 @@ public:
     // -- ROS --
     // get ROS parameters
     speed_to_rpm_factor_ = this->declare_parameter("speed_to_rpm_factor", 0.0);
-    wheelbase_ = this->declare_parameter("wheelbase", 0.33);
-    min_turning_radius_ = this->declare_parameter("min_turning_radius", 0.67);
+    wheelbase_ = this->declare_parameter("wheelbase", 2.85);
+    max_steering_angle_ = this->declare_parameter("max_steering_angle", 0.604);
     autopilot_cmd_publish_rate_ = this->declare_parameter("autopilot_cmd_publish_rate", 30);
 
     waywise_control_tower_address_ = this->declare_parameter(
@@ -71,7 +71,7 @@ public:
     mCarMovementController.reset(new CarMovementController(mCarState));
     mCarMovementController->setSpeedToRPMFactor(speed_to_rpm_factor_);
     mCarState->setAxisDistance(wheelbase_);
-    mCarState->setMaxSteeringAngle(atan(mCarState->getAxisDistance() / min_turning_radius_));
+    mCarState->setMaxSteeringAngle(max_steering_angle_);
 
     // Setup MAVLINK communication towards ControlTower
     mMavsdkVehicleServer.reset(
@@ -85,6 +85,7 @@ public:
     mWaypointFollower->setPurePursuitRadius(1.0);
     mWaypointFollower->setRepeatRoute(false);
     mWaypointFollower->setAdaptivePurePursuitRadiusActive(true);
+    mWaypointFollower->setAdaptivePurePursuitRadiusCoefficient(1.0);
     mMavsdkVehicleServer->setWaypointFollower(mWaypointFollower);
   }
 
@@ -176,7 +177,7 @@ private:
   // ROS parameters
   float speed_to_rpm_factor_;
 
-  float wheelbase_, min_turning_radius_;
+  float wheelbase_, max_steering_angle_;
 
   int autopilot_cmd_publish_rate_;
 
