@@ -11,4 +11,5 @@
 
     # To spawn models within the world after launching gazebo
     ros2 launch waywiser_gazebo spawn.launch.py model_sdf_paths:='["./src/WayWiseR/waywiser_description/sdf/actor_stand/model.sdf"]'
+    ros2 launch waywiser_gazebo spawn.launch.py model_sdf_paths:='["./src/WayWiseR/waywiser_description/sdf/actor_walk/model.sdf"]'
     ros2 launch waywiser_gazebo spawn.launch.py model_sdf_paths:='["./src/WayWiseR/waywiser_description/sdf/actor_stand/model.sdf", "./src/WayWiseR/waywiser_description/sdf/drone/model.sdf"]'

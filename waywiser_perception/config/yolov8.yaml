@@ -13,5 +13,9 @@ yolov8_node:
         depth_camerainfo_topic: "/sensors/camera/aligned_depth_to_color/camera_info"
         maximum_object_depth_size: 0.5
 
+        use_tracker: True
+        color_image_topic_as_stream: True
+        tracker_config_filepath: "bytetrack.yaml" # "bytetrack.yaml" or "botsort.yaml"
+
         publish_bbox_3d_markers: True
         rviz_3d_visualization_markers_topic: "/sensors/camera/color/bbox_3d_markers"

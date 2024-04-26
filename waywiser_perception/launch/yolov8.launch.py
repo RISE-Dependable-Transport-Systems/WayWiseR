@@ -43,6 +43,22 @@ def yolov8_launch(context):
     config_data = yaml_to_dict(LaunchConfiguration('yolov8_config').perform(context))
     yolov8_parameters = config_data['yolov8_node']['ros__parameters']
     yolov8_parameters['model_file_path'] = os.path.expanduser(yolov8_parameters['model_file_path'])
+    if yolov8_parameters['use_tracker']:
+        tracker_config_filepath = os.path.expanduser(yolov8_parameters['tracker_config_filepath'])
+
+        if not tracker_config_filepath.startswith('/'):
+            tracker_config_filepath = os.path.join(
+                get_package_share_directory('waywiser_perception'),
+                'config/',
+                tracker_config_filepath,
+            )
+
+        if not os.path.exists(tracker_config_filepath):
+            raise FileNotFoundError(
+                f"Tracker config file '{tracker_config_filepath}' does not exist."
+            )
+        else:
+            yolov8_parameters['tracker_config_filepath'] = tracker_config_filepath
 
     yolov8_node = Node(
         package='waywiser_perception',
