@@ -14,11 +14,11 @@ def generate_launch_description():
 
     # args that can be set from the command line or a default will be used
     use_sim_time_la = DeclareLaunchArgument(
-        'use_sim_time', default_value='True', description='Use simulation/Gazebo clock'
+        'use_sim_time', default_value='False', description='Use simulation/Gazebo clock'
     )
     rviz_config_la = DeclareLaunchArgument(
         'rviz_config',
-        default_value=os.path.join(waywiser_rviz2_dir, 'rviz/map_reference_frame_nav2.rviz'),
+        default_value='',
         description='Full path of rviz display config file or path to their directory',
     )
 

@@ -18,10 +18,10 @@
 
     ros2 launch waywiser_hwbringup waywise_autopilot.launch.py
     ros2 launch waywiser_hwbringup waywise_autopilot.launch.py rover_config:=./src/WayWiseR/waywiser_hwbringup/config/rover.yaml
-    ros2 launch waywiser_hwbringup waywise_autopilot.launch.py use_sim_time:=false
+    ros2 launch waywiser_hwbringup waywise_autopilot.launch.py use_sim_time:=true
 
     ros2 launch waywiser_hwbringup realsense_d435i.launch.py
-    ros2 launch waywiser_hwbringup realsense_d435i.launch.py use_sim_time:=false
+    ros2 launch waywiser_hwbringup realsense_d435i.launch.py use_sim_time:=true
     ros2 launch waywiser_hwbringup realsense_d435i.launch.py log_level:=debug
     ros2 launch waywiser_hwbringup realsense_d435i.launch.py namespace:=/sensors/drone/camera
     ros2 launch waywiser_hwbringup realsense_d435i.launch.py container:=/sensors/camera/camera_container

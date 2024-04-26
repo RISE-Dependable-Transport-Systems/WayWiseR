@@ -1,7 +1,7 @@
 ## Examples
 
     ros2 launch waywiser_twist_safety twist_safety.launch.py
-    ros2 launch waywiser_twist_safety twist_safety.launch.py use_sim_time:=false
+    ros2 launch waywiser_twist_safety twist_safety.launch.py use_sim_time:=true
     ros2 launch waywiser_twist_safety twist_safety.launch.py enable_collision_monitor:=true
     ros2 launch waywiser_twist_safety twist_safety.launch.py twist_safety_config:=./src/WayWiseR/waywiser_twist_safety/config/twist_safety.yaml
 
