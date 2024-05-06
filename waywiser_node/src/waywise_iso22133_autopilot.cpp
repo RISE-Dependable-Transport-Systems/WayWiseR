@@ -43,6 +43,7 @@ public:
     wheelbase_ = this->declare_parameter("wheelbase", 2.85);
     max_steering_angle_ = this->declare_parameter("max_steering_angle", 0.604);
     autopilot_cmd_publish_rate_ = this->declare_parameter("autopilot_cmd_publish_rate", 30);
+    pure_pursuit_radius_ = this->declare_parameter("pure_pursuit_radius", 1.0);
 
     waywise_control_tower_address_ = this->declare_parameter(
       "waywise_control_tower_address",
@@ -82,7 +83,7 @@ public:
 
     // --- Autopilot ---
     mWaypointFollower.reset(new PurepursuitWaypointFollower(mCarMovementController));
-    mWaypointFollower->setPurePursuitRadius(1.0);
+    mWaypointFollower->setPurePursuitRadius(pure_pursuit_radius_);
     mWaypointFollower->setRepeatRoute(false);
     mWaypointFollower->setAdaptivePurePursuitRadiusActive(true);
     mWaypointFollower->setAdaptivePurePursuitRadiusCoefficient(1.0);
@@ -176,8 +177,9 @@ private:
 
   // ROS parameters
   float speed_to_rpm_factor_;
-
   float wheelbase_, max_steering_angle_;
+
+  double pure_pursuit_radius_;
 
   int autopilot_cmd_publish_rate_;
 
