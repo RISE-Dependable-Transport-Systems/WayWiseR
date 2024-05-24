@@ -27,7 +27,9 @@ install(TARGETS twist_angular_correction RUNTIME DESTINATION lib/${PROJECT_NAME}
 
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
 
-ament_python_install_package(py_scripts)
+ament_python_install_package(${PROJECT_NAME}_py
+  PACKAGE_DIR py_scripts
+)
 
 install(PROGRAMS
   py_scripts/twist_keyboard.py

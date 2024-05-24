@@ -56,7 +56,9 @@ install(DIRECTORY launch config
   DESTINATION share/${PROJECT_NAME}
 )
 
-ament_python_install_package(py_scripts)
+ament_python_install_package(${PROJECT_NAME}_py
+  PACKAGE_DIR py_scripts
+)
 
 install(PROGRAMS
   py_scripts/yolov8_node.py
