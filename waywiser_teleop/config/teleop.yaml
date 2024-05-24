@@ -26,7 +26,7 @@ teleop_twist_joy:
 
 twist_keyboard:
   ros__parameters:
-    enable: false
+    enable: true
     max_linear_speed: 2.0
     max_angular_speed: 2.0
     startup_linear_speed: 0.5
