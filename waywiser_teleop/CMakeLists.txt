@@ -15,9 +15,13 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
+find_package(waywiser_twist_safety REQUIRED)
 
 add_executable(joy_emergency_stop src/joy_emergency_stop.cpp)
-ament_target_dependencies(joy_emergency_stop rclcpp sensor_msgs std_msgs)
+ament_target_dependencies(joy_emergency_stop rclcpp sensor_msgs std_msgs waywiser_twist_safety)
+target_include_directories(joy_emergency_stop PRIVATE
+  ${waywiser_twist_safety_INCLUDE_DIRS}
+)
 
 add_executable(twist_angular_correction src/twist_angular_correction.cpp)
 ament_target_dependencies(twist_angular_correction geometry_msgs rclcpp sensor_msgs std_msgs)
