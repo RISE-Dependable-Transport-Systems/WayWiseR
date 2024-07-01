@@ -4,7 +4,12 @@ from geometry_msgs.msg import Twist
 import pygame
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Bool
+from rclpy.qos import QoSDurabilityPolicy
+from rclpy.qos import QoSHistoryPolicy
+from rclpy.qos import QoSProfile
+from rclpy.qos import QoSReliabilityPolicy
+
+from waywiser_twist_safety.msg import EmergencyStopState
 
 
 class TwistKeyboard(Node):
@@ -13,11 +18,27 @@ class TwistKeyboard(Node):
     def __init__(self):
         super().__init__('twist_keyboard')
         self.twist_publisher = self.create_publisher(Twist, 'cmd_vel', 10)
-        self.emergency_stop_publisher = self.create_publisher(Bool, 'emergency_stop', 10)
+        self.emergency_stop_request_publisher = self.create_publisher(
+            EmergencyStopState, '/emergency_stop/target_state', 10
+        )
 
-        # Initialize emergency_stop_msg
-        self.emergency_stop_msg = Bool()
-        self.emergency_stop_msg.data = False
+        self.emergency_stop_state_subscriber = self.create_subscription(
+            EmergencyStopState,
+            '/emergency_stop/current_state',
+            self.emergency_stop_state_subscriber_callback,
+            QoSProfile(
+                reliability=QoSReliabilityPolicy.BEST_EFFORT,
+                history=QoSHistoryPolicy.KEEP_LAST,
+                durability=QoSDurabilityPolicy.VOLATILE,
+                depth=1,
+            ),
+        )
+        self.emergency_stop_current_state = EmergencyStopState.UNKNOWN
+
+        # Initialize emergency_stop_target_state_msg
+        self.emergency_stop_target_state_msg = EmergencyStopState()
+        self.emergency_stop_target_state_msg.sender_id = 'twist_keyboard'
+        self.emergency_stop_target_state_msg.state = EmergencyStopState.ACTIVE
 
         # Set up keybindings
         self.forward_key = pygame.K_w
@@ -90,6 +111,9 @@ class TwistKeyboard(Node):
         pygame.event.set_allowed(None)  # Disable all events
         pygame.event.set_allowed(pygame.QUIT)  # Enable quit event
 
+    def emergency_stop_state_subscriber_callback(self, emergency_stop_current_state):
+        self.emergency_stop_current_state = emergency_stop_current_state.state
+
     def capture_pressed_keys(self):
         keys = pygame.key.get_pressed()
 
@@ -111,9 +135,9 @@ class TwistKeyboard(Node):
 
         if keys:
             # Process emergency stop set/clear event
-            emergency_stop_event_registered = self.process_emergency_stop_keys(keys)
+            emergency_stop_set_event_registered = self.process_emergency_stop_keys(keys)
 
-            if not emergency_stop_event_registered:
+            if not emergency_stop_set_event_registered:
                 # Check if the key associated with increasing linear speed is pressed
                 if keys[self.increase_linear_speed_key]:
                     # Increase linear speed by 10%
@@ -147,7 +171,7 @@ class TwistKeyboard(Node):
 
         if keys:
             # Process emergency stop set/clear event
-            self.process_emergency_stop_keys(keys)
+            emergency_stop_set_event_registered = self.process_emergency_stop_keys(keys)
 
             # Check if any of the actuation keys are pressed now
             is_actuation_requested_now = any(keys[i] for i in self.actuation_keys)
@@ -157,7 +181,7 @@ class TwistKeyboard(Node):
                     # Publish zero velocity twist message
                     self.twist_publisher.publish(twist)
 
-                elif not self.emergency_stop_msg.data:
+                elif not emergency_stop_set_event_registered:
                     # Process actuation keys
                     if not keys[self.stop_key]:
                         if keys[self.forward_key]:
@@ -191,18 +215,13 @@ class TwistKeyboard(Node):
         # Check if emergency stop key is pressed
         if emergency_stop_event_registered:
             if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
-                if self.emergency_stop_msg.data:
-                    # Clear emergency stop signal
-                    self.emergency_stop_msg.data = False
-                    self.get_logger().warn('Emergency stop CLEARED from keyboard.')
+                emergency_stop_event_registered = False
+                self.emergency_stop_target_state_msg.state = EmergencyStopState.CLEAR
             else:
-                if not self.emergency_stop_msg.data:
-                    # Set emergency stop signal
-                    self.emergency_stop_msg.data = True
-                    self.get_logger().warn('Emergency stop ACTIVATED from keyboard.')
-                    self.twist_publisher.publish(Twist())
+                self.emergency_stop_target_state_msg.state = EmergencyStopState.ACTIVE
 
-            self.emergency_stop_publisher.publish(self.emergency_stop_msg)
+            self.emergency_stop_target_state_msg.stamp = self.get_clock().now().to_msg()
+            self.emergency_stop_request_publisher.publish(self.emergency_stop_target_state_msg)
 
         return emergency_stop_event_registered
 
@@ -224,9 +243,16 @@ class TwistKeyboard(Node):
             '************************** Status *********************************\n\n'
             f'Configured speeds: Linear - {self.linear_speed:.2f}; Angular - {self.angular_speed:.2f}\n\n'  # noqa
             f'Publishing speeds: Linear - {twist.linear.x:.2f}; Angular - {twist.angular.z:.2f}\n\n'  # noqa
-            f'Emergency stop: {"ACTIVATED" if self.emergency_stop_msg.data else "CLEARED"}\n\n'
-            '*********************************************************************\n\n'
         )
+
+        if self.emergency_stop_current_state == EmergencyStopState.ACTIVE:
+            text = text + 'Emergency stop state: "ACTIVE"\n\n'
+        elif self.emergency_stop_current_state == EmergencyStopState.CLEAR:
+            text = text + 'Emergency stop state: "CLEAR"\n\n'
+        else:
+            text = text + 'Emergency stop state: "UNKNOWN"\n\n'
+
+        text = text + '*********************************************************************\n\n'
 
         self.blit_text(text, (20, 20))
 
