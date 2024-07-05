@@ -80,7 +80,7 @@ def conditional_launch_setup(context):
                         LaunchConfiguration('twist_safety_config'),
                         {'use_sim_time': LaunchConfiguration('use_sim_time')},
                     ],
-                    remappings={('/bond', '/bond_nav2')},
+                    remappings={('/bond', '/bond_collision_monitor')},
                 ),
                 Node(
                     package='nav2_lifecycle_manager',

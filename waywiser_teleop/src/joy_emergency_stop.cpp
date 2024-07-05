@@ -1,13 +1,13 @@
-#include <chrono>
-#include <functional>
 #include <memory>
 #include <string>
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "waywiser_twist_safety/msg/emergency_stop_state.hpp"
 
-using std::placeholders::_1;
+using namespace std::placeholders;
+using namespace waywiser_twist_safety::msg;
 
 class JoyEmergencyStop : public rclcpp::Node
 {
@@ -21,15 +21,19 @@ public:
       "emergency_stop_clear_joy_button_index", 7);
     joy_emergency_stop_timeout_ = this->declare_parameter("joy_emergency_stop_timeout", 1.0);
 
-    emergency_stop_publisher_ = this->create_publisher<std_msgs::msg::Bool>("emergency_stop", 10);
+    emergency_stop_request_publisher_ = this->create_publisher<EmergencyStopState>(
+      "/emergency_stop/target_state", 10);
+
     joy_subscriber_ = this->create_subscription<sensor_msgs::msg::Joy>(
-      "/joy", 10, std::bind(&JoyEmergencyStop::joy_callback, this, std::placeholders::_1));
+      "/joy", 10, std::bind(&JoyEmergencyStop::joy_callback, this, _1));
 
     joy_watchdog_timer_ =
       this->create_wall_timer(
       std::chrono::milliseconds((int)std::round(1000.0 * joy_emergency_stop_timeout_)),
       std::bind(&JoyEmergencyStop::joy_watchdog_callback, this));
-    emergency_stop_msg_.data = false;
+
+    emergency_stop_target_state_msg_.sender_id = "twist_joy";
+    emergency_stop_target_state_msg_.state = EmergencyStopState::ACTIVE;
 
     RCLCPP_INFO(
       get_logger(),
@@ -42,43 +46,26 @@ private:
   void joy_callback(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
   {
     if (joy_watchdog_timer_->is_canceled()) {
-      if (emergency_stop_msg_.data) {
-        RCLCPP_WARN(
-          get_logger(),
-          "Receiving messages from /joy topic now, "
-          "but emergency_stop is ACTIVATED.");
-      } else {
-        RCLCPP_WARN(
-          get_logger(),
-          "Receiving messages from /joy topic now. "
-          "Monitoring emergency_stop button.");
-      }
+      RCLCPP_WARN(
+        get_logger(),
+        "Receiving messages from /joy topic now. "
+        "Monitoring emergency_stop button.");
     }
     joy_watchdog_timer_->reset();
 
     if (joy_msg->buttons[emergency_stop_set_joy_button_index_] == 1) {
-      if (!emergency_stop_msg_.data) {
-        emergency_stop_msg_.data = true;
-        emergency_stop_publisher_->publish(emergency_stop_msg_);
-        RCLCPP_WARN(get_logger(), "emergency_stop ACTIVATED from /joy topic.");
-      } else {
-        emergency_stop_publisher_->publish(emergency_stop_msg_);
-      }
+      emergency_stop_target_state_msg_.state = EmergencyStopState::ACTIVE;
+      emergency_stop_request_publisher_->publish(emergency_stop_target_state_msg_);
     } else if (joy_msg->buttons[emergency_stop_clear_joy_button_index_] == 1) {
-      if (emergency_stop_msg_.data) {
-        emergency_stop_msg_.data = false;
-        emergency_stop_publisher_->publish(emergency_stop_msg_);
-        RCLCPP_WARN(get_logger(), "emergency_stop CLEARED from /joy topic.");
-      } else {
-        emergency_stop_publisher_->publish(emergency_stop_msg_);
-      }
+      emergency_stop_target_state_msg_.state = EmergencyStopState::CLEAR;
+      emergency_stop_request_publisher_->publish(emergency_stop_target_state_msg_);
     }
   }
 
   void joy_watchdog_callback()
   {
-    emergency_stop_msg_.data = true;
-    emergency_stop_publisher_->publish(emergency_stop_msg_);
+    emergency_stop_target_state_msg_.state = EmergencyStopState::ACTIVE;
+    emergency_stop_request_publisher_->publish(emergency_stop_target_state_msg_);
     RCLCPP_WARN(
       get_logger(),
       "/joy topic has stopped publishing for %.2f seconds. "
@@ -89,7 +76,7 @@ private:
   }
 
   // Publishers and subscribers
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr emergency_stop_publisher_;
+  rclcpp::Publisher<EmergencyStopState>::SharedPtr emergency_stop_request_publisher_;
   rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_subscriber_;
 
   // Timer
@@ -99,7 +86,7 @@ private:
   int emergency_stop_set_joy_button_index_;
   int emergency_stop_clear_joy_button_index_;
   float joy_emergency_stop_timeout_;
-  std_msgs::msg::Bool emergency_stop_msg_;
+  EmergencyStopState emergency_stop_target_state_msg_;
 };
 
 int main(int argc, char * argv[])

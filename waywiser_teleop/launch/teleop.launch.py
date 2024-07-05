@@ -3,6 +3,7 @@ import os
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.actions import LogInfo
 from launch.actions import OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -115,17 +116,23 @@ def twist_keyboard_conditional_launch(context):
             twist_keyboard_params = config_data['twist_keyboard']['ros__parameters']
             enable_twist_keyboard = twist_keyboard_params['enable']
             if enable_twist_keyboard:
-                twist_keyboard_node = Node(
-                    package='waywiser_teleop',
-                    executable='twist_keyboard.py',
-                    name='twist_keyboard',
-                    output='screen',
-                    parameters=[
-                        twist_keyboard_params,
-                        {'use_sim_time': LaunchConfiguration('use_sim_time')},
-                    ],
-                    remappings={('/cmd_vel', '/key_vel')},
-                )
-                return [twist_keyboard_node]
+                if 'DISPLAY' in os.environ:
+                    twist_keyboard_node = Node(
+                        package='waywiser_teleop',
+                        executable='twist_keyboard.py',
+                        name='twist_keyboard',
+                        output='screen',
+                        parameters=[
+                            twist_keyboard_params,
+                            {'use_sim_time': LaunchConfiguration('use_sim_time')},
+                        ],
+                        remappings={('/cmd_vel', '/key_vel')},
+                    )
+                    return [twist_keyboard_node]
+                else:
+                    log_no_display = LogInfo(
+                        msg='No GUI display detected. twist_keyboard_node will not be launched.'
+                    )
+                    return [log_no_display]
 
     return []
