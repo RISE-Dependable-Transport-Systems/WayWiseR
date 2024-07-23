@@ -8,7 +8,7 @@ carla_ros_bridge:
   ros__parameters:
     host: localhost
     port: 2000
-    timeout: 2
+    timeout: 10
     passive: true
     synchronous_mode: true
     synchronous_mode_wait_for_vehicle_control_command: false
@@ -24,3 +24,13 @@ carla_spawn_objects:
 carla_initial_pose:
   ros__parameters:
     control_id: control
+
+emulated_angle_sensor:
+  ros__parameters:
+    enable: true
+    primary_frame: truck
+    secondary_frame: semitrailer
+    topic: sensors/truck/angle
+    publish_rate: 10
+    invert_angle: true
+    warmup_time: 10.0

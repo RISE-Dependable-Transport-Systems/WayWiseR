@@ -221,7 +221,13 @@
         },
         {
             "type": "vehicle.dts.semitrailer",
-            "id": "semitrailer"
+            "id": "semitrailer",
+            "sensors": [
+                {
+                    "type": "sensor.pseudo.tf",
+                    "id": "tf"
+                }
+            ]
         }
     ]
 }

@@ -12,11 +12,17 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(std_msgs REQUIRED)
 
 add_executable(map_to_odom_tf_publisher src/map_to_odom_tf_publisher.cpp)
 ament_target_dependencies(map_to_odom_tf_publisher rclcpp tf2_ros tf2_geometry_msgs geometry_msgs nav_msgs)
 
+add_executable(emulated_angle_sensor src/emulated_angle_sensor.cpp)
+ament_target_dependencies(emulated_angle_sensor rclcpp tf2 tf2_ros geometry_msgs std_msgs)
+
 install(TARGETS map_to_odom_tf_publisher RUNTIME DESTINATION lib/${PROJECT_NAME})
+install(TARGETS emulated_angle_sensor RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 install(
   DIRECTORY launch config
