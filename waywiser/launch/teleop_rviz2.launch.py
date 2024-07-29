@@ -11,6 +11,7 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description():
     waywiser_teleop_dir = get_package_share_directory('waywiser_teleop')
     waywiser_rviz2_dir = get_package_share_directory('waywiser_rviz2')
+    teleop_dir = get_package_share_directory('waywiser_teleop')
 
     # args that can be set from the command line or a default will be used
     use_sim_time_la = DeclareLaunchArgument(
@@ -20,6 +21,11 @@ def generate_launch_description():
         'rviz_config',
         default_value='',
         description='Full path of rviz display config file or path to their directory',
+    )
+    teleop_config_la = DeclareLaunchArgument(
+        'teleop_config',
+        default_value=os.path.join(teleop_dir, 'config/teleop.yaml'),
+        description='Full path to params file',
     )
 
     # include launch files
@@ -35,6 +41,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'teleop_config': LaunchConfiguration('teleop_config'),
         }.items(),
     )
 
@@ -60,6 +67,7 @@ def generate_launch_description():
     # declare launch args
     ld.add_action(use_sim_time_la)
     ld.add_action(rviz_config_la)
+    ld.add_action(teleop_config_la)
 
     # start nodes
     ld.add_action(teleop)
