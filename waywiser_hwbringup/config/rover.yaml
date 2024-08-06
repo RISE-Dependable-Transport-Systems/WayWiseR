@@ -30,3 +30,4 @@ waywise_car_autopilot_node:
   ros__parameters:
     autopilot_cmd_publish_rate: 30
     waywise_control_tower_address: "127.0.0.1"
+    purepursuit_radius: 1.0

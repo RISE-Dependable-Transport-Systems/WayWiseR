@@ -48,6 +48,7 @@ public:
       "waywise_control_tower_address",
       "127.0.0.1");
     odom_topic_ = this->declare_parameter("odom_topic", "/odom");
+    purepursuit_radius_ = this->declare_parameter("purepursuit_radius", 1.0);
 
     has_trailer_ = this->declare_parameter("has_trailer", false);
     if (has_trailer_) {
@@ -109,7 +110,7 @@ public:
 
     // --- Autopilot ---
     mWaypointFollower.reset(new PurepursuitWaypointFollower(mCarMovementController));
-    mWaypointFollower->setPurePursuitRadius(1.0);
+    mWaypointFollower->setPurePursuitRadius(purepursuit_radius_);
     mWaypointFollower->setRepeatRoute(false);
     mWaypointFollower->setAdaptivePurePursuitRadiusActive(true);
     mMavsdkVehicleServer->setWaypointFollower(mWaypointFollower);
@@ -163,6 +164,7 @@ private:
   float length_, width_, wheelbase_, min_turning_radius_;
   int autopilot_cmd_publish_rate_;
   std::string waywise_control_tower_address_, odom_topic_;
+  float purepursuit_radius_;
 
   float trailer_length_, trailer_width_, trailer_wheelbase_;
   float purepursuit_forward_gain_, purepursuit_reverse_gain_;

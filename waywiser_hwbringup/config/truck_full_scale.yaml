@@ -17,9 +17,13 @@
     trailer_width: 2.51
     trailer_wheelbase: 9.0
 
-waywise_autopilot_node:
+waywise_truck_autopilot_node:
   ros__parameters:
     has_trailer: true
     autopilot_cmd_publish_rate: 30
     waywise_control_tower_address: "127.0.0.1"
     angle_sensor_topic: "sensors/truck/angle"
+    purepursuit_radius: 20.0
+    purepursuit_forward_gain: 1.0
+    purepursuit_reverse_gain: -1.0
+    adaptive_pure_pursuit: true

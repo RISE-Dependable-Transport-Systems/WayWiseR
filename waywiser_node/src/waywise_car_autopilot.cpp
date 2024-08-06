@@ -40,11 +40,11 @@ public:
     wheelbase_ = this->declare_parameter("wheelbase", 0.33);
     min_turning_radius_ = this->declare_parameter("min_turning_radius", 0.67);
     autopilot_cmd_publish_rate_ = this->declare_parameter("autopilot_cmd_publish_rate", 30);
-
     waywise_control_tower_address_ = this->declare_parameter(
       "waywise_control_tower_address",
       "127.0.0.1");
     odom_topic_ = this->declare_parameter("odom_topic", "/odom");
+    purepursuit_radius_ = this->declare_parameter("purepursuit_radius", 1.0);
 
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
       odom_topic_, 10, std::bind(&WaywiseCarAutopilot::odom_callback, this, _1));
@@ -73,7 +73,7 @@ public:
 
     // --- Autopilot ---
     mWaypointFollower.reset(new PurepursuitWaypointFollower(mCarMovementController));
-    mWaypointFollower->setPurePursuitRadius(1.0);
+    mWaypointFollower->setPurePursuitRadius(purepursuit_radius_);
     mWaypointFollower->setRepeatRoute(false);
     mWaypointFollower->setAdaptivePurePursuitRadiusActive(true);
     mMavsdkVehicleServer->setWaypointFollower(mWaypointFollower);
@@ -116,12 +116,10 @@ private:
 
   // ROS parameters
   float speed_to_erpm_factor_;
-
   float wheelbase_, min_turning_radius_;
-
   int autopilot_cmd_publish_rate_;
-
   std::string waywise_control_tower_address_, odom_topic_;
+  float purepursuit_radius_;
 
   // internal variables
   PosType waywise_posType_used_ = PosType::simulated;
