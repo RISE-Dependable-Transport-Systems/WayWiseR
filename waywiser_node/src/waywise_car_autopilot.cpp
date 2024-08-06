@@ -26,13 +26,13 @@
 using namespace std::chrono_literals;
 using namespace std::placeholders;
 
-class WayWiseAutoPilot : public QObject, public rclcpp::Node
+class WaywiseCarAutopilot : public QObject, public rclcpp::Node
 {
   Q_OBJECT
 
 public:
-  WayWiseAutoPilot()
-  : QObject(), Node("waywise_autopilot")
+  WaywiseCarAutopilot()
+  : QObject(), Node("waywise_car_autopilot")
   {
     // -- ROS --
     // get ROS parameters
@@ -47,12 +47,12 @@ public:
     odom_topic_ = this->declare_parameter("odom_topic", "/odom");
 
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-      odom_topic_, 10, std::bind(&WayWiseAutoPilot::odom_callback, this, _1));
+      odom_topic_, 10, std::bind(&WaywiseCarAutopilot::odom_callback, this, _1));
     twist_pub_ = create_publisher<geometry_msgs::msg::Twist>("/waywise_vel", 10);
     autopilot_timer_ =
       this->create_wall_timer(
       std::chrono::milliseconds((int)std::round(1000.0 / autopilot_cmd_publish_rate_)),
-      std::bind(&WayWiseAutoPilot::autopilot_timer_callback, this));
+      std::bind(&WaywiseCarAutopilot::autopilot_timer_callback, this));
 
     // -- WayWise --
     mCarState.reset(new CarState);
@@ -149,7 +149,7 @@ int main(int argc, char * argv[])
 
   a.processEvents();
 
-  auto waywiseNode = std::make_shared<WayWiseAutoPilot>();
+  auto waywiseNode = std::make_shared<WaywiseCarAutopilot>();
   rclcpp::executors::MultiThreadedExecutor exec;
   exec.add_node(waywiseNode);
 
@@ -164,4 +164,4 @@ int main(int argc, char * argv[])
   return 0;
 }
 
-#include "waywise_autopilot.moc"
+#include "waywise_car_autopilot.moc"

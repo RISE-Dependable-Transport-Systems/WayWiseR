@@ -22,13 +22,13 @@
 using namespace std::chrono_literals;
 using namespace std::placeholders;
 
-class WayWiseRover : public QObject, public rclcpp::Node
+class WayWiseCar : public QObject, public rclcpp::Node
 {
   Q_OBJECT
 
 public:
-  WayWiseRover()
-  : QObject(), Node("waywise_rover")
+  WayWiseCar()
+  : QObject(), Node("waywise_car")
   {
     // -- ROS --
     // get ROS parameters
@@ -71,7 +71,7 @@ public:
 
     // subscribers
     twist_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
-      "/cmd_vel", 10, std::bind(&WayWiseRover::twist_callback, this, _1));
+      "/cmd_vel", 10, std::bind(&WayWiseCar::twist_callback, this, _1));
 
     // -- WayWise --
     mCarState.reset(new CarState);
@@ -111,7 +111,7 @@ public:
       waywise_posType_used_ = PosType::odom;
       QObject::connect(
         mCarMovementController.get(), &CarMovementController::updatedOdomPositionAndYaw, this,
-        &WayWiseRover::updated_waywise_odomPos_callback);
+        &WayWiseCar::updated_waywise_odomPos_callback);
     } else {
       // publish periodically with timer when no motorcontroller connected
       // (simulation)
@@ -120,12 +120,12 @@ public:
       simulation_timer_ =
         this->create_wall_timer(
         mUpdateVehicleStatePeriod,
-        std::bind(&WayWiseRover::simulation_timer_callback, this));
+        std::bind(&WayWiseCar::simulation_timer_callback, this));
 
       RCLCPP_INFO(
         get_logger(),
         "VESCMotorController is not connected. "
-        "waywise_rover is in simulation mode!");
+        "waywise_car is in simulation mode!");
     }
 
     // IMU
@@ -139,7 +139,7 @@ public:
         waywise_posType_used_ = PosType::fused;
         QObject::connect(
           mIMUOrientationUpdater.get(), &IMUOrientationUpdater::updatedIMUOrientation, this,
-          &WayWiseRover::updated_waywise_imuPos_callback);
+          &WayWiseCar::updated_waywise_imuPos_callback);
       } else {
         RCLCPP_INFO(
           get_logger(),
@@ -391,7 +391,7 @@ int main(int argc, char * argv[])
 
   a.processEvents();
 
-  auto waywiseNode = std::make_shared<WayWiseRover>();
+  auto waywiseNode = std::make_shared<WayWiseCar>();
   rclcpp::executors::MultiThreadedExecutor exec;
   exec.add_node(waywiseNode);
 
@@ -406,4 +406,4 @@ int main(int argc, char * argv[])
   return 0;
 }
 
-#include "waywise_rover.moc"
+#include "waywise_car.moc"

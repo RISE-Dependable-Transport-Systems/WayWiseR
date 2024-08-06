@@ -26,8 +26,8 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 add_executable(
-  waywise_rover
-  src/waywise_rover.cpp
+  waywise_car
+  src/waywise_car.cpp
   WayWise/core/pospoint.cpp
   WayWise/core/vbytearray.cpp
   WayWise/vehicles/objectstate.cpp
@@ -48,8 +48,8 @@ add_executable(
   WayWise/logger/logger.cpp)
 
 add_executable(
-  waywise_autopilot
-  src/waywise_autopilot.cpp
+  waywise_car_autopilot
+  src/waywise_car_autopilot.cpp
   WayWise/core/pospoint.cpp
   WayWise/core/vbytearray.cpp
   WayWise/vehicles/objectstate.cpp
@@ -76,18 +76,18 @@ add_executable(
   WayWise/sensors/camera/gimbal.h
   WayWise/logger/logger.cpp)
 
-target_include_directories(waywise_rover PRIVATE WayWise/)
-target_include_directories(waywise_autopilot PRIVATE WayWise/)
+target_include_directories(waywise_car PRIVATE WayWise/)
+target_include_directories(waywise_car_autopilot PRIVATE WayWise/)
 
-target_link_libraries(waywise_rover Qt5::Core Qt5::SerialPort Qt5::Network)
+target_link_libraries(waywise_car Qt5::Core Qt5::SerialPort Qt5::Network)
 
-target_link_libraries(waywise_autopilot Qt5::Core Qt5::SerialPort Qt5::Network
+target_link_libraries(waywise_car_autopilot Qt5::Core Qt5::SerialPort Qt5::Network
   MAVSDK::mavsdk)
 
-ament_target_dependencies(waywise_rover rclcpp std_msgs nav_msgs geometry_msgs
+ament_target_dependencies(waywise_car rclcpp std_msgs nav_msgs geometry_msgs
   tf2_ros)
 ament_target_dependencies(
-  waywise_autopilot
+  waywise_car_autopilot
   rclcpp
   std_msgs
   nav_msgs
@@ -95,8 +95,8 @@ ament_target_dependencies(
   tf2_ros
   tf2_geometry_msgs)
 
-install(TARGETS waywise_rover DESTINATION lib/${PROJECT_NAME})
+install(TARGETS waywise_car DESTINATION lib/${PROJECT_NAME})
 
-install(TARGETS waywise_autopilot DESTINATION lib/${PROJECT_NAME})
+install(TARGETS waywise_car_autopilot DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
