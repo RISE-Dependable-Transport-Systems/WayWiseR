@@ -3,12 +3,12 @@
   ros__parameters:
     ego_vehicle_role_name: truck
     role_name: truck
-
-carla_ros_bridge:
-  ros__parameters:
     host: localhost
     port: 2000
     timeout: 10
+
+carla_ros_bridge:
+  ros__parameters:
     passive: true
     synchronous_mode: true
     synchronous_mode_wait_for_vehicle_control_command: false
@@ -34,3 +34,10 @@ emulated_angle_sensor:
     publish_rate: 10
     invert_angle: true
     warmup_time: 10.0
+
+carla_osm_tile_server_node:
+  ros__parameters:
+    tcp_server_ip: localhost
+    tcp_server_port: 8080
+    carla_world_origin_offset_x: 0.0
+    carla_world_origin_offset_y: 0.0

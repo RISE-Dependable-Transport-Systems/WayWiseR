@@ -15,6 +15,7 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>topic_tools</depend>
+  <depend>rclpy</depend>
   <exec_depend>carla_ros_bridge</exec_depend>
   <exec_depend>carla_spawn_objects</exec_depend>
   <exec_depend>carla_twist_to_control</exec_depend>
