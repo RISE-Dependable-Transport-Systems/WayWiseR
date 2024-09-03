@@ -6,7 +6,7 @@
 
 ### Intel realsense camera
 
-    sudo apt-get install librealsense2-utils librealsense2-dev ros-humble-realsense2-camera ros-humble-realsense2-camera-msgs
+* Install Intel Realsense SDK and its ROS2 wrapper following the instructions [here](https://github.com/IntelRealSense/realsense-ros?tab=readme-ov-file#installation-on-ubuntu).
 
 ## Examples
 
