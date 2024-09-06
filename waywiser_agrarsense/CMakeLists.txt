@@ -7,22 +7,21 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rclpy REQUIRED)
+
+ament_python_install_package(${PROJECT_NAME}_py PACKAGE_DIR py_scripts)
+
+install(DIRECTORY launch config ros_bridge DESTINATION share/${PROJECT_NAME})
 
 install(
-  DIRECTORY launch ros_bridge
-  DESTINATION share/${PROJECT_NAME}
-)
+  PROGRAMS py_scripts/agrarsense_orchestrator.py
+           py_scripts/vehicle_tf_publisher.py
+           py_scripts/waywiser_twist_to_agrarsense_control.py
+  DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
   set(ament_cmake_copyright_FOUND TRUE)
-
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()

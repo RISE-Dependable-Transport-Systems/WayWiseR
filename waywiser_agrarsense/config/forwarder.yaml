@@ -1,0 +1,86 @@
+/**:
+  # general parameters shared by all agrarsense nodes
+  ros__parameters:
+    vehicle_identifier: "forwarder"
+    base_frame_id: "forwarder/base_link"
+    odom_frame_id: "forwarder/odom"
+    base_frame: "forwarder/base_link"
+    odom_frame: "forwarder/odom"
+    erpm_min: -30000.0
+    erpm_max: 30000.0
+    length: 6.97
+    width: 2.98
+    wheelbase: 5.2
+    min_turning_radius: 0.58 # wheelbase/tan(max_steering_angle)
+    speed_to_erpm_factor: 4500.0
+    max_angular_velocity: 2.0 # rad/s
+    standstill_velocity_threshold: 0.05
+    odom_topic: "/agrarsense/out/vehicles/forwarder/odometry"
+
+waywiser_twist_to_agrarsense_control:
+  ros__parameters:
+    speed_control_threshold: 0.5 # in m/s
+    max_steering_angle: 80.0
+    max_throttle: 1.0
+    max_brake: 1.0
+    speed_control_kp: 0.5
+    speed_control_ki: 0.1
+    speed_control_kd: 0.05
+    speed_control_loop_rate: 20
+
+emergency_stop_monitor:
+  ros__parameters:
+    start_with_emergency_stop: false
+    cmd_vel_in_timeout: 2.0
+    emergency_stop_state_publish_rate: 10
+
+onboard_twist_mux:
+  ros__parameters:
+    topics:
+      teleop:
+        topic: teleop_mux_vel
+        timeout: 0.5
+        priority: 100
+      waywise:
+        topic: waywise_vel
+        timeout: 0.5
+        priority: 60
+      nav2:
+        topic: nav2_vel
+        timeout: 0.5
+        priority: 50
+
+collision_monitor:
+  ros__parameters:
+    cmd_vel_in_topic: "onboard_mux_vel"
+    cmd_vel_out_topic: "collision_monitor_vel"
+    transform_tolerance: 0.5
+    source_timeout: 5.0
+    base_shift_correction: True
+    stop_pub_timeout: 2.0
+    polygons: ["PolygonSlow"]
+    PolygonStop:
+      type: "circle"
+      action_type: "stop"
+      max_points: 3
+      visualize: True
+      radius: 10.0
+      polygon_pub_topic: "/agrarsense/out/vehicles/forwarder/polygon_stop"
+    PolygonSlow:
+      type: "circle"
+      action_type: "slowdown"
+      max_points: 3
+      slowdown_ratio: 0.5
+      visualize: True
+      radius: 20.0
+      polygon_pub_topic: "/agrarsense/out/vehicles/forwarder/polygon_slowdown"
+    FootprintApproach:
+      type: "circle"
+      radius: 10.0
+      footprint_topic: "/agrarsense/out/vehicles/forwarder/polygon_slowdown"
+      action_type: "approach"
+      time_before_collision: 1.0
+      simulation_time_step: 0.1
+      max_points: 5
+      visualize: True
+    observation_sources: ["pointcloud_front"]
