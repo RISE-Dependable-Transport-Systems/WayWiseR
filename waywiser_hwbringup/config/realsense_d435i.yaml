@@ -16,6 +16,7 @@ colorizer.enable: false
 enable_sync: true
 publish_tf: true
 tf_publish_rate: 30.0
+initial_reset: false
 pointcloud_tranformation:
   enable: true
   output_frame: "camera_link"

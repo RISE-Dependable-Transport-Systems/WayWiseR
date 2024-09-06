@@ -20,8 +20,14 @@ def generate_launch_description():
     # args that can be set from the command line or a default will be used
     namespace_la = DeclareLaunchArgument(
         'namespace',
-        default_value='/sensors/camera',
+        default_value='/sensors',
         description='namespace for all components',
+    )
+
+    camera_node_name_la = DeclareLaunchArgument(
+        'camera_node_name',
+        default_value='camera',
+        description='name for camera node',
     )
 
     use_sim_time_la = DeclareLaunchArgument(
@@ -55,6 +61,7 @@ def generate_launch_description():
 
     # declare launch arg
     ld.add_action(namespace_la)
+    ld.add_action(camera_node_name_la)
     ld.add_action(use_sim_time_la)
     ld.add_action(log_level_la)
     ld.add_action(camera_config_la)
@@ -72,6 +79,11 @@ def camera_launch(context):
     enable_pointcloud_tranformation = False
     publish_color_pointcloud = False
     pointcloud_tranformation_params_dict = {}
+    namespace_with_camera_name = (
+        LaunchConfiguration('namespace').perform(context)
+        + '/'
+        + LaunchConfiguration('camera_node_name').perform(context)
+    )
 
     with open(LaunchConfiguration('camera_config').perform(context)) as f:
         camera_params_dict = yaml.safe_load(f)
@@ -86,13 +98,24 @@ def camera_launch(context):
         ComposableNode(
             package='realsense2_camera',
             plugin='realsense2_camera::RealSenseNodeFactory',
-            name='camera_node',
+            name=LaunchConfiguration('camera_node_name'),
             namespace=LaunchConfiguration('namespace'),
             parameters=[camera_params_dict],
             remappings=[
                 (
-                    'depth/color/points',
-                    'depth/points_raw',
+                    [LaunchConfiguration('camera_node_name'), '/depth/color/points'],
+                    [LaunchConfiguration('camera_node_name'), '/depth/points_raw'],
+                ),
+                (
+                    [LaunchConfiguration('camera_node_name'), '/color/image_raw'],
+                    [LaunchConfiguration('camera_node_name'), '/color/image_rect'],
+                ),
+                (
+                    [LaunchConfiguration('camera_node_name'), '/aligned_depth_to_color/image_raw'],
+                    [
+                        LaunchConfiguration('camera_node_name'),
+                        '/aligned_depth_to_color/image_rect_raw',
+                    ],
                 ),
             ],
             extra_arguments=[{'use_intra_process_comms': True}],
@@ -101,46 +124,27 @@ def camera_launch(context):
             package='waywiser_perception',
             plugin='waywiser_perception::PointCloudTransformer',
             name='point_cloud_transformer_node',
+            namespace=[namespace_with_camera_name, '/depth'],
             condition=IfCondition(str(enable_pointcloud_tranformation)),
             parameters=[pointcloud_tranformation_params_dict],
-            extra_arguments=[{'use_intra_process_comms': True}],
-        ),
-        ComposableNode(
-            package='image_proc',
-            plugin='image_proc::DebayerNode',
-            name='debayer_node',
-            namespace=[LaunchConfiguration('namespace'), '/color'],
-            extra_arguments=[{'use_intra_process_comms': True}],
-            remappings=[
-                ('image_color', 'image'),
-            ],
-        ),
-        ComposableNode(
-            package='image_proc',
-            plugin='image_proc::RectifyNode',
-            name='rectify_node',
-            namespace=[LaunchConfiguration('namespace'), '/color'],
             extra_arguments=[{'use_intra_process_comms': True}],
         ),
         ComposableNode(
             package='depth_image_proc',
             plugin='depth_image_proc::ConvertMetricNode',
             name='convert_metric_node',
-            namespace=[LaunchConfiguration('namespace'), '/aligned_depth_to_color'],
+            namespace=[namespace_with_camera_name, '/aligned_depth_to_color'],
             extra_arguments=[{'use_intra_process_comms': True}],
-        ),
-        ComposableNode(
-            package='image_proc',
-            plugin='image_proc::RectifyNode',
-            name='rectify_node',
-            namespace=[LaunchConfiguration('namespace'), '/aligned_depth_to_color'],
-            extra_arguments=[{'use_intra_process_comms': True}],
+            remappings=[
+                ('aligned_depth_to_color/image_raw', 'aligned_depth_to_color/image_rect_raw'),
+                ('aligned_depth_to_color/image', 'aligned_depth_to_color/image_rect'),
+            ],
         ),
         ComposableNode(
             package='depth_image_proc',
             plugin='depth_image_proc::PointCloudXyzrgbNode',
             name='point_cloud_xyzrgb_node',
-            namespace=LaunchConfiguration('namespace'),
+            namespace=namespace_with_camera_name,
             condition=IfCondition(str(publish_color_pointcloud)),
             remappings=[
                 ('rgb/camera_info', 'color/camera_info'),
@@ -156,7 +160,7 @@ def camera_launch(context):
     image_processing_container = ComposableNodeContainer(
         condition=LaunchConfigurationEquals('container', ''),
         name='pc_proc_container',
-        namespace=LaunchConfiguration('namespace'),
+        namespace=namespace_with_camera_name,
         package='rclcpp_components',
         executable='component_container',
         composable_node_descriptions=composable_nodes,
