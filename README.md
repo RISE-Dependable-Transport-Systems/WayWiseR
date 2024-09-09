@@ -68,7 +68,11 @@ Setup workspace and build our package:
     git clone --recurse-submodules git@github.com:RISE-Dependable-Transport-Systems/WayWiseR.git
     cd ..
     rosdep install -i --from-path src --rosdistro humble -r -y
+    # if simulation related packages are not necessary:
+    # rosdep install --from-paths $(colcon list --paths-only | grep -v -E "waywiser_gazebo|waywiser_carla")  --ignore-src -r -y
     colcon build --symlink-install
+    # if simulation related packages are not necessary:
+    # colcon build --symlink-install --packages-skip waywiser_gazebo waywiser_carla
     colcon test
 
 Before sourcing the overlay, it is very important that you open a new terminal, separate from the one where you built the workspace. Sourcing an overlay in the same terminal where you built, or likewise building where an overlay is sourced, may create complex issues.
@@ -84,6 +88,7 @@ The current state presents a foundation that our research projects [AGRARSENSE](
 WayWiseR is divided into several ROS2 packages. Make sure to have a look into the respecitve package.xml files.
 
 - **waywiser**: A meta package that depends on all packages below to be able to refer to WayWiseR as a whole. It contains configuration files to optionally setup fastdds discovery server.
+- **waywiser_carla**: Everything related to simulation using [Carla](https://carla.org/).
 - **waywiser_description**: Contains vehicle descriptions in the form of [xacro](https://docs.ros.org/en/humble/Tutorials/Intermediate/URDF/Using-Xacro-to-Clean-Up-a-URDF-File.html) files. Currently a single vehicle is available that corresponds to a [Traxxas](https://traxxas.com/) Slash incl. camera, depth camera, LiDAR and IMU.
 - **waywiser_gazebo**: Everything related to simulation using [Gazebo](https://gazebosim.org).
 - **waywiser_hwbringup**: Configuration and launch files to get real (not simulated) vehicles running.
