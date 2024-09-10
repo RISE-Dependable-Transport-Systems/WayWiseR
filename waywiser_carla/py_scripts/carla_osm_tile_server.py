@@ -32,17 +32,12 @@ EARTH_REF_LONGITUDE = 12.89134921
 EARTH_CIRCUMFERENCE = 40075000  # in meters
 METERS_PER_DEG_LATITUDE = 111320
 
+
 class CarlaMapper(object):
     """Class that renders a 2D image from top view of a carla world. Please note that a cache system is used, so if the OpenDrive content
     of a Carla town has not changed, it will read and use the stored image if it was rendered in a previous execution"""
 
-    def __init__(
-        self,
-        carla_world,
-        carla_map,
-        logger,
-        carla_world_origin_offset = (0,0)
-    ):
+    def __init__(self, carla_world, carla_map, logger, carla_world_origin_offset=(0, 0)):
         """Renders the map image generated based on the world, its map and additional flags that provide extra information about the road network"""
         self.scale = 1.0
         self.logger = logger
@@ -59,11 +54,17 @@ class CarlaMapper(object):
         self._world_offset = (min_x, min_y)
 
         self.earth_max_zoom_level = MAX_ZOOM_LEVEL
-        self.min_meters_per_pixel = EARTH_CIRCUMFERENCE / (2 ** self.earth_max_zoom_level * TILE_SIZE)
-        self.width_in_pixels = math.ceil(self.width/self.min_meters_per_pixel)
-        self.carla_zoom_level_offset = self.earth_max_zoom_level - math.ceil(math.log2(self.width / (self.min_meters_per_pixel * TILE_SIZE)))
+        self.min_meters_per_pixel = EARTH_CIRCUMFERENCE / (
+            2**self.earth_max_zoom_level * TILE_SIZE
+        )
+        self.width_in_pixels = math.ceil(self.width / self.min_meters_per_pixel)
+        self.carla_zoom_level_offset = self.earth_max_zoom_level - math.ceil(
+            math.log2(self.width / (self.min_meters_per_pixel * TILE_SIZE))
+        )
 
-        self.map_image = Image.new("RGBA", (self.width_in_pixels, self.width_in_pixels), color=(255, 255, 255, 0))
+        self.map_image = Image.new(
+            'RGBA', (self.width_in_pixels, self.width_in_pixels), color=(255, 255, 255, 0)
+        )
 
         # Load OpenDrive content
         opendrive_content = carla_map.to_opendrive()
@@ -74,7 +75,14 @@ class CarlaMapper(object):
         opendrive_hash = str(hash_func.hexdigest())
 
         # Build path for saving or loading the cached rendered map
-        filename = carla_map.name.split('/')[-1] + '_' + str(self.width_in_pixels) + '_' + opendrive_hash + '.tga'
+        filename = (
+            carla_map.name.split('/')[-1]
+            + '_'
+            + str(self.width_in_pixels)
+            + '_'
+            + opendrive_hash
+            + '.tga'
+        )
         dirname = os.path.join('carla_map')
         full_path = str(os.path.join(dirname, filename))
 
@@ -87,7 +95,7 @@ class CarlaMapper(object):
 
             # Render road network map
             self.draw_road_map(carla_world, carla_map)
-            self.map_image = self.map_image.convert("RGB")
+            self.map_image = self.map_image.convert('RGB')
             self.logger.info('Completed rendering map image.')
             # If folders path does not exist, create it
             if not os.path.exists(dirname):
@@ -104,11 +112,15 @@ class CarlaMapper(object):
         self.meters_per_degree_lat = METERS_PER_DEG_LATITUDE
         self.earth_ref_lat = EARTH_REF_LATITUDE
         self.earth_ref_lon = EARTH_REF_LONGITUDE
-        self.carla_world_center = self.pixel_to_carla_world((self.map_image.width / 2, self.map_image.height / 2))
-        self.carla_world_origin_offset = carla.Location(carla_world_origin_offset[0], carla_world_origin_offset[1], 0)
+        self.carla_world_center = self.pixel_to_carla_world(
+            (self.map_image.width / 2, self.map_image.height / 2)
+        )
+        self.carla_world_origin_offset = carla.Location(
+            carla_world_origin_offset[0], carla_world_origin_offset[1], 0
+        )
 
         map_tile = Image.new('RGB', (TILE_SIZE, TILE_SIZE), COLOR_WHITE)
-        self.draw_text_on_tile(map_tile, "Out of Range")
+        self.draw_text_on_tile(map_tile, 'Out of Range')
         self.out_of_range_tile = map_tile
 
     def capture_aerial_view(self, carla_world, image_res_in_pixels):
@@ -132,7 +144,7 @@ class CarlaMapper(object):
             return spawn_locations
 
         camera_fov = 10.0
-        image_width_meters = image_res_in_pixels*self.min_meters_per_pixel
+        image_width_meters = image_res_in_pixels * self.min_meters_per_pixel
         camera_height = (image_width_meters / 2) / math.tan(math.radians(camera_fov / 2))
         camera_bp = carla_world.get_blueprint_library().find('sensor.camera.rgb')
         camera_bp.set_attribute('image_size_x', str(image_res_in_pixels))
@@ -140,9 +152,13 @@ class CarlaMapper(object):
         camera_bp.set_attribute('fov', str(camera_fov))
 
         # Get waypoints to cover the whole world
-        camera_spawn_locations = get_camera_spawn_locations(image_width_meters, image_width_meters, camera_height)
+        camera_spawn_locations = get_camera_spawn_locations(
+            image_width_meters, image_width_meters, camera_height
+        )
         num_waypoints = len(camera_spawn_locations)
-        logger.info(f'Number of images to cover the world at {camera_height}m camera height: {num_waypoints}')
+        logger.info(
+            f'Number of images to cover the world at {camera_height}m camera height: {num_waypoints}'
+        )
 
         # Spawn the camera and draw the images on the map
         for index, location in enumerate(camera_spawn_locations):
@@ -156,11 +172,16 @@ class CarlaMapper(object):
                 nonlocal image_captured
                 image_captured = True
                 # Convert CARLA image to NumPy array
-                img_array = np.frombuffer(image.raw_data, dtype=np.uint8).reshape((image.height, image.width, 4))
+                img_array = np.frombuffer(image.raw_data, dtype=np.uint8).reshape(
+                    (image.height, image.width, 4)
+                )
                 img_array = img_array[:, :, [2, 1, 0, 3]]  # Reorder BGRA to RGBA
                 img_pil = Image.fromarray(img_array, 'RGBA')
 
-                position = self.carla_world_to_pixel(transform.location, offset=(int(image_res_in_pixels/2), int(image_res_in_pixels/2)))
+                position = self.carla_world_to_pixel(
+                    transform.location,
+                    offset=(int(image_res_in_pixels / 2), int(image_res_in_pixels / 2)),
+                )
                 Image.Image.paste(base_image, img_pil, position)
 
             camera.listen(on_image_received)
@@ -179,7 +200,7 @@ class CarlaMapper(object):
 
         logger = self.logger
         base_image = self.map_image
-        road_map_image = Image.new("RGBA", base_image.size, color=(255, 255, 255, 0))
+        road_map_image = Image.new('RGBA', base_image.size, color=(255, 255, 255, 0))
         draw = ImageDraw.Draw(road_map_image)
         precision = 0.01
 
@@ -191,15 +212,18 @@ class CarlaMapper(object):
             angle = -waypoint.transform.rotation.yaw - 90.0
 
             # Rotate the text
-            font_surface = Image.new("RGBA", (100, 100))  # Create a dummy surface
+            font_surface = Image.new('RGBA', (100, 100))  # Create a dummy surface
             temp_draw = ImageDraw.Draw(font_surface)
-            text = "STOP" if 'stop' in actor.type_id else "YIELD"
+            text = 'STOP' if 'stop' in actor.type_id else 'YIELD'
             temp_draw.text((10, 10), text, font=font, fill=color)
             font_surface = font_surface.rotate(angle, expand=1)
 
             # Compute the pixel position and offset
             pixel_pos = self.carla_world_to_pixel(waypoint.transform.location)
-            offset = (pixel_pos[0] - font_surface.width // 2, pixel_pos[1] - font_surface.height // 2)
+            offset = (
+                pixel_pos[0] - font_surface.width // 2,
+                pixel_pos[1] - font_surface.height // 2,
+            )
 
             # Paste the rotated text onto the main surface
             draw.bitmap(offset, font_surface, fill=color)
@@ -223,9 +247,11 @@ class CarlaMapper(object):
 
         def lateral_shift(transform, shift):
             """Makes a lateral shift of the forward vector of a transform"""
-            rotation = carla.Rotation(pitch=transform.rotation.pitch,
-                            yaw=transform.rotation.yaw + 90,
-                            roll=transform.rotation.roll)
+            rotation = carla.Rotation(
+                pitch=transform.rotation.pitch,
+                yaw=transform.rotation.yaw + 90,
+                roll=transform.rotation.roll,
+            )
             lateral_vector = carla.Transform(rotation=rotation).get_forward_vector()
             return transform.location + shift * lateral_vector
 
@@ -255,12 +281,8 @@ class CarlaMapper(object):
         road_color_with_alpha = COLOR_ROAD + (128,)
         for waypoints in set_waypoints:
             waypoint = waypoints[0]
-            road_left_side = [
-                lateral_shift(w.transform, -w.lane_width * 0.5) for w in waypoints
-            ]
-            road_right_side = [
-                lateral_shift(w.transform, w.lane_width * 0.5) for w in waypoints
-            ]
+            road_left_side = [lateral_shift(w.transform, -w.lane_width * 0.5) for w in waypoints]
+            road_right_side = [lateral_shift(w.transform, w.lane_width * 0.5) for w in waypoints]
 
             polygon = road_left_side + [x for x in reversed(road_right_side)]
             polygon = [self.carla_world_to_pixel(x) for x in polygon]
@@ -271,7 +293,7 @@ class CarlaMapper(object):
         actors = carla_world.get_actors()
 
         # Find and Draw Traffic Signs: Stops and Yields
-        font_size = int(self.scale /self.min_meters_per_pixel * 1)
+        font_size = int(self.scale / self.min_meters_per_pixel * 1)
         font = ImageFont.truetype('arial.ttf', font_size)
 
         stops = [actor for actor in actors if 'stop' in actor.type_id]
@@ -295,7 +317,7 @@ class CarlaMapper(object):
 
         carla_zoom_level = zoom - self.carla_zoom_level_offset
 
-        if carla_zoom_level<0:
+        if carla_zoom_level < 0:
             return self.out_of_range_tile
         else:
             lon_deg = tilex2long_deg(x, zoom)
@@ -303,7 +325,7 @@ class CarlaMapper(object):
             carla_location = self.earth_to_carla_transform(lon_deg, lat_deg)
             carla_location_pixel_idx = self.carla_world_to_pixel(carla_location)
 
-            tiles_count = 2 ** carla_zoom_level
+            tiles_count = 2**carla_zoom_level
             tile_width = math.floor(self.map_image.width / tiles_count)
             tile_height = math.floor(self.map_image.height / tiles_count)
 
@@ -312,21 +334,33 @@ class CarlaMapper(object):
             right = left + tile_width
             bottom = top + tile_height
 
-            if left<-tile_width or top <-tile_width or left >= self.map_image.width or top >= self.map_image.height:
+            if (
+                left < -tile_width
+                or top < -tile_width
+                or left >= self.map_image.width
+                or top >= self.map_image.height
+            ):
                 return self.out_of_range_tile
 
             map_tile = Image.new('RGB', (tile_width, tile_height), COLOR_WHITE)
-            cropped_image = self.map_image.crop((max(left,0), max(top,0), min(right, self.map_image.width -1), min(bottom, self.map_image.height -1)))
+            cropped_image = self.map_image.crop(
+                (
+                    max(left, 0),
+                    max(top, 0),
+                    min(right, self.map_image.width - 1),
+                    min(bottom, self.map_image.height - 1),
+                )
+            )
 
-            left_px_in_tile = int((abs(left) - left)/2)
-            top_px_in_tile = int((abs(top) - top)/2)
+            left_px_in_tile = int((abs(left) - left) / 2)
+            top_px_in_tile = int((abs(top) - top) / 2)
             map_tile.paste(cropped_image, (left_px_in_tile, top_px_in_tile))
 
             map_tile = map_tile.resize((TILE_SIZE, TILE_SIZE), Image.ANTIALIAS)
 
         return map_tile
 
-    def draw_text_on_tile(self, map_tile, text, color_str="red"):
+    def draw_text_on_tile(self, map_tile, text, color_str='red'):
         # Create a drawing context
         draw = ImageDraw.Draw(map_tile)
 
@@ -334,7 +368,7 @@ class CarlaMapper(object):
         font_size = 20  # Adjust the size as needed
         try:
             # Load a font, or use the default one if not available
-            font = ImageFont.truetype("arial.ttf", font_size)
+            font = ImageFont.truetype('arial.ttf', font_size)
         except IOError:
             font = ImageFont.load_default()
 
@@ -350,8 +384,8 @@ class CarlaMapper(object):
 
     def carla_world_to_pixel(self, location, offset=(0, 0)):
         """Converts the world coordinates to pixel coordinates"""
-        x = self.scale  * (location.x - self._world_offset[0]) / self.min_meters_per_pixel
-        y = self.scale  * (location.y - self._world_offset[1]) / self.min_meters_per_pixel
+        x = self.scale * (location.x - self._world_offset[0]) / self.min_meters_per_pixel
+        y = self.scale * (location.y - self._world_offset[1]) / self.min_meters_per_pixel
         return (int(x - offset[0]), int(y - offset[1]))
 
     def pixel_to_carla_world(self, pixel_location, offset=(0, 0)):
@@ -368,8 +402,12 @@ class CarlaMapper(object):
 
     def earth_to_carla_transform(self, lon, lat):
         # Offset from reference location
-        x_offset_meters = ((lon - self.earth_ref_lon) * self.meters_per_degree_lat * math.cos(math.radians(self.earth_ref_lat)))
-        y_offset_meters = ((lat - self.earth_ref_lat) * self.meters_per_degree_lat)
+        x_offset_meters = (
+            (lon - self.earth_ref_lon)
+            * self.meters_per_degree_lat
+            * math.cos(math.radians(self.earth_ref_lat))
+        )
+        y_offset_meters = (lat - self.earth_ref_lat) * self.meters_per_degree_lat
 
         # Convert offsets to CARLA world coordinates
         carla_x = self.carla_world_origin_offset.x + x_offset_meters
@@ -383,10 +421,14 @@ class CarlaMapper(object):
         y_offset_meters = carla_location.y - self.carla_world_origin_offset.y
 
         # Calculate the longitude and latitude
-        lon = (x_offset_meters / (self.meters_per_degree_lat * math.cos(math.radians(self.earth_ref_lat)))) + self.earth_ref_lon
+        lon = (
+            x_offset_meters
+            / (self.meters_per_degree_lat * math.cos(math.radians(self.earth_ref_lat)))
+        ) + self.earth_ref_lon
         lat = self.earth_ref_lat - (y_offset_meters / self.meters_per_degree_lat)
 
         return lon, lat
+
 
 class CarlaOsmTileServer(Node):
     def __init__(self):
@@ -406,9 +448,15 @@ class CarlaOsmTileServer(Node):
         self.timeout = self.get_parameter('timeout').get_parameter_value().integer_value
 
         self.tcp_server_ip = self.get_parameter('tcp_server_ip').get_parameter_value().string_value
-        self.tcp_server_port = self.get_parameter('tcp_server_port').get_parameter_value().integer_value
-        self.carla_world_origin_offset_x = self.get_parameter('carla_world_origin_offset_x').get_parameter_value().double_value
-        self.carla_world_origin_offset_y = self.get_parameter('carla_world_origin_offset_y').get_parameter_value().double_value
+        self.tcp_server_port = (
+            self.get_parameter('tcp_server_port').get_parameter_value().integer_value
+        )
+        self.carla_world_origin_offset_x = (
+            self.get_parameter('carla_world_origin_offset_x').get_parameter_value().double_value
+        )
+        self.carla_world_origin_offset_y = (
+            self.get_parameter('carla_world_origin_offset_y').get_parameter_value().double_value
+        )
 
         self.client = carla.Client(self.host, self.port)
         self.client.set_timeout(self.timeout)
@@ -417,8 +465,13 @@ class CarlaOsmTileServer(Node):
         self.logger = rclpy.logging.get_logger(self.get_name())
 
         # Load the map and create a CarlaMapper instance
-        carla_world_origin_offset = (self.carla_world_origin_offset_x, self.carla_world_origin_offset_y)
-        self.carla_mapper = CarlaMapper(self.world, self.world.get_map(),self.logger,carla_world_origin_offset)
+        carla_world_origin_offset = (
+            self.carla_world_origin_offset_x,
+            self.carla_world_origin_offset_y,
+        )
+        self.carla_mapper = CarlaMapper(
+            self.world, self.world.get_map(), self.logger, carla_world_origin_offset
+        )
 
         # Start TCP server in a separate thread
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -430,10 +483,12 @@ class CarlaOsmTileServer(Node):
         self.socket.listen(1)
 
         # Log the server address and port
-        self.get_logger().info(f"Map server is listening on {self.tcp_server_ip}:{self.tcp_server_port}. Max. supported zoom level is {self.carla_mapper.earth_max_zoom_level} with m/px {self.carla_mapper.min_meters_per_pixel} ")
+        self.get_logger().info(
+            f'Map server is listening on {self.tcp_server_ip}:{self.tcp_server_port}. Max. supported zoom level is {self.carla_mapper.earth_max_zoom_level} with m/px {self.carla_mapper.min_meters_per_pixel} '
+        )
 
         while True:
-            conn,_ = self.socket.accept()
+            conn, _ = self.socket.accept()
             self.handle_client(conn)
 
     def handle_client(self, conn):
@@ -442,12 +497,12 @@ class CarlaOsmTileServer(Node):
             # Receive the entire request data from the client
             request_data = conn.recv(BUFFER_SIZE).decode().strip()
             if not request_data:
-                self.get_logger().warning("Received empty request")
+                self.get_logger().warning('Received empty request')
                 return
 
             lines = request_data.split('\r\n')
             if not lines:
-                self.get_logger().error("Invalid request format: No lines in request")
+                self.get_logger().error('Invalid request format: No lines in request')
                 return
 
             request_line = lines[0]
@@ -500,6 +555,7 @@ class CarlaOsmTileServer(Node):
     def destroy(self):
         # self._action_server.destroy()
         super().destroy_node()
+
 
 def main(args=None):
     rclpy.init(args=args)
