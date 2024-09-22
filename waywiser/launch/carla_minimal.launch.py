@@ -13,10 +13,21 @@ def generate_launch_description():
     waywiser_rviz2_dir = get_package_share_directory('waywiser_rviz2')
     waywiser_carla_dir = get_package_share_directory('waywiser_carla')
     teleop_dir = get_package_share_directory('waywiser_teleop')
+    waywiser_hwbringup_dir = get_package_share_directory('waywiser_hwbringup')
 
     # args that can be set from the command line or a default will be used
     use_sim_time_la = DeclareLaunchArgument(
         'use_sim_time', default_value='True', description='Use simulation clock'
+    )
+    carla_config_la = DeclareLaunchArgument(
+        'carla_config',
+        default_value=os.path.join(waywiser_carla_dir, 'config/carla.yaml'),
+        description='Full path to params file for carla',
+    )
+    carla_spawn_objects_file_la = DeclareLaunchArgument(
+        'carla_spawn_objects_file',
+        default_value=os.path.join(waywiser_carla_dir, 'config/dts_truck_semitrailer.json'),
+        description='Full path to carla spawn objects definition file',
     )
     enable_collision_monitor_la = DeclareLaunchArgument(
         'enable_collision_monitor',
@@ -33,6 +44,11 @@ def generate_launch_description():
         default_value=os.path.join(teleop_dir, 'config/teleop_sim.yaml'),
         description='Full path to params file',
     )
+    vehicle_config_la = DeclareLaunchArgument(
+        'vehicle_config',
+        default_value=os.path.join(waywiser_hwbringup_dir, 'config/truck_full_scale.yaml'),
+        description='Full path to params file of vehicle',
+    )
 
     # include launch files
     carla = IncludeLaunchDescription(
@@ -47,6 +63,8 @@ def generate_launch_description():
         ),
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'carla_config': LaunchConfiguration('carla_config'),
+            'carla_spawn_objects_file': LaunchConfiguration('carla_spawn_objects_file'),
         }.items(),
     )
 
@@ -62,7 +80,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'enable_collision_monitor': LaunchConfiguration('enable_collision_monitor'),
+            'carla_config': LaunchConfiguration('carla_config'),
         }.items(),
     )
 
@@ -108,6 +126,9 @@ def generate_launch_description():
     ld.add_action(enable_collision_monitor_la)
     ld.add_action(rviz_config_la)
     ld.add_action(teleop_config_la)
+    ld.add_action(carla_config_la)
+    ld.add_action(vehicle_config_la)
+    ld.add_action(carla_spawn_objects_file_la)
 
     # start nodes
     ld.add_action(carla)
