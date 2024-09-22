@@ -65,6 +65,8 @@ class TwistKeyboard(Node):
         self.declare_parameter('max_angular_speed', 2.0)
         self.declare_parameter('startup_linear_speed', 0.5)
         self.declare_parameter('startup_angular_speed', 1.0)
+        self.declare_parameter('linear_speed_increment', 1.0)
+        self.declare_parameter('angular_speed_increment', 1.0)
         self.declare_parameter('speed_control_rate', 10.0)
         self.declare_parameter('publish_rate', 10.0)
 
@@ -82,6 +84,15 @@ class TwistKeyboard(Node):
         self.max_angular_speed = (
             self.get_parameter('max_angular_speed').get_parameter_value().double_value
         )
+
+        self.linear_speed_increment = (
+            self.get_parameter('linear_speed_increment').get_parameter_value().double_value
+        )
+        self.angular_speed_increment = (
+            self.get_parameter('angular_speed_increment').get_parameter_value().double_value
+        )
+        self.linear_speed_factor = 1.0
+        self.angular_speed_factor = 1.0
 
         # Create a timer to control speeds
         self.speed_control_rate = (
@@ -138,29 +149,37 @@ class TwistKeyboard(Node):
             emergency_stop_set_event_registered = self.process_emergency_stop_keys(keys)
 
             if not emergency_stop_set_event_registered:
-                # Check if the key associated with increasing linear speed is pressed
+                # Check if keys associated with increasing or decreasing linear speed are pressed
                 if keys[self.increase_linear_speed_key]:
-                    # Increase linear speed by 10%
-                    self.linear_speed *= 1.1
+                    # Increase linear speed
+                    self.linear_speed += self.linear_speed_increment * self.linear_speed_factor
+                    self.linear_speed_factor *= 1.1
                     # Ensure linear speed does not exceed the maximum value
                     self.linear_speed = min(self.linear_speed, self.max_linear_speed)
+                elif keys[self.decrease_linear_speed_key]:
+                    # Decrease linear speed
+                    self.linear_speed -= self.linear_speed_increment * self.linear_speed_factor
+                    self.linear_speed_factor *= 1.1
+                    # Ensure linear speed does not go to zero
+                    self.linear_speed = max(self.linear_speed, self.linear_speed_increment)
+                else:
+                    self.linear_speed_factor = 1.0
 
-                # Check if the key associated with decreasing linear speed is pressed
-                if keys[self.decrease_linear_speed_key]:
-                    # Decrease linear speed by 10%
-                    self.linear_speed /= 1.1
-
-                # Check if the key associated with increasing angular speed is pressed
+                # Check if keys associated with increasing or decreasing angular speed are pressed
                 if keys[self.increase_angular_speed_key]:
-                    # Increase angular speed by 10%
-                    self.angular_speed *= 1.1
+                    # Increase angular speed
+                    self.angular_speed += self.angular_speed_increment * self.angular_speed_factor
+                    self.angular_speed_factor *= 1.1
                     # Ensure angular speed does not exceed the maximum value
                     self.angular_speed = min(self.angular_speed, self.max_angular_speed)
-
-                # Check if the key associated with decreasing angular speed is pressed
-                if keys[self.decrease_angular_speed_key]:
-                    # Decrease angular speed by 10%
-                    self.angular_speed /= 1.1
+                elif keys[self.decrease_angular_speed_key]:
+                    # Decrease angular speed
+                    self.angular_speed -= self.angular_speed_increment * self.angular_speed_factor
+                    self.angular_speed_factor *= 1.1
+                    # Ensure linear speed does not go to zero
+                    self.angular_speed = max(self.angular_speed, self.angular_speed_increment)
+                else:
+                    self.angular_speed_factor = 1.0
 
     def publish_twist(self):
         # Prepare the Twist message

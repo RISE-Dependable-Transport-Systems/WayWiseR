@@ -29,8 +29,10 @@ twist_keyboard:
     enable: true
     max_linear_speed: 20.0
     max_angular_speed: 2.0
-    startup_linear_speed: 20.0
+    startup_linear_speed: 10.0
     startup_angular_speed: 0.2
+    linear_speed_increment: 0.1
+    angular_speed_increment: 0.1
     speed_control_rate: 10.0
     publish_rate: 10.0
 
@@ -38,7 +40,7 @@ joy_emergency_stop:
   ros__parameters:
     emergency_stop_set_joy_button_index: 5
     emergency_stop_clear_joy_button_index: 7
-    joy_emergency_stop_timeout: Inf #seconds
+    joy_emergency_stop_timeout: 1000000000 #seconds
 
 twist_angular_correction:
   ros__parameters:
