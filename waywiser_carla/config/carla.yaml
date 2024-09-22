@@ -6,6 +6,7 @@
     host: localhost
     port: 2000
     timeout: 10
+    town: Sunrise_from_Town05
 
 carla_ros_bridge:
   ros__parameters:
@@ -13,13 +14,12 @@ carla_ros_bridge:
     synchronous_mode: true
     synchronous_mode_wait_for_vehicle_control_command: false
     fixed_delta_seconds: 0.01
-    town: Town10HD_Opt
     register_all_sensors: true
 
 carla_spawn_objects:
   ros__parameters:
-    spawn_point_truck: "-41.49,-104.94,0.1,0,0,90"
-    spawn_point_semitrailer: "-41.49,-111.94,0.1,0,0,90"
+    spawn_point_truck: "-32.0,14.0,0.5,0,0,180"
+    spawn_point_semitrailer: "-25.0,14.0,0.5,0,0,180"
 
 carla_initial_pose:
   ros__parameters:
@@ -41,3 +41,18 @@ carla_osm_tile_server_node:
     tcp_server_port: 8080
     carla_world_origin_offset_x: 0.0
     carla_world_origin_offset_y: 0.0
+    reset_base_map_image: false
+    aerial_view_camera_resolution: 1920
+    aerial_view_camera_fov: 5.0
+    aerial_view_camera_height: 1500.0
+
+waywiser_twist_to_carla_control_node:
+  ros__parameters:
+    speed_control_threshold: 0.5 # in m/s
+    max_steering_angle: 0.7
+    max_throttle: 1.0
+    max_brake: 1.0
+    speed_control_kp: 0.5
+    speed_control_ki: 0.1
+    speed_control_kd: 0.05
+    speed_control_loop_rate: 20

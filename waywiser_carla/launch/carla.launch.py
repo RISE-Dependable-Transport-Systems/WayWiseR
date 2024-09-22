@@ -67,18 +67,6 @@ def generate_launch_description():
         ],
     )
 
-    carla_twist_to_control = Node(
-        package='carla_twist_to_control',
-        executable='carla_twist_to_control',
-        name='carla_twist_to_control',
-        output='screen',
-        emulate_tty=True,
-        parameters=[
-            {'use_sim_time': LaunchConfiguration('use_sim_time')},
-            LaunchConfiguration('carla_config'),
-        ],
-    )
-
     emulated_angle_sensor_conditional_launch_action = OpaqueFunction(
         function=emulated_angle_sensor_conditional_launch
     )
@@ -95,7 +83,6 @@ def generate_launch_description():
     ld.add_action(carla_ros_bridge)
     ld.add_action(carla_spawn_objects)
     ld.add_action(carla_initial_pose)
-    ld.add_action(carla_twist_to_control)
     ld.add_action(emulated_angle_sensor_conditional_launch_action)
 
     return ld

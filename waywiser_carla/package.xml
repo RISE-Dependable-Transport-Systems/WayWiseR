@@ -16,9 +16,9 @@
 
   <depend>topic_tools</depend>
   <depend>rclpy</depend>
+  <depend>carla_msgs</depend>
   <exec_depend>carla_ros_bridge</exec_depend>
   <exec_depend>carla_spawn_objects</exec_depend>
-  <exec_depend>carla_twist_to_control</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

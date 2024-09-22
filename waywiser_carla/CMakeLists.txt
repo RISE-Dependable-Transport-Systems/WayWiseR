@@ -16,6 +16,7 @@ find_package(tf2 REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
+find_package(carla_msgs REQUIRED)
 
 # C++ targets
 add_executable(map_to_odom_tf_publisher src/map_to_odom_tf_publisher.cpp)
@@ -33,6 +34,10 @@ ament_python_install_package(${PROJECT_NAME}_py
 
 install(PROGRAMS
   py_scripts/carla_osm_tile_server.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+install(PROGRAMS
+  py_scripts/waywiser_twist_to_carla_control.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
