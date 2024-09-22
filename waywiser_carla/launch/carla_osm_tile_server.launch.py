@@ -31,6 +31,7 @@ def generate_launch_description():
         ],
         arguments=['--ros-args', '--log-level', 'info'],
         output='screen',
+        emulate_tty=True,
     )
 
     # create launch description
