@@ -48,8 +48,8 @@ def generate_launch_description():
     # start nodes and use args to set parameters
     waywise_node = Node(
         package='waywiser_node',
-        executable='waywise_rover',
-        name='waywise_rover_node',
+        executable='waywise_car',
+        name='waywise_car_node',
         parameters=[LaunchConfiguration('rover_config')],
         remappings=[('/cmd_vel', '/cmd_vel_out')],
         arguments=['--ros-args', '--log-level', 'info'],
@@ -102,9 +102,9 @@ def lidar_conditional_launch(context):
     enable_lidar = False
     with open(LaunchConfiguration('rover_config').perform(context)) as f:
         config_data = yaml.safe_load(f)
-        waywise_rover_node_params_dict = config_data['waywise_rover_node']['ros__parameters']
-        if 'enable_lidar' in waywise_rover_node_params_dict:
-            enable_lidar = waywise_rover_node_params_dict['enable_lidar']
+        waywise_car_node_params_dict = config_data['waywise_car_node']['ros__parameters']
+        if 'enable_lidar' in waywise_car_node_params_dict:
+            enable_lidar = waywise_car_node_params_dict['enable_lidar']
 
     lidar_node = Node(
         package='rplidar_ros',
@@ -124,9 +124,9 @@ def camera_conditional_launch(context):
 
     with open(LaunchConfiguration('rover_config').perform(context)) as f:
         config_data = yaml.safe_load(f)
-        waywise_rover_node_params_dict = config_data['waywise_rover_node']['ros__parameters']
-        if 'enable_camera' in waywise_rover_node_params_dict:
-            enable_camera = waywise_rover_node_params_dict['enable_camera']
+        waywise_car_node_params_dict = config_data['waywise_car_node']['ros__parameters']
+        if 'enable_camera' in waywise_car_node_params_dict:
+            enable_camera = waywise_car_node_params_dict['enable_camera']
 
     camera_launch_acton = []
     if enable_camera:

@@ -10,6 +10,7 @@
 #include "WayWise/logger/logger.h"
 #include "WayWise/vehicles/carstate.h"
 #include "WayWise/vehicles/controller/carmovementcontroller.h"
+#include "WayWise/autopilot/followpoint.h"
 #include <QCoreApplication>
 #include <QObject>
 
@@ -25,13 +26,13 @@
 using namespace std::chrono_literals;
 using namespace std::placeholders;
 
-class WayWiseAutoPilot : public QObject, public rclcpp::Node
+class WaywiseCarAutopilot : public QObject, public rclcpp::Node
 {
   Q_OBJECT
 
 public:
-  WayWiseAutoPilot()
-  : QObject(), Node("waywise_autopilot")
+  WaywiseCarAutopilot()
+  : QObject(), Node("waywise_car_autopilot")
   {
     // -- ROS --
     // get ROS parameters
@@ -39,18 +40,19 @@ public:
     wheelbase_ = this->declare_parameter("wheelbase", 0.33);
     min_turning_radius_ = this->declare_parameter("min_turning_radius", 0.67);
     autopilot_cmd_publish_rate_ = this->declare_parameter("autopilot_cmd_publish_rate", 30);
-
     waywise_control_tower_address_ = this->declare_parameter(
       "waywise_control_tower_address",
       "127.0.0.1");
+    odom_topic_ = this->declare_parameter("odom_topic", "/odom");
+    purepursuit_radius_ = this->declare_parameter("purepursuit_radius", 1.0);
 
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-      "/odom", 10, std::bind(&WayWiseAutoPilot::odom_callback, this, _1));
+      odom_topic_, 10, std::bind(&WaywiseCarAutopilot::odom_callback, this, _1));
     twist_pub_ = create_publisher<geometry_msgs::msg::Twist>("/waywise_vel", 10);
     autopilot_timer_ =
       this->create_wall_timer(
       std::chrono::milliseconds((int)std::round(1000.0 / autopilot_cmd_publish_rate_)),
-      std::bind(&WayWiseAutoPilot::autopilot_timer_callback, this));
+      std::bind(&WaywiseCarAutopilot::autopilot_timer_callback, this));
 
     // -- WayWise --
     mCarState.reset(new CarState);
@@ -60,6 +62,7 @@ public:
     mCarMovementController->setSpeedToRPMFactor(speed_to_erpm_factor_);
     mCarState->setAxisDistance(wheelbase_);
     mCarState->setMaxSteeringAngle(atan(mCarState->getAxisDistance() / min_turning_radius_));
+    mFollowPoint.reset(new FollowPoint(mCarMovementController));
 
     // Setup MAVLINK communication towards ControlTower
     mMavsdkVehicleServer.reset(
@@ -70,7 +73,7 @@ public:
 
     // --- Autopilot ---
     mWaypointFollower.reset(new PurepursuitWaypointFollower(mCarMovementController));
-    mWaypointFollower->setPurePursuitRadius(1.0);
+    mWaypointFollower->setPurePursuitRadius(purepursuit_radius_);
     mWaypointFollower->setRepeatRoute(false);
     mWaypointFollower->setAdaptivePurePursuitRadiusActive(true);
     mMavsdkVehicleServer->setWaypointFollower(mWaypointFollower);
@@ -113,12 +116,10 @@ private:
 
   // ROS parameters
   float speed_to_erpm_factor_;
-
   float wheelbase_, min_turning_radius_;
-
   int autopilot_cmd_publish_rate_;
-
-  std::string waywise_control_tower_address_;
+  std::string waywise_control_tower_address_, odom_topic_;
+  float purepursuit_radius_;
 
   // internal variables
   PosType waywise_posType_used_ = PosType::simulated;
@@ -136,6 +137,7 @@ private:
   QSharedPointer<CarMovementController> mCarMovementController;
   QSharedPointer<PurepursuitWaypointFollower> mWaypointFollower;
   QSharedPointer<MavsdkVehicleServer> mMavsdkVehicleServer;
+  QSharedPointer<FollowPoint> mFollowPoint;
 };
 
 int main(int argc, char * argv[])
@@ -145,7 +147,7 @@ int main(int argc, char * argv[])
 
   a.processEvents();
 
-  auto waywiseNode = std::make_shared<WayWiseAutoPilot>();
+  auto waywiseNode = std::make_shared<WaywiseCarAutopilot>();
   rclcpp::executors::MultiThreadedExecutor exec;
   exec.add_node(waywiseNode);
 
@@ -160,4 +162,4 @@ int main(int argc, char * argv[])
   return 0;
 }
 
-#include "waywise_autopilot.moc"
+#include "waywise_car_autopilot.moc"

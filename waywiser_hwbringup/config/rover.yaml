@@ -11,7 +11,7 @@
     max_angular_velocity: 0.5
     standstill_velocity_threshold: 0.05
 
-waywise_rover_node:
+waywise_car_node:
   ros__parameters:
     servo_min: 0.0
     servo_max: 0.9
@@ -26,7 +26,8 @@ waywise_rover_node:
     enable_lidar: false
     enable_camera: false
 
-waywise_autopilot_node:
+waywise_car_autopilot_node:
   ros__parameters:
     autopilot_cmd_publish_rate: 30
     waywise_control_tower_address: "127.0.0.1"
+    purepursuit_radius: 1.0
