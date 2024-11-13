@@ -1,3 +1,22 @@
+## Gazebo setup
+
+- Install Gazebo simulator, if not already done: https://gazebosim.org/docs/fortress/install_ubuntu
+
+- Install waywiser dependencies using rosdep:
+
+  ```
+  rosdep install --from-paths $(colcon list --paths-only | grep "waywiser_gazebo") --ignore-src --rosdistro humble -r -y
+  ```
+
+- Build waywiser_gazebo package:
+  ```
+  colcon build --symlink-install --packages-select waywiser_gazebo
+  ```
+- Source the overlay:
+  ```
+  source install/local_setup.bash
+  ```
+
 ## Examples
 
     # To launch gazebo world with a robot and a ros2 bridge

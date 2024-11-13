@@ -51,15 +51,11 @@ To instead build MAVSDK from source (optional):
 
 - [Scripts can be found in the WayWise repository](https://github.com/RISE-Dependable-Transport-Systems/WayWise/tree/main/tools/build_MAVSDK)
 
-Gazebo simulator can be installed on dektop (optional):
-
-- [Install Gazebo](https://gazebosim.org/docs/fortress/install_ubuntu)
-
 To automatically source the ROS2 environment when a new terminal is opened:
 
 `echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc`
 
-Setup workspace and build our package:
+Setup workspace and build it (without simulator-related packages):
 
     sudo apt update && sudo apt install -y libunwind-dev libqt5serialport5-dev git build-essential cmake python3-colcon-common-extensions
 
@@ -67,13 +63,10 @@ Setup workspace and build our package:
     cd ~/waywiser_ws/src
     git clone --recurse-submodules git@github.com:RISE-Dependable-Transport-Systems/WayWiseR.git
     cd ..
-    rosdep install -i --from-path src --rosdistro humble -r -y
-    # if simulation related packages are not necessary:
-    # rosdep install --from-paths $(colcon list --paths-only | grep -v -E "waywiser_gazebo|waywiser_carla")  --ignore-src -r -y
-    colcon build --symlink-install
-    # if simulation related packages are not necessary:
-    # colcon build --symlink-install --packages-skip waywiser_gazebo waywiser_carla
-    colcon test
+    rosdep install --from-paths $(colcon list --paths-only | grep -v -E "waywiser_gazebo|waywiser_carla") --ignore-src --rosdistro humble -r -y
+    colcon build --symlink-install --packages-skip waywiser_gazebo waywiser_carla
+
+To build simulator-related packages such as waywiser_carla, and waywiser_gazebo, follow the instructions in the respective packages.
 
 Before sourcing the overlay, it is very important that you open a new terminal, separate from the one where you built the workspace. Sourcing an overlay in the same terminal where you built, or likewise building where an overlay is sourced, may create complex issues.
 
@@ -109,6 +102,10 @@ https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/assets/2404625/997
 Use case 2 ﹘ WayWise autopilot driving in Gazebo:
 
 https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/assets/2404625/c936d089-d462-4c81-a0ff-e2c9cdb1e4ab
+
+## Developer Guide
+
+For detailed developer setup configuration, refer to the [Developer Guide](.github/DEVELOPER_GUIDE.md).
 
 ## Funded by
 
