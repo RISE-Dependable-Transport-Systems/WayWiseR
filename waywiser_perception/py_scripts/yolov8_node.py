@@ -36,7 +36,7 @@ from waywiser_perception.msg import DetectionArray
 
 
 class Yolov8Node(Node):
-    """Node that provides yolo object detection capabilities"""
+    """Node that provides yolo object detection capabilities."""
 
     def __init__(self) -> None:
         super().__init__('yolov8_node')
@@ -143,7 +143,7 @@ class Yolov8Node(Node):
                 self.tracker = BOTSORT(args=tracker_config, frame_rate=1)
             else:
                 raise AssertionError(
-                    f"Only 'bytetrack' and 'botsort' are supported for now, but got '{tracker_config.tracker_type}'"
+                    f"Only 'bytetrack' and 'botsort' are supported for now, but got '{tracker_config.tracker_type}'"  # noqa
                 )
 
         self.publish_bbox_3d_markers = (
@@ -152,8 +152,8 @@ class Yolov8Node(Node):
         if self.publish_bbox_3d_markers:
             if not self.use_tracker:
                 raise AssertionError(
-                    'publish_bbox_3d_markers parameter is set to True but use_tracker is set to False.'
-                    ' 3d_marker unique ID management without object tracking is not implemented yet.'
+                    'publish_bbox_3d_markers parameter is set to True but use_tracker is set to False.'  # noqa
+                    ' 3d_marker unique ID management without object tracking is not implemented yet.'  # noqa
                 )
 
             self.rviz_3d_visualization_markers_pub = self.create_publisher(
@@ -400,7 +400,7 @@ class Yolov8Node(Node):
 
         # Create bbox mask and apply to object mask
         bbox_mask = np.zeros_like(depth_image, dtype=bool)
-        bbox_mask[bbox_y_min : bbox_y_max + 1, bbox_x_min : bbox_x_max + 1] = True
+        bbox_mask[bbox_y_min : bbox_y_max + 1, bbox_x_min : bbox_x_max + 1] = True  # noqa
         object_mask = np.logical_and(
             object_mask,
             bbox_mask,

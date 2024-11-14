@@ -1,4 +1,4 @@
-## Carla dependencies
+## Carla setup
 
 - Clone the carla-ros-bridge repo (fork from [ros-bridge](https://github.com/carla-simulator/ros-bridge)):
   ```
@@ -20,6 +20,27 @@
   ```
   source ~/carla_ros_bridge_ws/install/local_setup.bash
   ```
+- Install waywiser dependencies using rosdep:
+
+  ```
+  cd waywiser_ws
+  rosdep install --from-paths $(colcon list --paths-only | grep "waywiser_carla") --ignore-src --rosdistro humble -r -y
+  ```
+
+- Build waywiser_gazebo package:
+  ```
+  colcon build --symlink-install --packages-select waywiser_carla
+  ```
+- Source the overlay:
+  ```
+  source install/local_setup.bash
+  ```
+
+Note: Both carla_ros_bridge_ws and waywiser_ws overlays need to be sourced in every new terminal:
+
+```
+source ~/carla_ros_bridge_ws/install/local_setup.bash && source install/local_setup.bash
+```
 
 ## Examples
 
@@ -31,7 +52,4 @@
 
 The carla_osm_tile_server node implements a TCP/IP based server that generates map tiles from CARLA simulator data and serves them in a format similar to OpenStreetMap (OSM) tile servers, making WayWiseR compatible with OSM-based mapping applications like [ControlTower](https://github.com/RISE-Dependable-Transport-Systems/ControlTower). When the node is run for the first time, it connects to CARLA via ros-bridge and renders a 2D top-view image of the CARLA world, including roads and lane markings from opendrive data. The high-resolution map image is saved locally and is used to generate map tiles on demand.
 
-
-
 https://github.com/user-attachments/assets/edb4115a-6099-4ebc-97ff-f9e2919c92bc
-
