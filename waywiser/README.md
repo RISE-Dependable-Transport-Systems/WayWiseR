@@ -33,9 +33,9 @@
 
   ```
   cd ~/waywiser_ws
-  ./install/waywiser/discovery/client_setup.sh
+  source install/waywiser/discovery/client_setup.sh
   # If running on remote machine, run:
-  # ./install/waywiser/discovery/client_setup.sh -r -s <server_ip> -c <client_ip>
+  # source install/waywiser/discovery/client_setup.sh -r -s <server_ip> -c <client_ip>
   # To display help for this script, run:
   # ./install/waywiser/discovery/client_setup.sh -h
   ros2 daemon stop && ros2 daemon start
@@ -48,9 +48,9 @@
   export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
   export ROS_DOMAIN_ID=0
   cd ~/waywiser_ws
-  ./install/waywiser/discovery/client_setup.sh
+  source install/waywiser/discovery/client_setup.sh
   # If running on remote machine, run:
-  # ./install/waywiser/discovery/client_setup.sh -r -s <server_ip> -c <client_ip>
+  # source install/waywiser/discovery/client_setup.sh -r -s <server_ip> -c <client_ip>
   ros2 run demo_nodes_cpp listener
   ```
 
@@ -60,9 +60,9 @@
   export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
   export ROS_DOMAIN_ID=0
   cd ~/waywiser_ws
-  ./install/waywiser/discovery/client_setup.sh -su
+  source install/waywiser/discovery/client_setup.sh -su
   # If running on remote machine, run:
-  # ./install/waywiser/discovery/client_setup.sh -su -r -s <server_ip> -c <client_ip>
+  # source install/waywiser/discovery/client_setup.sh -su -r -s <server_ip> -c <client_ip>
   ros2 node list
   ```
 
