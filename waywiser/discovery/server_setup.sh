@@ -15,7 +15,7 @@ display_usage() {
 server_setup() {
     local server_id=$1
     local file_path=$(get_full_file_path $2)
-    
+
     # Start server and capture output
     fastdds discovery --server-id $server_id -x $file_path | while IFS= read -r line; do
         echo "[server $server_id] $line"
@@ -25,19 +25,19 @@ server_setup() {
 # Function to get full file path
 get_full_file_path() {
     local file_path=$1
-    
+
     if [ ! -f "$file_path" ]; then
         # Find config fullfilepath
         if [ -d "src" ]; then
             file_path="$PWD/src/WayWiseR/waywiser/discovery/$file_path"
-            elif [ -d "waywiser" ]; then
+        elif [ -d "waywiser" ]; then
             file_path="$PWD/waywiser/discovery/$file_path"
         else
             echo "Error: Unable to find file $file_path"
             exit 1
         fi
     fi
-    
+
     echo "$file_path"
 }
 
@@ -79,31 +79,31 @@ domain_id_input=-1
 # Parse options
 while getopts "hers:d:" opt; do
     case $opt in
-        h)
-            display_usage
-            exit 0
+    h)
+        display_usage
+        exit 0
         ;;
-        e) edit_config=true ;;
-        r) start_remote=true ;;
-        s) server_ip="$OPTARG" ;;
-        d) # Check if domain_id is valid
-            if [[ $OPTARG =~ ^[0-9]+$ ]] && ((OPTARG >= 0 && OPTARG < 200)); then
-                domain_id_input="$OPTARG"
-            else
-                echo "Error: Invalid domain_id. It must be an integer >= 0 and < 200." >&2
-                display_usage
-                exit 1
-            fi
-        ;;
-        \?)
-            echo "Invalid option: -$OPTARG" >&2
+    e) edit_config=true ;;
+    r) start_remote=true ;;
+    s) server_ip="$OPTARG" ;;
+    d) # Check if domain_id is valid
+        if [[ $OPTARG =~ ^[0-9]+$ ]] && ((OPTARG >= 0 && OPTARG < 200)); then
+            domain_id_input="$OPTARG"
+        else
+            echo "Error: Invalid domain_id. It must be an integer >= 0 and < 200." >&2
             display_usage
             exit 1
+        fi
         ;;
-        :)
-            echo "Option -$OPTARG requires an argument." >&2
-            display_usage
-            exit 1
+    \?)
+        echo "Invalid option: -$OPTARG" >&2
+        display_usage
+        exit 1
+        ;;
+    :)
+        echo "Option -$OPTARG requires an argument." >&2
+        display_usage
+        exit 1
         ;;
     esac
 done
@@ -131,14 +131,14 @@ if [ "$configured_domain_id" -ne "$domain_id" ]; then
         # Copy the configuration file to the tmp_dir and replace the domain_id in the file
         tmp_config_fullfilepath="$tmp_dir${local_server_config_file%.xml}_${domain_id}.xml"
         cp $config_fullfilepath $tmp_config_fullfilepath
-        
+
         config_fullfilepath=$tmp_config_fullfilepath
-        
+
         echo "[server $server_id] Using the config_file: $config_fullfilepath to create the local server with domain id $domain_id."
     else
         echo "[server $server_id] Edited the default config_file: $config_fullfilepath to create the local server with domain id $domain_id."
     fi
-    
+
     sed -i "s|<domainId>$configured_domain_id</domainId>|<domainId>$domain_id</domainId>|g" "$config_fullfilepath"
 fi
 
@@ -148,21 +148,21 @@ server_setup $server_id $config_fullfilepath &
 # Configure remote server if requested
 if $start_remote; then
     server_id=1
-    
+
     config_fullfilepath=$(get_full_file_path $remote_server_config_file)
     configured_server_ip=$(grep -oP -m 1 '(?<=<address _marker="server">)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(?=</address>)' $config_fullfilepath)
-    
+
     if [ -z "$server_ip" ]; then
         server_ip=$configured_server_ip
     fi
-    
+
     configured_domain_id=$(grep -oP -m 1 '(?<=<domainId>)[0-9]+(?=</domainId>)' $config_fullfilepath)
     if (($domain_id_input < 0)); then
         domain_id=$configured_domain_id
     else
         domain_id=$domain_id_input
     fi
-    
+
     # Check if server_ip is a valid IP address
     if is_valid_ip "$server_ip"; then
         # Check if the system has the specified IP address in any of its network interfaces
@@ -172,19 +172,19 @@ if $start_remote; then
                     # Copy the configuration file to the tmp_dir and replace the server_ip in the file
                     tmp_config_fullfilepath="$tmp_dir${remote_server_config_file%.xml}_${server_ip//./}_${domain_id}.xml"
                     cp $config_fullfilepath $tmp_config_fullfilepath
-                    
+
                     config_fullfilepath=$tmp_config_fullfilepath
-                    
+
                     echo "[server $server_id] Using the config_file: $config_fullfilepath to create the remote server $server_ip with domain id $domain_id."
                 else
                     echo "[server $server_id] Edited the default config_file: $config_fullfilepath to create the remote server $server_ip with domain id $domain_id."
                 fi
-                
+
                 sed -i "s|<address _marker=\"server\">$configured_server_ip</address>|<address _marker=\"server\">$server_ip</address>|g" "$config_fullfilepath"
                 sed -i "s|<domainId>$configured_domain_id</domainId>|<domainId>$domain_id</domainId>|g" "$config_fullfilepath"
-                
+
             fi
-            
+
             # Start remote server
             server_setup $server_id $config_fullfilepath &
         else
