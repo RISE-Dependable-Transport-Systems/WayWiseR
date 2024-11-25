@@ -16,19 +16,19 @@ display_usage() {
 # Function to get full file path
 get_full_file_path() {
     local file_path=$1
-
+    
     if [ ! -f "$file_path" ]; then
         # Find config fullfilepath
         if [ -d "src" ]; then
             file_path="$PWD/src/WayWiseR/waywiser/discovery/$file_path"
-        elif [ -d "waywiser" ]; then
+            elif [ -d "waywiser" ]; then
             file_path="$PWD/waywiser/discovery/$file_path"
         else
             echo "Error: Unable to find file $file_path"
             exit 1
         fi
     fi
-
+    
     echo "$file_path"
 }
 
@@ -72,38 +72,38 @@ domain_id_input=-1
 # Parse options
 while getopts "hers:c:d:" opt; do
     case $opt in
-    h)
-        display_usage
-        exit 0
+        h)
+            display_usage
+            exit 0
         ;;
-    e) edit_config=true ;;
-    r) remote_client=true ;;
-    s)
-        if [[ "$OPTARG" == "u" ]]; then
-            is_super_client=1
-        else
-            server_ip="$OPTARG"
-        fi
+        e) edit_config=true ;;
+        r) remote_client=true ;;
+        s)
+            if [[ "$OPTARG" == "u" ]]; then
+                is_super_client=1
+            else
+                server_ip="$OPTARG"
+            fi
         ;;
-    c) client_ip="$OPTARG" ;;
-    d) # Check if domain_id is valid
-        if [[ $OPTARG =~ ^[0-9]+$ ]] && ((OPTARG >= 0 && OPTARG < 200)); then
-            domain_id_input="$OPTARG"
-        else
-            echo "Error: Invalid domain_id. It must be an integer >= 0 and < 200." >&2
+        c) client_ip="$OPTARG" ;;
+        d) # Check if domain_id is valid
+            if [[ $OPTARG =~ ^[0-9]+$ ]] && ((OPTARG >= 0 && OPTARG < 200)); then
+                domain_id_input="$OPTARG"
+            else
+                echo "Error: Invalid domain_id. It must be an integer >= 0 and < 200." >&2
+                display_usage
+                exit 1
+            fi
+        ;;
+        \?)
+            echo "Invalid option: -$OPTARG" >&2
             display_usage
             exit 1
-        fi
         ;;
-    \?)
-        echo "Invalid option: -$OPTARG" >&2
-        display_usage
-        exit 1
-        ;;
-    :)
-        echo "Option -$OPTARG requires an argument." >&2
-        display_usage
-        exit 1
+        :)
+            echo "Option -$OPTARG requires an argument." >&2
+            display_usage
+            exit 1
         ;;
     esac
 done
@@ -118,27 +118,31 @@ fi
 if $remote_client; then
     config_file=$remote_client_config_file
     config_fullfilepath=$(get_full_file_path $remote_client_config_file)
-
+    
     configured_server_ip=$(grep -oP -m 1 '(?<=<address _marker="server">)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(?=</address>)' $config_fullfilepath)
-
+    
     if [ -z "$server_ip" ]; then
         server_ip=$configured_server_ip
     fi
-
+    
     configured_client_ip=$(grep -oP -m 1 '(?<=<address _marker="client">)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(?=</address>)' $config_fullfilepath)
     if [ -z "$client_ip" ]; then
         client_ip=$configured_client_ip
     fi
-
+    
     configured_domain_id=$(grep -oP -m 1 '(?<=<domainId>)[0-9]+(?=</domainId>)' $config_fullfilepath)
     if (($domain_id_input < 0)); then
-        domain_id=$configured_domain_id
+        if [[ -n "$ROS_DOMAIN_ID" ]] && [[ "$ROS_DOMAIN_ID" =~ ^[0-9]+$ ]] && ((ROS_DOMAIN_ID >= 0 && ROS_DOMAIN_ID < 200)); then
+            domain_id=$ROS_DOMAIN_ID
+        else
+            domain_id=$configured_domain_id
+        fi
     else
         domain_id=$domain_id_input
     fi
-
+    
     configured_discovery_protocol=$(grep -oP '(?<=<discoveryProtocol>).*?(?=</discoveryProtocol>)' $config_fullfilepath)
-
+    
     # Check if server_ip and client_ip are valid IP addresses
     if is_valid_ip "$server_ip" && is_valid_ip "$client_ip"; then
         # Check if the system has the specified client_ip address in any of its network interfaces
@@ -148,13 +152,13 @@ if $remote_client; then
                     # Copy the configuration file to the tmp_dir and replace the server_ip and client_ip in the file
                     tmp_config_fullfilepath="$tmp_dir${config_file%.xml}_${server_ip//./}_${client_ip//./}_${domain_id}_$is_super_client.xml"
                     cp $config_fullfilepath $tmp_config_fullfilepath
-
+                    
                     config_fullfilepath=$tmp_config_fullfilepath
                     echo "Using the config_file: $config_fullfilepath to access the remote server $server_ip from the client $client_ip with domain id $domain_id and $discovery_protocol protocol."
                 else
                     echo "Edited the default config_file: $config_fullfilepath to access the remote server $server_ip from the client $client_ip with domain id $domain_id and $discovery_protocol protocol."
                 fi
-
+                
                 sed -i "s|<address _marker=\"server\">$configured_server_ip</address>|<address _marker=\"server\">$server_ip</address>|g" "$config_fullfilepath"
                 sed -i "s|<address _marker=\"client\">$configured_client_ip</address>|<address _marker=\"client\">$client_ip</address>|g" "$config_fullfilepath"
                 sed -i "s|<domainId>$configured_domain_id</domainId>|<domainId>$domain_id</domainId>|g" "$config_fullfilepath"
@@ -168,38 +172,42 @@ if $remote_client; then
         echo "Error: Make sure server_ip $server_ip and client_ip $client_ip are valid ip addresses."
         exit 1
     fi
-
+    
     export ROS_DISCOVERY_SERVER=";UDPv4:[$server_ip]:11812"
 else
     config_file=$local_client_config_file
     config_fullfilepath=$(get_full_file_path $local_client_config_file)
-
+    
     configured_domain_id=$(grep -oP -m 1 '(?<=<domainId>)[0-9]+(?=</domainId>)' $config_fullfilepath)
     if (($domain_id_input < 0)); then
-        domain_id=$configured_domain_id
+        if [[ -n "$ROS_DOMAIN_ID" ]] && [[ "$ROS_DOMAIN_ID" =~ ^[0-9]+$ ]] && ((ROS_DOMAIN_ID >= 0 && ROS_DOMAIN_ID < 200)); then
+            domain_id=$ROS_DOMAIN_ID
+        else
+            domain_id=$configured_domain_id
+        fi
     else
         domain_id=$domain_id_input
     fi
-
+    
     configured_discovery_protocol=$(grep -oP '(?<=<discoveryProtocol>).*?(?=</discoveryProtocol>)' $config_fullfilepath)
-
+    
     if [ "$configured_domain_id" != "$domain_id" ] || [ "$configured_discovery_protocol" != "$discovery_protocol" ]; then
         if ! $edit_config; then
             # Copy the configuration file to the tmp_dir and replace the server_ip and client_ip in the file
             tmp_config_fullfilepath="$tmp_dir${config_file%.xml}_${domain_id}_$is_super_client.xml"
             cp $config_fullfilepath $tmp_config_fullfilepath
-
+            
             config_fullfilepath=$tmp_config_fullfilepath
-
+            
             echo "Using the config_file: $config_fullfilepath to access the local server with domain id $domain_id and $discovery_protocol protocol."
         else
             echo "Edited the default config_file: $config_fullfilepath to access the local server with domain id $domain_id and $discovery_protocol protocol."
         fi
-
+        
         sed -i "s|<domainId>$configured_domain_id</domainId>|<domainId>$domain_id</domainId>|g" "$config_fullfilepath"
         sed -i "s|<discoveryProtocol>$configured_discovery_protocol</discoveryProtocol>|<discoveryProtocol>$discovery_protocol</discoveryProtocol>|g" $config_fullfilepath
     fi
-
+    
     export ROS_DISCOVERY_SERVER="UDPv4:[127.0.0.1]:11811;UDPv4:[127.0.0.1]:11812"
 fi
 
