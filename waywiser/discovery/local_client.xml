@@ -23,7 +23,6 @@
                 <useBuiltinTransports>false</useBuiltinTransports>
                 <userTransports>
                     <transport_id>udp_transport</transport_id>
-                    <transport_id>tcp_transport</transport_id>
                     <transport_id>shm_transport</transport_id>
                 </userTransports>
 
