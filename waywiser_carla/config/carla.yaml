@@ -36,10 +36,9 @@ emulated_angle_sensor:
     enable: true
     primary_frame: truck
     secondary_frame: semitrailer
-    topic: sensors/truck/angle
+    topic: carla/truck/trailer_angle
     publish_rate: 10
     invert_angle: true
-    warmup_time: 10.0
 
 carla_osm_tile_server_node:
   ros__parameters:
