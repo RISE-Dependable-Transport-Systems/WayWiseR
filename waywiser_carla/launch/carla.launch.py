@@ -3,8 +3,10 @@ import os
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.actions import IncludeLaunchDescription
 from launch.actions import OpaqueFunction
 from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import yaml
@@ -28,6 +30,7 @@ def generate_launch_description():
     emulated_angle_sensor_conditional_launch_action = OpaqueFunction(
         function=emulated_angle_sensor_conditional_launch
     )
+    rgbd_to_pointcloud_launch_action = OpaqueFunction(function=rgbd_to_pointcloud_launch)
 
     # create launch description
     ld = LaunchDescription()
@@ -39,6 +42,7 @@ def generate_launch_description():
     # start nodes
     ld.add_action(carla_orchestrator_launch_action)
     ld.add_action(emulated_angle_sensor_conditional_launch_action)
+    ld.add_action(rgbd_to_pointcloud_launch_action)
 
     return ld
 
@@ -121,3 +125,41 @@ def emulated_angle_sensor_conditional_launch(context):
     )
 
     return [emulated_angle_sensor_node]
+
+
+def rgbd_to_pointcloud_launch(context):
+    waywiser_perception_dir = get_package_share_directory('waywiser_perception')
+    nodes = []
+    with open(LaunchConfiguration('carla_config').perform(context)) as f:
+        config_data = yaml.safe_load(f)
+        node_params = config_data['/**']['ros__parameters']
+        ego_vehicle_role_name = node_params['ego_vehicle_role_name']
+        rgbd_to_pointcloud_sources = node_params['rgbd_to_pointcloud_sources']
+        for rgbd_to_pointcloud_source in rgbd_to_pointcloud_sources:
+            rgbd_to_pointcloud_source_params = node_params[rgbd_to_pointcloud_source]
+            attached_to_ego_vehicle = rgbd_to_pointcloud_source_params['attached_to_ego_vehicle']
+            namespace = '/carla'
+            if attached_to_ego_vehicle:
+                namespace = namespace + '/' + ego_vehicle_role_name
+
+            nodes.append(
+                IncludeLaunchDescription(
+                    PythonLaunchDescriptionSource(
+                        [
+                            os.path.join(
+                                waywiser_perception_dir,
+                                'launch',
+                                'rgbd_to_pointcloud.launch.py',
+                            )
+                        ]
+                    ),
+                    launch_arguments={
+                        'use_sim_time': LaunchConfiguration('use_sim_time'),
+                        'namespace': namespace,
+                        'rgb_camera_node_name': rgbd_to_pointcloud_source_params['rgb_camera'],
+                        'depth_camera_node_name': rgbd_to_pointcloud_source_params['depth_camera'],
+                    }.items(),
+                )
+            )
+
+    return nodes

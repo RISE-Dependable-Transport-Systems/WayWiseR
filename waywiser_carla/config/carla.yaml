@@ -7,6 +7,15 @@
     port: 2000
     timeout: 10
     town: Sunrise_from_Town05
+    rgbd_to_pointcloud_sources: ["front", "dock"]
+    front:
+      attached_to_ego_vehicle: true
+      rgb_camera: "rgb_front"
+      depth_camera: "depth_front"
+    dock:
+      attached_to_ego_vehicle: false
+      rgb_camera: "rgb_dock"
+      depth_camera: "depth_dock"
 
 carla_orchestrator_node:
   ros__parameters:
