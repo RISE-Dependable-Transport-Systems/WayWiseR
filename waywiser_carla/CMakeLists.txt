@@ -20,42 +20,49 @@ find_package(carla_msgs REQUIRED)
 
 # C++ targets
 add_executable(map_to_odom_tf_publisher src/map_to_odom_tf_publisher.cpp)
-ament_target_dependencies(map_to_odom_tf_publisher rclcpp tf2_ros tf2_geometry_msgs geometry_msgs nav_msgs)
+ament_target_dependencies(
+  map_to_odom_tf_publisher
+  rclcpp
+  tf2_ros
+  tf2_geometry_msgs
+  geometry_msgs
+  nav_msgs)
 
 add_executable(emulated_angle_sensor src/emulated_angle_sensor.cpp)
-ament_target_dependencies(emulated_angle_sensor rclcpp tf2 tf2_ros geometry_msgs std_msgs)
+ament_target_dependencies(
+  emulated_angle_sensor
+  rclcpp
+  tf2
+  tf2_ros
+  geometry_msgs
+  std_msgs)
 
-install(TARGETS map_to_odom_tf_publisher RUNTIME DESTINATION lib/${PROJECT_NAME})
+install(TARGETS map_to_odom_tf_publisher
+        RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(TARGETS emulated_angle_sensor RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 # Python package
-ament_python_install_package(${PROJECT_NAME}_py
-  PACKAGE_DIR py_scripts)
+ament_python_install_package(${PROJECT_NAME}_py PACKAGE_DIR py_scripts)
 
-install(PROGRAMS
-  py_scripts/carla_osm_tile_server.py
-  DESTINATION lib/${PROJECT_NAME}
-)
-install(PROGRAMS
-  py_scripts/waywiser_twist_to_carla_control.py
-  DESTINATION lib/${PROJECT_NAME}
-)
+install(PROGRAMS py_scripts/carla_osm_tile_server.py
+        DESTINATION lib/${PROJECT_NAME})
+install(PROGRAMS py_scripts/waywiser_twist_to_carla_control.py
+        DESTINATION lib/${PROJECT_NAME})
+install(PROGRAMS py_scripts/carla_orchestrator.py
+        DESTINATION lib/${PROJECT_NAME})
 
-install(
-  DIRECTORY launch config
-  DESTINATION share/${PROJECT_NAME}
-)
+install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
 
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
+  # the following line skips the linter which checks for copyrights comment the
+  # line when a copyright and license is added to all source files
   set(ament_cmake_copyright_FOUND TRUE)
 
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
+  # the following line skips cpplint (only works in a git repo) comment the line
+  # when this package is in a git repo and when a copyright and license is added
+  # to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()

@@ -1,0 +1,29 @@
+{
+    "sim_configurations": [
+        {
+            "iterations": 2,
+            "spawn_point": {
+                "truck": "-32.0,14.0,0.5,0,0,180",
+                "semitrailer": "-25.0,14.0,1.5,0,0,180"
+            },
+            "topics_to_record": [
+                "/carla/end_simulation",
+                "/carla/status",
+                "/carla/truck/collision",
+                "/carla/truck/gnss",
+                "/carla/truck/gnss/filtered",
+                "/carla/truck/imu",
+                "/carla/truck/odometry",
+                "/carla/truck/odometry/filtered_global",
+                "/carla/truck/odometry/filtered_local",
+                "/carla/truck/odometry/gps",
+                "/carla/truck/trailer_angle",
+                "/carla/truck/vehicle_control_cmd",
+                "/cmd_vel_out",
+                "/emergency_stop/current_state",
+                "/emergency_stop/target_state",
+                "/waywise_vel"
+            ]
+        }
+    ]
+}
