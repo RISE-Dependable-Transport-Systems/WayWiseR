@@ -110,6 +110,68 @@ public:
       mTruckState->setTrailerState(mTrailerState);
     }
 
+    provide_vehicle_parameters_to_controltower();
+
+    if (has_trailer_) {
+      mavsdk::Mavsdk::Configuration config =
+        mavsdk::Mavsdk::Configuration{mavsdk::Mavsdk::ComponentType::Custom};
+      config.set_system_id(mTruckState->getId());
+      config.set_always_send_heartbeats(true);
+      config.set_component_id(mTrailerState->getId());
+      mTrailerMavsdk.reset(new mavsdk::Mavsdk{config});
+
+      mTrailerMavsdk->subscribe_on_new_system(
+        [this]() {
+          for (const auto & system : mTrailerMavsdk->systems()) {
+            auto mavlinkPassthrough = new mavsdk::MavlinkPassthrough(system);
+            mavlinkPassthrough->subscribe_message(
+              MAVLINK_MSG_ID_HEARTBEAT,
+              [this, system, mavlinkPassthrough](const mavlink_message_t & message) {
+                mavlink_heartbeat_t heartbeat;
+                mavlink_msg_heartbeat_decode(&message, &heartbeat);
+                // unsubscribe from further heartbeats by deleting passthrough
+                delete mavlinkPassthrough;
+
+                if ((MAV_TYPE) heartbeat.type == MAV_TYPE_GCS) {
+                  mTrailerMavlinkPassthrough.reset(new mavsdk::MavlinkPassthrough(system));
+                  is_connected_to_controltower = true;
+                }
+              });
+          }
+        });
+
+      mTrailerMavsdk->intercept_outgoing_messages_async(
+        [this](mavlink_message_t & message) {
+          switch (message.msgid) {
+            case MAVLINK_MSG_ID_HEARTBEAT: // Fix some info in heartbeat s.th. MAVSDK / ControlTower detects vehicle correctly
+              mavlink_heartbeat_t heartbeat;
+              mavlink_msg_heartbeat_decode(&message, &heartbeat);
+              if (message.compid == mTrailerState->getId()) {
+                heartbeat.type = MAV_TYPE_ONBOARD_CONTROLLER;
+                heartbeat.autopilot = MAV_AUTOPILOT_INVALID;
+              }
+              mavlink_msg_heartbeat_encode(message.sysid, message.compid, &message, &heartbeat);
+              break;
+            default:;
+              //            qDebug() << "out:" << message.msgid;
+          }
+          return true;
+        });
+
+      mTrailerMavsdk->setup_udp_remote(waywise_control_tower_address_, 14540);
+    }
+
+    // --- Autopilot ---
+    mWaypointFollower.reset(new PurepursuitWaypointFollower(mCarMovementController));
+    mWaypointFollower->setPurePursuitRadius(purepursuit_radius_);
+    mWaypointFollower->setRepeatRoute(false);
+    mWaypointFollower->setAdaptivePurePursuitRadiusActive(true);
+    mMavsdkVehicleServer->setWaypointFollower(mWaypointFollower);
+  }
+
+private:
+  void provide_vehicle_parameters_to_controltower()
+  {
     ParameterServer::getInstance()->provideFloatParameter(
       "VEH_LENGTH",
       std::function<void(float)>(
@@ -201,64 +263,9 @@ public:
             return this->trailer_wheelbase_;
           })
       );
-
-      mavsdk::Mavsdk::Configuration config =
-        mavsdk::Mavsdk::Configuration{mavsdk::Mavsdk::ComponentType::Custom};
-      config.set_system_id(mTruckState->getId());
-      config.set_always_send_heartbeats(true);
-      config.set_component_id(mTrailerState->getId());
-      mTrailerMavsdk.reset(new mavsdk::Mavsdk{config});
-
-      mTrailerMavsdk->subscribe_on_new_system(
-        [this]() {
-          for (const auto & system : mTrailerMavsdk->systems()) {
-            auto mavlinkPassthrough = new mavsdk::MavlinkPassthrough(system);
-            mavlinkPassthrough->subscribe_message(
-              MAVLINK_MSG_ID_HEARTBEAT,
-              [this, system, mavlinkPassthrough](const mavlink_message_t & message) {
-                mavlink_heartbeat_t heartbeat;
-                mavlink_msg_heartbeat_decode(&message, &heartbeat);
-                // unsubscribe from further heartbeats by deleting passthrough
-                delete mavlinkPassthrough;
-
-                if ((MAV_TYPE) heartbeat.type == MAV_TYPE_GCS) {
-                  mTrailerMavlinkPassthrough.reset(new mavsdk::MavlinkPassthrough(system));
-                  is_connected_to_controltower = true;
-                }
-              });
-          }
-        });
-
-      mTrailerMavsdk->intercept_outgoing_messages_async(
-        [this](mavlink_message_t & message) {
-          switch (message.msgid) {
-            case MAVLINK_MSG_ID_HEARTBEAT: // Fix some info in heartbeat s.th. MAVSDK / ControlTower detects vehicle correctly
-              mavlink_heartbeat_t heartbeat;
-              mavlink_msg_heartbeat_decode(&message, &heartbeat);
-              if (message.compid == mTrailerState->getId()) {
-                heartbeat.type = MAV_TYPE_ONBOARD_CONTROLLER;
-                heartbeat.autopilot = MAV_AUTOPILOT_INVALID;
-              }
-              mavlink_msg_heartbeat_encode(message.sysid, message.compid, &message, &heartbeat);
-              break;
-            default:;
-              //            qDebug() << "out:" << message.msgid;
-          }
-          return true;
-        });
-
-      mTrailerMavsdk->setup_udp_remote(waywise_control_tower_address_, 14540);
     }
-
-    // --- Autopilot ---
-    mWaypointFollower.reset(new PurepursuitWaypointFollower(mCarMovementController));
-    mWaypointFollower->setPurePursuitRadius(purepursuit_radius_);
-    mWaypointFollower->setRepeatRoute(false);
-    mWaypointFollower->setAdaptivePurePursuitRadiusActive(true);
-    mMavsdkVehicleServer->setWaypointFollower(mWaypointFollower);
   }
 
-private:
   void autopilot_timer_callback()
   {
     double mDesiredSpeed = mCarMovementController->getDesiredSpeed();        // [m/s]
@@ -316,7 +323,7 @@ private:
             0.0,            // time_boot_ms (not used)
             0.0,            // roll (not used)
             0.0,            // pitch (not used)
-            trailerYawRad,   // yaw (your desired yaw value)
+            trailerYawRad,   // yaw
             0.0,            // rollspeed (not used)
             0.0,            // pitchspeed (not used)
             0.0             // yawspeed (not used)
