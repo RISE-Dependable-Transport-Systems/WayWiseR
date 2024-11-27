@@ -190,6 +190,25 @@ class CarlaOrchestrator(Node):
 
         return parsed_configs
 
+    def create_subprocess(
+        self,
+        start_simulator_command,
+        subprocess_name,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        text=False,
+    ):
+        self.subprocesses[subprocess_name] = subprocess.Popen(
+            start_simulator_command,
+            start_new_session=True,
+            stdout=stdout,
+            stderr=stderr,
+            text=text,
+        )
+        self.get_logger().info(
+            f'Started {subprocess_name} with PID [{self.subprocesses[subprocess_name].pid}].'
+        )
+
     def setup_simulator(self, weather):
         """Setup the CARLA simulator."""
         if self.carla_script_path:
@@ -200,16 +219,9 @@ class CarlaOrchestrator(Node):
             if self.render_off_screen:
                 start_simulator_command.append('-RenderOffScreen')
             start_simulator_command.append('-vulkan')
-            self.subprocesses['simulator'] = subprocess.Popen(
-                start_simulator_command,
-                start_new_session=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+
+            self.create_subprocess(start_simulator_command, 'simulator')
             time.sleep(self.sim_startup_time)
-            self.get_logger().info(
-                f"Started simulator with PID [{self.subprocesses['simulator'].pid}]."
-            )
 
         self.client = carla.Client(self.host, self.port)
         self.client.set_timeout(self.timeout)
@@ -238,12 +250,7 @@ class CarlaOrchestrator(Node):
         for param, value in self.carla_ros_bridge_params.items():
             command.extend(['-p', f'{param}:={value}'])
 
-        self.subprocesses['carla_ros_bridge'] = subprocess.Popen(
-            command, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
-        self.get_logger().info(
-            f"Started carla_ros_bridge with PID [{self.subprocesses['carla_ros_bridge'].pid}]."
-        )
+        self.create_subprocess(command, 'carla_ros_bridge')
 
     def start_rosbag_recording(self, topics_to_record):
         """Start the rosbag_recording node."""
@@ -255,15 +262,16 @@ class CarlaOrchestrator(Node):
             command += ['--output', output_dir]
         command += topics_to_record
 
-        self.subprocesses['ros_bag_recorder'] = subprocess.Popen(
-            command, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
-        self.get_logger().info(
-            f"Started ros_bag_recorder with PID [{self.subprocesses['ros_bag_recorder'].pid}]."
-        )
+        self.create_subprocess(command, 'ros_bag_recorder')
 
-    def spawn_objects(self, spawn_objects_params, timeout=10):
+    def spawn_objects(self, sim_config, timeout=10):
         """Start the carla_spawn_objects node."""
+
+        spawn_objects_params = {}
+        spawn_objects_params['use_sim_time'] = True
+        spawn_objects_params['objects_definition_file'] = sim_config['objects_json_path']
+        for id_, value in sim_config['spawn_point'].items():
+            spawn_objects_params['spawn_point_' + id_] = value
 
         command = [
             'ros2',
@@ -275,15 +283,12 @@ class CarlaOrchestrator(Node):
         for param, value in spawn_objects_params.items():
             command.extend(['-p', f'{param}:={value}'])
 
-        self.subprocesses['carla_spawn_objects'] = subprocess.Popen(
+        self.create_subprocess(
             ['unbuffer'] + command,
-            start_new_session=True,
+            'carla_spawn_objects',
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-        )
-        self.get_logger().info(
-            f"Started carla_spawn_objects with PID [{self.subprocesses['carla_spawn_objects'].pid}]."
         )
 
         # Tail the stdout and wait until all objects are spawned
@@ -293,7 +298,7 @@ class CarlaOrchestrator(Node):
 
             if output:
                 # self.get_logger().info(output)
-                if 'All objects spawned.' in output:
+                if 'All objects spawned' in output:
                     self.get_logger().info('All objects are spawned.')
                     break
             elif self.subprocesses['carla_spawn_objects'].poll() is not None:
@@ -313,6 +318,27 @@ class CarlaOrchestrator(Node):
             time.sleep(0.1)
         self.subprocesses['carla_spawn_objects'].stdout.close()
 
+        if sim_config['ego_vehicle_role_name']:
+            objects_json_path = sim_config['objects_json_path']
+            try:
+                with open(objects_json_path, 'r') as f:
+                    objects = json.load(f).get('objects', [])
+                    # Extract spawn points for vehicle.* types
+                    for object_ in objects:
+                        if sim_config['ego_vehicle_role_name'] in object_['id']:
+                            sensors = object_['sensors']
+                            for sensor in sensors:
+                                if 'actor.pseudo.control' in sensor['type']:
+                                    self.set_initial_pose(
+                                        sim_config['ego_vehicle_role_name'], sensor['id']
+                                    )
+                                    self.get_logger().info(
+                                        f"Initialized vehicle control for {sim_config['ego_vehicle_role_name']} with control id {sensor['id']}."
+                                    )
+                                    break
+            except Exception as e:
+                self.get_logger().error(f'Failed to load objects JSON file: {e}')
+
     def set_initial_pose(self, role_name, control_id):
         """Start the carla_set_initial_pose node."""
 
@@ -330,12 +356,7 @@ class CarlaOrchestrator(Node):
             'use_sim_time:=True',
         ]
 
-        self.subprocesses['carla_set_initial_pose'] = subprocess.Popen(
-            command, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
-        self.get_logger().info(
-            f"Started carla_set_initial_pose with PID [{self.subprocesses['carla_set_initial_pose'].pid}]."
-        )
+        self.create_subprocess(command, 'carla_set_initial_pose')
 
     def clock_callback(self, msg):
         if not self.received_first_clock:
@@ -378,41 +399,13 @@ class CarlaOrchestrator(Node):
     def execute_simulation(self):
         sim_config = self.sim_configurations[self.current_config_index]
         self.get_logger().info(
-            f'Starting simulation {self.current_config_index + 1} with map {self.town}'
+            f'Starting simulation {self.current_config_index} with map {self.town}'
         )
 
         # spawn objects
-        spawn_objects_params = {}
-        spawn_objects_params['use_sim_time'] = True
-        spawn_objects_params['objects_definition_file'] = sim_config['objects_json_path']
-        for id, value in sim_config['spawn_point'].items():
-            spawn_objects_params['spawn_point_' + id] = value
+        self.spawn_objects(sim_config)
 
-        self.spawn_objects(spawn_objects_params)
-
-        if sim_config['ego_vehicle_role_name']:
-            objects_json_path = sim_config['objects_json_path']
-            try:
-                with open(objects_json_path, 'r') as f:
-                    objects = json.load(f).get('objects', [])
-                    # Extract spawn points for vehicle.* types
-                    for object_ in objects:
-                        if sim_config['ego_vehicle_role_name'] in object_['id']:
-                            sensors = object_['sensors']
-                            for sensor in sensors:
-                                if 'actor.pseudo.control' in sensor['type']:
-                                    self.set_initial_pose(
-                                        sim_config['ego_vehicle_role_name'], sensor['id']
-                                    )
-                                    self.get_logger().info(
-                                        f"Initialized vehicle control for {sim_config['ego_vehicle_role_name']} with control id {sensor['id']}."
-                                    )
-                                    break
-            except Exception as e:
-                self.get_logger().error(f'Failed to load objects JSON file: {e}')
-
-        if len(self.static_tf_publishers) > 0:
-            self.publish_static_tfs()
+        self.publish_static_tfs()
 
         # start rosbag recording
         topics_to_record = sim_config['topics_to_record']
