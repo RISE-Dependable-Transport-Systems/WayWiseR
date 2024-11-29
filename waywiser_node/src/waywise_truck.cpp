@@ -2,6 +2,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <map>
 
 #include "WayWise/core/simplewatchdog.h"
 #include "WayWise/logger/logger.h"
@@ -11,6 +12,7 @@
 #include "WayWise/sensors/gnss/ubloxrover.h"
 #include "WayWise/sensors/imu/bno055orientationupdater.h"
 #include "WayWise/sensors/imu/imuorientationupdater.h"
+#include "WayWise/sensors/tof/vl53l0xtofsensor.h"
 #include "WayWise/vehicles/truckstate.h"
 #include "WayWise/vehicles/trailerstate.h"
 #include "WayWise/vehicles/controller/carmovementcontroller.h"
@@ -221,6 +223,48 @@ public:
 
 
     if (has_trailer_) {
+      // ToF Sensors
+      std::vector<std::string> tof_sensor_names = this->declare_parameter<std::vector<std::string>>(
+        "tof_sensors", {}, rcl_interfaces::msg::ParameterDescriptor{});
+
+      RCLCPP_WARN(
+        this->get_logger(),
+        "ToF sensors: %ld",
+        tof_sensor_names.size());
+
+
+      if (tof_sensor_names.size() > 1) {
+        RCLCPP_WARN(
+          this->get_logger(),
+          "More than one ToF sensor is not currently supported. "
+          "Only the first sensor will be used: '%s'. Ignoring others.",
+          tof_sensor_names[0].c_str());
+
+        tof_sensor_names.resize(1); // TODO: enable setting multiple tof sensors
+      }
+      for (const auto & tof_sensor_name : tof_sensor_names) {
+        int i2c_addr =
+          this->declare_parameter<int>(tof_sensor_name + ".i2c_addr", 0);
+        std::string topic_name = this->declare_parameter<std::string>(
+          tof_sensor_name + ".topic", "");
+
+        ToFSensorInfo tof_sensor_info;
+        tof_sensor_info.i2c_addr = i2c_addr;
+        tof_sensor_info.topic_name = topic_name;
+
+        // tof_sensor_info.sensor.reset(new VL53L0XToFSensor(i2c_addr)); // TODO: enable setting i2c address
+        tof_sensor_info.sensor.reset(new VL53L0XToFSensor());
+        QObject::connect(
+          tof_sensor_info.sensor.get(), &ToFSensor::updatedDistance, this,
+          [this, tof_sensor_name](double distance) {
+            updated_tof_distance_callback(tof_sensor_name, distance);
+          });
+
+        tof_sensor_info.publisher = this->create_publisher<std_msgs::msg::Float32>(topic_name, 10);
+
+        tof_sensors_[tof_sensor_name] = tof_sensor_info;
+      }
+
       // Angle Sensor
       mAngleSensorUpdater.reset(new AS5600Updater(mTruckState, angle_sensor_offset_));
     }
@@ -363,6 +407,18 @@ private:
     angle_pub_->publish(angle_msg);
   }
 
+  void updated_tof_distance_callback(const std::string & tof_sensor_name, double distance_m)
+  {
+    auto sensor_info = tof_sensors_[tof_sensor_name];
+
+    std_msgs::msg::Float32 msg;
+    msg.data = static_cast<float>(distance_m);
+    sensor_info.publisher->publish(msg);
+    RCLCPP_INFO(
+      this->get_logger(), "Published ToF distance %.2f from %s", distance_m,
+      tof_sensor_name.c_str());
+  }
+
   void twist_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg)
   {
     // RCLCPP_INFO(this->get_logger(), "got Twist: linear %f, angular %f",
@@ -460,6 +516,15 @@ private:
   RtcmClient * rtcmClient;
   SimpleWatchdog * watchdog;
   QSharedPointer<AngleSensorUpdater> mAngleSensorUpdater;
+  QSharedPointer<ToFSensor> mToFSensor;
+  struct ToFSensorInfo
+  {
+    int i2c_addr;
+    std::string topic_name;
+    QSharedPointer<ToFSensor> sensor;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr publisher;
+  };
+  std::map<std::string, ToFSensorInfo> tof_sensors_;
 };
 
 int main(int argc, char * argv[])

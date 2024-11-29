@@ -32,6 +32,16 @@ waywise_truck_node:
     publish_odom_to_baselink_tf: true
     odom_publish_rate: 30 # currently same rate for both odom topic and odom->base_link tf
     imu_for_position_fusion: "vesc"
+    tof_sensors: [tof_trailer_rear, tof_trailer_right, tof_trailer_left]
+    tof_trailer_rear:
+      i2c_addr: 0x29
+      topic: "/truck/sensors/tof/trailer_rear"
+    # tof_trailer_right:
+    #   i2c_addr: 0x30
+    #   topic: "/truck/sensors/tof/trailer_right"
+    # tof_trailer_left:
+    #   i2c_addr: 0x31
+    #   topic: "/truck/sensors/tof/trailer_left"
 
 waywise_truck_autopilot_node:
   ros__parameters:

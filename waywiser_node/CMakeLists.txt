@@ -80,8 +80,12 @@ add_executable(
   WayWise/external/pi-as5600/iic.c
   WayWise/external/pi-as5600/driver_as5600_basic.c
   WayWise/external/pi-as5600/raspberrypi4b_driver_as5600_interface.c
+  WayWise/external/VL53L0X/tof.h
+  WayWise/external/VL53L0X/tof.c
   WayWise/sensors/angle/as5600updater.cpp
   WayWise/sensors/angle/anglesensorupdater.cpp
+  WayWise/sensors/tof/vl53l0xtofsensor.cpp
+  WayWise/sensors/tof/tofsensor.h
   WayWise/vehicles/truckstate.cpp
   WayWise/vehicles/trailerstate.cpp)
 
