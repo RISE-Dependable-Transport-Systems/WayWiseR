@@ -24,11 +24,6 @@ def generate_launch_description():
         default_value=os.path.join(waywiser_carla_dir, 'config/carla.yaml'),
         description='Full path to params file for carla',
     )
-    carla_spawn_objects_file_la = DeclareLaunchArgument(
-        'carla_spawn_objects_file',
-        default_value=os.path.join(waywiser_carla_dir, 'config/dts_truck_semitrailer.json'),
-        description='Full path to carla spawn objects definition file',
-    )
     enable_collision_monitor_la = DeclareLaunchArgument(
         'enable_collision_monitor',
         default_value='True',
@@ -64,7 +59,6 @@ def generate_launch_description():
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'carla_config': LaunchConfiguration('carla_config'),
-            'carla_spawn_objects_file': LaunchConfiguration('carla_spawn_objects_file'),
         }.items(),
     )
 
@@ -128,7 +122,6 @@ def generate_launch_description():
     ld.add_action(teleop_config_la)
     ld.add_action(carla_config_la)
     ld.add_action(vehicle_config_la)
-    ld.add_action(carla_spawn_objects_file_la)
 
     # start nodes
     ld.add_action(carla)
