@@ -57,7 +57,7 @@ def generate_launch_description():
                 os.path.join(
                     waywiser_dir,
                     'launch',
-                    'carla_minimal.launch.py',
+                    'carla_manual_control.launch.py',
                 )
             ]
         ),
