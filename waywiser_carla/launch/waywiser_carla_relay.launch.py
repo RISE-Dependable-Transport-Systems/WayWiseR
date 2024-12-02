@@ -4,6 +4,7 @@ from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import OpaqueFunction
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import yaml
@@ -46,6 +47,9 @@ def generate_launch_description():
     carla_map_to_odom_tf_publisher_la = OpaqueFunction(
         function=carla_map_to_odom_tf_publisher_launch
     )
+    emulated_angle_sensor_conditional_launch_action = OpaqueFunction(
+        function=emulated_angle_sensor_conditional_launch
+    )
 
     # create launch description
     ld = LaunchDescription()
@@ -58,6 +62,7 @@ def generate_launch_description():
     # start nodes
     ld.add_action(waywiser_twist_to_carla_control_node)
     ld.add_action(carla_map_to_odom_tf_publisher_la)
+    ld.add_action(emulated_angle_sensor_conditional_launch_action)
 
     return ld
 
@@ -85,3 +90,26 @@ def carla_map_to_odom_tf_publisher_launch(context):
     )
 
     return [carla_map_to_odom_tf_publisher]
+
+
+def emulated_angle_sensor_conditional_launch(context):
+    enable_emulated_angle_sensor = False
+    with open(LaunchConfiguration('vehicle_config').perform(context)) as f:
+        config_data = yaml.safe_load(f)
+        emulated_angle_sensor_params_dict = config_data['emulated_angle_sensor']['ros__parameters']
+        if 'enable' in emulated_angle_sensor_params_dict:
+            enable_emulated_angle_sensor = emulated_angle_sensor_params_dict['enable']
+
+    emulated_angle_sensor_node = Node(
+        package='waywiser_carla',
+        executable='emulated_angle_sensor',
+        name='emulated_angle_sensor',
+        parameters=[
+            {'use_sim_time': LaunchConfiguration('use_sim_time')},
+            LaunchConfiguration('vehicle_config'),
+        ],
+        output='screen',
+        condition=IfCondition(str(enable_emulated_angle_sensor)),
+    )
+
+    return [emulated_angle_sensor_node]
