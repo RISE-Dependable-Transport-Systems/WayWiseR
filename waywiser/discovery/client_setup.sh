@@ -70,6 +70,7 @@ client_ip=""
 domain_id_input=-1
 
 # Parse options
+OPTIND=1
 while getopts "hers:c:d:" opt; do
     case $opt in
     h)
