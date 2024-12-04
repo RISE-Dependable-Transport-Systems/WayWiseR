@@ -11,6 +11,10 @@ Install these VS Code extensions:
 - [isort](https://marketplace.visualstudio.com/items?itemName=ms-python.isort)
 - [C++](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools)
 - [Uncrustify](https://marketplace.visualstudio.com/items?itemName=zachflower.uncrustify)
+- [cmake-format](https://marketplace.visualstudio.com/items?itemName=cheshirekow.cmake-format)
+- [shell-format](https://marketplace.visualstudio.com/items?itemName=foxundermoon.shell-format)
+- [XML](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-xml)
+- [YAML](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
 
 ## Configure Ruff for Python
 
@@ -53,7 +57,25 @@ Create or update `.vscode/settings.json` with:
         "editor.defaultFormatter": "zachflower.uncrustify"
     },
     "uncrustify.configPath.linux": ".vscode/ament_code_style.cfg",
-    "C_Cpp.codeAnalysis.clangTidy.enabled": true
+    "C_Cpp.codeAnalysis.clangTidy.enabled": true,
+    "[cmake]": {
+        "editor.defaultFormatter": "cheshirekow.cmake-format"
+    },
+    "cmakeFormat.args": [
+        "--max-pargs-hwrap=4",
+    ],
+    "[shellscript]": {
+        "editor.defaultFormatter": "foxundermoon.shell-format"
+    },
+    "[xml]": {
+        "editor.defaultFormatter": "redhat.vscode-xml"
+    },
+    "[yaml]": {
+        "editor.defaultFormatter": "redhat.vscode-yaml"
+    },
+    "[jsonc]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
+    }
 }
 ```
 

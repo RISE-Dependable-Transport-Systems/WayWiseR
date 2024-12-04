@@ -70,6 +70,7 @@ client_ip=""
 domain_id_input=-1
 
 # Parse options
+OPTIND=1
 while getopts "hers:c:d:" opt; do
     case $opt in
     h)
@@ -132,7 +133,11 @@ if $remote_client; then
 
     configured_domain_id=$(grep -oP -m 1 '(?<=<domainId>)[0-9]+(?=</domainId>)' $config_fullfilepath)
     if (($domain_id_input < 0)); then
-        domain_id=$configured_domain_id
+        if [[ -n "$ROS_DOMAIN_ID" ]] && [[ "$ROS_DOMAIN_ID" =~ ^[0-9]+$ ]] && ((ROS_DOMAIN_ID >= 0 && ROS_DOMAIN_ID < 200)); then
+            domain_id=$ROS_DOMAIN_ID
+        else
+            domain_id=$configured_domain_id
+        fi
     else
         domain_id=$domain_id_input
     fi
@@ -176,7 +181,11 @@ else
 
     configured_domain_id=$(grep -oP -m 1 '(?<=<domainId>)[0-9]+(?=</domainId>)' $config_fullfilepath)
     if (($domain_id_input < 0)); then
-        domain_id=$configured_domain_id
+        if [[ -n "$ROS_DOMAIN_ID" ]] && [[ "$ROS_DOMAIN_ID" =~ ^[0-9]+$ ]] && ((ROS_DOMAIN_ID >= 0 && ROS_DOMAIN_ID < 200)); then
+            domain_id=$ROS_DOMAIN_ID
+        else
+            domain_id=$configured_domain_id
+        fi
     else
         domain_id=$domain_id_input
     fi
