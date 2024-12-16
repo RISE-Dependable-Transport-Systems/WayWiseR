@@ -12,7 +12,6 @@ import yaml
 
 def generate_launch_description():
     waywiser_carla_dir = get_package_share_directory('waywiser_carla')
-    waywiser_hwbringup_dir = get_package_share_directory('waywiser_hwbringup')
 
     # args that can be set from the command line or a default will be used
     use_sim_time_la = DeclareLaunchArgument(
@@ -25,7 +24,7 @@ def generate_launch_description():
     )
     vehicle_config_la = DeclareLaunchArgument(
         'vehicle_config',
-        default_value=os.path.join(waywiser_hwbringup_dir, 'config/truck_full_scale.yaml'),
+        default_value=os.path.join(waywiser_carla_dir, 'config/truck_full_scale.yaml'),
         description='Full path to params file of truck',
     )
 
