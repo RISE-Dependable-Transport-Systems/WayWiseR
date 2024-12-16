@@ -37,6 +37,8 @@ public:
     // -- ROS --
     // get ROS parameters
     speed_to_erpm_factor_ = this->declare_parameter("speed_to_erpm_factor", 0.0);
+    length_ = this->declare_parameter("length", 0.33);
+    width_ = this->declare_parameter("width", 0.33);
     wheelbase_ = this->declare_parameter("wheelbase", 0.33);
     min_turning_radius_ = this->declare_parameter("min_turning_radius", 0.67);
     autopilot_cmd_publish_rate_ = this->declare_parameter("autopilot_cmd_publish_rate", 30);
@@ -56,12 +58,17 @@ public:
 
     // -- WayWise --
     mCarState.reset(new CarState);
+    mCarState->setLength(length_);
+    mCarState->setWidth(width_);
+    mCarState->setAxisDistance(wheelbase_);
+    mCarState->setMaxSteeringAngle(
+      atan(
+        mCarState->getAxisDistance() /
+        min_turning_radius_));
 
     // --- Movement control setup ---
     mCarMovementController.reset(new CarMovementController(mCarState));
     mCarMovementController->setSpeedToRPMFactor(speed_to_erpm_factor_);
-    mCarState->setAxisDistance(wheelbase_);
-    mCarState->setMaxSteeringAngle(atan(mCarState->getAxisDistance() / min_turning_radius_));
     mFollowPoint.reset(new FollowPoint(mCarMovementController));
 
     // Setup MAVLINK communication towards ControlTower
@@ -70,6 +77,9 @@ public:
         mCarState,
         QHostAddress(QString::fromStdString(waywise_control_tower_address_))));
     mMavsdkVehicleServer->setMovementController(mCarMovementController);
+
+    // Provide parameters
+    mCarState->provideParameters();
 
     // --- Autopilot ---
     mWaypointFollower.reset(new PurepursuitWaypointFollower(mCarMovementController));
@@ -116,7 +126,7 @@ private:
 
   // ROS parameters
   float speed_to_erpm_factor_;
-  float wheelbase_, min_turning_radius_;
+  float length_, width_, wheelbase_, min_turning_radius_;
   int autopilot_cmd_publish_rate_;
   std::string waywise_control_tower_address_, odom_topic_;
   float purepursuit_radius_;
