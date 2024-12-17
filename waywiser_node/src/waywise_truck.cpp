@@ -267,6 +267,7 @@ public:
 
       // Angle Sensor
       mAngleSensorUpdater.reset(new AS5600Updater(mTruckState, angle_sensor_offset_));
+      mTruckState->setSimulateTrailer(!mAngleSensorUpdater->isConnected());
     }
 
     // Odometry
@@ -317,7 +318,6 @@ private:
       previousTimeCalled).count();
 
     publish_odom_and_tf(timePassed_ms);
-    publish_trailer_angle(); // TODO: connect this with updatedAngleSensor signal
 
     previousTimeCalled = thisTimeCalled;
   }
@@ -391,6 +391,8 @@ private:
         trailer_tf.transform.rotation.w = cos(trailer_yaw_rad / 2.0);
 
         tf_pub_->sendTransform(trailer_tf);
+
+        publish_trailer_angle();
       }
     }
 
