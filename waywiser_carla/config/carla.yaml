@@ -40,15 +40,6 @@ carla_orchestrator_node:
       parent_frame_id: "map"
       transform_to_parent: "1.7,68.4,5.2,0.0,0.0,-90.0"
 
-emulated_angle_sensor:
-  ros__parameters:
-    enable: true
-    primary_frame: truck
-    secondary_frame: semitrailer
-    topic: carla/truck/trailer_angle
-    publish_rate: 10
-    invert_angle: true
-
 carla_osm_tile_server_node:
   ros__parameters:
     tcp_server_ip: localhost

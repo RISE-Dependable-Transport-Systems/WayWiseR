@@ -46,7 +46,7 @@ def generate_launch_description():
     )
     vehicle_config_la = DeclareLaunchArgument(
         'vehicle_config',
-        default_value=os.path.join(waywiser_hwbringup_dir, 'config/truck_full_scale.yaml'),
+        default_value=os.path.join(waywiser_carla_dir, 'config/truck_full_scale.yaml'),
         description='Full path to params file of vehicle',
     )
 
@@ -57,7 +57,7 @@ def generate_launch_description():
                 os.path.join(
                     waywiser_dir,
                     'launch',
-                    'carla_minimal.launch.py',
+                    'carla_manual_control.launch.py',
                 )
             ]
         ),

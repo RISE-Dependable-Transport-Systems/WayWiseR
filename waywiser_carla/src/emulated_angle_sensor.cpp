@@ -16,7 +16,7 @@ public:
   {
     primary_frame_ = this->declare_parameter<std::string>("primary_frame", "truck");
     secondary_frame_ = this->declare_parameter<std::string>("secondary_frame", "semitrailer");
-    topic_ = this->declare_parameter<std::string>("topic", "sensors/angle");
+    topic_ = this->declare_parameter<std::string>("angle_sensor_topic", "sensors/angle");
     publish_rate_ = this->declare_parameter<int>("publish_rate", 10);
     invert_angle_ = this->declare_parameter<bool>("invert_angle", false);
 

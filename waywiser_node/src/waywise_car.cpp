@@ -50,13 +50,6 @@ public:
     publish_odom_to_baselink_tf_ = this->declare_parameter("publish_odom_to_baselink_tf", true);
     enable_imu_for_odom_ = this->declare_parameter("enable_imu_for_odom", true);
 
-    enable_autopilot_on_vehicle_ = this->declare_parameter("enable_autopilot_on_vehicle", false);
-    enable_mavsdkVehicleServer_ = this->declare_parameter("enable_mavsdkVehicleServer", false);
-
-    waywise_control_tower_address_ = this->declare_parameter(
-      "waywise_control_tower_address",
-      "127.0.0.1");
-
     max_angular_velocity_ = this->declare_parameter("max_angular_velocity", 0.5);
     standstill_velocity_threshold_ = this->declare_parameter("standstill_velocity_threshold", 0.05);
 
@@ -354,10 +347,6 @@ private:
   bool publish_odom_to_baselink_tf_;
   int odom_publish_rate_;
   bool enable_imu_for_odom_;
-
-  bool enable_autopilot_on_vehicle_, enable_mavsdkVehicleServer_;
-
-  std::string waywise_control_tower_address_;
 
   float standstill_velocity_threshold_;
   float max_angular_velocity_;

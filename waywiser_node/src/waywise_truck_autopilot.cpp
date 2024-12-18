@@ -78,18 +78,23 @@ public:
     mTruckState->setLength(length_);
     mTruckState->setWidth(width_);
     mTruckState->setAxisDistance(wheelbase_);
-    mTruckState->setMaxSteeringAngle(
-      atan(
-        mTruckState->getAxisDistance() /
-        min_turning_radius_));
+    mTruckState->setMaxSteeringAngle(atan(wheelbase_ / min_turning_radius_));
     mTruckState->setPurePursuitForwardGain(purepursuit_forward_gain_);
     mTruckState->setPurePursuitReverseGain(purepursuit_reverse_gain_);
+    if (has_trailer_) {
+      mTrailerMavlinkComponentID = (int) MAV_COMP_ID_USER1;
+
+      mTrailerState.reset(new TrailerState(mTrailerMavlinkComponentID, Qt::white));
+      mTrailerState->setLength(trailer_length_);
+      mTrailerState->setWidth(trailer_width_);
+      mTrailerState->setWheelBase(trailer_wheelbase_);
+
+      mTruckState->setTrailingVehicle(mTrailerState);
+    }
 
     // --- Movement control setup ---
     mCarMovementController.reset(new CarMovementController(mTruckState));
     mCarMovementController->setSpeedToRPMFactor(speed_to_erpm_factor_);
-    mTruckState->setAxisDistance(wheelbase_);
-    mTruckState->setMaxSteeringAngle(atan(mTruckState->getAxisDistance() / min_turning_radius_));
     mFollowPoint.reset(new FollowPoint(mCarMovementController));
 
     // Setup MAVLINK communication towards ControlTower
@@ -99,66 +104,10 @@ public:
         QHostAddress(QString::fromStdString(waywise_control_tower_address_))));
     mMavsdkVehicleServer->setMovementController(mCarMovementController);
 
+    // Provide parameters
+    mTruckState->provideParameters();
     if (has_trailer_) {
-      mTrailerMavlinkComponentID = (int) MAV_COMP_ID_USER1;
-
-      mTrailerState.reset(new TrailerState(mTrailerMavlinkComponentID, Qt::white));
-      mTrailerState->setLength(trailer_length_);
-      mTrailerState->setWidth(trailer_width_);
-      mTrailerState->setWheelBase(trailer_wheelbase_);
-
-      mTruckState->setTrailerState(mTrailerState);
-    }
-
-    provide_vehicle_parameters_to_controltower();
-
-    if (has_trailer_) {
-      mavsdk::Mavsdk::Configuration config =
-        mavsdk::Mavsdk::Configuration{mavsdk::Mavsdk::ComponentType::Custom};
-      config.set_system_id(mTruckState->getId());
-      config.set_always_send_heartbeats(true);
-      config.set_component_id(mTrailerState->getId());
-      mTrailerMavsdk.reset(new mavsdk::Mavsdk{config});
-
-      mTrailerMavsdk->subscribe_on_new_system(
-        [this]() {
-          for (const auto & system : mTrailerMavsdk->systems()) {
-            auto mavlinkPassthrough = new mavsdk::MavlinkPassthrough(system);
-            mavlinkPassthrough->subscribe_message(
-              MAVLINK_MSG_ID_HEARTBEAT,
-              [this, system, mavlinkPassthrough](const mavlink_message_t & message) {
-                mavlink_heartbeat_t heartbeat;
-                mavlink_msg_heartbeat_decode(&message, &heartbeat);
-                // unsubscribe from further heartbeats by deleting passthrough
-                delete mavlinkPassthrough;
-
-                if ((MAV_TYPE) heartbeat.type == MAV_TYPE_GCS) {
-                  mTrailerMavlinkPassthrough.reset(new mavsdk::MavlinkPassthrough(system));
-                  is_connected_to_controltower = true;
-                }
-              });
-          }
-        });
-
-      mTrailerMavsdk->intercept_outgoing_messages_async(
-        [this](mavlink_message_t & message) {
-          switch (message.msgid) {
-            case MAVLINK_MSG_ID_HEARTBEAT: // Fix some info in heartbeat s.th. MAVSDK / ControlTower detects vehicle correctly
-              mavlink_heartbeat_t heartbeat;
-              mavlink_msg_heartbeat_decode(&message, &heartbeat);
-              if (message.compid == mTrailerState->getId()) {
-                heartbeat.type = MAV_TYPE_ONBOARD_CONTROLLER;
-                heartbeat.autopilot = MAV_AUTOPILOT_INVALID;
-              }
-              mavlink_msg_heartbeat_encode(message.sysid, message.compid, &message, &heartbeat);
-              break;
-            default:;
-              //            qDebug() << "out:" << message.msgid;
-          }
-          return true;
-        });
-
-      mTrailerMavsdk->setup_udp_remote(waywise_control_tower_address_, 14540);
+      mTrailerState->provideParameters();
     }
 
     // --- Autopilot ---
@@ -170,102 +119,6 @@ public:
   }
 
 private:
-  void provide_vehicle_parameters_to_controltower()
-  {
-    ParameterServer::getInstance()->provideFloatParameter(
-      "VEH_LENGTH",
-      std::function<void(float)>(
-        [this](float value) {
-          this->length_ = value;
-          mTruckState->setLength(this->length_);
-        }),
-      std::function<float(void)>(
-        [this]() {
-          return this->length_;
-        })
-    );
-
-    ParameterServer::getInstance()->provideFloatParameter(
-      "VEH_WIDTH",
-      std::function<void(float)>(
-        [this](float value) {
-          this->width_ = value;
-          mTruckState->setWidth(this->width_);
-        }),
-      std::function<float(void)>(
-        [this]() {
-          return this->width_;
-        })
-    );
-
-    ParameterServer::getInstance()->provideFloatParameter(
-      "VEH_WHLBASE",
-      std::function<void(float)>(
-        [this](float value) {
-          this->wheelbase_ = value;
-          mTruckState->setAxisDistance(this->wheelbase_);
-        }),
-      std::function<float(void)>(
-        [this]() {
-          return this->wheelbase_;
-        })
-    );
-
-    ParameterServer::getInstance()->provideIntParameter(
-      "TRLR_COMP_ID",
-      std::function<void(int)>(
-        [this](int value) {
-          this->mTrailerMavlinkComponentID = value;
-          mTrailerState->setId(this->mTrailerMavlinkComponentID);
-        }),
-      std::function<int(void)>(
-        [this]() {
-          return this->mTrailerMavlinkComponentID;
-        })
-    );
-
-    if (has_trailer_) {
-      ParameterServer::getInstance()->provideFloatParameter(
-        "TRLR_LENGTH",
-        std::function<void(float)>(
-          [this](float value) {
-            this->trailer_length_ = value;
-            mTrailerState->setLength(this->trailer_length_);
-          }),
-        std::function<float(void)>(
-          [this]() {
-            return this->trailer_length_;
-          })
-      );
-
-      ParameterServer::getInstance()->provideFloatParameter(
-        "TRLR_WIDTH",
-        std::function<void(float)>(
-          [this](float value) {
-            this->trailer_width_ = value;
-            mTrailerState->setWidth(this->trailer_width_);
-          }),
-        std::function<float(void)>(
-          [this]() {
-            return this->trailer_width_;
-          })
-      );
-
-      ParameterServer::getInstance()->provideFloatParameter(
-        "TRLR_WHLBASE",
-        std::function<void(float)>(
-          [this](float value) {
-            this->trailer_wheelbase_ = value;
-            mTrailerState->setWheelBase(this->trailer_wheelbase_);
-          }),
-        std::function<float(void)>(
-          [this]() {
-            return this->trailer_wheelbase_;
-          })
-      );
-    }
-  }
-
   void autopilot_timer_callback()
   {
     double mDesiredSpeed = mCarMovementController->getDesiredSpeed();        // [m/s]
@@ -303,34 +156,7 @@ private:
 
   void angle_sensor_callback(const std_msgs::msg::Float32::SharedPtr angle_msg)
   {
-    double agnle_in_degrees = angle_msg->data;
-    double angle_in_radians = agnle_in_degrees * (M_PI / 180.0);
-    mTruckState->setTrailerAngle(0, angle_in_radians, agnle_in_degrees); // raw_angle is not currently used
-
-    if (is_connected_to_controltower) {
-      double trailerYawRad = (mTruckState->getPosition(PosType::fused).getYaw() * (M_PI / 180.0)) -
-        angle_in_radians;
-
-      mTrailerMavlinkPassthrough->queue_message(
-        [this, trailerYawRad](MavlinkAddress mavlink_address, uint8_t channel)->mavlink_message_t {
-          mavlink_address.system_id = mTruckState->getId();
-          mavlink_address.component_id = mTrailerState->getId();
-          mavlink_msg_attitude_pack_chan(
-            mavlink_address.system_id,
-            mavlink_address.component_id,
-            channel,
-            &mTrailerYawMsg,
-            0.0,            // time_boot_ms (not used)
-            0.0,            // roll (not used)
-            0.0,            // pitch (not used)
-            trailerYawRad,   // yaw
-            0.0,            // rollspeed (not used)
-            0.0,            // pitchspeed (not used)
-            0.0             // yawspeed (not used)
-          );
-          return mTrailerYawMsg;
-        });
-    }
+    mTruckState->setTrailerAngle(angle_msg->data);
   }
 
   // ROS parameters
@@ -347,7 +173,6 @@ private:
 
   // internal variables
   PosType waywise_posType_used_ = PosType::simulated;
-  bool is_connected_to_controltower = false;
 
   // publishers
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr twist_pub_;

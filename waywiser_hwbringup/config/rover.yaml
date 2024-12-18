@@ -6,6 +6,8 @@
     erpm_min: -10000.0
     erpm_max: 10000.0
     speed_to_erpm_factor: 4500.0
+    length: 0.8
+    width: 0.335
     wheelbase: 0.33
     min_turning_radius: 0.92
     max_angular_velocity: 0.5
