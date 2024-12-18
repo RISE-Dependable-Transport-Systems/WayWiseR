@@ -38,7 +38,8 @@ set(COMMON_WAYWISE_SOURCES
     WayWise/sensors/gnss/rtcmclient.cpp
     WayWise/logger/logger.cpp
     WayWise/communication/parameterserver.cpp
-    WayWise/sensors/camera/gimbal.h)
+    WayWise/sensors/camera/gimbal.h
+    WayWise/core/simplewatchdog.cpp)
 
 set(COMMON_WAYWISE_AP_SOURCES
     WayWise/vehicles/controller/motorcontroller.h
@@ -52,16 +53,41 @@ set(COMMON_WAYWISE_AP_SOURCES
     WayWise/communication/vehicleconnections/vehicleconnection.cpp
     WayWise/communication/mavlinkparameterserver.cpp)
 
+set(WAYWISE_CAR_SOURCES
+    WayWise/vehicles/carstate.cpp
+    WayWise/vehicles/controller/carmovementcontroller.cpp
+    WayWise/vehicles/controller/motorcontroller.h
+    WayWise/vehicles/controller/vescmotorcontroller.cpp
+    WayWise/external/vesc/vescpacket.cpp
+    WayWise/external/pi-bno055/i2c_bno055.c
+    WayWise/sensors/fusion/sdvpvehiclepositionfuser.cpp
+    WayWise/sensors/gnss/rtcm3_simple.cpp
+    WayWise/sensors/gnss/rtcmclient.cpp
+    WayWise/sensors/gnss/ublox.cpp
+    WayWise/sensors/gnss/ubloxrover.cpp
+    WayWise/sensors/imu/bno055orientationupdater.cpp
+    WayWise/sensors/imu/imuorientationupdater.cpp)
+
+add_executable(waywise_car src/waywise_car.cpp ${COMMON_WAYWISE_SOURCES}
+                           ${WAYWISE_CAR_SOURCES})
+
 add_executable(
-  waywise_car
-  src/waywise_car.cpp
+  waywise_truck
+  src/waywise_truck.cpp
   ${COMMON_WAYWISE_SOURCES}
-  WayWise/vehicles/carstate.cpp
-  WayWise/vehicles/controller/carmovementcontroller.cpp
-  WayWise/vehicles/controller/motorcontroller.h
-  WayWise/vehicles/controller/vescmotorcontroller.cpp
-  WayWise/external/vesc/vescpacket.cpp
-  WayWise/sensors/imu/imuorientationupdater.cpp)
+  ${WAYWISE_CAR_SOURCES}
+  WayWise/external/pi-as5600/driver_as5600.c
+  WayWise/external/pi-as5600/iic.c
+  WayWise/external/pi-as5600/driver_as5600_basic.c
+  WayWise/external/pi-as5600/raspberrypi4b_driver_as5600_interface.c
+  WayWise/external/VL53L0X/tof.h
+  WayWise/external/VL53L0X/tof.c
+  WayWise/sensors/angle/as5600updater.cpp
+  WayWise/sensors/angle/anglesensorupdater.cpp
+  WayWise/sensors/tof/vl53l0xtofsensor.cpp
+  WayWise/sensors/tof/tofsensor.h
+  WayWise/vehicles/truckstate.cpp
+  WayWise/vehicles/trailerstate.cpp)
 
 add_executable(
   waywise_car_autopilot
@@ -82,10 +108,12 @@ add_executable(
   WayWise/vehicles/trailerstate.cpp)
 
 target_include_directories(waywise_car PRIVATE WayWise/)
+target_include_directories(waywise_truck PRIVATE WayWise/)
 target_include_directories(waywise_car_autopilot PRIVATE WayWise/)
 target_include_directories(waywise_truck_autopilot PRIVATE WayWise/)
 
 target_link_libraries(waywise_car Qt5::Core Qt5::SerialPort Qt5::Network)
+target_link_libraries(waywise_truck Qt5::Core Qt5::SerialPort Qt5::Network)
 target_link_libraries(
   waywise_car_autopilot
   Qt5::Core
@@ -101,6 +129,13 @@ target_link_libraries(
 
 ament_target_dependencies(
   waywise_car
+  rclcpp
+  std_msgs
+  nav_msgs
+  geometry_msgs
+  tf2_ros)
+ament_target_dependencies(
+  waywise_truck
   rclcpp
   std_msgs
   nav_msgs
@@ -124,6 +159,7 @@ ament_target_dependencies(
   tf2_geometry_msgs)
 
 install(TARGETS waywise_car DESTINATION lib/${PROJECT_NAME})
+install(TARGETS waywise_truck DESTINATION lib/${PROJECT_NAME})
 install(TARGETS waywise_car_autopilot DESTINATION lib/${PROJECT_NAME})
 install(TARGETS waywise_truck_autopilot DESTINATION lib/${PROJECT_NAME})
 
