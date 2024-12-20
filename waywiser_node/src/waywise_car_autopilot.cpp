@@ -357,3 +357,91 @@ double WaywiseCarAutopilot::update_joint_states_msg(
 
   return wheel_position;
 }
+
+QList<PosPoint> WaywiseCarAutopilot::readXMLFile()
+{
+  std::string filename = "route.xml";
+  std::string package_path = ament_index_cpp::get_package_share_directory("waywiser_node");
+  if (package_path.empty()) {
+    RCLCPP_ERROR(this->get_logger(), "Package not found.");
+  }
+
+  std::string path = package_path + "/resources/route.xml";
+  QString file_path = QString::fromUtf8(path.c_str());
+  RCLCPP_INFO(this->get_logger(), "Reading xml file in reader" + file_path.toUtf8());
+  QFile file(file_path);
+
+
+  QXmlStreamReader stream(&file);
+  QList<PosPoint> importedRoute;
+
+  if (!file.open(QIODevice::ReadOnly)) {
+    RCLCPP_INFO(this->get_logger(), "could not open file");
+
+  }
+  if (stream.readNextStartElement()) {
+
+    if (stream.name() == "routes") {
+      llh_t importedEnuRef{0.0, 0.0, 0.0};
+      while (stream.readNextStartElement()) {
+        if (stream.name() == "enuref") {
+          while (stream.readNextStartElement()) {
+            if (stream.name() == "Latitude") {
+              importedEnuRef.latitude = stream.readElementText().toDouble();
+            }
+            if (stream.name() == "Longitude") {
+              importedEnuRef.longitude = stream.readElementText().toDouble();
+            }
+            if (stream.name() == "Height") {
+              importedEnuRef.height = stream.readElementText().toDouble();
+            }
+          }
+
+        }
+        if (stream.name() == "route") {
+          while (stream.readNextStartElement()) {
+
+            if (stream.name() == "point") {
+              PosPoint importedPoint;
+
+              while (stream.readNextStartElement()) {
+                if (stream.name() == "x") {
+                  importedPoint.setX(stream.readElementText().toDouble());
+                }
+                if (stream.name() == "y") {
+                  importedPoint.setY(stream.readElementText().toDouble());
+                }
+                if (stream.name() == "z") {
+                  importedPoint.setHeight(stream.readElementText().toDouble());
+                }
+                if (stream.name() == "speed") {
+                  importedPoint.setSpeed(stream.readElementText().toDouble());
+                }
+                if (stream.name() == "attributes") {
+                  importedPoint.setAttributes(stream.readElementText().toUInt());
+                }
+              }
+
+              llh_t importedAbsPoint = coordinateTransforms::enuToLlh(
+                importedEnuRef,
+                {importedPoint.getX(), importedPoint.getY(), importedPoint.getHeight()});
+              //xyz_t importedEnuPoint = coordinateTransforms::llhToEnu(getRouteGeneratorUI()->getEnuRef(), importedAbsPoint);
+              xyz_t importedEnuPoint = coordinateTransforms::llhToEnu(
+                importedEnuRef,
+                importedAbsPoint);                                                                                     //This is a bad fix just to get things working.
+
+              importedPoint.setX(importedEnuPoint.x);
+              importedPoint.setY(importedEnuPoint.y);
+              importedPoint.setHeight(importedEnuPoint.z);
+
+              importedRoute.append(importedPoint);
+            }
+          }
+
+
+        }
+      }
+    }
+  }
+  return importedRoute;
+}

@@ -5,13 +5,17 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <QFile>
 #include <QObject>
+#include <QString>
+#include <QXmlStreamReader>
 #include <Eigen/Geometry>
 
 #include "WayWise/autopilot/purepursuitwaypointfollower.h"
 #include "WayWise/autopilot/waypointfollower.h"
 #include "WayWise/communication/mavsdkvehicleserver.h"
 #include "WayWise/communication/parameterserver.h"
+#include "WayWise/core/coordinatetransforms.h"
 #include "WayWise/logger/logger.h"
 #include "WayWise/vehicles/carstate.h"
 #include "WayWise/vehicles/controller/carmovementcontroller.h"
@@ -74,6 +78,7 @@ protected:
   virtual double update_joint_states_msg(
     sensor_msgs::msg::JointState & joint_state_msg,
     double timePassed_ms);
+  QList<PosPoint> readXMLFile();
 
   // ROS parameters
   std::string odom_topic_;
