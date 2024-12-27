@@ -2,7 +2,7 @@
 
 # Set default values
 DOCKER_IMAGE_NAME="agrarsense-ros1-bridge:latest"
-DOCKERFILE_DIR="src/WayWiseR/waywiser_agrarsense/ros_bridge"
+DOCKERFILE_DIR="$(dirname "$0")"
 DOCKER_CONTAINER_NAME="agrarsense_ros_bridge"
 
 # Parse optional arguments
