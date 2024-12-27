@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import signal
 import subprocess
 import time
@@ -27,9 +28,9 @@ class AgrarsenseOrchestrator(Node):
         self.declare_parameter('sim_script_path', '')
         self.declare_parameter('ros_bridge_script_path', '')
         self.declare_parameter('sim_in_command_topic', '/agrarsense/in/commands')
+        self.declare_parameter('docker_container_name', 'agrarsense_ros_bridge')
         self.declare_parameter('ego_vehicle_identifier', '')
         self.declare_parameter('sim_startup_time', 2.0)
-        self.declare_parameter('map_loading_time', 2.0)
         self.declare_parameter('map_name', 'playground')
         self.declare_parameter('objects_json_path', '')
         self.declare_parameter('command_publish_delay', 2.0)
@@ -53,14 +54,14 @@ class AgrarsenseOrchestrator(Node):
         self.sim_in_command_topic = (
             self.get_parameter('sim_in_command_topic').get_parameter_value().string_value
         )
+        self.docker_container_name = (
+            self.get_parameter('docker_container_name').get_parameter_value().string_value
+        )
         self.ego_vehicle_identifier = (
             self.get_parameter('ego_vehicle_identifier').get_parameter_value().string_value
         )
         self.sim_startup_time = (
             self.get_parameter('sim_startup_time').get_parameter_value().double_value
-        )
-        self.map_loading_time = (
-            self.get_parameter('map_loading_time').get_parameter_value().double_value
         )
         self.map_name = self.get_parameter('map_name').get_parameter_value().string_value
         self.objects_json_path = (
@@ -106,6 +107,13 @@ class AgrarsenseOrchestrator(Node):
             Bool, '/agrarsense/end_simulation', self.end_simulation_callback, 10
         )
 
+        self.info_subscriber = self.create_subscription(
+            String,
+            '/agrarsense/out/info',
+            self.info_callback,
+            10,  # QoS profile depth
+        )
+
         # Create publishers
         self.simulation_ready_publisher = self.create_publisher(
             Bool, '/carla/simulation_ready', 10
@@ -125,10 +133,32 @@ class AgrarsenseOrchestrator(Node):
         )
 
         # Flags for controlling simulator actions
-        self.received_first_clock = False
         self.sim_paused = False
+        self.previous_sim_time = None
+        self.spawn_objects_started = False
+        self.spawn_objects_pending = set()
+
+        self.start_agrarsense_ros_bridge()
 
         self.start_next_simulation()
+
+    def info_callback(self, msg):
+        message_data = msg.data
+        # self.get_logger().info(f'Agrarsense info: {msg.data}')
+
+        if self.spawn_objects_pending:
+            match = re.search(r'Spawned Sensor:.*?\n.*?ID: ([^\s]+)', message_data)
+            if match:
+                spawned_id = match.group(1)
+
+                for obj_id in list(self.spawn_objects_pending):
+                    if obj_id == spawned_id:
+                        self.spawn_objects_pending.remove(obj_id)
+                        # self.get_logger().info(f"Object '{obj_id}' spawn confirmed.")
+
+                if not self.spawn_objects_pending:
+                    self.get_logger().info('All objects spawned successfully.')
+                    self.start_sim_execution()
 
     def parse_sim_configs(self):
         """Parse the raw simulation configurations from the YAML parameter."""
@@ -166,18 +196,17 @@ class AgrarsenseOrchestrator(Node):
         stderr=subprocess.DEVNULL,
         text=False,
     ):
-        self.subprocesses[subprocess_name] = subprocess.Popen(
+        subprocess_ = subprocess.Popen(
             command,
             start_new_session=True,
             stdout=stdout,
             stderr=stderr,
             text=text,
         )
-        self.get_logger().info(
-            f'Started {subprocess_name} with PID [{self.subprocesses[subprocess_name].pid}].'
-        )
+        self.get_logger().info(f'Started {subprocess_name} with PID [{subprocess_.pid}].')
+        return subprocess_
 
-    def setup_simulator(self):
+    def start_simulator(self):
         """Setup the Agrarsense simulator."""
         start_simulator_command = [self.sim_script_path]
         start_simulator_command.append(f'--{self.map_name}')
@@ -192,18 +221,20 @@ class AgrarsenseOrchestrator(Node):
         if self.quality_level != '':
             start_simulator_command.append(f'--quality-level={self.quality_level}')
 
-        self.create_subprocess(start_simulator_command, 'simulator')
-        time.sleep(self.sim_startup_time)
+        subprocess_name = 'simulator'
+        self.subprocesses[subprocess_name] = self.create_subprocess(
+            start_simulator_command, subprocess_name
+        )
 
     def start_agrarsense_ros_bridge(self):
         """Start the agrarsense ros bridge"""
 
         command = [self.ros_bridge_script_path]
+        command.append('--container-name')
+        command.append(f'{self.docker_container_name}')
 
-        self.get_logger().info(
-            f'Starting ros bridge with command [{self.ros_bridge_script_path}].'
-        )
-        self.create_subprocess(command, 'agrarsense_ros_bridge')
+        subprocess_name = 'agrarsense_ros_bridge'
+        self.agrarsense_ros_bridge = self.create_subprocess(command, subprocess_name)
 
     def start_rosbag_recording(self, topics_to_record):
         """Start the rosbag_recording node."""
@@ -215,7 +246,8 @@ class AgrarsenseOrchestrator(Node):
             command += ['--output', output_dir]
         command += topics_to_record
 
-        self.create_subprocess(command, 'ros_bag_recorder')
+        subprocess_name = 'ros_bag_recorder'
+        self.subprocesses[subprocess_name] = self.create_subprocess(command, subprocess_name)
 
     def publish_command(self, command):
         """Helper function to publish a command to the simulator."""
@@ -226,11 +258,19 @@ class AgrarsenseOrchestrator(Node):
         time.sleep(self.command_publish_delay)
 
     def spawn_objects(self, sim_config):
+        self.spawn_objects_pending.clear()
         update_objects_json_path = False
         if self.objects_json_path:
             try:
                 with open(self.objects_json_path, 'r') as file:
                     file_data = json.load(file)
+
+                    for obj in file_data.get('objects', []):
+                        obj_info_id = obj['id']
+                        if obj.get('type', '') == 'vehicle':
+                            obj_info_id = obj_info_id + '/transform'
+                        self.spawn_objects_pending.add(obj_info_id)
+
                     if not sim_config.get('spawn_point', {}):
                         self.publish_command(f'SpawnObjects {self.objects_json_path}')
                     else:
@@ -266,12 +306,21 @@ class AgrarsenseOrchestrator(Node):
                 except Exception as e:
                     self.get_logger().error(f'Failed to write updated JSON: {e}')
 
-            # TODO: tail out info and wait untill all objects are spawned
-
     def clock_callback(self, msg):
-        if not self.received_first_clock:
-            self.received_first_clock = True
-            self.execute_simulation()
+        current_sim_time = msg.clock.sec + msg.clock.nanosec * 1e-9
+
+        # Detect clock reset
+        if self.previous_sim_time is not None and current_sim_time < self.previous_sim_time:
+            self.spawn_objects_started = False
+
+        # Check if we should execute the simulation
+        if (not self.spawn_objects_started) and (current_sim_time >= self.sim_startup_time):
+            self.spawn_objects_started = True
+
+            self.spawn_objects(self.sim_configurations[self.current_config_index])
+
+        # Update the previous time
+        self.previous_sim_time = current_sim_time
 
     def end_simulation_callback(self, msg):
         if msg.data:
@@ -287,7 +336,7 @@ class AgrarsenseOrchestrator(Node):
                 self.current_config_index += 1
                 self.current_iter_index = 0
 
-            self.received_first_clock = False
+            self.spawn_objects_started = False
             self.start_next_simulation()
 
     def start_next_simulation(self):
@@ -298,22 +347,14 @@ class AgrarsenseOrchestrator(Node):
             return
 
         self.get_logger().info(
-            f'Starting simulation with index [{self.current_config_index}-{self.current_iter_index}].'
+            f'Executing simulation with index [{self.current_config_index}-{self.current_iter_index}].'
         )
-        # sim_config = self.sim_configurations[self.current_config_index]
 
-        # Setup the simulator and ros bridge
-        self.start_agrarsense_ros_bridge()
-        time.sleep(self.sim_startup_time)
-        self.setup_simulator()
+        # Setup the simulator
+        self.start_simulator()
 
-    def execute_simulation(self):
+    def start_sim_execution(self):
         sim_config = self.sim_configurations[self.current_config_index]
-        self.get_logger().info(
-            f'Executing simulation [{self.current_config_index}-{self.current_iter_index}]'
-        )
-
-        self.spawn_objects(sim_config)
 
         if self.spectator_transform != '':
             self.publish_command(f'TeleportSpectator {self.spectator_transform}')
@@ -354,6 +395,14 @@ class AgrarsenseOrchestrator(Node):
             if self.context.ok():
                 self.get_logger().info('Shutting down AgrarsenseOrchestrator node.')
             self.cleanup_subprocesses()
+            self.terminate_process(self.agrarsense_ros_bridge)
+
+            subprocess.run(['docker', 'rm', '-f', self.docker_container_name], check=True)
+            self.get_logger().info(f'Docker container {self.docker_container_name} removed.')
+        except subprocess.CalledProcessError as e:
+            self.get_logger().warn(
+                f'Error removing Docker container {self.docker_container_name}: {e}'
+            )
         except Exception as e:
             self.get_logger().warn(f'Error during node destruction: {e}')
         finally:
@@ -396,9 +445,9 @@ class AgrarsenseOrchestrator(Node):
 
     def cleanup_subprocesses(self):
         """Cleanup subprocesses."""
-        for id in list(self.subprocesses.keys()):
+        for id_ in list(self.subprocesses.keys()):
             try:
-                process = self.subprocesses.pop(id)
+                process = self.subprocesses.pop(id_)
                 self.terminate_process(process)
             except Exception as e:
                 self.get_logger().warn(f'Error cleaning up subprocess {id}: {e}')

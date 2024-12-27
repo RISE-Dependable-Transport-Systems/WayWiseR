@@ -11,6 +11,7 @@ sim_orchestrator_node:
   ros__parameters:
     sim_script_path: "~/workspaces/agrarsense_ws/Agrarsense.sh"
     ros_bridge_script_path: "agrarsense_ros_bridge.sh"
+    docker_container_name: "agrarsense_ros_bridge"
     sigterm_timeout: 20.0
     sim_in_command_topic: "/agrarsense/in/commands"
     workersthreadpool: 0 #By default the Simulator uses maximum number of CPU threads - 1
@@ -18,7 +19,6 @@ sim_orchestrator_node:
     quality_level: "Balanced" #"Ultra", "Balanced" or "Low"
     # spectator_transform: "85,2650,1200,0,270,0"
     sim_startup_time: 5.0
-    map_loading_time: 2.0
     command_publish_delay: 2.0
     objects_json_path: "playground_objects.json"
     sim_configurations_json_path: "sim_configurations.json"
