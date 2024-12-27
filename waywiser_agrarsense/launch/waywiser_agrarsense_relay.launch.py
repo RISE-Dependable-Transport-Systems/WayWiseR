@@ -91,16 +91,6 @@ def vehicle_tf_publishers_launch(context):
                         emulate_tty=True,
                         parameters=[
                             {
-                                'start_position': {
-                                    'x': obj['spawnPoint']['x'],
-                                    'y': obj['spawnPoint']['y'],
-                                    'z': obj['spawnPoint']['z'],
-                                },
-                                'start_orientation': {
-                                    'roll': obj['spawnPoint']['roll'],
-                                    'pitch': obj['spawnPoint']['pitch'],
-                                    'yaw': obj['spawnPoint']['yaw'],
-                                },
                                 'odom_topic': f'/agrarsense/out/vehicles/{vehicle_identifier}/odometry',
                                 'input_transform': f'/agrarsense/out/sensors/{vehicle_identifier}/transform',
                                 'base_link_frame': f'{vehicle_identifier}/base_link',
