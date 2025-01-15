@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="semitruck">
+    <!-- Arguments -->
+    <xacro:arg name="has_trailer" default="true" />
+
+    <!-- Create the combined robot -->
+    <xacro:macro name="create_semitruck" params="has_trailer">
+        <!-- Include the truck URDF -->
+        <xacro:include filename="truck.urdf" />
+
+        <!-- Conditionally include the trailer URDF -->
+        <xacro:if value="${has_trailer}">
+            <xacro:include filename="semitrailer.urdf" />
+
+            <!-- Connect trailer to truck -->
+            <joint name="truck_trailer_link_joint" type="continuous">
+                <parent link="truck_fifth_wheel_link" />
+                <child link="semitrailer_kingpin_link" />
+                <origin xyz="0 0 0" rpy="0 0 0" />
+                <axis xyz="0 0 1" />
+            </joint>
+        </xacro:if>
+    </xacro:macro>
+
+    <!-- Create the actual robot instance -->
+    <xacro:create_semitruck has_trailer="$(arg has_trailer)" />
+</robot>
