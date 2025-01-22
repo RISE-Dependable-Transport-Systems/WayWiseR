@@ -225,6 +225,9 @@ class AgrarsenseOrchestrator(Node):
         self.subprocesses[subprocess_name] = self.create_subprocess(
             start_simulator_command, subprocess_name
         )
+        self.get_logger().info(
+            'Waiting for the first clock message.'
+        )  # will wait for the first clock message to spawn objects
 
     def start_agrarsense_ros_bridge(self):
         """Start the agrarsense ros bridge"""
@@ -235,6 +238,7 @@ class AgrarsenseOrchestrator(Node):
 
         subprocess_name = 'agrarsense_ros_bridge'
         self.agrarsense_ros_bridge = self.create_subprocess(command, subprocess_name)
+        time.sleep(3.0)  # Wait for the bridge to start
 
     def start_rosbag_recording(self, topics_to_record):
         """Start the rosbag_recording node."""
@@ -309,11 +313,15 @@ class AgrarsenseOrchestrator(Node):
     def clock_callback(self, msg):
         current_sim_time = msg.clock.sec + msg.clock.nanosec * 1e-9
 
-        # Detect clock reset
-        if self.previous_sim_time is not None and current_sim_time < self.previous_sim_time:
+        if self.previous_sim_time is None:
+            self.get_logger().info('Received first clock message.')
+            if current_sim_time < self.sim_startup_time:
+                self.get_logger().info('Waiting for simulator to startup before spawning objects.')
+        elif current_sim_time < self.previous_sim_time:  # Detect clock reset
             self.spawn_objects_started = False
+            self.get_logger().info('Detected clock reset!')
 
-        # Check if we should execute the simulation
+        # Check if we should spawn the objects
         if (not self.spawn_objects_started) and (current_sim_time >= self.sim_startup_time):
             self.spawn_objects_started = True
 
