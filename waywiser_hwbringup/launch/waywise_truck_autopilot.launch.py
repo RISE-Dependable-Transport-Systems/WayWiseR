@@ -26,7 +26,7 @@ def generate_launch_description():
     # start nodes and use args to set parameters
     waywise_autopilot_node = Node(
         package='waywiser_node',
-        executable='waywise_truck_autopilot',
+        executable='waywise_truck_autopilot_node',
         name='waywise_truck_autopilot_node',
         output='screen',
         emulate_tty=True,
