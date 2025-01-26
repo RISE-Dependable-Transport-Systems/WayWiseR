@@ -20,8 +20,11 @@
 #include "WayWise/vehicles/controller/vescmotorcontroller.h"
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
+#include "geometry_msgs/msg/vector3.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/nav_sat_fix.hpp"
+#include "sensor_msgs/msg/nav_sat_status.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "tf2_ros/transform_broadcaster.h"
@@ -57,6 +60,8 @@ protected:
 
   // Utility methods
   virtual void publish_odom_and_tf(double timePassed_ms);
+  void publish_ublox_nav_sat_fix(const ubx_nav_pvt & ubxPvt);
+  void publish_enu_refernce(const llh_t enuRef);
   float clip_min_max(float value, float min_value, float max_value) const;
 
   // ROS parameters
@@ -75,9 +80,14 @@ protected:
   std::string odom_frame_;
   std::string base_frame_;
 
+  std::string nav_sat_fix_topic_;
+  std::string enu_refernce_topic_;
+
   // Publishers
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr nav_sat_fix_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr enu_refernce_pub_;
 
   // Subscribers
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr twist_sub_;

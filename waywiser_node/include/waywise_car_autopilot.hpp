@@ -17,6 +17,7 @@
 #include "WayWise/autopilot/followpoint.h"
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
+#include "geometry_msgs/msg/vector3.hpp"
 #include "mavsdk/mavsdk.h"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -52,6 +53,7 @@ protected:
   // Callback methods
   void autopilot_timer_callback();
   void odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom_msg);
+  void enu_refernce_callback(const geometry_msgs::msg::Vector3::SharedPtr enuRef_msg);
 
   // Utility methods
 
@@ -69,17 +71,21 @@ protected:
   std::string odom_frame_;
   std::string base_frame_;
 
+  std::string enu_refernce_topic_;
+
   // Publishers
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr twist_pub_;
 
   // Subscribers
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr enu_refernce_sub_;
 
   // Timers
   rclcpp::TimerBase::SharedPtr autopilot_timer_;
 
   // WayWise components
   QSharedPointer<CarState> mCarState;
+  QSharedPointer<GNSSReceiver> mGNSSReceiver;
   QSharedPointer<CarMovementController> mCarMovementController;
   QSharedPointer<PurepursuitWaypointFollower> mWaypointFollower;
   QSharedPointer<MavsdkVehicleServer> mMavsdkVehicleServer;

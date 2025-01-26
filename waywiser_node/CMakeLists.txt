@@ -13,6 +13,7 @@ find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 # Qt5
 find_package(
@@ -134,7 +135,8 @@ set(COMMON_DEPENDENCIES
     std_msgs
     nav_msgs
     geometry_msgs
-    tf2_ros)
+    tf2_ros
+    sensor_msgs)
 
 ament_target_dependencies(waywise_car_node ${COMMON_DEPENDENCIES})
 ament_target_dependencies(waywise_car_autopilot_node ${COMMON_DEPENDENCIES}

@@ -42,6 +42,9 @@ void WayWiseCar::setup_parameters()
 
   odom_frame_ = declare_parameter("odom_frame", "odom");
   base_frame_ = declare_parameter("base_frame", "base_link");
+
+  nav_sat_fix_topic_ = this->declare_parameter("nav_sat_fix_topic", "/gnss_fix");
+  enu_refernce_topic_ = this->declare_parameter("enu_refernce_topic", "/enu_refernce");
 }
 
 void WayWiseCar::setup_publishers()
@@ -51,6 +54,12 @@ void WayWiseCar::setup_publishers()
   if (publish_odom_to_baselink_tf_) {
     tf_pub_.reset(new tf2_ros::TransformBroadcaster(this));
   }
+
+  nav_sat_fix_pub_ = create_publisher<sensor_msgs::msg::NavSatFix>(nav_sat_fix_topic_, 10);
+  enu_refernce_pub_ =
+    create_publisher<geometry_msgs::msg::Vector3>(
+    enu_refernce_topic_,
+    rclcpp::QoS(rclcpp::KeepLast(10)).reliable());
 }
 
 void WayWiseCar::setup_subscribers()
@@ -147,6 +156,11 @@ void WayWiseCar::setup_hardware(QSharedPointer<CarState> carState)
       }
     }
   }
+  QObject::connect(
+    mUbloxRover.get(), &UbloxRover::txNavPvt, this, &WayWiseCar::publish_ublox_nav_sat_fix);
+  QObject::connect(
+    mUbloxRover.get(), &UbloxRover::updatedEnuReference, this,
+    &WayWiseCar::publish_enu_refernce);
 
   rtcmClient = new RtcmClient(this);
   QObject::connect(
@@ -231,6 +245,7 @@ void WayWiseCar::updated_waywise_odomPos_callback(
 {
   // suppress 'unused' warnings
   (void)vehicleState;
+  (void)distanceDriven;
 
   auto thisTimeCalled = std::chrono::high_resolution_clock::now();
   static auto previousTimeCalled = thisTimeCalled - mUpdateVehicleStatePeriod;
@@ -238,20 +253,6 @@ void WayWiseCar::updated_waywise_odomPos_callback(
     std::chrono::duration_cast<std::chrono::milliseconds>(
     thisTimeCalled -
     previousTimeCalled).count();
-
-  // When IMU is enabled, odom is calculated using its yaw and distance from
-  // motorcontroller. Saved in 'fused' position type
-  if (enable_imu_for_odom_) {
-    PosPoint posFused = vehicleState->getPosition(PosType::fused);
-
-    double yawRad = posFused.getYaw() / (180.0 / M_PI);
-    posFused.setXY(
-      posFused.getX() + cos(yawRad) * distanceDriven, posFused.getY() + sin(
-        yawRad) * distanceDriven);
-
-    posFused.setTime(QTime::currentTime().addSecs(-QDateTime::currentDateTime().offsetFromUtc()));
-    vehicleState->setPosition(posFused);
-  }
 
   publish_odom_and_tf(timePassed_ms);
 
@@ -351,6 +352,52 @@ void WayWiseCar::twist_callback(const geometry_msgs::msg::Twist::SharedPtr twist
     //   this->get_logger(), "clipped_angular_velocity %f, desired_steering %f", twist_msg->angular.z, clipped_angular_velocity,
     //   desired_steering);
   }
+}
+
+void WayWiseCar::publish_ublox_nav_sat_fix(const ubx_nav_pvt & ubxPvt)
+{
+  sensor_msgs::msg::NavSatFix nav_sat_fix_msg;
+
+  // Set the header timestamp
+  nav_sat_fix_msg.header.stamp = this->now();
+  nav_sat_fix_msg.header.frame_id = "gnss"; // Set your frame ID
+
+  // Set the status of the fix
+  nav_sat_fix_msg.status.status = sensor_msgs::msg::NavSatStatus::STATUS_FIX;
+  if (ubxPvt.fix_type == 3) { // 3D fix
+    nav_sat_fix_msg.status.status = sensor_msgs::msg::NavSatStatus::STATUS_GBAS_FIX;
+  } else if (ubxPvt.fix_type == 2) { // 2D fix
+    nav_sat_fix_msg.status.status = sensor_msgs::msg::NavSatStatus::STATUS_FIX;
+  } else { // No fix
+    nav_sat_fix_msg.status.status = sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX;
+  }
+
+  // Set the service type (GPS, GLONASS, etc.)
+  nav_sat_fix_msg.status.service = sensor_msgs::msg::NavSatStatus::SERVICE_GPS;
+
+  // Set the latitude, longitude, and altitude
+  nav_sat_fix_msg.latitude = ubxPvt.lat; // Latitude in degrees
+  nav_sat_fix_msg.longitude = ubxPvt.lon; // Longitude in degrees
+  nav_sat_fix_msg.altitude = ubxPvt.height; // Altitude in meters
+
+  // Set the position covariance (assuming diagonal covariance matrix)
+  nav_sat_fix_msg.position_covariance[0] = ubxPvt.h_acc * ubxPvt.h_acc; // Latitude variance
+  nav_sat_fix_msg.position_covariance[4] = ubxPvt.h_acc * ubxPvt.h_acc; // Longitude variance
+  nav_sat_fix_msg.position_covariance[8] = ubxPvt.v_acc * ubxPvt.v_acc; // Altitude variance
+  nav_sat_fix_msg.position_covariance_type =
+    sensor_msgs::msg::NavSatFix::COVARIANCE_TYPE_DIAGONAL_KNOWN;
+
+  // Publish the message
+  nav_sat_fix_pub_->publish(nav_sat_fix_msg);
+}
+
+void WayWiseCar::publish_enu_refernce(const llh_t enuRef)
+{
+  auto enuRef_msg = geometry_msgs::msg::Vector3();
+  enuRef_msg.x = enuRef.latitude;
+  enuRef_msg.y = enuRef.longitude;
+  enuRef_msg.z = enuRef.height;
+  enu_refernce_pub_->publish(enuRef_msg);
 }
 
 float WayWiseCar::clip_min_max(float value, float min_value, float max_value) const
