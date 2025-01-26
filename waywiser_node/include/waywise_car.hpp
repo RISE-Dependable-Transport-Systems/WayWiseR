@@ -7,8 +7,13 @@
 #include <string>
 #include <QObject>
 
+#include "WayWise/core/simplewatchdog.h"
+#include "WayWise/core/coordinatetransforms.h"
 #include "WayWise/logger/logger.h"
+#include "WayWise/sensors/fusion/sdvpvehiclepositionfuser.h"
+#include "WayWise/sensors/gnss/rtcmclient.h"
 #include "WayWise/sensors/gnss/ubloxrover.h"
+#include "WayWise/sensors/imu/bno055orientationupdater.h"
 #include "WayWise/sensors/imu/imuorientationupdater.h"
 #include "WayWise/vehicles/carstate.h"
 #include "WayWise/vehicles/controller/carmovementcontroller.h"
@@ -49,8 +54,6 @@ protected:
   virtual void updated_waywise_odomPos_callback(
     QSharedPointer<VehicleState> vehicleState,
     double distanceDriven);
-  void updated_waywise_imuPos_callback(QSharedPointer<VehicleState> vehicleState);
-
 
   // Utility methods
   virtual void publish_odom_and_tf(double timePassed_ms);
@@ -65,6 +68,7 @@ protected:
   bool publish_odom_to_baselink_tf_;
   int odom_publish_rate_;
   bool enable_imu_for_odom_;
+  std::string imu_for_position_fusion_;
   float standstill_velocity_threshold_;
   float max_angular_velocity_;
 
@@ -87,6 +91,9 @@ protected:
   QSharedPointer<VESCMotorController> mVESCMotorController;
   QSharedPointer<IMUOrientationUpdater> mIMUOrientationUpdater;
   QSharedPointer<UbloxRover> mUbloxRover;
+  SDVPVehiclePositionFuser * positionFuser;
+  RtcmClient * rtcmClient;
+  SimpleWatchdog * watchdog;
 
   // Internal variables
   std::chrono::milliseconds mUpdateVehicleStatePeriod;

@@ -35,6 +35,7 @@ void WayWiseCar::setup_parameters()
   odom_publish_rate_ = this->declare_parameter("odom_publish_rate", 30);
   publish_odom_to_baselink_tf_ = this->declare_parameter("publish_odom_to_baselink_tf", true);
   enable_imu_for_odom_ = this->declare_parameter("enable_imu_for_odom", true);
+  imu_for_position_fusion_ = declare_parameter("imu_for_position_fusion", "");
 
   max_angular_velocity_ = this->declare_parameter("max_angular_velocity", 0.5);
   standstill_velocity_threshold_ = this->declare_parameter("standstill_velocity_threshold", 0.05);
@@ -131,25 +132,81 @@ void WayWiseCar::setup_hardware(QSharedPointer<CarState> carState)
       "waywise_car is in simulation mode!");
   }
 
-  // IMU
-  if (enable_imu_for_odom_) {
-    // TODO: support for BNO055
-    // mIMUOrientationUpdater.reset(new BNO055OrientationUpdater(mCarState,
-    // "/dev/i2c-1"));
+  // --- Positioning setup ---
+  // Position Fuser
+  positionFuser = new SDVPVehiclePositionFuser(this);
+  // GNSS (with fused IMU when using u-blox F9R)
+  mUbloxRover.reset(new UbloxRover(mCarState));
+  foreach(const QSerialPortInfo & portInfo, QSerialPortInfo::availablePorts()) {
+    // qDebug()<<portInfo.manufacturer();
+    if (portInfo.manufacturer().toLower().replace("-", "").contains("ublox")) {
+      if (mUbloxRover->connectSerial(portInfo)) {
+        qDebug() << "UbloxRover connected to:" << portInfo.systemLocation();
 
-    if (mVESCMotorController->isSerialConnected()) {
-      mIMUOrientationUpdater = mVESCMotorController->getIMUOrientationUpdater(mCarState);
-      waywise_posType_used_ = PosType::fused;
+        //mUbloxRover->setIMUOrientationOffset(0.0, 0.0, 0.0);
+      }
+    }
+  }
+
+  rtcmClient = new RtcmClient(this);
+  QObject::connect(
+    mUbloxRover.get(), &UbloxRover::updatedGNSSPositionAndYaw, positionFuser,
+    &SDVPVehiclePositionFuser::correctPositionAndYawGNSS);
+
+  // -- NTRIP/TCP client setup for feeding RTCM data into GNSS receiver
+  QObject::connect(
+    mUbloxRover.get(), &UbloxRover::gotNmeaGga, rtcmClient, &RtcmClient::forwardNmeaGgaToServer);
+  QObject::connect(
+    rtcmClient, &RtcmClient::rtcmData,
+    mUbloxRover.get(), &UbloxRover::writeRtcmToUblox);
+  QObject::connect(
+    rtcmClient, &RtcmClient::baseStationPosition,
+    mUbloxRover.get(), &UbloxRover::setEnuRef);
+  if (rtcmClient->connectWithInfoFromFile("./rtcmServerInfo.txt")) {
+    qDebug() << "RtcmClient: connected to" << QString(
+      rtcmClient->getCurrentHost() + ":" + QString::number(rtcmClient->getCurrentPort()));
+  } else {
+    qDebug() << "RtcmClient: not connected";
+  }
+
+
+  // IMU
+  if (!imu_for_position_fusion_.empty()) {
+    if (imu_for_position_fusion_ == "vesc") {
+      if (mVESCMotorController->isSerialConnected()) {
+        mIMUOrientationUpdater = mVESCMotorController->getIMUOrientationUpdater(mCarState);
+        QObject::connect(
+          mIMUOrientationUpdater.get(), &IMUOrientationUpdater::updatedIMUOrientation, positionFuser,
+          &SDVPVehiclePositionFuser::correctPositionAndYawIMU);
+        RCLCPP_INFO(this->get_logger(), "Using vesc IMU for position fusion.");
+      } else {
+        RCLCPP_INFO(
+          get_logger(),
+          "vesc IMU is configured for position fusion but VESCMotorController is not connected.");
+      }
+    } else if (imu_for_position_fusion_ == "bno055") {
+      mIMUOrientationUpdater.reset(new BNO055OrientationUpdater(mCarState, "/dev/i2c-1"));
       QObject::connect(
-        mIMUOrientationUpdater.get(), &IMUOrientationUpdater::updatedIMUOrientation, this,
-        &WayWiseCar::updated_waywise_imuPos_callback);
+        mIMUOrientationUpdater.get(), &IMUOrientationUpdater::updatedIMUOrientation, positionFuser,
+        &SDVPVehiclePositionFuser::correctPositionAndYawIMU);
+      RCLCPP_INFO(this->get_logger(), "Using bno055 IMU for position fusion.");
     } else {
       RCLCPP_INFO(
         get_logger(),
-        "IMU support is enabled but VESCMotorController is not connected.");
-      enable_imu_for_odom_ = false;
+        "Unknown IMU variant is requested for position fusion!");
     }
   }
+
+  // Odometry
+  QObject::connect(
+    mCarMovementController.get(), &CarMovementController::updatedOdomPositionAndYaw, positionFuser,
+    &SDVPVehiclePositionFuser::correctPositionAndYawOdom);
+  QObject::connect(
+    mCarMovementController.get(), &CarMovementController::updatedOdomPositionAndYaw, this,
+    &WayWiseCar::updated_waywise_odomPos_callback);
+
+  // Watchdog that warns when EventLoop is slowed down
+  watchdog = new SimpleWatchdog(this);
 }
 
 void WayWiseCar::simulation_timer_callback()
@@ -199,47 +256,6 @@ void WayWiseCar::updated_waywise_odomPos_callback(
   publish_odom_and_tf(timePassed_ms);
 
   previousTimeCalled = thisTimeCalled;
-}
-
-void WayWiseCar::updated_waywise_imuPos_callback(QSharedPointer<VehicleState> vehicleState)
-{
-  static bool standstillAtLastCall = false;
-  static double yawWhenStopping = 0.0;
-  static double yawDriftSinceStandstill = 0.0;
-
-  // --- correct relative/raw IMU yaw with external offset
-  PosPoint posIMU = vehicleState->getPosition(PosType::IMU);
-  PosPoint posFused = vehicleState->getPosition(PosType::fused);
-
-  // 1. handle drift at standstill and update offset
-  if (fabs(vehicleState->getSpeed()) < standstill_velocity_threshold_) {
-    if (!standstillAtLastCall) {
-      yawWhenStopping = posIMU.getYaw();
-    }
-
-    standstillAtLastCall = true;
-    yawDriftSinceStandstill = yawWhenStopping - posIMU.getYaw();
-    posIMU.setYaw(yawWhenStopping);    // lock yaw during standstill
-  } else {
-    if (standstillAtLastCall) {
-      mPosIMUyawOffset += yawDriftSinceStandstill;
-    }
-
-    standstillAtLastCall = false;
-  }
-
-  // 2. apply offset & normalize
-  double yawResult = posIMU.getYaw() + mPosIMUyawOffset;
-  while (yawResult < -180.0) {
-    yawResult += 360.0;
-  }
-  while (yawResult >= 180.0) {
-    yawResult -= 360.0;
-  }
-  posFused.setYaw(yawResult);
-
-  posFused.setTime(QTime::currentTime().addSecs(-QDateTime::currentDateTime().offsetFromUtc()));
-  vehicleState->setPosition(posFused);
 }
 
 void WayWiseCar::publish_odom_and_tf(double timePassed_ms)
