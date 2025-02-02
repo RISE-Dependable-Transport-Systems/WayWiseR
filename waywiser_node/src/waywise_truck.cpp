@@ -112,36 +112,33 @@ void WayWiseTruck::setup_hardware()
   WayWiseCar::setup_hardware(mTruckState);
 }
 
-void WayWiseTruck::publish_odom_and_tf(double timePassed_ms)
+void WayWiseTruck::publish_odom_and_tfs(double timePassed_ms)
 {
-  WayWiseCar::publish_odom_and_tf(timePassed_ms);
-
-  PosPoint currentPosition = mTruckState->getPosition(waywise_posType_used_);
-
-  double truck_x = currentPosition.getX();
-  double truck_y = currentPosition.getY();
-  double truck_yaw_rad = currentPosition.getYaw() * M_PI / 180.0;
-
-  if (publish_odom_to_baselink_tf_ && has_trailer_) {
-    // -- Calculate and publish Trailer transform and angle sensor data
-    double trailer_angle_rad = mTruckState->getTrailerAngleRadians();
-    double trailer_x = truck_x - cos(truck_yaw_rad + trailer_angle_rad) * trailer_wheelbase_;
-    double trailer_y = truck_y - sin(truck_yaw_rad + trailer_angle_rad) * trailer_wheelbase_;
-    double trailer_yaw_rad = truck_yaw_rad + trailer_angle_rad;
-
-    auto trailer_tf = geometry_msgs::msg::TransformStamped();
-    trailer_tf.header.frame_id = odom_frame_;
-    trailer_tf.child_frame_id = trailer_base_frame_;
-    trailer_tf.header.stamp = now();
-    trailer_tf.transform.translation.x = trailer_x;
-    trailer_tf.transform.translation.y = trailer_y;
-    trailer_tf.transform.translation.z = 0.0;
-    trailer_tf.transform.rotation.z = sin(trailer_yaw_rad / 2.0);
-    trailer_tf.transform.rotation.w = cos(trailer_yaw_rad / 2.0);
-
-    tf_pub_->sendTransform(trailer_tf);
-
+  WayWiseCar::publish_odom_and_tfs(timePassed_ms);
+  if (has_trailer_) {
     publish_trailer_angle();
+
+    if (publish_odom_to_baselink_tf_) {
+      PosPoint trailerPosition = mTrailerState->getPosition(PosType::odom);
+      double trailer_x = trailerPosition.getX();
+      double trailer_y = trailerPosition.getY();
+      double trailer_yaw_rad = trailerPosition.getYaw() * M_PI / 180.0;
+
+      auto odom_to_trailer_msg_tf = geometry_msgs::msg::Transform();
+      odom_to_trailer_msg_tf.translation.x = trailer_x;
+      odom_to_trailer_msg_tf.translation.y = trailer_y;
+      odom_to_trailer_msg_tf.rotation.z = sin(trailer_yaw_rad / 2.0);
+      odom_to_trailer_msg_tf.rotation.w = cos(trailer_yaw_rad / 2.0);
+
+      auto odom_to_trailer_msg_tfs = geometry_msgs::msg::TransformStamped();
+      odom_to_trailer_msg_tfs.header.frame_id = odom_frame_;
+      odom_to_trailer_msg_tfs.child_frame_id = trailer_base_frame_;
+      odom_to_trailer_msg_tfs.header.stamp = now();
+      odom_to_trailer_msg_tfs.transform = odom_to_trailer_msg_tf;
+
+      // -- Publish Transform
+      tf_pub_->sendTransform(odom_to_trailer_msg_tfs);
+    }
   }
 }
 

@@ -33,7 +33,7 @@ protected:
   virtual void setup_hardware() override;
 
   // Callback methods
-  virtual void publish_odom_and_tf(double timePassed_ms) override;
+  virtual void publish_odom_and_tfs(double timePassed_ms) override;
   void publish_trailer_angle();
   void updated_tof_distance_callback(const std::string & tof_sensor_name, double distance_m);
 

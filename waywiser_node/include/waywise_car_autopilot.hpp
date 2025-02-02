@@ -56,6 +56,7 @@ protected:
   void enu_refernce_callback(const geometry_msgs::msg::Vector3::SharedPtr enuRef_msg);
 
   // Utility methods
+  virtual void update_world_positon(geometry_msgs::msg::Pose world_pose);
 
   // ROS parameters
   std::string odom_topic_;
@@ -64,17 +65,22 @@ protected:
   int autopilot_cmd_publish_rate_;
   std::string waywise_control_tower_address_;
   float purepursuit_radius_;
+  bool update_world_position_with_odom_;
+  bool update_world_position_with_tf_;
 
   float standstill_velocity_threshold_;
   float max_angular_velocity_;
 
   std::string odom_frame_;
   std::string base_frame_;
+  std::string world_frame_;
 
   std::string enu_refernce_topic_;
+  std::string vehicle_pose_topic_;
 
   // Publishers
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr twist_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr vehicle_pose_pub_;
 
   // Subscribers
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
@@ -82,6 +88,9 @@ protected:
 
   // Timers
   rclcpp::TimerBase::SharedPtr autopilot_timer_;
+
+  // Transform buffer
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
 
   // WayWise components
   QSharedPointer<CarState> mCarState;
@@ -92,7 +101,6 @@ protected:
   QSharedPointer<FollowPoint> mFollowPoint;
 
   // Internal variables
-  PosType waywise_posType_used_ = PosType::simulated;
 };
 
 #endif  // WAYWISE_CAR_AUTOPILOT_HPP_

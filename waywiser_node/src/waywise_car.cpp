@@ -32,8 +32,12 @@ void WayWiseCar::setup_parameters()
   width_ = this->declare_parameter("width", 0.33);
   wheelbase_ = this->declare_parameter("wheelbase", 0.33);
   min_turning_radius_ = this->declare_parameter("min_turning_radius", 0.67);
-  odom_publish_rate_ = this->declare_parameter("odom_publish_rate", 30);
+  odom_and_tf_publish_rate_ = this->declare_parameter("odom_and_tf_publish_rate", 30);
   publish_odom_to_baselink_tf_ = this->declare_parameter("publish_odom_to_baselink_tf", true);
+  publish_world_to_odom_tf_ = this->declare_parameter("publish_world_to_odom_tf", false);
+  update_world_position_with_odom_ = this->declare_parameter(
+    "update_world_position_with_odom",
+    false);
   enable_imu_for_odom_ = this->declare_parameter("enable_imu_for_odom", true);
   imu_for_position_fusion_ = declare_parameter("imu_for_position_fusion", "");
 
@@ -42,6 +46,7 @@ void WayWiseCar::setup_parameters()
 
   odom_frame_ = declare_parameter("odom_frame", "odom");
   base_frame_ = declare_parameter("base_frame", "base_link");
+  world_frame_ = declare_parameter("world_frame", "map");
 
   nav_sat_fix_topic_ = this->declare_parameter("nav_sat_fix_topic", "/gnss_fix");
   enu_refernce_topic_ = this->declare_parameter("enu_refernce_topic", "/enu_refernce");
@@ -51,7 +56,7 @@ void WayWiseCar::setup_publishers()
 {
   // Publishers
   odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(odom_topic_, 10);
-  if (publish_odom_to_baselink_tf_) {
+  if (publish_odom_to_baselink_tf_ || publish_world_to_odom_tf_) {
     tf_pub_.reset(new tf2_ros::TransformBroadcaster(this));
   }
 
@@ -73,7 +78,7 @@ void WayWiseCar::setup_timers()
 {
   // Timers
   mUpdateVehicleStatePeriod =
-    std::chrono::milliseconds((int)std::round(1000.0 / odom_publish_rate_));
+    std::chrono::milliseconds((int)std::round(1000.0 / odom_and_tf_publish_rate_));
 
   simulation_timer_ =
     this->create_wall_timer(
@@ -129,12 +134,10 @@ void WayWiseCar::setup_hardware(QSharedPointer<CarState> carState)
       mCarMovementController.get(), &CarMovementController::updatedOdomPositionAndYaw, this,
       &WayWiseCar::updated_waywise_odomPos_callback);
 
-    waywise_posType_used_ = PosType::odom;
     simulation_timer_->cancel();
   } else {
     // publish periodically with timer when no motorcontroller connected
     // (simulation)
-    waywise_posType_used_ = PosType::simulated;
     RCLCPP_INFO(
       get_logger(),
       "VESCMotorController is not connected. "
@@ -232,9 +235,16 @@ void WayWiseCar::simulation_timer_callback()
     thisTimeCalled -
     previousTimeCalled).count();
 
-  mCarState->simulationStep(timePassed_ms, waywise_posType_used_);
+  mCarState->simulationStep(timePassed_ms, PosType::simulated);
+  PosPoint currentPosition = mCarState->getPosition(PosType::simulated);
+  currentPosition.setType(PosType::odom)
+  mCarState->setPosition(currentPosition)
+  if (publish_world_to_odom_tf_) {
+    currentPosition.setType(PosType::fused)
+    mCarState->setPosition(currentPosition)
+  }
 
-  publish_odom_and_tf(timePassed_ms);
+  publish_odom_and_tfs(timePassed_ms);
 
   previousTimeCalled = thisTimeCalled;
 }
@@ -254,15 +264,15 @@ void WayWiseCar::updated_waywise_odomPos_callback(
     thisTimeCalled -
     previousTimeCalled).count();
 
-  publish_odom_and_tf(timePassed_ms);
+  publish_odom_and_tfs(timePassed_ms);
 
   previousTimeCalled = thisTimeCalled;
 }
 
-void WayWiseCar::publish_odom_and_tf(double timePassed_ms)
+void WayWiseCar::publish_odom_and_tfs(double timePassed_ms)
 {
-  PosPoint currentPosition = mCarState->getPosition(waywise_posType_used_);
-  if (waywise_posType_used_ != PosType::fused) {
+  PosPoint currentPosition = mCarState->getPosition(PosType::odom);
+  if (update_world_position_with_odom_) {
     currentPosition.setType(PosType::fused);   // the 'fused' position type is communicated to topics
                                                // & potentially MAVLINK
     mCarState->setPosition(currentPosition);
@@ -296,19 +306,57 @@ void WayWiseCar::publish_odom_and_tf(double timePassed_ms)
 
   // TODO: velocity uncertainty?
 
-  if (publish_odom_to_baselink_tf_) {
+  if (publish_odom_to_baselink_tf_ || publish_world_to_odom_tf_) {
     // -- Prepare Transform
-    auto tf = geometry_msgs::msg::TransformStamped();
-    tf.header.frame_id = odom_frame_;
-    tf.child_frame_id = base_frame_;
-    tf.header.stamp = now();
-    tf.transform.translation.x = x_;
-    tf.transform.translation.y = y_;
-    tf.transform.translation.z = 0.0;
-    tf.transform.rotation = odom.pose.pose.orientation;
+    auto odom_to_base_link_msg_tf = geometry_msgs::msg::Transform();
+    odom_to_base_link_msg_tf.translation.x = x_;
+    odom_to_base_link_msg_tf.translation.y = y_;
+    odom_to_base_link_msg_tf.translation.z = 0.0;
+    odom_to_base_link_msg_tf.rotation = odom.pose.pose.orientation;
 
-    // -- Publish Transform
-    tf_pub_->sendTransform(tf);
+    if (publish_odom_to_baselink_tf_) {
+      auto odom_to_base_link_msg_tfs = geometry_msgs::msg::TransformStamped();
+      odom_to_base_link_msg_tfs.header.frame_id = odom_frame_;
+      odom_to_base_link_msg_tfs.child_frame_id = base_frame_;
+      odom_to_base_link_msg_tfs.header.stamp = now();
+      odom_to_base_link_msg_tfs.transform = odom_to_base_link_msg_tf;
+
+      // -- Publish Transform
+      tf_pub_->sendTransform(odom_to_base_link_msg_tfs);
+    }
+
+    if (publish_world_to_odom_tf_) {
+      // -- Prepare Transform
+      auto map_to_odom_msg_tfs = geometry_msgs::msg::TransformStamped();
+      map_to_odom_msg_tfs.header.frame_id = world_frame_;
+      map_to_odom_msg_tfs.child_frame_id = odom_frame_;
+      map_to_odom_msg_tfs.header.stamp = now();
+
+      if (!update_world_position_with_odom_) {
+        tf2::Transform odom_to_base_link_tf2_tf, map_to_base_link_tf2_tf;
+
+        tf2::fromMsg(odom_to_base_link_msg_tf, odom_to_base_link_tf2_tf);
+
+        PosPoint worldPosition = mCarState->getPosition(PosType::fused);
+        auto map_to_base_link_msg_tf = geometry_msgs::msg::Transform();
+        map_to_base_link_msg_tf.translation.x = worldPosition.getX();
+        map_to_base_link_msg_tf.translation.y = worldPosition.getY();
+        map_to_base_link_msg_tf.translation.z = worldPosition.getHeight();
+        double worldYawRad_ = worldPosition.getYaw() * M_PI / 180.0;
+        map_to_base_link_msg_tf.rotation.x = 0.0;
+        map_to_base_link_msg_tf.rotation.y = 0.0;
+        map_to_base_link_msg_tf.rotation.z = sin(worldYawRad_ / 2.0);
+        map_to_base_link_msg_tf.rotation.w = cos(worldYawRad_ / 2.0);
+        tf2::fromMsg(map_to_base_link_msg_tf, map_to_base_link_tf2_tf);
+
+        tf2::toMsg(
+          map_to_base_link_tf2_tf * odom_to_base_link_tf2_tf.inverse(),
+          map_to_odom_msg_tfs.transform);
+      }
+
+      // -- Publish Transform
+      tf_pub_->sendTransform(map_to_odom_msg_tfs);
+    }
   }
 
   // -- Publish Odom

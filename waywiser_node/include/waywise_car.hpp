@@ -59,7 +59,7 @@ protected:
     double distanceDriven);
 
   // Utility methods
-  virtual void publish_odom_and_tf(double timePassed_ms);
+  virtual void publish_odom_and_tfs(double timePassed_ms);
   void publish_ublox_nav_sat_fix(const ubx_nav_pvt & ubxPvt);
   void publish_enu_refernce(const llh_t enuRef);
   float clip_min_max(float value, float min_value, float max_value) const;
@@ -71,7 +71,9 @@ protected:
   float servo_min_, servo_max_, servo_offset_;
   float length_, width_, wheelbase_, min_turning_radius_;
   bool publish_odom_to_baselink_tf_;
-  int odom_publish_rate_;
+  bool publish_world_to_odom_tf_;
+  int odom_and_tf_publish_rate_;
+  bool update_world_position_with_odom_;
   bool enable_imu_for_odom_;
   std::string imu_for_position_fusion_;
   float standstill_velocity_threshold_;
@@ -79,6 +81,7 @@ protected:
 
   std::string odom_frame_;
   std::string base_frame_;
+  std::string world_frame_;
 
   std::string nav_sat_fix_topic_;
   std::string enu_refernce_topic_;
@@ -107,8 +110,6 @@ protected:
 
   // Internal variables
   std::chrono::milliseconds mUpdateVehicleStatePeriod;
-  PosType waywise_posType_used_ = PosType::simulated;
-  double mPosIMUyawOffset = 0.0;
 
 // private:
 };
