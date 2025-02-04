@@ -38,16 +38,28 @@ protected:
   void updated_tof_distance_callback(const std::string & tof_sensor_name, double distance_m);
 
   // Utility methods
+  virtual double update_joint_states_msg(
+    sensor_msgs::msg::JointState & joint_state_msg,
+    double timePassed_ms) override;
 
   // ROS parameters
+  std::string hitch_frame_;
+  bool has_trailer_;
   float trailer_length_, trailer_width_, trailer_wheelbase_;
   float angle_sensor_offset_;
   std::string angle_sensor_topic_;
 
   std::vector<std::string> tof_sensor_names;
 
-  bool has_trailer_;
   std::string trailer_base_frame_;
+  std::string trailer_rear_axle_frame_;
+  std::string trailer_center_frame_;
+  std::string trailer_rear_end_frame_;
+  std::string trailer_hitch_frame_;
+
+  std::vector<std::string> trailer_wheel_joint_names_;
+  std::string truck_trailer_link_joint_name_;
+  bool invert_trailer_joint_state_;
 
   // Publishers
   rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr angle_pub_;

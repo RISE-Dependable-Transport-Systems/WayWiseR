@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <QObject>
+#include <Eigen/Geometry>
 
 #include "WayWise/core/simplewatchdog.h"
 #include "WayWise/core/coordinatetransforms.h"
@@ -23,11 +24,16 @@
 #include "geometry_msgs/msg/vector3.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/joint_state.hpp"
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
 #include "sensor_msgs/msg/nav_sat_status.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "tf2/LinearMath/Transform.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/transform_broadcaster.h"
+#include "urdf/model.h"
 
 class WayWiseCar : public QObject, public rclcpp::Node
 {
@@ -63,6 +69,13 @@ protected:
   void publish_ublox_nav_sat_fix(const ubx_nav_pvt & ubxPvt);
   void publish_enu_refernce(const llh_t enuRef);
   float clip_min_max(float value, float min_value, float max_value) const;
+  bool loadURDFFile();
+  Eigen::Vector3d getLinkPosition(
+    const urdf::Model & urdfModel,
+    const std::string & link_name) const;
+  virtual double update_joint_states_msg(
+    sensor_msgs::msg::JointState & joint_state_msg,
+    double timePassed_ms);
 
   // ROS parameters
   std::string odom_topic_;
@@ -78,19 +91,29 @@ protected:
   std::string imu_for_position_fusion_;
   float standstill_velocity_threshold_;
   float max_angular_velocity_;
+  bool publish_joint_states_;
 
   std::string odom_frame_;
   std::string base_frame_;
   std::string world_frame_;
+  std::string rear_axle_frame_;
+  std::string center_frame_;
+  std::string rear_end_frame_;
 
   std::string nav_sat_fix_topic_;
   std::string enu_refernce_topic_;
+
+  std::string urdf_file_;
+  std::vector<std::string> front_steering_joint_names_;
+  std::vector<std::string> front_wheel_joint_names_;
+  std::vector<std::string> rear_wheel_joint_names_;
 
   // Publishers
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_pub_;
   rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr nav_sat_fix_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr enu_refernce_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
 
   // Subscribers
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr twist_sub_;
@@ -110,6 +133,7 @@ protected:
 
   // Internal variables
   std::chrono::milliseconds mUpdateVehicleStatePeriod;
+  urdf::Model urdfModel;
 
 // private:
 };

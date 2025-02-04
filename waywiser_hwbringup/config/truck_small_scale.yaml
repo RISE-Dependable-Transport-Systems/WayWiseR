@@ -3,7 +3,10 @@
   ros__parameters:
     odom_frame: odom
     base_frame: truck
-    trailer_frame: semitrailer
+    rear_axle_frame: truck_rear_axle_link
+    center_frame: truck
+    rear_end_frame: truck_rear_end_link
+    hitch_frame: truck_fifth_wheel_link
     erpm_min: -10000.0
     erpm_max: 10000.0
     speed_to_erpm_factor: 5190.0
@@ -15,10 +18,37 @@
     standstill_velocity_threshold: 0.05
     odom_topic: "/truck/odometry"
     has_trailer: true
+    trailer_base_frame: semitrailer
+    trailer_rear_axle_frame: semitrailer_rear_axle_link
+    trailer_center_frame: semitrailer_base_link
+    trailer_rear_end_frame: semitrailer_rear_end_link
+    trailer_hitch_frame: semitrailer_kingpin_link
     trailer_length: 0.96
     trailer_width: 0.21
     trailer_wheelbase: 0.64
     angle_sensor_topic: "/truck/sensors/trailer_angle"
+    urdf_file: "semitruck.urdf.xacro"
+    urdf_scale: 0.071429 # 1:14
+    front_steering_joint_names: ["truck_fls_link_joint", "truck_frs_link_joint"]
+    front_wheel_joint_names: ["truck_flw_link_joint", "truck_frw_link_joint"]
+    rear_wheel_joint_names:
+      [
+        "truck_mlw_link_joint",
+        "truck_mrw_link_joint",
+        "truck_rlw_link_joint",
+        "truck_rrw_link_joint",
+      ]
+    trailer_wheel_joint_names:
+      [
+        "semitrailer_flw_link_joint",
+        "semitrailer_frw_link_joint",
+        "semitrailer_mlw_link_joint",
+        "semitrailer_mrw_link_joint",
+        "semitrailer_rlw_link_joint",
+        "semitrailer_rrw_link_joint",
+      ]
+    truck_trailer_link_joint_name: "truck_trailer_link_joint"
+    invert_trailer_joint_state: true
 
 waywise_truck_node:
   ros__parameters:
@@ -42,6 +72,7 @@ waywise_truck_node:
     # tof_trailer_left:
     #   i2c_addr: 0x31
     #   topic: "/truck/sensors/tof/trailer_left"
+    publish_joint_states: true
 
 waywise_truck_autopilot_node:
   ros__parameters:
@@ -51,3 +82,5 @@ waywise_truck_autopilot_node:
     purepursuit_forward_gain: 1.0
     purepursuit_reverse_gain: -1.0
     adaptive_pure_pursuit: true
+    update_world_position_with_odom: true
+    publish_joint_states: false

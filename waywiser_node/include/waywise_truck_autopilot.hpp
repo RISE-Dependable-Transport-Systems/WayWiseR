@@ -30,13 +30,27 @@ protected:
   void angle_sensor_callback(const std_msgs::msg::Float32::SharedPtr angle_msg);
 
   // Utility methods
+  virtual double update_joint_states_msg(
+    sensor_msgs::msg::JointState & joint_state_msg,
+    double timePassed_ms) override;
 
   // ROS parameters
   float purepursuit_forward_gain_, purepursuit_reverse_gain_;
 
+  std::string hitch_frame_;
   bool has_trailer_;
   float trailer_length_, trailer_width_, trailer_wheelbase_;
   std::string angle_sensor_topic_;
+
+  std::string trailer_base_frame_;
+  std::string trailer_rear_axle_frame_;
+  std::string trailer_center_frame_;
+  std::string trailer_rear_end_frame_;
+  std::string trailer_hitch_frame_;
+
+  std::vector<std::string> trailer_wheel_joint_names_;
+  std::string truck_trailer_link_joint_name_;
+  bool invert_trailer_joint_state_;
 
   // Publishers
 

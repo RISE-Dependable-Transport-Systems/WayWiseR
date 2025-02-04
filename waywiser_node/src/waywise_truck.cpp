@@ -9,6 +9,7 @@ void WayWiseTruck::setup_parameters()
   WayWiseCar::setup_parameters();
 
   // Additional parameters for truck
+  hitch_frame_ = declare_parameter("hitch_frame", base_frame_);
 
   // ToF Sensors
   tof_sensor_names = this->declare_parameter<std::vector<std::string>>(
@@ -38,7 +39,7 @@ void WayWiseTruck::setup_parameters()
 
   has_trailer_ = this->declare_parameter("has_trailer", false);
   if (has_trailer_) {
-    trailer_base_frame_ = declare_parameter("trailer_base_frame_", "trailer");
+    trailer_base_frame_ = declare_parameter("trailer_base_frame", "trailer");
 
     trailer_length_ = this->declare_parameter("trailer_length", 10.0);
     trailer_width_ = this->declare_parameter("trailer_width", 6.0);
@@ -46,6 +47,22 @@ void WayWiseTruck::setup_parameters()
 
     angle_sensor_offset_ = this->declare_parameter("angle_sensor_offset", 0.0);
     angle_sensor_topic_ = this->declare_parameter("angle_sensor_topic", "/sensors/angle");
+
+    trailer_rear_axle_frame_ = this->declare_parameter(
+      "trailer_rear_axle_frame",
+      trailer_base_frame_);
+    trailer_center_frame_ = this->declare_parameter("trailer_center_frame", trailer_base_frame_);
+    trailer_rear_end_frame_ = this->declare_parameter("trailer_rear_end_frame", "");
+    trailer_hitch_frame_ = this->declare_parameter("trailer_hitch_frame", "");
+
+    trailer_wheel_joint_names_ = declare_parameter<std::vector<std::string>>(
+      "trailer_wheel_joint_names",
+      std::vector<std::string>{"semitrailer_rlw_link_joint", "semitrailer_rrw_link_joint"}
+    );
+    truck_trailer_link_joint_name_ = declare_parameter<std::string>(
+      "truck_trailer_link_joint_name", "truck_trailer_link_joint"
+    );
+    invert_trailer_joint_state_ = this->declare_parameter("invert_trailer_joint_state", false);
   }
 }
 
@@ -82,12 +99,25 @@ void WayWiseTruck::setup_hardware()
   mTruckState.reset(new TruckState);
 
   // Additional setup for truck
-  geometry_msgs::msg::TransformStamped transformStamped;
   if (has_trailer_) {
     mTrailerState.reset(new TrailerState((int) MAV_COMP_ID_USER1, Qt::white));
     mTrailerState->setLength(trailer_length_);
     mTrailerState->setWidth(trailer_width_);
     mTrailerState->setWheelBase(trailer_wheelbase_);
+
+    if (loadURDFFile()) {
+      Eigen::Vector3d offset = getLinkPosition(urdfModel, trailer_center_frame_) -
+        getLinkPosition(urdfModel, trailer_rear_axle_frame_);
+      mTrailerState->setRearAxleToCenterOffset(xyz_t{offset.x(), offset.y(), offset.z()});
+
+      offset = getLinkPosition(urdfModel, trailer_rear_end_frame_) -
+        getLinkPosition(urdfModel, trailer_rear_axle_frame_);
+      mTrailerState->setRearAxleToRearEndOffset(xyz_t{offset.x(), offset.y(), offset.z()});
+
+      offset = getLinkPosition(urdfModel, trailer_hitch_frame_) -
+        getLinkPosition(urdfModel, trailer_rear_axle_frame_);
+      mTrailerState->setRearAxleToHitchOffset(xyz_t{offset.x(), offset.y(), offset.z()});
+    }
 
     mTruckState->setTrailingVehicle(mTrailerState);
 
@@ -110,6 +140,13 @@ void WayWiseTruck::setup_hardware()
 
   // Call base class setup_hardware with mTruckState
   WayWiseCar::setup_hardware(mTruckState);
+
+  // Additional setup for truck
+  if (loadURDFFile()) {
+    Eigen::Vector3d offset = getLinkPosition(urdfModel, hitch_frame_) -
+      getLinkPosition(urdfModel, rear_axle_frame_);
+    mTruckState->setRearAxleToHitchOffset(xyz_t{offset.x(), offset.y(), offset.z()});
+  }
 }
 
 void WayWiseTruck::publish_odom_and_tfs(double timePassed_ms)
@@ -119,10 +156,12 @@ void WayWiseTruck::publish_odom_and_tfs(double timePassed_ms)
     publish_trailer_angle();
 
     if (publish_odom_to_baselink_tf_) {
-      PosPoint trailerPosition = mTrailerState->getPosition(PosType::odom);
-      double trailer_x = trailerPosition.getX();
-      double trailer_y = trailerPosition.getY();
-      double trailer_yaw_rad = trailerPosition.getYaw() * M_PI / 180.0;
+      PosPoint odom_to_trailer_base_link_position = mTrailerState->posInVehicleFrameToPosPointENU(
+        mTrailerState->getRearAxleToCenterOffset(), PosType::odom);
+
+      double trailer_x = odom_to_trailer_base_link_position.getX();
+      double trailer_y = odom_to_trailer_base_link_position.getY();
+      double trailer_yaw_rad = -odom_to_trailer_base_link_position.getYaw() * M_PI / 180.0;
 
       auto odom_to_trailer_msg_tf = geometry_msgs::msg::Transform();
       odom_to_trailer_msg_tf.translation.x = trailer_x;
@@ -161,4 +200,32 @@ void WayWiseTruck::updated_tof_distance_callback(
   RCLCPP_INFO(
     this->get_logger(), "Published ToF distance %.2f from %s", distance_m,
     tof_sensor_name.c_str());
+}
+
+double WayWiseTruck::update_joint_states_msg(
+  sensor_msgs::msg::JointState & joint_state_msg,
+  double timePassed_ms)
+{
+  double wheel_position = WayWiseCar::update_joint_states_msg(joint_state_msg, timePassed_ms);
+
+  if (has_trailer_) {
+    double wheel_rad_per_sec = (30.0 / M_PI) * mTruckState->getSpeed() *
+      mCarMovementController->getSpeedToRPMFactor();
+
+    for (const auto & wheel_joint_name : trailer_wheel_joint_names_) {
+      joint_state_msg.name.push_back(wheel_joint_name);
+      joint_state_msg.position.push_back(wheel_position); // Wheel position in radians
+      joint_state_msg.velocity.push_back(wheel_rad_per_sec); // Wheel velocity in rad/s
+      joint_state_msg.effort.push_back(0.0); // Effort (not used here)
+    }
+  }
+
+  joint_state_msg.name.push_back(truck_trailer_link_joint_name_);
+  joint_state_msg.position.push_back(
+    invert_trailer_joint_state_ ? -mTruckState->getTrailerAngleRadians() : mTruckState->getTrailerAngleRadians()
+  );
+  joint_state_msg.velocity.push_back(0.0);   // Velocity in rad/s
+  joint_state_msg.effort.push_back(0.0);   // Effort (not used here)
+
+  return wheel_position;
 }

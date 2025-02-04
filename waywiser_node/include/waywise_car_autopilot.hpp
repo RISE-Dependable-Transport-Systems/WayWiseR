@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <QObject>
+#include <Eigen/Geometry>
 
 #include "WayWise/autopilot/purepursuitwaypointfollower.h"
 #include "WayWise/autopilot/waypointfollower.h"
@@ -15,17 +16,26 @@
 #include "WayWise/vehicles/carstate.h"
 #include "WayWise/vehicles/controller/carmovementcontroller.h"
 #include "WayWise/autopilot/followpoint.h"
+#include "WayWise/sensors/gnss/gnssreceiver.h"
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "geometry_msgs/msg/vector3.hpp"
 #include "mavsdk/mavsdk.h"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/joint_state.hpp"
+#include "sensor_msgs/msg/nav_sat_fix.hpp"
+#include "sensor_msgs/msg/nav_sat_status.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "tf2/utils.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2/LinearMath/Transform.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_broadcaster.h"
+#include "urdf/model.h"
 
 class WaywiseCarAutopilot : public QObject, public rclcpp::Node
 {
@@ -57,6 +67,13 @@ protected:
 
   // Utility methods
   virtual void update_world_positon(geometry_msgs::msg::Pose world_pose);
+  bool loadURDFFile();
+  Eigen::Vector3d getLinkPosition(
+    const urdf::Model & urdfModel,
+    const std::string & link_name) const;
+  virtual double update_joint_states_msg(
+    sensor_msgs::msg::JointState & joint_state_msg,
+    double timePassed_ms);
 
   // ROS parameters
   std::string odom_topic_;
@@ -67,20 +84,29 @@ protected:
   float purepursuit_radius_;
   bool update_world_position_with_odom_;
   bool update_world_position_with_tf_;
-
   float standstill_velocity_threshold_;
   float max_angular_velocity_;
+  bool publish_joint_states_;
 
   std::string odom_frame_;
   std::string base_frame_;
   std::string world_frame_;
+  std::string rear_axle_frame_;
+  std::string center_frame_;
+  std::string rear_end_frame_;
 
   std::string enu_refernce_topic_;
   std::string vehicle_pose_topic_;
 
+  std::string urdf_file_;
+  std::vector<std::string> front_steering_joint_names_;
+  std::vector<std::string> front_wheel_joint_names_;
+  std::vector<std::string> rear_wheel_joint_names_;
+
   // Publishers
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr twist_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr vehicle_pose_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
 
   // Subscribers
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
@@ -101,6 +127,7 @@ protected:
   QSharedPointer<FollowPoint> mFollowPoint;
 
   // Internal variables
+  urdf::Model urdfModel;
 };
 
 #endif  // WAYWISE_CAR_AUTOPILOT_HPP_

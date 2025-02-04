@@ -43,13 +43,32 @@ void WayWiseCar::setup_parameters()
 
   max_angular_velocity_ = this->declare_parameter("max_angular_velocity", 0.5);
   standstill_velocity_threshold_ = this->declare_parameter("standstill_velocity_threshold", 0.05);
+  publish_joint_states_ = this->declare_parameter("publish_joint_states", false);
 
   odom_frame_ = declare_parameter("odom_frame", "odom");
   base_frame_ = declare_parameter("base_frame", "base_link");
   world_frame_ = declare_parameter("world_frame", "map");
+  rear_axle_frame_ = this->declare_parameter("rear_axle_frame", base_frame_);
+  center_frame_ = this->declare_parameter("center_frame", base_frame_);
+  rear_end_frame_ = this->declare_parameter("rear_end_frame", "");
 
   nav_sat_fix_topic_ = this->declare_parameter("nav_sat_fix_topic", "/gnss_fix");
   enu_refernce_topic_ = this->declare_parameter("enu_refernce_topic", "/enu_refernce");
+
+  urdf_file_ = this->declare_parameter("urdf_file", "");
+  front_steering_joint_names_ = declare_parameter<std::vector<std::string>>(
+    "front_steering_joint_names",
+    std::vector<std::string>{"left_front_wheel_steering_joint", "right_front_wheel_steering_joint"}
+  );
+  front_wheel_joint_names_ = declare_parameter<std::vector<std::string>>(
+    "front_wheel_joint_names",
+    std::vector<std::string>{"left_front_wheel_joint", "right_front_wheel_joint"}
+  );
+
+  rear_wheel_joint_names_ = declare_parameter<std::vector<std::string>>(
+    "rear_wheel_joint_names",
+    std::vector<std::string>{"left_rear_wheel_joint", "right_rear_wheel_joint"}
+  );
 }
 
 void WayWiseCar::setup_publishers()
@@ -65,6 +84,10 @@ void WayWiseCar::setup_publishers()
     create_publisher<geometry_msgs::msg::Vector3>(
     enu_refernce_topic_,
     rclcpp::QoS(rclcpp::KeepLast(10)).reliable());
+
+  if (publish_joint_states_) {
+    joint_state_pub_ = create_publisher<sensor_msgs::msg::JointState>("waywise_joint_states", 10);
+  }
 }
 
 void WayWiseCar::setup_subscribers()
@@ -100,6 +123,16 @@ void WayWiseCar::setup_hardware(QSharedPointer<CarState> carState)
   mCarState->setWidth(width_);
   mCarState->setAxisDistance(wheelbase_);
   mCarState->setMaxSteeringAngle(atan(wheelbase_ / min_turning_radius_));
+
+  if (loadURDFFile()) {
+    Eigen::Vector3d offset = getLinkPosition(urdfModel, center_frame_) -
+      getLinkPosition(urdfModel, rear_axle_frame_);
+    mCarState->setRearAxleToCenterOffset(xyz_t{offset.x(), offset.y(), offset.z()});
+
+    offset = getLinkPosition(urdfModel, rear_end_frame_) -
+      getLinkPosition(urdfModel, rear_axle_frame_);
+    mCarState->setRearAxleToRearEndOffset(xyz_t{offset.x(), offset.y(), offset.z()});
+  }
 
   // --- Lower-level control setup ---
   mCarMovementController.reset(new CarMovementController(mCarState));
@@ -237,11 +270,11 @@ void WayWiseCar::simulation_timer_callback()
 
   mCarState->simulationStep(timePassed_ms, PosType::simulated);
   PosPoint currentPosition = mCarState->getPosition(PosType::simulated);
-  currentPosition.setType(PosType::odom)
-  mCarState->setPosition(currentPosition)
+  currentPosition.setType(PosType::odom);
+  mCarState->setPosition(currentPosition);
   if (publish_world_to_odom_tf_) {
-    currentPosition.setType(PosType::fused)
-    mCarState->setPosition(currentPosition)
+    currentPosition.setType(PosType::fused);
+    mCarState->setPosition(currentPosition);
   }
 
   publish_odom_and_tfs(timePassed_ms);
@@ -271,16 +304,19 @@ void WayWiseCar::updated_waywise_odomPos_callback(
 
 void WayWiseCar::publish_odom_and_tfs(double timePassed_ms)
 {
-  PosPoint currentPosition = mCarState->getPosition(PosType::odom);
   if (update_world_position_with_odom_) {
+    PosPoint currentPosition = mCarState->getPosition(PosType::odom);
     currentPosition.setType(PosType::fused);   // the 'fused' position type is communicated to topics
                                                // & potentially MAVLINK
     mCarState->setPosition(currentPosition);
   }
 
-  double x_ = currentPosition.getX();
-  double y_ = currentPosition.getY();
-  double yawRad_ = currentPosition.getYaw() * M_PI / 180.0;
+  PosPoint odom_to_base_link_position = mCarState->posInVehicleFrameToPosPointENU(
+    mCarState->getRearAxleToCenterOffset(), PosType::odom);
+
+  double x_ = odom_to_base_link_position.getX();
+  double y_ = odom_to_base_link_position.getY();
+  double yawRad_ = odom_to_base_link_position.getYaw() * M_PI / 180.0;
   static double previousYawRad_ = yawRad_;
 
   // -- Prepare Odom
@@ -337,12 +373,13 @@ void WayWiseCar::publish_odom_and_tfs(double timePassed_ms)
 
         tf2::fromMsg(odom_to_base_link_msg_tf, odom_to_base_link_tf2_tf);
 
-        PosPoint worldPosition = mCarState->getPosition(PosType::fused);
+        PosPoint world_to_base_link_position = mCarState->posInVehicleFrameToPosPointENU(
+          mCarState->getRearAxleToCenterOffset(), PosType::fused);
         auto map_to_base_link_msg_tf = geometry_msgs::msg::Transform();
-        map_to_base_link_msg_tf.translation.x = worldPosition.getX();
-        map_to_base_link_msg_tf.translation.y = worldPosition.getY();
-        map_to_base_link_msg_tf.translation.z = worldPosition.getHeight();
-        double worldYawRad_ = worldPosition.getYaw() * M_PI / 180.0;
+        map_to_base_link_msg_tf.translation.x = world_to_base_link_position.getX();
+        map_to_base_link_msg_tf.translation.y = world_to_base_link_position.getY();
+        map_to_base_link_msg_tf.translation.z = world_to_base_link_position.getHeight();
+        double worldYawRad_ = world_to_base_link_position.getYaw() * M_PI / 180.0;
         map_to_base_link_msg_tf.rotation.x = 0.0;
         map_to_base_link_msg_tf.rotation.y = 0.0;
         map_to_base_link_msg_tf.rotation.z = sin(worldYawRad_ / 2.0);
@@ -361,6 +398,13 @@ void WayWiseCar::publish_odom_and_tfs(double timePassed_ms)
 
   // -- Publish Odom
   odom_pub_->publish(odom);
+
+  // -- Publish Joint states
+  if (publish_joint_states_) {
+    sensor_msgs::msg::JointState joint_state_msg;
+    update_joint_states_msg(joint_state_msg, timePassed_ms);
+    joint_state_pub_->publish(joint_state_msg);
+  }
 
   previousYawRad_ = yawRad_;
 }
@@ -453,4 +497,92 @@ float WayWiseCar::clip_min_max(float value, float min_value, float max_value) co
   return std::min(
     std::max(value, (min_value + std::numeric_limits<float>::epsilon())),
     (max_value - std::numeric_limits<float>::epsilon()));
+}
+
+bool WayWiseCar::loadURDFFile()
+{
+  bool isLoaded = false;
+  if (!urdf_file_.empty()) {
+    if (urdf_file_.find("xml version=") != std::string::npos) {
+      isLoaded = urdfModel.initString(urdf_file_);
+    } else {
+      isLoaded = urdfModel.initFile(urdf_file_);
+    }
+  }
+  if (!isLoaded) {
+    RCLCPP_ERROR(this->get_logger(), "Failed to parse URDF file!");
+  }
+  return isLoaded;
+}
+
+Eigen::Vector3d WayWiseCar::getLinkPosition(
+  const urdf::Model & urdfModel,
+  const std::string & link_name) const
+{
+  Eigen::Vector3d position(0, 0, 0);
+  if (!link_name.empty() && link_name != base_frame_) {
+    const urdf::LinkConstSharedPtr link = urdfModel.getLink(link_name);
+    if (!link) {
+      RCLCPP_ERROR(this->get_logger(), "Link %s not found", link_name.c_str());
+      return Eigen::Vector3d::Zero();
+    }
+
+    const urdf::Pose & pose = link->parent_joint->parent_to_joint_origin_transform;
+    position.x() = pose.position.x;
+    position.y() = pose.position.y;
+    position.z() = pose.position.z;
+  }
+  return position;
+}
+
+double WayWiseCar::update_joint_states_msg(
+  sensor_msgs::msg::JointState & joint_state_msg,
+  double timePassed_ms)
+{
+  static double wheel_position = 0.0;
+
+  joint_state_msg.header.stamp = this->now();
+
+  // Calculate wheel speed and steering angle
+  double wheel_rad_per_sec = (30.0 / M_PI) * mCarState->getSpeed() *
+    mCarMovementController->getSpeedToRPMFactor();
+  double steeringAngle_rad = -mCarState->getSteering() * mCarState->getMaxSteeringAngle();
+  if (abs(steeringAngle_rad) > mCarState->getMaxSteeringAngle()) {
+    steeringAngle_rad = mCarState->getMaxSteeringAngle() * ((steeringAngle_rad > 0) ? 1.0 : -1.0);
+  }
+  wheel_position += wheel_rad_per_sec * timePassed_ms * 1000.0;
+  wheel_position = fmod(wheel_position, 2.0 * M_PI);
+  if (wheel_position < 0) {
+    wheel_position += 2.0 * M_PI;
+  }
+
+  // Clear previous data (if any)
+  joint_state_msg.name.clear();
+  joint_state_msg.position.clear();
+  joint_state_msg.velocity.clear();
+  joint_state_msg.effort.clear();
+
+  // Add wheel joint names and states
+  for (const auto & steering_joint_name : front_steering_joint_names_) {
+    joint_state_msg.name.push_back(steering_joint_name);
+    joint_state_msg.position.push_back(steeringAngle_rad); // Steering angle in radians
+    joint_state_msg.velocity.push_back(0.0); // Velocity in rad/s
+    joint_state_msg.effort.push_back(0.0); // Effort (not used here)
+  }
+
+  for (const auto & wheel_joint_name : front_wheel_joint_names_) {
+    joint_state_msg.name.push_back(wheel_joint_name);
+    joint_state_msg.position.push_back(wheel_position); // Wheel position in radians
+    joint_state_msg.velocity.push_back(wheel_rad_per_sec); // Wheel velocity in rad/s
+    joint_state_msg.effort.push_back(0.0); // Effort (not used here)
+  }
+
+  for (const auto & wheel_joint_name : rear_wheel_joint_names_) {
+    joint_state_msg.name.push_back(wheel_joint_name);
+    joint_state_msg.position.push_back(wheel_position); // Wheel position in radians
+    joint_state_msg.velocity.push_back(wheel_rad_per_sec); // Wheel velocity in rad/s
+    joint_state_msg.effort.push_back(0.0); // Effort (not used here)
+  }
+
+  return wheel_position;
 }

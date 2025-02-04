@@ -14,6 +14,8 @@ find_package(geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(urdf REQUIRED)
 
 # Qt5
 find_package(
@@ -121,7 +123,12 @@ add_executable(
   WayWise/vehicles/truckstate.cpp
   WayWise/vehicles/trailerstate.cpp)
 
-set(COMMON_LIBRARIES Qt5::Core Qt5::SerialPort Qt5::Network)
+set(COMMON_LIBRARIES
+    Qt5::Core
+    Qt5::SerialPort
+    Qt5::Network
+    urdf::urdf
+    Eigen3::Eigen)
 
 target_link_libraries(waywise_car_node ${COMMON_LIBRARIES})
 target_link_libraries(waywise_car_autopilot_node ${COMMON_LIBRARIES}
@@ -136,7 +143,8 @@ set(COMMON_DEPENDENCIES
     nav_msgs
     geometry_msgs
     tf2_ros
-    sensor_msgs)
+    sensor_msgs
+    tf2_geometry_msgs)
 
 ament_target_dependencies(waywise_car_node ${COMMON_DEPENDENCIES})
 ament_target_dependencies(waywise_car_autopilot_node ${COMMON_DEPENDENCIES}
