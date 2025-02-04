@@ -33,13 +33,16 @@
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "tf2/exceptions.h"
 #include "tf2/utils.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2/LinearMath/Transform.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/buffer.h"
+#include "tf2_ros/transform_listener.h"
 #include "tf2_ros/transform_broadcaster.h"
 #include "urdf/model.h"
+#include "visualization_msgs/msg/marker_array.hpp"
 
 class WaywiseCarAutopilot : public QObject, public rclcpp::Node
 {
@@ -68,6 +71,7 @@ protected:
   void autopilot_timer_callback();
   void odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom_msg);
   void enu_reference_callback(const geometry_msgs::msg::Vector3::SharedPtr enuRef_msg);
+  void autopilot_state_control_callback(const std_msgs::msg::Bool::SharedPtr bool_msg);
 
   // Utility methods
   virtual void update_world_positon(geometry_msgs::msg::Pose world_pose);
@@ -78,7 +82,11 @@ protected:
   virtual double update_joint_states_msg(
     sensor_msgs::msg::JointState & joint_state_msg,
     double timePassed_ms);
-  QList<PosPoint> readXMLFile();
+  QList<PosPoint> read_route_from_XMLFile(const std::string xml_filepath_);
+  void start_waypoint_follower(QList<PosPoint> & waypointList);
+  void stop_waypoint_follower();
+  void update_waypoint_follower_route(QList<PosPoint> & waypointList);
+  void publish_route_markers();
 
   // ROS parameters
   std::string odom_topic_;
@@ -86,6 +94,7 @@ protected:
   float length_, width_, wheelbase_, min_turning_radius_;
   int autopilot_cmd_publish_rate_;
   std::string waywise_control_tower_address_;
+  int waywise_control_tower_port_;
   float purepursuit_radius_;
   bool update_world_position_with_odom_;
   bool update_world_position_with_tf_;
@@ -108,20 +117,36 @@ protected:
   std::vector<std::string> front_wheel_joint_names_;
   std::vector<std::string> rear_wheel_joint_names_;
 
+  std::string preplanned_route_filepath_;
+  std::string autopilot_state_control_topic_;
+  bool start_with_autopilot_;
+  float desired_linear_velocity_;
+  std::string mission_status_topic_;
+  int end_goal_alignment_type_;
+  std::string vehicle_alignment_reference_point_topic_;
+  std::string autopilot_center_pose_topic_;
+
   // Publishers
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr twist_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr vehicle_pose_pub_;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr route_marker_pub_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr mission_status_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr
+    vehicle_alignment_reference_point_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr autopilot_center_pose_pub_;
 
   // Subscribers
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr enu_refernce_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr autopilot_state_control_sub_;
 
   // Timers
   rclcpp::TimerBase::SharedPtr autopilot_timer_;
 
-  // Transform buffer
+  // Transform buffer and listener
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
   // WayWise components
   QSharedPointer<CarState> mCarState;
@@ -130,9 +155,13 @@ protected:
   QSharedPointer<PurepursuitWaypointFollower> mWaypointFollower;
   QSharedPointer<MavsdkVehicleServer> mMavsdkVehicleServer;
   QSharedPointer<FollowPoint> mFollowPoint;
+  QList<PosPoint> mWaypointList;
 
   // Internal variables
   urdf::Model urdfModel;
+  bool is_on_mission_ = false;
+  bool received_first_odom_msg_ = false;
+  bool waiting_for_a_route_ = false;
 };
 
 #endif  // WAYWISE_CAR_AUTOPILOT_HPP_
