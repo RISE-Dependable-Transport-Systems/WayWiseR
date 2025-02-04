@@ -7,38 +7,42 @@
     port: 2000
     timeout: 10
     town: Sunrise_from_Town05
-    rgbd_to_pointcloud_sources: ["front", "dock"]
-    front:
-      attached_to_ego_vehicle: true
-      rgb_camera: "rgb_front"
-      depth_camera: "depth_front"
-    dock:
-      attached_to_ego_vehicle: false
-      rgb_camera: "rgb_dock"
-      depth_camera: "depth_dock"
+    mission_status_topic: "/carla/truck/mission_status"
+    autopilot_state_control_topic: "/carla/truck/autopilot_state_control"
+    # rgbd_to_pointcloud_sources: ["front", "dock"]
+    # front:
+    #   attached_to_ego_vehicle: true
+    #   rgb_camera: "rgb_front"
+    #   depth_camera: "depth_front"
+    # dock:
+    #   attached_to_ego_vehicle: false
+    #   rgb_camera: "rgb_dock"
+    #   depth_camera: "depth_dock"
 
 carla_orchestrator_node:
   ros__parameters:
     carla_script_path: "~/workspaces/carla_ws/CarlaUE4.sh"
     sim_startup_time: 5.0
     render_off_screen: false
-    reset_carla_after_exec: false
+    reset_carla_after_exec: true
+    relativemousemode: false
     carla_ros_bridge:
       passive: false
       synchronous_mode: true
       synchronous_mode_wait_for_vehicle_control_command: false
-      fixed_delta_seconds: 0.05
+      fixed_delta_seconds: 0.02
       register_all_sensors: true
     sim_configurations_json_path: "sim_configurations.json"
     objects_json_path: "dts_truck_semitrailer.json"
     weather: "ClearNoon"
     rosbag_output_dir: "sim_data" # relative path
-    use_rosbag_recording: false
-    static_tf_publishers: ["dock_to_map_static_tf"]
-    dock_to_map_static_tf:
-      frame_id: "dock"
-      parent_frame_id: "map"
-      transform_to_parent: "1.7,68.4,5.2,0.0,0.0,-90.0"
+    use_rosbag_recording: true
+    end_sim_after_mission_complete: false
+    # static_tf_publishers: ["dock_to_map_static_tf"]
+    # dock_to_map_static_tf:
+    #   frame_id: "dock"
+    #   parent_frame_id: "map"
+    #   transform_to_parent: "1.7,68.4,5.2,0.0,0.0,-90.0"
 
 carla_osm_tile_server_node:
   ros__parameters:
