@@ -4,8 +4,8 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /TF1/Tree1/odom1
-      Splitter Ratio: 0.6000000238418579
+        - /Global Options1
+      Splitter Ratio: 0.6504854559898376
     Tree Height: 703
   - Class: rviz_common/Selection
     Name: Selection
@@ -52,13 +52,63 @@ Visualization Manager:
       Enabled: true
       Frame Timeout: 15
       Frames:
-        All Enabled: true
+        All Enabled: false
         odom:
           Value: true
         semitrailer:
           Value: true
+        semitrailer_base_link:
+          Value: true
+        semitrailer_chassis_link:
+          Value: false
+        semitrailer_flw_link:
+          Value: false
+        semitrailer_frw_link:
+          Value: false
+        semitrailer_kingpin_link:
+          Value: false
+        semitrailer_mlw_link:
+          Value: false
+        semitrailer_mrw_link:
+          Value: false
+        semitrailer_rear_axle_link:
+          Value: false
+        semitrailer_rear_end_link:
+          Value: true
+        semitrailer_rear_left_end_link:
+          Value: false
+        semitrailer_rear_right_end_link:
+          Value: false
+        semitrailer_rlw_link:
+          Value: false
+        semitrailer_rrw_link:
+          Value: false
         truck:
           Value: true
+        truck_chassis_link:
+          Value: false
+        truck_fifth_wheel_link:
+          Value: false
+        truck_fls_link:
+          Value: false
+        truck_flw_link:
+          Value: false
+        truck_frs_link:
+          Value: false
+        truck_frw_link:
+          Value: false
+        truck_mlw_link:
+          Value: false
+        truck_mrw_link:
+          Value: false
+        truck_rear_axle_link:
+          Value: false
+        truck_rear_end_link:
+          Value: true
+        truck_rlw_link:
+          Value: false
+        truck_rrw_link:
+          Value: false
       Marker Scale: 1
       Name: TF
       Show Arrows: false
@@ -66,8 +116,55 @@ Visualization Manager:
       Show Names: true
       Tree:
         odom:
-          semitrailer: {}
-          truck: {}
+          semitrailer:
+            {}
+          truck:
+            truck_chassis_link:
+              {}
+            truck_fifth_wheel_link:
+              semitrailer_kingpin_link:
+                semitrailer_base_link:
+                  {}
+                semitrailer_chassis_link:
+                  {}
+                semitrailer_flw_link:
+                  {}
+                semitrailer_frw_link:
+                  {}
+                semitrailer_mlw_link:
+                  {}
+                semitrailer_mrw_link:
+                  {}
+                semitrailer_rear_axle_link:
+                  {}
+                semitrailer_rear_end_link:
+                  {}
+                semitrailer_rear_left_end_link:
+                  {}
+                semitrailer_rear_right_end_link:
+                  {}
+                semitrailer_rlw_link:
+                  {}
+                semitrailer_rrw_link:
+                  {}
+            truck_fls_link:
+              truck_flw_link:
+                {}
+            truck_frs_link:
+              truck_frw_link:
+                {}
+            truck_mlw_link:
+              {}
+            truck_mrw_link:
+              {}
+            truck_rear_axle_link:
+              {}
+            truck_rear_end_link:
+              {}
+            truck_rlw_link:
+              {}
+            truck_rrw_link:
+              {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -88,6 +185,125 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
+        semitrailer_base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        semitrailer_chassis_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        semitrailer_flw_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        semitrailer_frw_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        semitrailer_kingpin_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        semitrailer_mlw_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        semitrailer_mrw_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        semitrailer_rear_axle_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        semitrailer_rear_end_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        semitrailer_rear_left_end_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        semitrailer_rear_right_end_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        semitrailer_rlw_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        semitrailer_rrw_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        truck:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        truck_chassis_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        truck_fifth_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        truck_fls_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        truck_flw_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        truck_frs_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        truck_frw_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        truck_mlw_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        truck_mrw_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        truck_rear_axle_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        truck_rear_end_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        truck_rlw_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        truck_rrw_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
       Mass Properties:
         Inertia: false
         Mass: false
@@ -228,7 +444,8 @@ Visualization Manager:
     - Class: rviz_default_plugins/MarkerArray
       Enabled: false
       Name: 3D bounding box markers
-      Namespaces: {}
+      Namespaces:
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -282,16 +499,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 10
+      Distance: 4.934074878692627
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
+        X: -0.3816322088241577
+        Y: -0.2014046162366867
+        Z: 0.15132351219654083
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
@@ -300,7 +517,7 @@ Visualization Manager:
       Pitch: 1.5697963237762451
       Target Frame: truck
       Value: Orbit (rviz)
-      Yaw: 3.1490659713745117
+      Yaw: 3.14406681060791
     Saved: ~
 Window Geometry:
   Displays:
@@ -322,5 +539,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1280
-  X: 1244
+  X: 604
   Y: 27
