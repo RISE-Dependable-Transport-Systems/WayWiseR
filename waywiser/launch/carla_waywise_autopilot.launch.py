@@ -31,7 +31,7 @@ def generate_launch_description():
     )
     enable_collision_monitor_la = DeclareLaunchArgument(
         'enable_collision_monitor',
-        default_value='True',
+        default_value='False',
         description='Use Nav2 collision monitoring',
     )
     rviz_config_la = DeclareLaunchArgument(
@@ -49,9 +49,19 @@ def generate_launch_description():
         default_value=os.path.join(waywiser_carla_dir, 'config/truck_full_scale.yaml'),
         description='Full path to params file of vehicle',
     )
+    teleop_la = DeclareLaunchArgument(
+        'teleop',
+        default_value='False',
+        description='Launch teleop',
+    )
+    rviz2_la = DeclareLaunchArgument(
+        'rviz2',
+        default_value='False',
+        description='Launch rviz2',
+    )
 
     # include launch files
-    carla_minimal_launch = IncludeLaunchDescription(
+    carla_manual_control = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
                 os.path.join(
@@ -69,6 +79,8 @@ def generate_launch_description():
             'rviz_config': LaunchConfiguration('rviz_config'),
             'teleop_config': LaunchConfiguration('teleop_config'),
             'vehicle_config': LaunchConfiguration('vehicle_config'),
+            'teleop': LaunchConfiguration('teleop'),
+            'rviz2': LaunchConfiguration('rviz2'),
         }.items(),
     )
 
@@ -99,9 +111,11 @@ def generate_launch_description():
     ld.add_action(carla_config_la)
     ld.add_action(vehicle_config_la)
     ld.add_action(carla_spawn_objects_file_la)
+    ld.add_action(teleop_la)
+    ld.add_action(rviz2_la)
 
     # start nodes
-    ld.add_action(carla_minimal_launch)
+    ld.add_action(carla_manual_control)
     ld.add_action(waywise_autopilot)
 
     return ld
