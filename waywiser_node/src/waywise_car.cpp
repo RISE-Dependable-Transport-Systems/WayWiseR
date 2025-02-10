@@ -179,7 +179,7 @@ void WayWiseCar::setup_hardware(QSharedPointer<CarState> carState)
 
   // --- Positioning setup ---
   // Position Fuser
-  positionFuser = new SDVPVehiclePositionFuser(this);
+  mSDVPVehiclePositionFuser.reset(new SDVPVehiclePositionFuser(this));
   // GNSS (with fused IMU when using u-blox F9R)
   mUbloxRover.reset(new UbloxRover(mCarState));
   foreach(const QSerialPortInfo & portInfo, QSerialPortInfo::availablePorts()) {
@@ -198,23 +198,24 @@ void WayWiseCar::setup_hardware(QSharedPointer<CarState> carState)
     mUbloxRover.get(), &UbloxRover::updatedEnuReference, this,
     &WayWiseCar::publish_enu_refernce);
 
-  rtcmClient = new RtcmClient(this);
+  mRtcmClient.reset(new RtcmClient(this));
   QObject::connect(
-    mUbloxRover.get(), &UbloxRover::updatedGNSSPositionAndYaw, positionFuser,
+    mUbloxRover.get(), &UbloxRover::updatedGNSSPositionAndYaw, mSDVPVehiclePositionFuser.get(),
     &SDVPVehiclePositionFuser::correctPositionAndYawGNSS);
 
   // -- NTRIP/TCP client setup for feeding RTCM data into GNSS receiver
   QObject::connect(
-    mUbloxRover.get(), &UbloxRover::gotNmeaGga, rtcmClient, &RtcmClient::forwardNmeaGgaToServer);
+    mUbloxRover.get(), &UbloxRover::gotNmeaGga,
+    mRtcmClient.get(), &RtcmClient::forwardNmeaGgaToServer);
   QObject::connect(
-    rtcmClient, &RtcmClient::rtcmData,
+    mRtcmClient.get(), &RtcmClient::rtcmData,
     mUbloxRover.get(), &UbloxRover::writeRtcmToUblox);
   QObject::connect(
-    rtcmClient, &RtcmClient::baseStationPosition,
+    mRtcmClient.get(), &RtcmClient::baseStationPosition,
     mUbloxRover.get(), &UbloxRover::setEnuRef);
-  if (rtcmClient->connectWithInfoFromFile("./rtcmServerInfo.txt")) {
+  if (mRtcmClient->connectWithInfoFromFile("./rtcmServerInfo.txt")) {
     qDebug() << "RtcmClient: connected to" << QString(
-      rtcmClient->getCurrentHost() + ":" + QString::number(rtcmClient->getCurrentPort()));
+      mRtcmClient->getCurrentHost() + ":" + QString::number(mRtcmClient->getCurrentPort()));
   } else {
     qDebug() << "RtcmClient: not connected";
   }
@@ -226,7 +227,8 @@ void WayWiseCar::setup_hardware(QSharedPointer<CarState> carState)
       if (mVESCMotorController->isSerialConnected()) {
         mIMUOrientationUpdater = mVESCMotorController->getIMUOrientationUpdater(mCarState);
         QObject::connect(
-          mIMUOrientationUpdater.get(), &IMUOrientationUpdater::updatedIMUOrientation, positionFuser,
+          mIMUOrientationUpdater.get(), &IMUOrientationUpdater::updatedIMUOrientation,
+          mSDVPVehiclePositionFuser.get(),
           &SDVPVehiclePositionFuser::correctPositionAndYawIMU);
         RCLCPP_INFO(this->get_logger(), "Using vesc IMU for position fusion.");
       } else {
@@ -237,7 +239,8 @@ void WayWiseCar::setup_hardware(QSharedPointer<CarState> carState)
     } else if (imu_for_position_fusion_ == "bno055") {
       mIMUOrientationUpdater.reset(new BNO055OrientationUpdater(mCarState, "/dev/i2c-1"));
       QObject::connect(
-        mIMUOrientationUpdater.get(), &IMUOrientationUpdater::updatedIMUOrientation, positionFuser,
+        mIMUOrientationUpdater.get(), &IMUOrientationUpdater::updatedIMUOrientation,
+        mSDVPVehiclePositionFuser.get(),
         &SDVPVehiclePositionFuser::correctPositionAndYawIMU);
       RCLCPP_INFO(this->get_logger(), "Using bno055 IMU for position fusion.");
     } else {
@@ -249,14 +252,15 @@ void WayWiseCar::setup_hardware(QSharedPointer<CarState> carState)
 
   // Odometry
   QObject::connect(
-    mCarMovementController.get(), &CarMovementController::updatedOdomPositionAndYaw, positionFuser,
+    mCarMovementController.get(), &CarMovementController::updatedOdomPositionAndYaw,
+    mSDVPVehiclePositionFuser.get(),
     &SDVPVehiclePositionFuser::correctPositionAndYawOdom);
   QObject::connect(
     mCarMovementController.get(), &CarMovementController::updatedOdomPositionAndYaw, this,
     &WayWiseCar::updated_waywise_odomPos_callback);
 
   // Watchdog that warns when EventLoop is slowed down
-  watchdog = new SimpleWatchdog(this);
+  mSimpleWatchdog.reset(new SimpleWatchdog(this));
 }
 
 void WayWiseCar::simulation_timer_callback()

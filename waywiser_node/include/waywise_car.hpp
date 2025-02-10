@@ -127,9 +127,9 @@ protected:
   QSharedPointer<VESCMotorController> mVESCMotorController;
   QSharedPointer<IMUOrientationUpdater> mIMUOrientationUpdater;
   QSharedPointer<UbloxRover> mUbloxRover;
-  SDVPVehiclePositionFuser * positionFuser;
-  RtcmClient * rtcmClient;
-  SimpleWatchdog * watchdog;
+  QSharedPointer<SDVPVehiclePositionFuser> mSDVPVehiclePositionFuser;
+  QSharedPointer<RtcmClient> mRtcmClient;
+  QSharedPointer<SimpleWatchdog> mSimpleWatchdog;
 
   // Internal variables
   std::chrono::milliseconds mUpdateVehicleStatePeriod;
