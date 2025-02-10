@@ -86,7 +86,7 @@ void WaywiseCarAutopilot::setup_subscribers()
   enu_refernce_sub_ = this->create_subscription<geometry_msgs::msg::Vector3>(
     enu_refernce_topic_,
     rclcpp::QoS(rclcpp::KeepLast(10)).reliable(),
-    std::bind(&WaywiseCarAutopilot::enu_refernce_callback, this, _1)
+    std::bind(&WaywiseCarAutopilot::enu_reference_callback, this, _1)
   );
 }
 
@@ -231,7 +231,7 @@ void WaywiseCarAutopilot::odom_callback(const nav_msgs::msg::Odometry::SharedPtr
   }
 }
 
-void WaywiseCarAutopilot::enu_refernce_callback(
+void WaywiseCarAutopilot::enu_reference_callback(
   const geometry_msgs::msg::Vector3::SharedPtr enuRef_msg)
 {
   llh_t mEnuReference{enuRef_msg->x, enuRef_msg->y, enuRef_msg->z};

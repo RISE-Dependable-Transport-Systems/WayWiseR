@@ -63,7 +63,7 @@ protected:
   // Callback methods
   void autopilot_timer_callback();
   void odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom_msg);
-  void enu_refernce_callback(const geometry_msgs::msg::Vector3::SharedPtr enuRef_msg);
+  void enu_reference_callback(const geometry_msgs::msg::Vector3::SharedPtr enuRef_msg);
 
   // Utility methods
   virtual void update_world_positon(geometry_msgs::msg::Pose world_pose);

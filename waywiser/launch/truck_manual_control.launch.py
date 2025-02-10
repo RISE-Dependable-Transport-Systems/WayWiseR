@@ -55,7 +55,7 @@ def generate_launch_description():
         }.items(),
     )
 
-    truck_state_publihser = IncludeLaunchDescription(
+    truck_state_publisher = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
                 os.path.join(
@@ -115,7 +115,7 @@ def generate_launch_description():
 
     # start nodes
     ld.add_action(truck)
-    ld.add_action(truck_state_publihser)
+    ld.add_action(truck_state_publisher)
     ld.add_action(twist_safety)
     ld.add_action(teleop_rviz2)
 
