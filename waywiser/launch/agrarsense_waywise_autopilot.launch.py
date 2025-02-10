@@ -84,7 +84,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'rover_config': LaunchConfiguration('vehicle_config'),
+            'vehicle_config': LaunchConfiguration('vehicle_config'),
         }.items(),
     )
 

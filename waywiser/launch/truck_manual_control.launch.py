@@ -55,6 +55,21 @@ def generate_launch_description():
         }.items(),
     )
 
+    truck_state_publisher = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(
+                    waywiser_hwbringup_dir,
+                    'launch',
+                    'waywise_state_publisher.launch.py',
+                )
+            ]
+        ),
+        launch_arguments={
+            'vehicle_config': LaunchConfiguration('vehicle_config'),
+        }.items(),
+    )
+
     twist_safety = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -100,6 +115,7 @@ def generate_launch_description():
 
     # start nodes
     ld.add_action(truck)
+    ld.add_action(truck_state_publisher)
     ld.add_action(twist_safety)
     ld.add_action(teleop_rviz2)
 

@@ -21,8 +21,8 @@ def generate_launch_description():
     description_dir = get_package_share_directory('waywiser_description')
 
     # args that can be set from the command line or a default will be used
-    rover_config_la = DeclareLaunchArgument(
-        'rover_config',
+    vehicle_config_la = DeclareLaunchArgument(
+        'vehicle_config',
         default_value=os.path.join(hw_bringup_dir, 'config/rover.yaml'),
         description='Full path to params file of rover',
     )
@@ -48,9 +48,9 @@ def generate_launch_description():
     # start nodes and use args to set parameters
     waywise_node = Node(
         package='waywiser_node',
-        executable='waywise_car',
+        executable='waywise_car_node',
         name='waywise_car_node',
-        parameters=[LaunchConfiguration('rover_config')],
+        parameters=[LaunchConfiguration('vehicle_config')],
         remappings=[('/cmd_vel', '/cmd_vel_out')],
         arguments=['--ros-args', '--log-level', 'info'],
     )
@@ -83,7 +83,7 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # declare launch arg
-    ld.add_action(rover_config_la)
+    ld.add_action(vehicle_config_la)
     ld.add_action(lidar_config_la)
     ld.add_action(robot_state_publisher_la)
     ld.add_action(frame_prefix_la)
@@ -100,7 +100,7 @@ def generate_launch_description():
 
 def lidar_conditional_launch(context):
     enable_lidar = False
-    with open(LaunchConfiguration('rover_config').perform(context)) as f:
+    with open(LaunchConfiguration('vehicle_config').perform(context)) as f:
         config_data = yaml.safe_load(f)
         waywise_car_node_params_dict = config_data['waywise_car_node']['ros__parameters']
         if 'enable_lidar' in waywise_car_node_params_dict:
@@ -122,7 +122,7 @@ def lidar_conditional_launch(context):
 def camera_conditional_launch(context):
     enable_camera = False
 
-    with open(LaunchConfiguration('rover_config').perform(context)) as f:
+    with open(LaunchConfiguration('vehicle_config').perform(context)) as f:
         config_data = yaml.safe_load(f)
         waywise_car_node_params_dict = config_data['waywise_car_node']['ros__parameters']
         if 'enable_camera' in waywise_car_node_params_dict:

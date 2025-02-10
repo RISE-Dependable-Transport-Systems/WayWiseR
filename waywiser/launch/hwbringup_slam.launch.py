@@ -17,8 +17,8 @@ def generate_launch_description():
     use_sim_time_la = DeclareLaunchArgument(
         'use_sim_time', default_value='False', description='Use simulation/Gazebo clock'
     )
-    rover_config_la = DeclareLaunchArgument(
-        'rover_config',
+    vehicle_config_la = DeclareLaunchArgument(
+        'vehicle_config',
         default_value=os.path.join(waywiser_hwbringup_dir, 'config/rover.yaml'),
         description='Full path to params file of rover',
     )
@@ -35,12 +35,12 @@ def generate_launch_description():
                 os.path.join(
                     waywiser_hwbringup_dir,
                     'launch',
-                    'rover.launch.py',
+                    'waywise_car.launch.py',
                 )
             ]
         ),
         launch_arguments={
-            'rover_config': LaunchConfiguration('rover_config'),
+            'vehicle_config': LaunchConfiguration('vehicle_config'),
         }.items(),
     )
 
@@ -80,7 +80,7 @@ def generate_launch_description():
 
     # declare launch args
     ld.add_action(use_sim_time_la)
-    ld.add_action(rover_config_la)
+    ld.add_action(vehicle_config_la)
     ld.add_action(enable_collision_monitor_la)
 
     # start nodes

@@ -13,8 +13,8 @@ def generate_launch_description():
     hw_bringup_dir = get_package_share_directory('waywiser_hwbringup')
 
     # args that can be set from the command line or a default will be used
-    rover_config_la = DeclareLaunchArgument(
-        'rover_config',
+    vehicle_config_la = DeclareLaunchArgument(
+        'vehicle_config',
         default_value=os.path.join(hw_bringup_dir, 'config/rover.yaml'),
         description='Full path to params file of rover',
     )
@@ -26,10 +26,10 @@ def generate_launch_description():
     # start nodes and use args to set parameters
     waywise_autopilot_node = Node(
         package='waywiser_node',
-        executable='waywise_car_autopilot',
+        executable='waywise_car_autopilot_node',
         name='waywise_car_autopilot_node',
         parameters=[
-            LaunchConfiguration('rover_config'),
+            LaunchConfiguration('vehicle_config'),
             {
                 'use_sim_time': LaunchConfiguration('use_sim_time'),
             },
@@ -41,7 +41,7 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # declare launch arg
-    ld.add_action(rover_config_la)
+    ld.add_action(vehicle_config_la)
     ld.add_action(use_sim_time_la)
 
     # start nodes
