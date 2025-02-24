@@ -57,9 +57,11 @@ void WaywiseTruckAutopilot::setup_subscribers()
   // Call base class setup_subscribers
   WaywiseCarAutopilot::setup_subscribers();
 
-  angle_sensor_sub_ = this->create_subscription<std_msgs::msg::Float32>(
-    angle_sensor_topic_, 10,
-    std::bind(&WaywiseTruckAutopilot::angle_sensor_callback, this, _1));
+  if (has_trailer_) {
+    angle_sensor_sub_ = this->create_subscription<std_msgs::msg::Float32>(
+      angle_sensor_topic_, 10,
+      std::bind(&WaywiseTruckAutopilot::angle_sensor_callback, this, _1));
+  }
 }
 
 void WaywiseTruckAutopilot::setup_timers()
@@ -120,18 +122,20 @@ void WaywiseTruckAutopilot::update_world_positon(geometry_msgs::msg::Pose world_
 {
   WaywiseCarAutopilot::update_world_positon(world_pose);
 
-  geometry_msgs::msg::PoseStamped world_pose_stamped;
-  world_pose_stamped.header.frame_id = world_frame_;
-  world_pose_stamped.header.stamp = this->get_clock()->now();
+  if (has_trailer_) {
+    geometry_msgs::msg::PoseStamped world_pose_stamped;
+    world_pose_stamped.header.frame_id = world_frame_;
+    world_pose_stamped.header.stamp = this->get_clock()->now();
 
-  PosPoint currentTrailerPosition = mTrailerState->getPosition(PosType::fused);
-  world_pose_stamped.pose.position.x = currentTrailerPosition.getX();
-  world_pose_stamped.pose.position.y = currentTrailerPosition.getY();
-  world_pose_stamped.pose.position.z = currentTrailerPosition.getHeight();
-  tf2::Quaternion orientation;
-  orientation.setRPY(0.0, 0.0, currentTrailerPosition.getYaw() * M_PI / 180.0);
-  world_pose_stamped.pose.orientation = tf2::toMsg(orientation);
-  trailer_pose_pub_->publish(world_pose_stamped);
+    PosPoint currentTrailerPosition = mTrailerState->getPosition(PosType::fused);
+    world_pose_stamped.pose.position.x = currentTrailerPosition.getX();
+    world_pose_stamped.pose.position.y = currentTrailerPosition.getY();
+    world_pose_stamped.pose.position.z = currentTrailerPosition.getHeight();
+    tf2::Quaternion orientation;
+    orientation.setRPY(0.0, 0.0, currentTrailerPosition.getYaw() * M_PI / 180.0);
+    world_pose_stamped.pose.orientation = tf2::toMsg(orientation);
+    trailer_pose_pub_->publish(world_pose_stamped);
+  }
 }
 
 double WaywiseTruckAutopilot::update_joint_states_msg(
