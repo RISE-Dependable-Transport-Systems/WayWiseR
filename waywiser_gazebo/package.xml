@@ -7,10 +7,9 @@
   <description>Initiates Gazebo world, generates robot and establishes communication link between
     ROS2 and Gazebo</description>
 
-  <maintainer email="rickard.hall@ri.se">Rickard Häll</maintainer>
   <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
 
-  <license>TODO: License declaration</license>
+  <license>GPLv3</license>
 
   <url type="website">https://gazebosim.org/docs/fortress/install</url>
   <url type="website">https://gazebosim.org/docs/fortress/tutorials</url>

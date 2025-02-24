@@ -7,12 +7,12 @@
   <description>Package that supports mapping and localization with rviz2</description>
 
   <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
-  
-  <license>TODO: License declaration</license>
+
+  <license>GPLv3</license>
 
   <url type="website">https://wiki.ros.org/rviz</url>
   <url type="website">https://github.com/SteveMacenski/slam_toolbox/tree/humble</url>
-  
+
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>slam_toolbox</depend>
