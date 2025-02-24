@@ -181,8 +181,7 @@ void WaywiseCarAutopilot::setup_autopilot(QSharedPointer<CarState> carState)
   mMavsdkVehicleServer->setWaypointFollower(mWaypointFollower);
 
   if (start_with_autopilot_) {
-    is_on_mission_ = true;
-    waiting_for_a_route_ = true;
+    currentMissionState = MissionState::WaitingForRoute;
   }
 
   // --- Load preplanned route ---
@@ -204,8 +203,7 @@ void WaywiseCarAutopilot::autopilot_timer_callback()
     RCLCPP_WARN(this->get_logger(), "Clock reset detected! Resetting autopilot state.");
     mWaypointFollower->clearRoute();
     mWaypointFollower->resetState();
-    is_on_mission_ = false;
-    waiting_for_a_route_ = false;
+    currentMissionState = MissionState::Idle;
     mWaypointList.clear();
     previousTimeCalled = now;
     return;
@@ -254,40 +252,63 @@ void WaywiseCarAutopilot::autopilot_timer_callback()
 
   twist_pub_->publish(twist_msg);
 
-  if (is_on_mission_) {
-    if (waiting_for_a_route_) {
-      if (mWaypointList.isEmpty() && !preplanned_route_filepath_.empty()) {
-        mWaypointList = read_route_from_XMLFile(preplanned_route_filepath_);
-      }
-      if (!mWaypointList.isEmpty()) {
-        waiting_for_a_route_ = false;
-        start_waypoint_follower(mWaypointList);
-      }
-    } else if (!mWaypointFollower->isActive()) {
-      stop_waypoint_follower();
-    } else {
-      geometry_msgs::msg::PoseStamped world_pose_stamped;
-      world_pose_stamped.header.frame_id = world_frame_;
-      world_pose_stamped.header.stamp = this->get_clock()->now();
-      QSharedPointer<VehicleState> referenceVehicleState = mCarState;
-      if (mCarState->hasTrailingVehicle() && mCarState->getSpeed() < 0) { // position defined by trailer when backing (if exists)
-        referenceVehicleState = mCarState->getTrailingVehicle();
-      }
-      PosPoint currentVehiclePosition = referenceVehicleState->getPosition(PosType::fused);
-      world_pose_stamped.pose.position.x = currentVehiclePosition.getX();
-      world_pose_stamped.pose.position.y = currentVehiclePosition.getY();
-      world_pose_stamped.pose.position.z = currentVehiclePosition.getHeight();
-      tf2::Quaternion orientation;
-      orientation.setRPY(0.0, 0.0, currentVehiclePosition.getYaw() * M_PI / 180.0);
-      world_pose_stamped.pose.orientation = tf2::toMsg(orientation);
-      autopilot_center_pose_pub_->publish(world_pose_stamped);
+  switch (currentMissionState) {
+    case MissionState::Idle: {
+        // Check if mWaypointFollower is started via MAVLINK
+        if (mWaypointFollower->isActive()) {
+          if (mWaypointFollower->getCurrentRoute().size() > 0) {
+            currentMissionState = MissionState::ActiveMission;
+          } else {
+            currentMissionState = MissionState::WaitingForRoute;
+          }
+        }
+      } break;
+    case MissionState::WaitingForRoute: {
+        // Check if mWaypointFollower is stopped via MAVLINK
+        if (!mWaypointFollower->isActive()) {
+          currentMissionState = MissionState::Idle;
+          stop_waypoint_follower();
+        } else {
+          if (mWaypointList.isEmpty() && !preplanned_route_filepath_.empty()) {
+            mWaypointList = read_route_from_XMLFile(preplanned_route_filepath_);
+          }
+          if (!mWaypointList.isEmpty()) {
+            currentMissionState = MissionState::ActiveMission;
+            start_waypoint_follower(mWaypointList);
+          }
+        }
+      } break;
+    case MissionState::ActiveMission: {
+        // Check if mWaypointFollower is stopped via MAVLINK
+        if (!mWaypointFollower->isActive()) {
+          currentMissionState = MissionState::Idle;
+          stop_waypoint_follower();
+        } else {
+          geometry_msgs::msg::PoseStamped world_pose_stamped;
+          world_pose_stamped.header.frame_id = world_frame_;
+          world_pose_stamped.header.stamp = this->get_clock()->now();
+          QSharedPointer<VehicleState> referenceVehicleState = mCarState;
+          if (mCarState->hasTrailingVehicle() && mCarState->getSpeed() < 0) { // position defined by trailer when backing (if exists)
+            referenceVehicleState = mCarState->getTrailingVehicle();
+          }
+          PosPoint currentVehiclePosition = referenceVehicleState->getPosition(PosType::fused);
+          world_pose_stamped.pose.position.x = currentVehiclePosition.getX();
+          world_pose_stamped.pose.position.y = currentVehiclePosition.getY();
+          world_pose_stamped.pose.position.z = currentVehiclePosition.getHeight();
+          tf2::Quaternion orientation;
+          orientation.setRPY(0.0, 0.0, currentVehiclePosition.getYaw() * M_PI / 180.0);
+          world_pose_stamped.pose.orientation = tf2::toMsg(orientation);
+          autopilot_center_pose_pub_->publish(world_pose_stamped);
 
-      QPointF vehicleAlignmentReferencePointXY =
-        mWaypointFollower->getVehicleAlignmentReferencePoint();
-      world_pose_stamped.pose.position.x = vehicleAlignmentReferencePointXY.x();
-      world_pose_stamped.pose.position.y = vehicleAlignmentReferencePointXY.y();
-      vehicle_alignment_reference_point_pub_->publish(world_pose_stamped);
-    }
+          QPointF vehicleAlignmentReferencePointXY =
+            mWaypointFollower->getVehicleAlignmentReferencePoint();
+          world_pose_stamped.pose.position.x = vehicleAlignmentReferencePointXY.x();
+          world_pose_stamped.pose.position.y = vehicleAlignmentReferencePointXY.y();
+          vehicle_alignment_reference_point_pub_->publish(world_pose_stamped);
+        }
+      } break;
+    default:
+      break;
   }
 }
 
@@ -350,17 +371,18 @@ void WaywiseCarAutopilot::autopilot_state_control_callback(
   const std_msgs::msg::Bool::SharedPtr bool_msg)
 {
   if (bool_msg->data) {
-    if (!is_on_mission_) {
-      is_on_mission_ = true;
+    if (currentMissionState == MissionState::Idle) {
       if (mWaypointList.isEmpty()) {
         RCLCPP_INFO(this->get_logger(), "Waiting for a route to follow...");
-        waiting_for_a_route_ = true;
+        currentMissionState = MissionState::WaitingForRoute;
         return;
       }
+      currentMissionState = MissionState::ActiveMission;
       start_waypoint_follower(mWaypointList);
     }
   } else {
-    if (is_on_mission_) {
+    if (currentMissionState != MissionState::Idle) {
+      currentMissionState = MissionState::Idle;
       stop_waypoint_follower();
     }
   }
@@ -604,8 +626,6 @@ void WaywiseCarAutopilot::stop_waypoint_follower()
 {
   mWaypointFollower->stop();
   RCLCPP_INFO(this->get_logger(), "Waypoint follower is stopped.");
-  is_on_mission_ = false;
-  waiting_for_a_route_ = false;
   mission_status_pub_->publish(std_msgs::msg::Bool().set__data(false));
 }
 

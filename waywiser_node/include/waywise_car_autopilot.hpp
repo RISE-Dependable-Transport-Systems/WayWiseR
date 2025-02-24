@@ -44,6 +44,14 @@
 #include "urdf/model.h"
 #include "visualization_msgs/msg/marker_array.hpp"
 
+
+enum class MissionState
+{
+  Idle,
+  WaitingForRoute,
+  ActiveMission
+};
+
 class WaywiseCarAutopilot : public QObject, public rclcpp::Node
 {
   Q_OBJECT
@@ -159,9 +167,8 @@ protected:
 
   // Internal variables
   urdf::Model urdfModel;
-  bool is_on_mission_ = false;
+  MissionState currentMissionState = MissionState::Idle;
   bool received_first_odom_msg_ = false;
-  bool waiting_for_a_route_ = false;
 };
 
 #endif  // WAYWISE_CAR_AUTOPILOT_HPP_
