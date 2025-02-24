@@ -91,7 +91,7 @@ def waywise_autopilot_node_launch(context):
 
         nodes.append(
             Node(
-                package='waywiser_node',
+                package='waywiser_core',
                 executable='waywise_truck_autopilot_node',
                 name='waywise_truck_autopilot_node',
                 output='screen',

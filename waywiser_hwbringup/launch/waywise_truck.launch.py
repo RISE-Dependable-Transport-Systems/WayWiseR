@@ -92,7 +92,7 @@ def waywise_node_launch(context):
 
         nodes.append(
             Node(
-                package='waywiser_node',
+                package='waywiser_core',
                 executable='waywise_truck_node',
                 name='waywise_truck_node',
                 parameters=[
