@@ -17,11 +17,14 @@ find_package(std_msgs REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(carla_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(OpenCV REQUIRED)
 
 # C++ targets
-add_executable(map_to_odom_tf_publisher src/map_to_odom_tf_publisher.cpp)
+add_executable(vehicle_odom_transform src/vehicle_odom_transform.cpp)
 ament_target_dependencies(
-  map_to_odom_tf_publisher
+  vehicle_odom_transform
   rclcpp
   tf2_ros
   tf2_geometry_msgs
@@ -37,9 +40,20 @@ ament_target_dependencies(
   geometry_msgs
   std_msgs)
 
-install(TARGETS map_to_odom_tf_publisher
-        RUNTIME DESTINATION lib/${PROJECT_NAME})
+# Add the EmulatedRangeSensor executable
+add_executable(emulated_range_sensor src/emulated_range_sensor.cpp)
+ament_target_dependencies(
+  emulated_range_sensor
+  rclcpp
+  sensor_msgs
+  std_msgs
+  cv_bridge
+  OpenCV)
+
+# Install targets
+install(TARGETS vehicle_odom_transform RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(TARGETS emulated_angle_sensor RUNTIME DESTINATION lib/${PROJECT_NAME})
+install(TARGETS emulated_range_sensor RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 # Python package
 ament_python_install_package(${PROJECT_NAME}_py PACKAGE_DIR py_scripts)

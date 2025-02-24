@@ -103,6 +103,7 @@ def waywise_autopilot_node_launch(context):
                     },
                 ],
                 arguments=['--ros-args', '--log-level', 'info'],
+                # prefix='gdb -ex run --args'
             )
         )
 

@@ -16,6 +16,8 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(urdf REQUIRED)
+find_package(tf2_sensor_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 # Qt5
 find_package(
@@ -148,10 +150,10 @@ set(COMMON_DEPENDENCIES
 
 ament_target_dependencies(waywise_car_node ${COMMON_DEPENDENCIES})
 ament_target_dependencies(waywise_car_autopilot_node ${COMMON_DEPENDENCIES}
-                          tf2_geometry_msgs)
+                          tf2_sensor_msgs visualization_msgs)
 ament_target_dependencies(waywise_truck_node ${COMMON_DEPENDENCIES})
 ament_target_dependencies(waywise_truck_autopilot_node ${COMMON_DEPENDENCIES}
-                          tf2_geometry_msgs)
+                          tf2_sensor_msgs visualization_msgs)
 
 install(TARGETS waywise_car_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS waywise_car_autopilot_node DESTINATION lib/${PROJECT_NAME})

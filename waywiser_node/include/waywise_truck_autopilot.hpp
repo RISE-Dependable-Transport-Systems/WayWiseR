@@ -30,6 +30,7 @@ protected:
   void angle_sensor_callback(const std_msgs::msg::Float32::SharedPtr angle_msg);
 
   // Utility methods
+  virtual void update_world_positon(geometry_msgs::msg::Pose world_pose) override;
   virtual double update_joint_states_msg(
     sensor_msgs::msg::JointState & joint_state_msg,
     double timePassed_ms) override;
@@ -52,7 +53,10 @@ protected:
   std::string truck_trailer_link_joint_name_;
   bool invert_trailer_joint_state_;
 
+  std::string trailer_pose_topic_;
+
   // Publishers
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr trailer_pose_pub_;
 
   // Subscribers
   rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr angle_sensor_sub_;

@@ -11,7 +11,6 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description():
     waywiser_teleop_dir = get_package_share_directory('waywiser_teleop')
     waywiser_rviz2_dir = get_package_share_directory('waywiser_rviz2')
-    teleop_dir = get_package_share_directory('waywiser_teleop')
 
     # args that can be set from the command line or a default will be used
     use_sim_time_la = DeclareLaunchArgument(
@@ -24,7 +23,7 @@ def generate_launch_description():
     )
     teleop_config_la = DeclareLaunchArgument(
         'teleop_config',
-        default_value=os.path.join(teleop_dir, 'config/teleop.yaml'),
+        default_value=os.path.join(waywiser_teleop_dir, 'config/teleop.yaml'),
         description='Full path to params file',
     )
 

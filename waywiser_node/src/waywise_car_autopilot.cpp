@@ -6,6 +6,8 @@ using namespace std::placeholders;
 void WaywiseCarAutopilot::initialize_node()
 {
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
   setup_parameters();
   setup_publishers();
   setup_subscribers();
@@ -29,6 +31,7 @@ void WaywiseCarAutopilot::setup_parameters()
   waywise_control_tower_address_ = this->declare_parameter(
     "waywise_control_tower_address",
     "127.0.0.1");
+  waywise_control_tower_port_ = this->declare_parameter("waywise_control_tower_port", 14540);
   purepursuit_radius_ = this->declare_parameter("purepursuit_radius", 1.0);
   update_world_position_with_odom_ = this->declare_parameter(
     "update_world_position_with_odom",
@@ -65,6 +68,20 @@ void WaywiseCarAutopilot::setup_parameters()
     "rear_wheel_joint_names",
     std::vector<std::string>{"left_rear_wheel_joint", "right_rear_wheel_joint"}
   );
+
+  preplanned_route_filepath_ = this->declare_parameter("preplanned_route_filepath", "");
+  autopilot_state_control_topic_ =
+    this->declare_parameter("autopilot_state_control_topic", "/autopilot_state_control");
+  start_with_autopilot_ = this->declare_parameter("start_with_autopilot", true);
+  desired_linear_velocity_ = this->declare_parameter("desired_linear_velocity", 0.2);
+  mission_status_topic_ = this->declare_parameter("mission_status_topic", "/mission_status");
+  end_goal_alignment_type_ = this->declare_parameter("end_goal_alignment_type", 0);
+  vehicle_alignment_reference_point_topic_ = declare_parameter(
+    "vehicle_alignment_reference_point_topic",
+    "/vehicle_alignment_reference_point");
+  autopilot_center_pose_topic_ = declare_parameter(
+    "autopilot_center_pose_topic",
+    "/autopilot_center_pose");
 }
 
 void WaywiseCarAutopilot::setup_publishers()
@@ -72,6 +89,14 @@ void WaywiseCarAutopilot::setup_publishers()
   // Publishers
   twist_pub_ = create_publisher<geometry_msgs::msg::Twist>("/waywise_vel", 10);
   vehicle_pose_pub_ = create_publisher<geometry_msgs::msg::PoseStamped>(vehicle_pose_topic_, 10);
+
+  route_marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
+    "waypoints", 10);
+  mission_status_pub_ = this->create_publisher<std_msgs::msg::Bool>(mission_status_topic_, 10);
+  vehicle_alignment_reference_point_pub_ = create_publisher<geometry_msgs::msg::PoseStamped>(
+    vehicle_alignment_reference_point_topic_, 10);
+  autopilot_center_pose_pub_ = create_publisher<geometry_msgs::msg::PoseStamped>(
+    autopilot_center_pose_topic_, 10);
 
   if (publish_joint_states_) {
     joint_state_pub_ = create_publisher<sensor_msgs::msg::JointState>("waywise_joint_states", 10);
@@ -87,6 +112,11 @@ void WaywiseCarAutopilot::setup_subscribers()
     enu_refernce_topic_,
     rclcpp::QoS(rclcpp::KeepLast(10)).reliable(),
     std::bind(&WaywiseCarAutopilot::enu_reference_callback, this, _1)
+  );
+  autopilot_state_control_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+    autopilot_state_control_topic_,
+    rclcpp::QoS(rclcpp::KeepLast(10)).reliable(),
+    std::bind(&WaywiseCarAutopilot::autopilot_state_control_callback, this, _1)
   );
 }
 
@@ -113,6 +143,8 @@ void WaywiseCarAutopilot::setup_autopilot(QSharedPointer<CarState> carState)
   mCarState->setWidth(width_);
   mCarState->setAxisDistance(wheelbase_);
   mCarState->setMaxSteeringAngle(atan(wheelbase_ / min_turning_radius_));
+  mCarState->setEndGoalAlignmentType(
+    static_cast<AutopilotEndGoalAlignmentType>(end_goal_alignment_type_));
 
   if (loadURDFFile()) {
     Eigen::Vector3d offset = getLinkPosition(urdfModel, center_frame_) -
@@ -136,7 +168,8 @@ void WaywiseCarAutopilot::setup_autopilot(QSharedPointer<CarState> carState)
   mMavsdkVehicleServer.reset(
     new MavsdkVehicleServer(
       mCarState,
-      QHostAddress(QString::fromStdString(waywise_control_tower_address_))));
+      QHostAddress(QString::fromStdString(waywise_control_tower_address_)),
+      waywise_control_tower_port_));
   mMavsdkVehicleServer->setMovementController(mCarMovementController);
   mMavsdkVehicleServer->setGNSSReceiver(mGNSSReceiver);
 
@@ -146,23 +179,61 @@ void WaywiseCarAutopilot::setup_autopilot(QSharedPointer<CarState> carState)
   mWaypointFollower->setRepeatRoute(false);
   mWaypointFollower->setAdaptivePurePursuitRadiusActive(true);
   mMavsdkVehicleServer->setWaypointFollower(mWaypointFollower);
+
+  if (start_with_autopilot_) {
+    currentMissionState = MissionState::WaitingForRoute;
+  }
+
+  // --- Load preplanned route ---
+  if (!preplanned_route_filepath_.empty()) {
+    if (preplanned_route_filepath_[0] == '~') {
+      preplanned_route_filepath_ = std::string(std::getenv("HOME")) +
+        preplanned_route_filepath_.substr(1);
+    }
+    mWaypointList = read_route_from_XMLFile(preplanned_route_filepath_);
+  }
 }
 
 void WaywiseCarAutopilot::autopilot_timer_callback()
 {
+  auto now = this->get_clock()->now();
+  static auto previousTimeCalled = now;
+  // Detect clock reset
+  if (now < previousTimeCalled) {
+    RCLCPP_WARN(this->get_logger(), "Clock reset detected! Resetting autopilot state.");
+    mWaypointFollower->clearRoute();
+    mWaypointFollower->resetState();
+    currentMissionState = MissionState::Idle;
+    mWaypointList.clear();
+    previousTimeCalled = now;
+    return;
+  }
+  previousTimeCalled = now;
+
   if (update_world_position_with_tf_) {
+    static bool transform_warning_logged_ = false;
     try {
       geometry_msgs::msg::TransformStamped map_to_base_link_msg_tfs = tf_buffer_->lookupTransform(
         world_frame_, rear_axle_frame_, tf2::TimePointZero);
-
       geometry_msgs::msg::Pose world_pose;
       world_pose.position.x = map_to_base_link_msg_tfs.transform.translation.x;
       world_pose.position.y = map_to_base_link_msg_tfs.transform.translation.y;
       world_pose.position.z = map_to_base_link_msg_tfs.transform.translation.z;
       world_pose.orientation = map_to_base_link_msg_tfs.transform.rotation;
       update_world_positon(world_pose);
+      if (transform_warning_logged_) {
+        RCLCPP_INFO(
+          get_logger(), "Transform from %s to %s is available now.",
+          world_frame_.c_str(), rear_axle_frame_.c_str());
+        transform_warning_logged_ = false;
+      }
     } catch (tf2::TransformException & ex) {
-      RCLCPP_WARN(this->get_logger(), "Failed to update world position: %s", ex.what());
+      if (!transform_warning_logged_) {
+        RCLCPP_WARN(
+          get_logger(), "Transform from %s to %s not available yet!",
+          world_frame_.c_str(), rear_axle_frame_.c_str());
+        transform_warning_logged_ = true;
+      }
     }
   }
 
@@ -180,17 +251,81 @@ void WaywiseCarAutopilot::autopilot_timer_callback()
   twist_msg.angular.z = mDesiredAngularVelocity;
 
   twist_pub_->publish(twist_msg);
+
+  switch (currentMissionState) {
+    case MissionState::Idle: {
+        // Check if mWaypointFollower is started via MAVLINK
+        if (mWaypointFollower->isActive()) {
+          if (mWaypointFollower->getCurrentRoute().size() > 0) {
+            currentMissionState = MissionState::ActiveMission;
+          } else {
+            currentMissionState = MissionState::WaitingForRoute;
+          }
+        }
+      } break;
+    case MissionState::WaitingForRoute: {
+        // Check if mWaypointFollower is stopped via MAVLINK
+        if (!mWaypointFollower->isActive()) {
+          currentMissionState = MissionState::Idle;
+          stop_waypoint_follower();
+        } else {
+          if (mWaypointList.isEmpty() && !preplanned_route_filepath_.empty()) {
+            mWaypointList = read_route_from_XMLFile(preplanned_route_filepath_);
+          }
+          if (!mWaypointList.isEmpty()) {
+            currentMissionState = MissionState::ActiveMission;
+            start_waypoint_follower(mWaypointList);
+          }
+        }
+      } break;
+    case MissionState::ActiveMission: {
+        // Check if mWaypointFollower is stopped via MAVLINK
+        if (!mWaypointFollower->isActive()) {
+          currentMissionState = MissionState::Idle;
+          stop_waypoint_follower();
+        } else {
+          geometry_msgs::msg::PoseStamped world_pose_stamped;
+          world_pose_stamped.header.frame_id = world_frame_;
+          world_pose_stamped.header.stamp = this->get_clock()->now();
+          QSharedPointer<VehicleState> referenceVehicleState = mCarState;
+          if (mCarState->hasTrailingVehicle() && mCarState->getSpeed() < 0) { // position defined by trailer when backing (if exists)
+            referenceVehicleState = mCarState->getTrailingVehicle();
+          }
+          PosPoint currentVehiclePosition = referenceVehicleState->getPosition(PosType::fused);
+          world_pose_stamped.pose.position.x = currentVehiclePosition.getX();
+          world_pose_stamped.pose.position.y = currentVehiclePosition.getY();
+          world_pose_stamped.pose.position.z = currentVehiclePosition.getHeight();
+          tf2::Quaternion orientation;
+          orientation.setRPY(0.0, 0.0, currentVehiclePosition.getYaw() * M_PI / 180.0);
+          world_pose_stamped.pose.orientation = tf2::toMsg(orientation);
+          autopilot_center_pose_pub_->publish(world_pose_stamped);
+
+          QPointF vehicleAlignmentReferencePointXY =
+            mWaypointFollower->getVehicleAlignmentReferencePoint();
+          world_pose_stamped.pose.position.x = vehicleAlignmentReferencePointXY.x();
+          world_pose_stamped.pose.position.y = vehicleAlignmentReferencePointXY.y();
+          vehicle_alignment_reference_point_pub_->publish(world_pose_stamped);
+        }
+      } break;
+    default:
+      break;
+  }
 }
 
 void WaywiseCarAutopilot::odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom_msg)
 {
-  auto current_pose = odom_msg->pose.pose;
+  geometry_msgs::msg::Pose current_pose = odom_msg->pose.pose;
   PosPoint currentPosition = mCarState->getPosition(PosType::odom);
   currentPosition.setX(current_pose.position.x);
   currentPosition.setY(current_pose.position.y);
   currentPosition.setHeight(current_pose.position.z);
-  currentPosition.updateWithOffsetAndYawRotation(
-    -(mCarState->getRearAxleToCenterOffset()), tf2::getYaw(current_pose.orientation));
+  if (odom_msg->child_frame_id == rear_axle_frame_) {
+    currentPosition.setYaw(tf2::getYaw(current_pose.orientation) * (180.0 / M_PI));
+  } else { // default is base_frame
+    currentPosition.updateWithOffsetAndYawRotation(
+      -(mCarState->getRearAxleToCenterOffset()), tf2::getYaw(current_pose.orientation));
+  }
+
   currentPosition.setTime(
     QTime::currentTime().addSecs(
       -QDateTime::currentDateTime().offsetFromUtc()));
@@ -218,15 +353,37 @@ void WaywiseCarAutopilot::odom_callback(const nav_msgs::msg::Odometry::SharedPtr
   }
 
   // -- Publish Joint states
-  if (publish_joint_states_) {
-    static auto previousTimeCalled = this->get_clock()->now();
+  static auto previousTimeCalled = this->get_clock()->now();
+  if (!received_first_odom_msg_) {
+    received_first_odom_msg_ = true;
+    previousTimeCalled = this->get_clock()->now();
+  } else if (publish_joint_states_) {
     auto thisTimeCalled = this->get_clock()->now();
     double timePassed_ms = (thisTimeCalled.nanoseconds() - previousTimeCalled.nanoseconds()) / 1e6;
     previousTimeCalled = thisTimeCalled;
-    if (timePassed_ms > 0) {
-      sensor_msgs::msg::JointState joint_state_msg;
-      update_joint_states_msg(joint_state_msg, timePassed_ms);
-      joint_state_pub_->publish(joint_state_msg);
+    sensor_msgs::msg::JointState joint_state_msg;
+    update_joint_states_msg(joint_state_msg, timePassed_ms);
+    joint_state_pub_->publish(joint_state_msg);
+  }
+}
+
+void WaywiseCarAutopilot::autopilot_state_control_callback(
+  const std_msgs::msg::Bool::SharedPtr bool_msg)
+{
+  if (bool_msg->data) {
+    if (currentMissionState == MissionState::Idle) {
+      if (mWaypointList.isEmpty()) {
+        RCLCPP_INFO(this->get_logger(), "Waiting for a route to follow...");
+        currentMissionState = MissionState::WaitingForRoute;
+        return;
+      }
+      currentMissionState = MissionState::ActiveMission;
+      start_waypoint_follower(mWaypointList);
+    }
+  } else {
+    if (currentMissionState != MissionState::Idle) {
+      currentMissionState = MissionState::Idle;
+      stop_waypoint_follower();
     }
   }
 }
@@ -311,22 +468,25 @@ double WaywiseCarAutopilot::update_joint_states_msg(
   double timePassed_ms)
 {
   static double wheel_position = 0.0;
+  double wheel_rad_per_sec = 0.0;
 
-  joint_state_msg.header.stamp = this->now();
+  if (mCarState->getSpeed() > standstill_velocity_threshold_) {
+    // Calculate wheel speed
+    wheel_rad_per_sec = (30.0 / M_PI) * mCarState->getSpeed() *
+      mCarMovementController->getSpeedToRPMFactor();
+    wheel_position += wheel_rad_per_sec * timePassed_ms * 1000.0;
+    wheel_position = fmod(wheel_position, 2.0 * M_PI);
+    if (wheel_position < 0) {
+      wheel_position += 2.0 * M_PI;
+    }
+  }
 
-  // Calculate wheel speed and steering angle
-  double wheel_rad_per_sec = (30.0 / M_PI) * mCarState->getSpeed() *
-    mCarMovementController->getSpeedToRPMFactor();
   double steeringAngle_rad = -mCarState->getSteering() * mCarState->getMaxSteeringAngle();
   if (abs(steeringAngle_rad) > mCarState->getMaxSteeringAngle()) {
     steeringAngle_rad = mCarState->getMaxSteeringAngle() * ((steeringAngle_rad > 0) ? 1.0 : -1.0);
   }
-  wheel_position += wheel_rad_per_sec * timePassed_ms * 1000.0;
-  wheel_position = fmod(wheel_position, 2.0 * M_PI);
-  if (wheel_position < 0) {
-    wheel_position += 2.0 * M_PI;
-  }
 
+  joint_state_msg.header.stamp = this->get_clock()->now();
   // Clear previous data (if any)
   joint_state_msg.name.clear();
   joint_state_msg.position.clear();
@@ -356,4 +516,155 @@ double WaywiseCarAutopilot::update_joint_states_msg(
   }
 
   return wheel_position;
+}
+
+QList<PosPoint> WaywiseCarAutopilot::read_route_from_XMLFile(const std::string xml_filepath_)
+{
+  QFile file(QString::fromUtf8(xml_filepath_.c_str()));
+
+  QXmlStreamReader stream(&file);
+  QList<PosPoint> importedRoute;
+
+  if (!file.open(QIODevice::ReadOnly)) {
+    RCLCPP_INFO(this->get_logger(), "could not open file");
+  }
+
+  if (stream.readNextStartElement()) {
+    if (stream.name() == "routes") {
+      PosPoint vehiclePosition;
+      bool use_curent_vehicle_position_as_enuref = true;
+      llh_t importedEnuRef{0.0, 0.0, 0.0};
+
+      while (stream.readNextStartElement()) {
+        if (stream.name() == "enuref") {
+          while (stream.readNextStartElement()) {
+            if (stream.name() == "Latitude") {
+              importedEnuRef.latitude = stream.readElementText().toDouble();
+              use_curent_vehicle_position_as_enuref = false;
+            }
+            if (stream.name() == "Longitude") {
+              importedEnuRef.longitude = stream.readElementText().toDouble();
+            }
+            if (stream.name() == "Height") {
+              importedEnuRef.height = stream.readElementText().toDouble();
+            }
+          }
+        }
+
+        if (use_curent_vehicle_position_as_enuref && !received_first_odom_msg_) {
+          return importedRoute;
+        }
+
+        if (stream.name() == "route") {
+          while (stream.readNextStartElement()) {
+            if (stream.name() == "point") {
+              PosPoint importedPoint;
+
+              while (stream.readNextStartElement()) {
+                if (stream.name() == "x") {
+                  importedPoint.setX(stream.readElementText().toDouble());
+                }
+                if (stream.name() == "y") {
+                  importedPoint.setY(stream.readElementText().toDouble());
+                }
+                if (stream.name() == "z") {
+                  importedPoint.setHeight(stream.readElementText().toDouble());
+                }
+                if (stream.name() == "speed") {
+                  importedPoint.setSpeed(stream.readElementText().toDouble());
+                }
+                if (stream.name() == "attributes") {
+                  importedPoint.setAttributes(stream.readElementText().toUInt());
+                }
+              }
+
+              if (use_curent_vehicle_position_as_enuref) {
+                vehiclePosition = mCarState->getPosition(PosType::fused);
+                if (mCarState->hasTrailingVehicle() && importedPoint.getSpeed() < 0) {
+                  vehiclePosition = mCarState->getTrailingVehicle()->getPosition(PosType::fused);
+                }
+
+                importedPoint.setX(importedPoint.getX() + vehiclePosition.getX());
+                importedPoint.setY(importedPoint.getY() + vehiclePosition.getY());
+              } else {
+                llh_t importedAbsPoint = coordinateTransforms::enuToLlh(
+                  importedEnuRef, {importedPoint.getX(),
+                    importedPoint.getY(), importedPoint.getHeight()});
+
+                xyz_t importedEnuPoint = coordinateTransforms::llhToEnu(
+                  mGNSSReceiver->getEnuRef(), importedAbsPoint);
+
+                importedPoint.setX(importedEnuPoint.x);
+                importedPoint.setY(importedEnuPoint.y);
+                importedPoint.setHeight(importedEnuPoint.z);
+              }
+
+              importedRoute.append(importedPoint);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return importedRoute;
+}
+
+void WaywiseCarAutopilot::start_waypoint_follower(QList<PosPoint> & waypointList)
+{
+  mWaypointFollower->clearRoute();
+  mWaypointFollower->addRoute(waypointList);
+  mWaypointFollower->startFollowingRoute(false);
+  RCLCPP_INFO(
+    this->get_logger(), "Started waypoint follower with a route of %d waypoints",
+    waypointList.size());
+  publish_route_markers();
+  mission_status_pub_->publish(std_msgs::msg::Bool().set__data(true));
+}
+
+void WaywiseCarAutopilot::stop_waypoint_follower()
+{
+  mWaypointFollower->stop();
+  RCLCPP_INFO(this->get_logger(), "Waypoint follower is stopped.");
+  mission_status_pub_->publish(std_msgs::msg::Bool().set__data(false));
+}
+
+void WaywiseCarAutopilot::update_waypoint_follower_route(QList<PosPoint> & waypointList)
+{
+  mWaypointFollower->addRoute(waypointList);
+  mWaypointList = mWaypointFollower->getCurrentRoute();
+  publish_route_markers();
+}
+
+void WaywiseCarAutopilot::publish_route_markers()
+{
+  visualization_msgs::msg::MarkerArray marker_array;
+  int id = 0;
+
+  for (const auto & waypoint : mWaypointList) {
+    visualization_msgs::msg::Marker marker;
+    marker.header.frame_id = world_frame_;
+    marker.header.stamp = this->get_clock()->now();
+    marker.ns = "";
+    marker.id = id++;
+    marker.type = visualization_msgs::msg::Marker::SPHERE;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+
+    marker.pose.position.x = waypoint.getX();
+    marker.pose.position.y = waypoint.getY();
+    marker.pose.position.z = 0.0;
+
+    marker.scale.x = 1.0;
+    marker.scale.y = 1.0;
+    marker.scale.z = 1.0;
+
+    marker.color.r = 0.0f;
+    marker.color.g = 1.0f;
+    marker.color.b = 0.0f;
+    marker.color.a = 1.0f;   // Full opacity
+
+    marker_array.markers.push_back(marker);
+  }
+
+  route_marker_pub_->publish(marker_array);
 }

@@ -3,8 +3,9 @@
   ros__parameters:
     odom_frame: odom
     base_frame: truck
+    world_frame: map
     rear_axle_frame: truck_rear_axle_link
-    center_frame: truck
+    center_frame: truck_chassis_link
     rear_end_frame: truck_rear_end_link
     hitch_frame: truck_fifth_wheel_link
     erpm_min: -10000.0
@@ -20,7 +21,7 @@
     has_trailer: true
     trailer_base_frame: semitrailer
     trailer_rear_axle_frame: semitrailer_rear_axle_link
-    trailer_center_frame: semitrailer_base_link
+    trailer_center_frame: semitrailer_chassis_link
     trailer_rear_end_frame: semitrailer_rear_end_link
     trailer_hitch_frame: semitrailer_kingpin_link
     trailer_length: 0.96
@@ -60,6 +61,8 @@ waywise_truck_node:
     # TODO: limit erpm also based on current
     # current_max: 30.0
     publish_odom_to_baselink_tf: true
+    publish_world_to_odom_tf: true
+    update_world_position_with_odom: false
     odom_publish_rate: 30 # currently same rate for both odom topic and odom->base_link tf
     imu_for_position_fusion: "vesc"
     tof_sensors: [tof_trailer_rear, tof_trailer_right, tof_trailer_left]
@@ -76,11 +79,22 @@ waywise_truck_node:
 
 waywise_truck_autopilot_node:
   ros__parameters:
+    start_with_autopilot: false
     autopilot_cmd_publish_rate: 30
     waywise_control_tower_address: "127.0.0.1"
+    waywise_control_tower_port: 14540
     purepursuit_radius: 1.5
     purepursuit_forward_gain: 1.0
     purepursuit_reverse_gain: -1.0
     adaptive_pure_pursuit: true
-    update_world_position_with_odom: true
+    preplanned_route_filepath: ""
     publish_joint_states: false
+    end_goal_alignment_type: 1 # Align {0: REAR_AXLE, 1: FRONT_REAR_END, 2: CENTER} with the end goal
+    update_world_position_with_odom: false
+    update_world_position_with_tf: true
+    mission_status_topic: "/truck/mission_status"
+    autopilot_state_control_topic: "/truck/autopilot_state_control"
+    vehicle_pose_topic: "/truck/rear_axle_pose"
+    trailer_pose_topic: "/semitrailer/rear_axle_pose"
+    vehicle_alignment_reference_point_topic: "/truck/vehicle_alignment_reference_point"
+    autopilot_center_pose_topic: "/truck/autopilot_center_pose"

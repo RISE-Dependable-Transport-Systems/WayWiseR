@@ -54,7 +54,6 @@ private:
       // Detect clock reset
       if (now < last_sim_time_) {
         RCLCPP_WARN(this->get_logger(), "Clock reset detected! Resetting initial angle.");
-        initial_angle_set_ = false;
         is_sim_ready_ = false;
         last_sim_time_ = now;
         return;
@@ -69,15 +68,7 @@ private:
 
         double dx = transformStamped.transform.translation.x;
         double dy = transformStamped.transform.translation.y;
-        double angle_radians = atan2(dy, dx);
-        double angle_degrees = angle_radians * (180.0 / M_PI);
-
-        if (!initial_angle_set_) {
-          initial_angle_ = angle_degrees;
-          initial_angle_set_ = true;
-        }
-
-        double relative_angle = angle_degrees - initial_angle_;
+        double relative_angle = (M_PI + atan2(dy, dx)) * (180.0 / M_PI);
 
         // Ensure the angle is within the range [-180, 180]
         if (relative_angle > 180.0) {
@@ -116,9 +107,7 @@ private:
   int publish_rate_;
   bool invert_angle_;
 
-  bool initial_angle_set_;
   bool is_sim_ready_ = false;
-  double initial_angle_;
   rclcpp::Time last_sim_time_;
 };
 

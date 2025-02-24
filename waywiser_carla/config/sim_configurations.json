@@ -1,27 +1,27 @@
 {
     "sim_configurations": [
         {
-            "iterations": 2,
+            "iterations": 1,
             "spawn_point": {
-                "truck": "-32.0,14.0,0.5,0,0,180",
-                "semitrailer": "-25.0,14.0,1.5,0,0,180"
+                "truck": "-38.428,40.511,0.5,0,0,180",
+                "semitrailer": "-31.428,40.511,1.5,0,0,180"
             },
             "topics_to_record": [
                 "/carla/end_simulation",
-                "/carla/status",
-                "/carla/truck/collision",
-                "/carla/truck/gnss",
-                "/carla/truck/gnss/filtered",
-                "/carla/truck/imu",
+                "/carla/semitrailer/rear_axle_pose",
+                "/carla/semitrailer/rear_left_range",
+                "/carla/semitrailer/rear_right_range",
+                "/carla/simulation_ready",
+                "/carla/truck/autopilot_center_pose",
+                "/carla/truck/autopilot_control",
+                "/carla/truck/mission_status",
                 "/carla/truck/odometry",
-                "/carla/truck/odometry/filtered_global",
-                "/carla/truck/odometry/filtered_local",
-                "/carla/truck/odometry/gps",
+                "/carla/truck/odometry_local",
+                "/carla/truck/rear_axle_pose",
                 "/carla/truck/trailer_angle",
+                "/carla/truck/vehicle_alignment_reference_point",
                 "/carla/truck/vehicle_control_cmd",
                 "/cmd_vel_out",
-                "/emergency_stop/current_state",
-                "/emergency_stop/target_state",
                 "/waywise_vel"
             ]
         }

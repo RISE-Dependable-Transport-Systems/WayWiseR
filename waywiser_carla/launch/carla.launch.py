@@ -13,6 +13,7 @@ import yaml
 
 def generate_launch_description():
     waywiser_carla_dir = get_package_share_directory('waywiser_carla')
+    waywiser_hwbringup_dir = get_package_share_directory('waywiser_hwbringup')
 
     # args that can be set from the command line or a default will be used
     use_sim_time_la = DeclareLaunchArgument(
@@ -23,10 +24,39 @@ def generate_launch_description():
         default_value=os.path.join(waywiser_carla_dir, 'config/carla.yaml'),
         description='Full path to params file for carla',
     )
+    vehicle_config_la = DeclareLaunchArgument(
+        'vehicle_config',
+        default_value=os.path.join(waywiser_carla_dir, 'config/truck_full_scale.yaml'),
+        description='Full path to params file of truck',
+    )
+
+    # include launch files
+    truck_state_publihser = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(
+                    waywiser_hwbringup_dir,
+                    'launch',
+                    'waywise_state_publisher.launch.py',
+                )
+            ]
+        ),
+        launch_arguments={
+            'vehicle_config': LaunchConfiguration('vehicle_config'),
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+        }.items(),
+    )
 
     # use context to start nodes
     carla_orchestrator_launch_action = OpaqueFunction(function=carla_orchestrator_launch)
     rgbd_to_pointcloud_launch_action = OpaqueFunction(function=rgbd_to_pointcloud_launch)
+    vehicle_odom_transform_la = OpaqueFunction(function=vehicle_odom_transform_launch)
+    emulated_angle_sensor_conditional_launch_action = OpaqueFunction(
+        function=emulated_angle_sensor_conditional_launch
+    )
+    emulated_range_sensor_conditional_launch_action = OpaqueFunction(
+        function=emulated_range_sensor_conditional_launch
+    )
 
     # create launch description
     ld = LaunchDescription()
@@ -34,10 +64,15 @@ def generate_launch_description():
     # declare launch args
     ld.add_action(use_sim_time_la)
     ld.add_action(carla_config_la)
+    ld.add_action(vehicle_config_la)
 
     # start nodes
+    ld.add_action(truck_state_publihser)
     ld.add_action(carla_orchestrator_launch_action)
     ld.add_action(rgbd_to_pointcloud_launch_action)
+    ld.add_action(vehicle_odom_transform_la)
+    ld.add_action(emulated_angle_sensor_conditional_launch_action)
+    ld.add_action(emulated_range_sensor_conditional_launch_action)
 
     return ld
 
@@ -106,32 +141,124 @@ def rgbd_to_pointcloud_launch(context):
         config_data = yaml.safe_load(f)
         node_params = config_data['/**']['ros__parameters']
         ego_vehicle_role_name = node_params['ego_vehicle_role_name']
-        rgbd_to_pointcloud_sources = node_params['rgbd_to_pointcloud_sources']
-        for rgbd_to_pointcloud_source in rgbd_to_pointcloud_sources:
-            rgbd_to_pointcloud_source_params = node_params[rgbd_to_pointcloud_source]
-            attached_to_ego_vehicle = rgbd_to_pointcloud_source_params['attached_to_ego_vehicle']
-            namespace = '/carla'
-            if attached_to_ego_vehicle:
-                namespace = namespace + '/' + ego_vehicle_role_name
+        if 'rgbd_to_pointcloud_sources' in node_params:
+            rgbd_to_pointcloud_sources = node_params['rgbd_to_pointcloud_sources']
+            for rgbd_to_pointcloud_source in rgbd_to_pointcloud_sources:
+                rgbd_to_pointcloud_source_params = node_params[rgbd_to_pointcloud_source]
+                attached_to_ego_vehicle = rgbd_to_pointcloud_source_params[
+                    'attached_to_ego_vehicle'
+                ]
+                namespace = '/carla'
+                if attached_to_ego_vehicle:
+                    namespace = namespace + '/' + ego_vehicle_role_name
 
-            nodes.append(
-                IncludeLaunchDescription(
-                    PythonLaunchDescriptionSource(
-                        [
-                            os.path.join(
-                                waywiser_perception_dir,
-                                'launch',
-                                'rgbd_to_pointcloud.launch.py',
-                            )
-                        ]
-                    ),
-                    launch_arguments={
-                        'use_sim_time': LaunchConfiguration('use_sim_time'),
-                        'namespace': namespace,
-                        'rgb_camera_node_name': rgbd_to_pointcloud_source_params['rgb_camera'],
-                        'depth_camera_node_name': rgbd_to_pointcloud_source_params['depth_camera'],
-                    }.items(),
+                nodes.append(
+                    IncludeLaunchDescription(
+                        PythonLaunchDescriptionSource(
+                            [
+                                os.path.join(
+                                    waywiser_perception_dir,
+                                    'launch',
+                                    'rgbd_to_pointcloud.launch.py',
+                                )
+                            ]
+                        ),
+                        launch_arguments={
+                            'use_sim_time': LaunchConfiguration('use_sim_time'),
+                            'namespace': namespace,
+                            'rgb_camera_node_name': rgbd_to_pointcloud_source_params['rgb_camera'],
+                            'depth_camera_node_name': rgbd_to_pointcloud_source_params[
+                                'depth_camera'
+                            ],
+                        }.items(),
+                    )
                 )
+
+    return nodes
+
+
+def vehicle_odom_transform_launch(context):
+    ego_vehicle_role_name = ''
+    with open(LaunchConfiguration('carla_config').perform(context)) as f:
+        config_data = yaml.safe_load(f)
+        carla_params = config_data['/**']['ros__parameters']
+        if 'ego_vehicle_role_name' in carla_params:
+            ego_vehicle_role_name = carla_params['ego_vehicle_role_name']
+
+    node_params = {}
+    with open(LaunchConfiguration('vehicle_config').perform(context)) as f:
+        config_data = yaml.safe_load(f)
+        node_params = config_data['/**']['ros__parameters']
+
+    vehicle_odom_transform = Node(
+        package='waywiser_carla',
+        executable='vehicle_odom_transform',
+        name=ego_vehicle_role_name + '_odom_transform',
+        output='screen',
+        emulate_tty=True,
+        parameters=[
+            {'use_sim_time': LaunchConfiguration('use_sim_time')},
+            {'base_frame': node_params['base_frame']},
+            {'odom_frame': node_params['odom_frame']},
+            {'input_odom_topic': '/carla/' + ego_vehicle_role_name + '/odometry'},
+            {'output_odom_topic': node_params['odom_topic']},
+        ],
+    )
+
+    return [vehicle_odom_transform]
+
+
+def emulated_angle_sensor_conditional_launch(context):
+    nodes = []
+    emulated_angle_sensors = []
+    params_dict = {}
+    with open(LaunchConfiguration('vehicle_config').perform(context)) as f:
+        config_data = yaml.safe_load(f)
+        params_dict = config_data['/**']['ros__parameters']
+        if 'emulated_angle_sensors' in params_dict:
+            emulated_angle_sensors = params_dict['emulated_angle_sensors']
+
+    for emulated_angle_sensor in emulated_angle_sensors:
+        node_params = params_dict[emulated_angle_sensor]
+        nodes.append(
+            Node(
+                package='waywiser_carla',
+                executable='emulated_angle_sensor',
+                name=emulated_angle_sensor,
+                parameters=[
+                    {'use_sim_time': LaunchConfiguration('use_sim_time')},
+                    node_params,
+                ],
+                output='screen',
             )
+        )
+
+    return nodes
+
+
+def emulated_range_sensor_conditional_launch(context):
+    nodes = []
+    emulated_range_sensors = []
+    params_dict = {}
+    with open(LaunchConfiguration('vehicle_config').perform(context)) as f:
+        config_data = yaml.safe_load(f)
+        params_dict = config_data['/**']['ros__parameters']
+        if 'emulated_range_sensors' in params_dict:
+            emulated_range_sensors = params_dict['emulated_range_sensors']
+
+    for emulated_range_sensor in emulated_range_sensors:
+        node_params = params_dict[emulated_range_sensor]
+        nodes.append(
+            Node(
+                package='waywiser_carla',
+                executable='emulated_range_sensor',
+                name=emulated_range_sensor,
+                parameters=[
+                    {'use_sim_time': LaunchConfiguration('use_sim_time')},
+                    node_params,
+                ],
+                output='screen',
+            )
+        )
 
     return nodes

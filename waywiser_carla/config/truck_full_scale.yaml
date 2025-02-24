@@ -1,37 +1,152 @@
 /**:
   # general parameters shared by all waywise-related nodes
   ros__parameters:
-    odom_frame: truck
+    odom_frame: odom
     base_frame: truck
+    world_frame: map
+    rear_axle_frame: truck_rear_axle_link
+    center_frame: truck_chassis_link
+    rear_end_frame: truck_rear_end_link
+    hitch_frame: truck_fifth_wheel_link
     erpm_min: -30000.0
     erpm_max: 30000.0
     speed_to_erpm_factor: 4500.0
-    length: 6.97
-    width: 2.98
-    wheelbase: 3.1
+    length: 6.96
+    width: 3.0
+    wheelbase: 3.77
     min_turning_radius: 2.54 # wheelbase/tan(max_steering_angle)
     max_angular_velocity: 0.5 # rad/s
     standstill_velocity_threshold: 0.05
-    odom_topic: "/carla/truck/odometry"
+    odom_topic: "/carla/truck/odometry_local"
+    has_trailer: true
+    trailer_base_frame: semitrailer
+    trailer_rear_axle_frame: semitrailer_rear_axle_link
+    trailer_center_frame: semitrailer_chassis_link
+    trailer_rear_end_frame: semitrailer_rear_end_link
+    trailer_hitch_frame: semitrailer_kingpin_link
     trailer_length: 13.7
     trailer_width: 2.51
     trailer_wheelbase: 9.0
-    angle_sensor_topic: "sensors/truck/angle"
+    angle_sensor_topic: "/carla/truck/trailer_angle"
+    urdf_file: "semitruck.urdf.xacro"
+    urdf_scale: 1.0 # 1:1
+    front_steering_joint_names: ["truck_fls_link_joint", "truck_frs_link_joint"]
+    front_wheel_joint_names: ["truck_flw_link_joint", "truck_frw_link_joint"]
+    rear_wheel_joint_names:
+      [
+        "truck_mlw_link_joint",
+        "truck_mrw_link_joint",
+        "truck_rlw_link_joint",
+        "truck_rrw_link_joint",
+      ]
+    trailer_wheel_joint_names:
+      [
+        "semitrailer_flw_link_joint",
+        "semitrailer_frw_link_joint",
+        "semitrailer_mlw_link_joint",
+        "semitrailer_mrw_link_joint",
+        "semitrailer_rlw_link_joint",
+        "semitrailer_rrw_link_joint",
+      ]
+    truck_trailer_link_joint_name: "truck_trailer_link_joint"
+    invert_trailer_joint_state: true
+    emulated_angle_sensors: ["truck_trailer_angle_sensor"]
+    truck_trailer_angle_sensor:
+      primary_frame: truck_fifth_wheel_link
+      secondary_frame: semitrailer
+      publish_rate: 30
+      invert_angle: true
+      angle_sensor_topic: "/carla/truck/trailer_angle"
+    emulated_range_sensors:
+      [
+        "semitrailer_rear_left_range_sensor",
+        "semitrailer_rear_range_right_sensor",
+      ]
+    semitrailer_rear_left_range_sensor:
+      frame_id: semitrailer_rear_left_end_link
+      publish_rate: 30
+      depth_topic: "/carla/semitrailer/rear_left/image"
+      range_topic: "/carla/semitrailer/rear_left_range"
+      min_range: 0.1
+      max_range: 1.5
+      field_of_view: 12.0
+      radiation_type: 0 # 0: ULTRASOUND, 1: INFRARED
+    semitrailer_rear_range_right_sensor:
+      frame_id: semitrailer_rear_right_end_link
+      publish_rate: 30
+      depth_topic: "/carla/semitrailer/rear_right/image"
+      range_topic: "/carla/semitrailer/rear_right_range"
+      min_range: 0.1
+      max_range: 1.5
+      field_of_view: 12.0
+      radiation_type: 0 # 0: ULTRASOUND, 1: INFRARED
 
 waywise_truck_autopilot_node:
   ros__parameters:
-    has_trailer: true
+    start_with_autopilot: false
     autopilot_cmd_publish_rate: 30
     waywise_control_tower_address: "127.0.0.1"
-    purepursuit_radius: 20.0
+    waywise_control_tower_port: 14540
+    purepursuit_radius: 4.0
     purepursuit_forward_gain: 1.0
-    purepursuit_reverse_gain: -1.0
+    purepursuit_reverse_gain: -1.1
     adaptive_pure_pursuit: true
+    preplanned_route_filepath: "~/workspaces/carla_ws/waywiser/resources/route.xml"
+    publish_joint_states: true
+    end_goal_alignment_type: 1 # Align {0: REAR_AXLE, 1: FRONT_REAR_END, 2: CENTER} with the end goal
+    update_world_position_with_odom: false
+    update_world_position_with_tf: true
+    mission_status_topic: "/carla/truck/mission_status"
+    autopilot_state_control_topic: "/carla/truck/autopilot_state_control"
+    vehicle_pose_topic: "/carla/truck/rear_axle_pose"
+    trailer_pose_topic: "/carla/semitrailer/rear_axle_pose"
+    vehicle_alignment_reference_point_topic: "/carla/truck/vehicle_alignment_reference_point"
+    autopilot_center_pose_topic: "/carla/truck/autopilot_center_pose"
 
-emulated_angle_sensor:
+emergency_stop_monitor:
   ros__parameters:
-    enable: true
-    primary_frame: truck
-    secondary_frame: semitrailer
-    publish_rate: 10
-    invert_angle: true
+    start_with_emergency_stop: false
+    cmd_vel_in_timeout: 0.5
+    emergency_stop_state_publish_rate: 10
+
+onboard_twist_mux:
+  ros__parameters:
+    topics:
+      teleop:
+        topic: teleop_mux_vel
+        timeout: 0.5
+        priority: 100
+      waywise:
+        topic: waywise_vel
+        timeout: 0.5
+        priority: 60
+      nav2:
+        topic: nav2_vel
+        timeout: 0.5
+        priority: 50
+
+collision_monitor:
+  ros__parameters:
+    base_frame_id: "truck"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "onboard_mux_vel"
+    cmd_vel_out_topic: "collision_monitor_vel"
+    transform_tolerance: 0.5
+    source_timeout: 5.0
+    base_shift_correction: True
+    stop_pub_timeout: 2.0
+    polygons: ["PolygonSlow"]
+    PolygonSlow:
+      type: "circle"
+      action_type: "slowdown"
+      max_points: 3
+      slowdown_ratio: 0.5
+      visualize: True
+      radius: 20.0
+      polygon_pub_topic: "/carla/truck/polygon_slowdown"
+    observation_sources: ["pointcloud_front"]
+    pointcloud_front:
+      type: "pointcloud"
+      topic: "/carla/truck/depth_front/color/points"
+      min_height: 0.1
+      max_height: 0.5

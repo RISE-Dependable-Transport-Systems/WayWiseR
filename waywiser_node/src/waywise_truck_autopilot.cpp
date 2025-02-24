@@ -20,6 +20,7 @@ void WaywiseTruckAutopilot::setup_parameters()
     purepursuit_reverse_gain_ = this->declare_parameter("purepursuit_reverse_gain", -1.0);
     angle_sensor_topic_ = this->declare_parameter("angle_sensor_topic", "/sensors/angle");
 
+    trailer_base_frame_ = declare_parameter("trailer_base_frame", "trailer");
     trailer_rear_axle_frame_ = this->declare_parameter(
       "trailer_rear_axle_frame",
       trailer_base_frame_);
@@ -35,6 +36,8 @@ void WaywiseTruckAutopilot::setup_parameters()
       "truck_trailer_link_joint_name", "truck_trailer_link_joint"
     );
     invert_trailer_joint_state_ = this->declare_parameter("invert_trailer_joint_state", false);
+
+    trailer_pose_topic_ = declare_parameter("trailer_pose_topic", "/trailer_pose");
   }
 }
 
@@ -42,6 +45,11 @@ void WaywiseTruckAutopilot::setup_publishers()
 {
   // Call base class setup_publishers
   WaywiseCarAutopilot::setup_publishers();
+
+  if (has_trailer_) {
+    trailer_pose_pub_ =
+      create_publisher<geometry_msgs::msg::PoseStamped>(trailer_pose_topic_, 10);
+  }
 }
 
 void WaywiseTruckAutopilot::setup_subscribers()
@@ -49,9 +57,11 @@ void WaywiseTruckAutopilot::setup_subscribers()
   // Call base class setup_subscribers
   WaywiseCarAutopilot::setup_subscribers();
 
-  angle_sensor_sub_ = this->create_subscription<std_msgs::msg::Float32>(
-    angle_sensor_topic_, 10,
-    std::bind(&WaywiseTruckAutopilot::angle_sensor_callback, this, _1));
+  if (has_trailer_) {
+    angle_sensor_sub_ = this->create_subscription<std_msgs::msg::Float32>(
+      angle_sensor_topic_, 10,
+      std::bind(&WaywiseTruckAutopilot::angle_sensor_callback, this, _1));
+  }
 }
 
 void WaywiseTruckAutopilot::setup_timers()
@@ -106,6 +116,26 @@ void WaywiseTruckAutopilot::setup_autopilot()
 void WaywiseTruckAutopilot::angle_sensor_callback(const std_msgs::msg::Float32::SharedPtr angle_msg)
 {
   mTruckState->setTrailerAngle(angle_msg->data);
+}
+
+void WaywiseTruckAutopilot::update_world_positon(geometry_msgs::msg::Pose world_pose)
+{
+  WaywiseCarAutopilot::update_world_positon(world_pose);
+
+  if (has_trailer_) {
+    geometry_msgs::msg::PoseStamped world_pose_stamped;
+    world_pose_stamped.header.frame_id = world_frame_;
+    world_pose_stamped.header.stamp = this->get_clock()->now();
+
+    PosPoint currentTrailerPosition = mTrailerState->getPosition(PosType::fused);
+    world_pose_stamped.pose.position.x = currentTrailerPosition.getX();
+    world_pose_stamped.pose.position.y = currentTrailerPosition.getY();
+    world_pose_stamped.pose.position.z = currentTrailerPosition.getHeight();
+    tf2::Quaternion orientation;
+    orientation.setRPY(0.0, 0.0, currentTrailerPosition.getYaw() * M_PI / 180.0);
+    world_pose_stamped.pose.orientation = tf2::toMsg(orientation);
+    trailer_pose_pub_->publish(world_pose_stamped);
+  }
 }
 
 double WaywiseTruckAutopilot::update_joint_states_msg(
