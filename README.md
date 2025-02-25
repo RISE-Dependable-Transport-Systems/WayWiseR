@@ -23,11 +23,14 @@ A typical project might start out in simulation using ROS2 and Gazebo. Then, Way
 Alternatively, a project could start out with a ROS2-supported sensor that you want to gather data with (say a LiDAR). Then, WayWise could be used to make the sensor mobile with exact positioning and waypoint following (2. use case).
 Considering the modularity of ROS2 and WayWise, a project could also do something entirely different that does not clearly fit into one of the use cases. 😊
 
-Main authors are (firstname.lastname@ri.se):
+Current maintainers are: (firstname.lastname@ri.se):
 
 - Ramana Reddy Avula
-- Rickard Häll
 - Marvin Damschen
+
+Previous maintainers:
+
+- Rickard Häll
 
 ## How to use it and what to expect
 
@@ -87,7 +90,7 @@ WayWiseR is divided into several ROS2 packages. Make sure to have a look into th
 - **waywiser_gazebo**: Everything related to simulation using [Gazebo](https://gazebosim.org).
 - **waywiser_hwbringup**: Configuration and launch files to get real (not simulated) vehicles running.
 - **waywiser_nav2**: Package that provides dynamic path planning using [Nav2](https://navigation.ros.org/).
-- **waywiser_node**: Wraps [WayWise](https://github.com/RISE-Dependable-Transport-Systems/WayWise) into ROS2 nodes (currently a single node).
+- **waywiser_core**: Wraps [WayWise](https://github.com/RISE-Dependable-Transport-Systems/WayWise) into ROS2 nodes.
 - **waywiser_perception**: Provides image-processing and computer vision functionalities using [YOLOv8](https://docs.ultralytics.com/).
 - **waywiser_rviz2**: Configuration and launch files for RViz2.
 - **waywiser_slam**: Configuration and launch files for [SLAM Toolbox](https://github.com/SteveMacenski/slam_toolbox).

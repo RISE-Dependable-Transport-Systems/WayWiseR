@@ -6,10 +6,9 @@
 
   <description>Provides hardware support for real robot and sensors</description>
 
-  <maintainer email="rickard.hall@ri.se">Rickard Häll</maintainer>
   <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
 
-  <license>TODO: License declaration</license>
+  <license>GPLv3</license>
 
   <url type="website">https://github.com/RISE-Dependable-Transport-Systems/WayWise</url>
 

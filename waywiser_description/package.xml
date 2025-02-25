@@ -6,7 +6,6 @@
 
   <description>Robot models and sensors are defined by URDF files</description>
 
-  <maintainer email="rickard.hall@ri.se">Rickard Häll</maintainer>
   <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
 
   <license>GPLv3</license>
