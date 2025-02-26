@@ -39,7 +39,7 @@ def generate_launch_description():
 
 def launch_setup(context):
     rviz2_dir = get_package_share_directory('waywiser_rviz2')
-    default_rviz_config_dir = os.path.join(rviz2_dir, 'rviz')
+    default_rviz_config_dir = os.path.join(rviz2_dir, 'config')
     default_rviz_config_file = os.path.join(default_rviz_config_dir, 'odom_reference_frame.rviz')
 
     rviz_config_file_full_path = ''
