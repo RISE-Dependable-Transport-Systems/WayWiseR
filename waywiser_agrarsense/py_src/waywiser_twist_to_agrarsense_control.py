@@ -15,6 +15,8 @@ from std_msgs.msg import String
 
 
 class PIDController:
+    """PIDController class for computing control output using a PID algorithm."""
+
     def __init__(self, kp, ki, kd):
         self.kp = kp
         self.ki = ki
@@ -35,6 +37,8 @@ class PIDController:
 
 
 class WaywiserTwistToAgrarsenseControl(Node):
+    """ROS2 node that converts Twist messages to Agrarsense vehicle control messages."""
+
     def __init__(self):
         super().__init__('waywiser_twist_to_agrarsense_control')
 

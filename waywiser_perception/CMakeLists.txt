@@ -43,7 +43,7 @@ include_directories(include)
 ament_export_include_directories(include)
 
 add_library(point_cloud_transformer_core SHARED
-            cpp_src/rclcpp_components/point_cloud_transformer_core.cpp)
+  cpp_src/rclcpp_components/point_cloud_transformer_core.cpp)
 ament_target_dependencies(
   point_cloud_transformer_core
   rclcpp
@@ -53,7 +53,7 @@ ament_target_dependencies(
   geometry_msgs
   rclcpp_components)
 rclcpp_components_register_nodes(point_cloud_transformer_core
-                                 waywiser_perception::PointCloudTransformer)
+  waywiser_perception::PointCloudTransformer)
 add_executable(point_cloud_transformer cpp_src/point_cloud_transformer.cpp)
 target_link_libraries(point_cloud_transformer point_cloud_transformer_core)
 

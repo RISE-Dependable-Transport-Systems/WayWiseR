@@ -19,6 +19,8 @@ import tf_transformations
 
 
 class CarlaOrchestrator(Node):
+    """CarlaOrchestrator is a ROS2 node that manages the orchestration of the CARLA simulator."""
+
     def __init__(self):
         super().__init__('carla_orchestrator_node')
 
@@ -239,7 +241,7 @@ class CarlaOrchestrator(Node):
         return subprocess_
 
     def setup_simulator(self, weather):
-        """Setup the CARLA simulator."""
+        """Start the CARLA simulator."""
         if self.carla_script_path:
             start_simulator_command = [self.carla_script_path]
             if self.town != '':
@@ -265,7 +267,8 @@ class CarlaOrchestrator(Node):
         if self.town != carla_map_name:
             if 'simulator' in self.subprocesses:
                 raise ValueError(
-                    f'Could not start carla with town {self.town}. "{carla_map_name}" town is loaded.'
+                    f'Could not start carla with town {self.town}. "{carla_map_name}" town '
+                    f'is loaded.'
                 )
             else:
                 self.client.load_world(self.town)
@@ -279,7 +282,6 @@ class CarlaOrchestrator(Node):
 
     def start_carla_ros_bridge(self):
         """Start the carla_ros_bridge node."""
-
         command = ['ros2', 'run', 'carla_ros_bridge', 'bridge', '--ros-args']
         for param, value in self.carla_ros_bridge_params.items():
             command.extend(['-p', f'{param}:={value}'])
@@ -302,7 +304,6 @@ class CarlaOrchestrator(Node):
 
     def spawn_objects(self, sim_config, timeout=10):
         """Start the carla_spawn_objects node."""
-
         spawn_objects_params = {}
         spawn_objects_params['use_sim_time'] = True
         spawn_objects_params['objects_definition_file'] = sim_config['objects_json_path']
@@ -370,7 +371,9 @@ class CarlaOrchestrator(Node):
                                         sim_config['ego_vehicle_role_name'], sensor['id']
                                     )
                                     self.get_logger().info(
-                                        f"Initialized vehicle control for {sim_config['ego_vehicle_role_name']} with control id {sensor['id']}."
+                                        f'Initialized vehicle control for '
+                                        f'{sim_config["ego_vehicle_role_name"]} with '
+                                        f'control id {sensor["id"]}.'
                                     )
                                     break
             except Exception as e:
@@ -378,7 +381,6 @@ class CarlaOrchestrator(Node):
 
     def set_initial_pose(self, role_name, control_id):
         """Start the carla_set_initial_pose node."""
-
         command = [
             'ros2',
             'run',
@@ -407,7 +409,8 @@ class CarlaOrchestrator(Node):
 
     def end_current_simulation(self):
         self.get_logger().info(
-            f'Ending simulation with index [{self.current_config_index}-{self.current_iter_index}].'
+            f'Ending simulation with index [{self.current_config_index}-'
+            f'{self.current_iter_index}].'
         )
         self.cleanup_subprocesses()
         if self.reset_carla_after_exec:
@@ -425,14 +428,15 @@ class CarlaOrchestrator(Node):
         self.start_next_simulation()
 
     def start_next_simulation(self):
-        """Loads the next simulation configuration and starts the simulation."""
+        """Load the next simulation configuration and starts the simulation."""
         if self.current_config_index >= len(self.sim_configurations):
             self.get_logger().info('All simulations completed.')
             self.destroy_node()
             return
 
         self.get_logger().info(
-            f'Starting simulation with index [{self.current_config_index}-{self.current_iter_index}].'
+            f'Starting simulation with index [{self.current_config_index}-'
+            f'{self.current_iter_index}].'
         )
         sim_config = self.sim_configurations[self.current_config_index]
 
@@ -489,7 +493,7 @@ class CarlaOrchestrator(Node):
             self.static_tf_broadcaster.sendTransform(transform)
 
     def terminate_process(self, process):
-        """Forcefully terminate a process and its children using psutil."""
+        """Force terminate a process and its children using psutil."""
         try:
             process_ps = psutil.Process(process.pid)
             child_ps = process_ps.children(recursive=True)
@@ -525,12 +529,12 @@ class CarlaOrchestrator(Node):
 
     def cleanup_subprocesses(self):
         """Cleanup subprocesses."""
-        for id in list(self.subprocesses.keys()):
+        for id_ in list(self.subprocesses.keys()):
             try:
-                process = self.subprocesses.pop(id)
+                process = self.subprocesses.pop(id_)
                 self.terminate_process(process)
             except Exception as e:
-                self.get_logger().warn(f'Error cleaning up subprocess {id}: {e}')
+                self.get_logger().warn(f'Error cleaning up subprocess {id_}: {e}')
 
     def destroy_node(self):
         """Override to ensure the subprocesses are terminated on shutdown."""

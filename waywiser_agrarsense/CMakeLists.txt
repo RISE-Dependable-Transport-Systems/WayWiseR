@@ -18,7 +18,7 @@ install(DIRECTORY launch config ros_bridge DESTINATION share/${PROJECT_NAME})
 
 install(
   PROGRAMS py_src/agrarsense_orchestrator.py py_src/vehicle_tf_publisher.py
-           py_src/waywiser_twist_to_agrarsense_control.py
+  py_src/waywiser_twist_to_agrarsense_control.py
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)

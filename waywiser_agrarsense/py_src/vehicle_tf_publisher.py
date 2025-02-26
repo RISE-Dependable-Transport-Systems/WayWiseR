@@ -13,6 +13,8 @@ from tf_transformations import quaternion_from_euler
 
 
 class VehicleTFPublisher(Node):
+    """ROS2 node that publishes vehicle odometry and transforms."""
+
     def __init__(self):
         super().__init__('vehicle_tf_publisher')
 

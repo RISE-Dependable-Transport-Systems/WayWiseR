@@ -38,10 +38,10 @@ rosidl_generate_interfaces(
   builtin_interfaces)
 
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME}
-                              rosidl_typesupport_cpp)
+  rosidl_typesupport_cpp)
 
 add_library(emergency_stop_monitor_core SHARED
-            cpp_src/rclcpp_components/emergency_stop_monitor_core.cpp)
+  cpp_src/rclcpp_components/emergency_stop_monitor_core.cpp)
 ament_target_dependencies(
   emergency_stop_monitor_core
   geometry_msgs
@@ -50,7 +50,7 @@ ament_target_dependencies(
   sensor_msgs
   std_msgs)
 rclcpp_components_register_nodes(emergency_stop_monitor_core
-                                 waywiser_twist_safety::EmergencyStopMonitor)
+  waywiser_twist_safety::EmergencyStopMonitor)
 target_link_libraries(emergency_stop_monitor_core "${cpp_typesupport_target}")
 
 add_executable(emergency_stop_monitor cpp_src/emergency_stop_monitor.cpp)
