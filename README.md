@@ -62,14 +62,20 @@ Setup workspace and build it (without simulator-related packages):
 
     sudo apt update && sudo apt install -y libunwind-dev libqt5serialport5-dev git build-essential cmake python3-colcon-common-extensions
 
-    mkdir -p ~/waywiser_ws/src
-    cd ~/waywiser_ws/src
-    git clone --recurse-submodules git@github.com:RISE-Dependable-Transport-Systems/WayWiseR.git
-    cd ..
+    export WAYWISER_WS=$HOME/waywiser_ws     #update the environment variable with desired path
+    mkdir -p $WAYWISER_WS/src
+    git clone git@github.com:RISE-Dependable-Transport-Systems/WayWiseR.git $WAYWISER_WS/src/WayWiseR
+    cd $WAYWISER_WS/src/WayWiseR
+    git submodule update --init waywiser_core/WayWise
+    cd $WAYWISER_WS
     rosdep install --from-paths $(colcon list --paths-only | grep -v -E "waywiser_agrarsense|waywiser_carla|waywiser_gazebo") --ignore-src --rosdistro humble -r -y
     colcon build --symlink-install --packages-skip waywiser_agrarsense waywiser_carla waywiser_gazebo
 
 To build simulator-related packages such as waywiser_agrarsense, waywiser_carla, and waywiser_gazebo, follow the instructions in the respective packages.
+
+Add WAYWISER_WS environment variable to .bashrc to persist the variable when a new terminal is opened:
+
+`echo "export WAYWISER_WS=$WAYWISER_WS" >> ~/.bashrc`
 
 Before sourcing the overlay, it is very important that you open a new terminal, separate from the one where you built the workspace. Sourcing an overlay in the same terminal where you built, or likewise building where an overlay is sourced, may create complex issues.
 
@@ -86,11 +92,11 @@ WayWiseR is divided into several ROS2 packages. Make sure to have a look into th
 - **waywiser**: A meta package that depends on all packages below to be able to refer to WayWiseR as a whole. It contains configuration files to optionally setup fastdds discovery server.
 - **waywiser_agrarsense**: Everything related to simulation using [Agrarsense simulator](https://agrarsense.frostbit.fi/index.html#md_Docs_getting_started).
 - **waywiser_carla**: Everything related to simulation using [Carla](https://carla.org/).
+- **waywiser_core**: Wraps [WayWise](https://github.com/RISE-Dependable-Transport-Systems/WayWise) into ROS2 nodes.
 - **waywiser_description**: Contains vehicle descriptions in the form of [xacro](https://docs.ros.org/en/humble/Tutorials/Intermediate/URDF/Using-Xacro-to-Clean-Up-a-URDF-File.html) files. Currently a single vehicle is available that corresponds to a [Traxxas](https://traxxas.com/) Slash incl. camera, depth camera, LiDAR and IMU.
 - **waywiser_gazebo**: Everything related to simulation using [Gazebo](https://gazebosim.org).
 - **waywiser_hwbringup**: Configuration and launch files to get real (not simulated) vehicles running.
 - **waywiser_nav2**: Package that provides dynamic path planning using [Nav2](https://navigation.ros.org/).
-- **waywiser_core**: Wraps [WayWise](https://github.com/RISE-Dependable-Transport-Systems/WayWise) into ROS2 nodes.
 - **waywiser_perception**: Provides image-processing and computer vision functionalities using [YOLOv8](https://docs.ultralytics.com/).
 - **waywiser_rviz2**: Configuration and launch files for RViz2.
 - **waywiser_slam**: Configuration and launch files for [SLAM Toolbox](https://github.com/SteveMacenski/slam_toolbox).
