@@ -17,39 +17,37 @@ find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(waywiser_twist_safety REQUIRED)
 
-add_executable(joy_emergency_stop src/joy_emergency_stop.cpp)
-ament_target_dependencies(joy_emergency_stop rclcpp sensor_msgs std_msgs waywiser_twist_safety)
-target_include_directories(joy_emergency_stop PRIVATE
-  ${waywiser_twist_safety_INCLUDE_DIRS}
-)
+add_executable(joy_emergency_stop cpp_src/joy_emergency_stop.cpp)
+ament_target_dependencies(
+  joy_emergency_stop
+  rclcpp
+  sensor_msgs
+  std_msgs
+  waywiser_twist_safety)
+target_include_directories(joy_emergency_stop
+                           PRIVATE ${waywiser_twist_safety_INCLUDE_DIRS})
 
-add_executable(twist_angular_correction src/twist_angular_correction.cpp)
-ament_target_dependencies(twist_angular_correction geometry_msgs rclcpp sensor_msgs std_msgs)
+add_executable(twist_angular_correction cpp_src/twist_angular_correction.cpp)
+ament_target_dependencies(
+  twist_angular_correction
+  geometry_msgs
+  rclcpp
+  sensor_msgs
+  std_msgs)
 
 install(TARGETS joy_emergency_stop RUNTIME DESTINATION lib/${PROJECT_NAME})
-install(TARGETS twist_angular_correction RUNTIME DESTINATION lib/${PROJECT_NAME})
+install(TARGETS twist_angular_correction
+        RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
 
-ament_python_install_package(${PROJECT_NAME}_py
-  PACKAGE_DIR py_scripts
-)
+ament_python_install_package(${PROJECT_NAME}_py PACKAGE_DIR py_src)
 
-install(PROGRAMS
-  py_scripts/twist_keyboard.py
-  DESTINATION lib/${PROJECT_NAME}
-)
+install(PROGRAMS py_src/twist_keyboard.py DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-
-  # the following line skips the linter which checks for copyrights comment the
-  # line when a copyright and license is added to all source files
   set(ament_cmake_copyright_FOUND TRUE)
-
-  # the following line skips cpplint (only works in a git repo) comment the line
-  # when this package is in a git repo and when a copyright and license is added
-  # to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
