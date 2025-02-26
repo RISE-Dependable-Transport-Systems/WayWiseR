@@ -11,6 +11,9 @@ find_package(rclpy REQUIRED)
 
 ament_python_install_package(${PROJECT_NAME}_py PACKAGE_DIR py_src)
 
+file(GLOB ROS_BRIDGE_FILES "ros_bridge/*")
+install(FILES ${ROS_BRIDGE_FILES} DESTINATION ros_bridge)
+
 install(DIRECTORY launch config ros_bridge DESTINATION share/${PROJECT_NAME})
 
 install(
