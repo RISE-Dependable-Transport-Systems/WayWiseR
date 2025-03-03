@@ -41,11 +41,11 @@ This ROS2 package is meant to be cloned into a ROS2 workspace.
 We do not do releases (for the time being) and do not promise a stable API but stick to standard ROS messages wherever possible.
 In general, our development resources are scarce and dedicated to fulfill use cases of research projects we are part of. We do our best to avoid it, but things will break from time to time.
 
-### How to install and build (on Ubuntu 22.04)
+### How to install and build (on Ubuntu 24.04)
 
 Install ROS2 (required):
 
-- [Install ROS2 Humble](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html)
+- [Install ROS2 Jazzy](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debians.html)
 
 Install MAVSDK latest 2.x version (required, version 3.x is not supported):
 
@@ -71,23 +71,23 @@ Setup workspace and build it (without simulator-related packages):
     cd $WAYWISER_WS
     python -m venv .venv
     source .venv/bin/activate
-    export PYTHONPATH=.venv/lib/python3.10/site-packages:$PYTHONPATH
+    export PYTHONPATH=.venv/lib/python3.12/site-packages:$PYTHONPATH
     pip install -r src/WayWiseR/requirements.txt
-    source /opt/ros/humble/setup.bash
-    rosdep install --from-paths $(colcon list --paths-only | grep -Evw "$(echo "$WAYWISER_SKIPPED_PACKAGES" | tr ' ' '|')") --ignore-src --rosdistro humble -r -y
+    source /opt/ros/jazzy/setup.bash
+    rosdep install --from-paths $(colcon list --paths-only | grep -Evw "$(echo "$WAYWISER_SKIPPED_PACKAGES" | tr ' ' '|')") --ignore-src --rosdistro jazzy -r -y
     colcon build --symlink-install --packages-skip $WAYWISER_SKIPPED_PACKAGES
 
 To build simulator-related packages such as waywiser_agrarsense, waywiser_carla, and waywiser_gazebo, follow the instructions in the respective packages.
 
 Add the following environment variables to .bashrc to persist them when a new terminal is opened:
 
-    echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+    echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc
     echo "export WAYWISER_WS=$WAYWISER_WS" >> ~/.bashrc
     echo "export WAYWISER_SKIPPED_PACKAGES=$WAYWISER_SKIPPED_PACKAGES" >> ~/.bashrc
 
 To setup the ROS2 environment with the correct python path and source overlay automatically, run the following command:
 
-    echo 'export PYTHONPATH=.venv/lib/python3.10/site-packages:$PYTHONPATH' >> .venv/bin/activate
+    echo 'export PYTHONPATH=.venv/lib/python3.12/site-packages:$PYTHONPATH' >> .venv/bin/activate
     echo 'if [ -f "install/setup.bash" ]; then' >> .venv/bin/activate
     echo ' source "install/setup.bash"' >> .venv/bin/activate
     echo 'fi' >> .venv/bin/activate
