@@ -65,6 +65,7 @@
         <update_rate>60</update_rate>
         <pose>0 0 0 0 0 -1.570795</pose>
         <topic>"sensors/camera"</topic>
+        <gz_frame_id>camera_link</gz_frame_id>
         <camera>
           <optical_frame_id>"camera_link"</optical_frame_id>
           <horizontal_fov>1.089</horizontal_fov>
