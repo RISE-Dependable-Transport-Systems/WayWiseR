@@ -54,28 +54,30 @@ To instead build MAVSDK from source (optional):
 
 - [Scripts can be found in the WayWise repository](https://github.com/RISE-Dependable-Transport-Systems/WayWise/tree/main/tools/build_MAVSDK)
 
-To automatically source the ROS2 environment when a new terminal is opened:
-
-`echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc`
-
 Setup workspace and build it (without simulator-related packages):
 
     sudo apt update && sudo apt install -y libunwind-dev libqt5serialport5-dev git build-essential cmake python3-colcon-common-extensions
 
     export WAYWISER_WS=$HOME/waywiser_ws     #update the environment variable with desired path
+    export WAYWISER_SKIPPED_PACKAGES="waywiser_agrarsense waywiser_carla waywiser_gazebo"
+
     mkdir -p $WAYWISER_WS/src
     git clone git@github.com:RISE-Dependable-Transport-Systems/WayWiseR.git $WAYWISER_WS/src/WayWiseR
     cd $WAYWISER_WS/src/WayWiseR
     git submodule update --init waywiser_core/WayWise
     cd $WAYWISER_WS
-    rosdep install --from-paths $(colcon list --paths-only | grep -v -E "waywiser_agrarsense|waywiser_carla|waywiser_gazebo") --ignore-src --rosdistro humble -r -y
-    colcon build --symlink-install --packages-skip waywiser_agrarsense waywiser_carla waywiser_gazebo
+    pip install -r src/WayWiseR/requirements.txt
+    source /opt/ros/humble/setup.bash
+    rosdep install --from-paths $(colcon list --paths-only | grep -v -w -E  $(echo $WAYWISER_SKIPPED_PACKAGES | tr ' ' '|')) --ignore-src --rosdistro humble -r -y
+    colcon build --symlink-install --packages-skip $WAYWISER_SKIPPED_PACKAGES
 
 To build simulator-related packages such as waywiser_agrarsense, waywiser_carla, and waywiser_gazebo, follow the instructions in the respective packages.
 
-Add WAYWISER_WS environment variable to .bashrc to persist the variable when a new terminal is opened:
+Add the following environment variables to .bashrc to persist them when a new terminal is opened:
 
-`echo "export WAYWISER_WS=$WAYWISER_WS" >> ~/.bashrc`
+    echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+    echo "export WAYWISER_WS=$WAYWISER_WS" >> ~/.bashrc
+    echo "export WAYWISER_SKIPPED_PACKAGES=$WAYWISER_SKIPPED_PACKAGES" >> ~/.bashrc
 
 Before sourcing the overlay, it is very important that you open a new terminal, separate from the one where you built the workspace. Sourcing an overlay in the same terminal where you built, or likewise building where an overlay is sourced, may create complex issues.
 
