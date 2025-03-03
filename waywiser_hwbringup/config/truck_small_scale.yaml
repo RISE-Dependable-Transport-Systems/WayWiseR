@@ -105,6 +105,7 @@ emergency_stop_monitor:
 
 onboard_twist_mux:
   ros__parameters:
+    use_stamped: false
     topics:
       teleop:
         topic: teleop_mux_vel

@@ -55,6 +55,7 @@ twist_angular_correction:
 
 teleop_twist_mux:
   ros__parameters:
+    use_stamped: false
     topics:
       joystick:
         topic: joy_vel_corrected
