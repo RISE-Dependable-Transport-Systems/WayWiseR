@@ -5,13 +5,14 @@
   ```
   export CARLA_ROS_BRIDGE_WS=$HOME/carla_ros_bridge_ws     #update the environment variable with desired path
   mkdir -p $CARLA_ROS_BRIDGE_WS/src
-  cd $CARLA_ROS_BRIDGE_WS
   git clone --recurse-submodules git@github.com:RISE-Dependable-Transport-Systems/carla-ros-bridge.git $CARLA_ROS_BRIDGE_WS/src/carla-ros-bridge
   ```
 
 - Add CARLA_ROS_BRIDGE_WS environment variable to .bashrc to persist the variable when a new terminal is opened:
 
-`echo "export CARLA_ROS_BRIDGE_WS=$CARLA_ROS_BRIDGE_WS" >> ~/.bashrc`
+  ```
+  echo "export CARLA_ROS_BRIDGE_WS=$CARLA_ROS_BRIDGE_WS" >> ~/.bashrc
+  ```
 
 - Install carla-ros-bridge specific dependencies from the root directory of the workspace:
   ```
@@ -21,7 +22,7 @@
   ```
 - Build carla-ros-bridge:
   ```
-  colcon build --symlink-install
+  colcon build --symlink-install --base-paths $CARLA_ROS_BRIDGE_WS/src/carla-ros-bridge
   ```
 - Source carla-ros-bridge from the waywiser workspace before building waywiser_carla:
   ```
@@ -34,7 +35,7 @@
   rosdep install --from-paths $(colcon list --paths-only | grep "waywiser_carla") --ignore-src --rosdistro humble -r -y
   ```
 
-- Build waywiser_gazebo package:
+- Build waywiser_carla package:
   ```
   colcon build --symlink-install --packages-select waywiser_carla
   ```
@@ -47,7 +48,7 @@ Note: Both CARLA_ROS_BRIDGE_WS and WAYWISER_WS overlays need to be sourced in ev
 
 ```
 cd $WAYWISER_WS
-source$CARLA_ROS_BRIDGE_WS/install/local_setup.bash && source install/local_setup.bash
+source $CARLA_ROS_BRIDGE_WS/install/local_setup.bash && source install/local_setup.bash
 ```
 
 ## Examples
