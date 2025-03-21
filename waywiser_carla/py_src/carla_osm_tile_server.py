@@ -34,8 +34,15 @@ Image.MAX_IMAGE_PIXELS = 250e6
 
 
 class CarlaMapper(object):
-    """Class that renders a 2D image from top view of a carla world. Please note that a cache system is used, so if the OpenDrive content
-    of a Carla town has not changed, it will read and use the stored image if it was rendered in a previous execution"""
+    """
+    Render a 2D image from the top view of a Carla world.
+
+    Note:
+    ----
+        This class uses a cache system; if the OpenDrive content of a Carla town has not changed,
+        it reuses the previously rendered image.
+
+    """
 
     def __init__(
         self,
@@ -50,7 +57,12 @@ class CarlaMapper(object):
         aerial_view_camera_height=1500.0,
         reset_base_map_image=False,
     ):
-        """Renders the map image generated based on the world, its map and additional flags that provide extra information about the road network"""
+        """
+        Initialize the CarlaMapper.
+
+        Render the map image based on the world, its map, and additional flags that provide extra
+        information about the road network.
+        """
         self.logger = logger
 
         aerial_view_camera_focus_length = aerial_view_camera_resolution / (
@@ -266,7 +278,8 @@ class CarlaMapper(object):
         )
         num_camera_spawn_locations = len(camera_spawn_locations)
         logger.info(
-            f'Number of images to cover the world at {self.aerial_view_camera_height}m camera height: {num_camera_spawn_locations}'
+            f'Number of images to cover the world at {self.aerial_view_camera_height}m '
+            f'camera height: {num_camera_spawn_locations}'
         )
 
         # Define a dictionary to store captured images
@@ -369,9 +382,10 @@ class CarlaMapper(object):
         self.map_image = base_image
 
     def draw_road_map(self, carla_world, carla_map, add_traffic_signs=False):
-        """Draws all the roads, including lane markings, arrows and traffic signs"""
+        """Draw all roads, including lane markings, arrows, and traffic signs."""
         # Adapted from
-        # https://github.com/carla-simulator/carla/blob/b23c01ae4a3bd3ec1501084db10f889d424cfadf/PythonAPI/examples/no_rendering_mode.py#L727
+        # https://github.com/carla-simulator/carla/blob/b23c01ae4a3bd3ec15
+        # 01084db10f889d424cfadf/PythonAPI/examples/no_rendering_mode.py#L727
 
         logger = self.logger
         base_image = self.map_image
@@ -380,7 +394,7 @@ class CarlaMapper(object):
         precision = 0.01
 
         def draw_traffic_signs(draw, font, actor, color=COLOR_ALUMINIUM):
-            """Draw stop traffic signs and its bounding box if enabled"""
+            """Draw stop and yield traffic signs and their bounding boxes if enabled."""
             transform = actor.get_transform()
             waypoint = carla_map.get_waypoint(transform.location)
 
@@ -421,7 +435,7 @@ class CarlaMapper(object):
             draw.line(line_pixel, fill=color, width=2)
 
         def lateral_shift(transform, shift):
-            """Makes a lateral shift of the forward vector of a transform"""
+            """Shift the transform laterally based on its forward vector."""
             rotation = carla.Rotation(
                 pitch=transform.rotation.pitch,
                 yaw=transform.rotation.yaw + 90,
@@ -459,7 +473,7 @@ class CarlaMapper(object):
             road_left_side = [lateral_shift(w.transform, -w.lane_width * 0.5) for w in waypoints]
             road_right_side = [lateral_shift(w.transform, w.lane_width * 0.5) for w in waypoints]
 
-            polygon = road_left_side + [x for x in reversed(road_right_side)]
+            polygon = road_left_side + list(reversed(road_right_side))
             polygon = [self.carla_world_to_pixel(x) for x in polygon]
 
             if len(polygon) > 2:
@@ -568,7 +582,6 @@ class CarlaMapper(object):
         draw.text((text_x, text_y), text, fill=color_str, font=font)
 
     def carla_world_to_pixel(self, location, offset=(0, 0), meters_per_pixel=None):
-        """Converts the world coordinates to pixel coordinates"""
         if meters_per_pixel is None:
             meters_per_pixel = self.min_meters_per_pixel
         x = (location.x - self.world_offset[0]) / meters_per_pixel
@@ -576,7 +589,6 @@ class CarlaMapper(object):
         return (int(x - offset[0]), int(y - offset[1]))
 
     def pixel_to_carla_world(self, pixel_location, offset=(0, 0)):
-        """Converts pixel coordinates to world coordinates"""
         # Adjust for offset
         x_pixel = pixel_location[0] + offset[0]
         y_pixel = pixel_location[1] + offset[1]
@@ -618,6 +630,8 @@ class CarlaMapper(object):
 
 
 class CarlaOsmTileServer(Node):
+    """ROS2 node to serve map tiles from a Carla world using OpenStreetMap data."""
+
     def __init__(self):
         super().__init__('carla_osm_tile_server')
 
@@ -688,14 +702,16 @@ class CarlaOsmTileServer(Node):
         threading.Thread(target=self.start_tcp_server, daemon=True).start()
 
     def start_tcp_server(self):
-        """Starts a TCP server to listen for incoming requests for map tiles"""
+        """Start a TCP server to listen for incoming requests for map tiles."""
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind((self.tcp_server_ip, self.tcp_server_port))
         self.socket.listen(1)
 
         # Log the server address and port
         self.get_logger().info(
-            f'Map server is listening on {self.tcp_server_ip}:{self.tcp_server_port}. Max. supported zoom level is {self.carla_mapper.earth_max_zoom_level} with m/px {self.carla_mapper.min_meters_per_pixel} '
+            f'Map server is listening on {self.tcp_server_ip}:{self.tcp_server_port}. '
+            f'Max. supported zoom level is {self.carla_mapper.earth_max_zoom_level} with '
+            f'm/px {self.carla_mapper.min_meters_per_pixel} '
         )
 
         while True:
@@ -703,7 +719,7 @@ class CarlaOsmTileServer(Node):
             self.handle_client(conn)
 
     def handle_client(self, conn):
-        """Handles incoming client connections and sends the requested tile"""
+        """Handle incoming client connections and sends the requested tile."""
         try:
             # Receive the entire request data from the client
             request_data = conn.recv(BUFFER_SIZE).decode().strip()

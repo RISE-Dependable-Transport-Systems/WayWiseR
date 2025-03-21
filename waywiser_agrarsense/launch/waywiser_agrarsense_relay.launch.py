@@ -91,8 +91,10 @@ def vehicle_tf_publishers_launch(context):
                         emulate_tty=True,
                         parameters=[
                             {
-                                'odom_topic': f'/agrarsense/out/vehicles/{vehicle_identifier}/odometry',
-                                'input_transform': f'/agrarsense/out/sensors/{vehicle_identifier}/transform',
+                                'odom_topic': f'/agrarsense/out/vehicles/'
+                                f'{vehicle_identifier}/odometry',
+                                'input_transform': f'/agrarsense/out/'
+                                f'sensors/{vehicle_identifier}/transform',
                                 'base_link_frame': f'{vehicle_identifier}/base_link',
                                 'odom_frame': f'{vehicle_identifier}/odom',
                                 'use_sim_time': LaunchConfiguration('use_sim_time'),

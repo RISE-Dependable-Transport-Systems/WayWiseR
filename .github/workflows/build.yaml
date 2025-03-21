@@ -17,15 +17,25 @@ jobs:
         uses: ros-tooling/setup-ros@0.7.1
         with:
           required-ros-distributions: humble
-
       - name: Install dependencies
         run: sudo apt update && sudo apt install -y libunwind-dev libqt5serialport5-dev
 
       - name: Install MAVSDK
         run: wget https://github.com/mavlink/MAVSDK/releases/download/v2.2.0/libmavsdk-dev_2.2.0_ubuntu22.04_amd64.deb && sudo dpkg --install libmavsdk-*.deb
 
+      - name: Generate repos file with carla-ros-bridge
+        run: |
+          cat << 'EOF' > /tmp/deps.repos
+          repositories:
+            carla_ros_bridge:
+              type: git
+              url: https://github.com/RISE-Dependable-Transport-Systems/carla-ros-bridge.git
+              version: v0.9.15-humble-dev
+          EOF
+
       - name: Run Tests
         uses: ros-tooling/action-ros-ci@0.3.5
         with:
-          package-name: waywiser waywiser_description waywiser_gazebo waywiser_hwbringup waywiser_core waywiser_rviz2 waywiser_slam waywiser_teleop
+          package-name: waywiser waywiser_agrarsense waywiser_carla waywiser_core waywiser_description waywiser_gazebo waywiser_hwbringup waywiser_nav2 waywiser_perception waywiser_rviz2 waywiser_slam waywiser_teleop waywiser_twist_safety
           target-ros2-distro: humble
+          vcs-repo-file-url: /tmp/deps.repos

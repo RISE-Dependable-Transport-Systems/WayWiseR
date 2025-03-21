@@ -1,6 +1,6 @@
 ## Overview
 
-The waywiser_agrarsense package integrates the [AGRARSENSE](https://agrarsense.frostbit.fi/) simulator with ROS2 and WayWiseR. This package addresses the compatibility gap between AGRARSENSE's ROS1-based plugins and modern ROS2 systems by utilizing a docker container running ROS1-ROS2 bridge. The [py_scripts](./py_scripts) contains python-based ros2 nodes to orchestrate the simulator execution, publish vehicle transforms, and relay twist commands from waywiser to the simulator.
+The waywiser_agrarsense package integrates the [AGRARSENSE](https://agrarsense.frostbit.fi/) simulator with ROS2 and WayWiseR. This package addresses the compatibility gap between AGRARSENSE's ROS1-based plugins and modern ROS2 systems by utilizing a docker container running ROS1-ROS2 bridge. The [py_src](./py_src) contains python-based ros2 nodes to orchestrate the simulator execution, publish vehicle transforms, and relay twist commands from waywiser to the simulator.
 
 ## Agrarsense setup
 

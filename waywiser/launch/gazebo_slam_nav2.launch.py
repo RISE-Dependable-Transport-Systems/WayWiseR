@@ -31,7 +31,7 @@ def generate_launch_description():
     )
     rviz_config_la = DeclareLaunchArgument(
         'rviz_config',
-        default_value=os.path.join(waywiser_rviz2_dir, 'rviz/map_reference_frame_nav2.rviz'),
+        default_value=os.path.join(waywiser_rviz2_dir, 'config/map_reference_frame_nav2.rviz'),
         description='Full path of rviz display config file or path to their directory',
     )
 

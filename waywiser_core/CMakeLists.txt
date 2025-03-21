@@ -92,13 +92,13 @@ set(WAYWISE_TRUCK_SOURCES
     WayWise/sensors/tof/tofsensor.h)
 
 add_executable(
-  waywise_car_node src/waywise_car_node.cpp src/waywise_car.cpp
+  waywise_car_node cpp_src/waywise_car_node.cpp cpp_src/waywise_car.cpp
                    ${COMMON_WAYWISE_SOURCES} ${WAYWISE_CAR_SOURCES})
 
 add_executable(
   waywise_car_autopilot_node
-  src/waywise_car_autopilot_node.cpp
-  src/waywise_car_autopilot.cpp
+  cpp_src/waywise_car_autopilot_node.cpp
+  cpp_src/waywise_car_autopilot.cpp
   ${COMMON_WAYWISE_SOURCES}
   ${COMMON_WAYWISE_AP_SOURCES}
   WayWise/vehicles/carstate.cpp
@@ -106,18 +106,18 @@ add_executable(
 
 add_executable(
   waywise_truck_node
-  src/waywise_truck_node.cpp
-  src/waywise_truck.cpp
-  src/waywise_car.cpp
+  cpp_src/waywise_truck_node.cpp
+  cpp_src/waywise_truck.cpp
+  cpp_src/waywise_car.cpp
   ${COMMON_WAYWISE_SOURCES}
   ${WAYWISE_CAR_SOURCES}
   ${WAYWISE_TRUCK_SOURCES})
 
 add_executable(
   waywise_truck_autopilot_node
-  src/waywise_truck_autopilot_node.cpp
-  src/waywise_truck_autopilot.cpp
-  src/waywise_car_autopilot.cpp
+  cpp_src/waywise_truck_autopilot_node.cpp
+  cpp_src/waywise_truck_autopilot.cpp
+  cpp_src/waywise_car_autopilot.cpp
   ${COMMON_WAYWISE_SOURCES}
   ${COMMON_WAYWISE_AP_SOURCES}
   WayWise/vehicles/carstate.cpp

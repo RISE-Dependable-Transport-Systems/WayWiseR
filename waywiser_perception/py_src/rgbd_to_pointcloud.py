@@ -15,6 +15,14 @@ from sensor_msgs.msg import PointField
 
 
 class RGBDToPointCloudNode(Node):
+    """
+    A ROS2 node that converts RGB and depth images into a PointCloud2 message.
+
+    This node subscribes to RGB, depth, and camera info topics, processes the incoming
+    data to generate a point cloud, and publishes the resulting PointCloud2 message.
+
+    """
+
     def __init__(self):
         super().__init__('rgbd_to_pointcloud')
 

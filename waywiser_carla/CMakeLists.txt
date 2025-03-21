@@ -56,14 +56,13 @@ install(TARGETS emulated_angle_sensor RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(TARGETS emulated_range_sensor RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 # Python package
-ament_python_install_package(${PROJECT_NAME}_py PACKAGE_DIR py_scripts)
+ament_python_install_package(${PROJECT_NAME}_py PACKAGE_DIR py_src)
 
-install(PROGRAMS py_scripts/carla_osm_tile_server.py
+install(PROGRAMS py_src/carla_osm_tile_server.py
         DESTINATION lib/${PROJECT_NAME})
-install(PROGRAMS py_scripts/waywiser_twist_to_carla_control.py
+install(PROGRAMS py_src/waywiser_twist_to_carla_control.py
         DESTINATION lib/${PROJECT_NAME})
-install(PROGRAMS py_scripts/carla_orchestrator.py
-        DESTINATION lib/${PROJECT_NAME})
+install(PROGRAMS py_src/carla_orchestrator.py DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
 

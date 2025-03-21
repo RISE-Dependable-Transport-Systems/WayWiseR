@@ -11,7 +11,6 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description():
     waywiser_dir = get_package_share_directory('waywiser')
     waywiser_hwbringup_dir = get_package_share_directory('waywiser_hwbringup')
-    waywiser_rviz2_dir = get_package_share_directory('waywiser_rviz2')
     teleop_dir = get_package_share_directory('waywiser_teleop')
 
     # args that can be set from the command line or a default will be used
@@ -30,13 +29,23 @@ def generate_launch_description():
     )
     rviz_config_la = DeclareLaunchArgument(
         'rviz_config',
-        default_value=os.path.join(waywiser_rviz2_dir, 'rviz/odom_reference_frame_truck.rviz'),
+        default_value='',
         description='Full path of rviz display config file or path to their directory',
     )
     teleop_config_la = DeclareLaunchArgument(
         'teleop_config',
         default_value=os.path.join(teleop_dir, 'config/teleop.yaml'),
         description='Full path to params file',
+    )
+    teleop_la = DeclareLaunchArgument(
+        'teleop',
+        default_value='False',
+        description='Launch teleop',
+    )
+    rviz2_la = DeclareLaunchArgument(
+        'rviz2',
+        default_value='False',
+        description='Launch rviz2',
     )
 
     # include launch files
@@ -56,6 +65,8 @@ def generate_launch_description():
             'enable_collision_monitor': LaunchConfiguration('enable_collision_monitor'),
             'rviz_config': LaunchConfiguration('rviz_config'),
             'teleop_config': LaunchConfiguration('teleop_config'),
+            'teleop': LaunchConfiguration('teleop'),
+            'rviz2': LaunchConfiguration('rviz2'),
         }.items(),
     )
 
@@ -84,6 +95,8 @@ def generate_launch_description():
     ld.add_action(rviz_config_la)
     ld.add_action(teleop_config_la)
     ld.add_action(vehicle_config_la)
+    ld.add_action(teleop_la)
+    ld.add_action(rviz2_la)
 
     # start nodes
     ld.add_action(truck_manual_control)

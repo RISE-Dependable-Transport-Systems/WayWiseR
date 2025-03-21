@@ -21,6 +21,8 @@ from std_msgs.msg import String
 
 
 class AgrarsenseOrchestrator(Node):
+    """ROS2 node that orchestrates the Agrarsense simulator and ROS bridge."""
+
     def __init__(self):
         super().__init__('agrarsense_orchestrator_node')
 
@@ -207,7 +209,7 @@ class AgrarsenseOrchestrator(Node):
         return subprocess_
 
     def start_simulator(self):
-        """Setup the Agrarsense simulator."""
+        """Start the Agrarsense simulator."""
         start_simulator_command = [self.sim_script_path]
         start_simulator_command.append(f'--{self.map_name}')
         if self.workersthreadpool > 0:
@@ -230,8 +232,7 @@ class AgrarsenseOrchestrator(Node):
         )  # will wait for the first clock message to spawn objects
 
     def start_agrarsense_ros_bridge(self):
-        """Start the agrarsense ros bridge"""
-
+        """Start the agrarsense ros bridge."""
         command = [self.ros_bridge_script_path]
         command.append('--container-name')
         command.append(f'{self.docker_container_name}')
@@ -254,7 +255,7 @@ class AgrarsenseOrchestrator(Node):
         self.subprocesses[subprocess_name] = self.create_subprocess(command, subprocess_name)
 
     def publish_command(self, command):
-        """Helper function to publish a command to the simulator."""
+        """Publish a command to the simulator."""
         command_msg = String()
         command_msg.data = command
         self.command_publisher.publish(command_msg)
@@ -299,7 +300,8 @@ class AgrarsenseOrchestrator(Node):
 
                 updated_json_path = os.path.join(
                     self.waywiser_tempdir,
-                    f'{os.path.splitext(os.path.basename(self.objects_json_path))[0]}_{self.current_config_index}.json',
+                    f'{os.path.splitext(os.path.basename(self.objects_json_path))[0]}_'
+                    f'{self.current_config_index}.json',
                 )
                 try:
                     with open(updated_json_path, 'w') as file:
@@ -333,7 +335,8 @@ class AgrarsenseOrchestrator(Node):
     def end_simulation_callback(self, msg):
         if msg.data:
             self.get_logger().info(
-                f'Ending simulation with index [{self.current_config_index}-{self.current_iter_index}].'
+                f'Ending simulation with index [{self.current_config_index}-'
+                f'{self.current_iter_index}].'
             )
             self.cleanup_subprocesses()
             self.current_iter_index += 1
@@ -348,14 +351,15 @@ class AgrarsenseOrchestrator(Node):
             self.start_next_simulation()
 
     def start_next_simulation(self):
-        """Loads the next simulation configuration and starts the simulation."""
+        """Load the next simulation configuration and starts the simulation."""
         if self.current_config_index >= len(self.sim_configurations):
             self.get_logger().info('All simulations completed.')
             self.destroy_node()
             return
 
         self.get_logger().info(
-            f'Executing simulation with index [{self.current_config_index}-{self.current_iter_index}].'
+            f'Executing simulation with index [{self.current_config_index}-'
+            f'{self.current_iter_index}].'
         )
 
         # Setup the simulator
@@ -417,7 +421,7 @@ class AgrarsenseOrchestrator(Node):
             super().destroy_node()
 
     def terminate_process(self, process):
-        """Forcefully terminate a process and its children using psutil."""
+        """Force terminate a process and its children using psutil."""
         try:
             process_ps = psutil.Process(process.pid)
             child_ps = process_ps.children(recursive=True)

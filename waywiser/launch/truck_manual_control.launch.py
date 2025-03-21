@@ -12,7 +12,6 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description():
     waywiser_hwbringup_dir = get_package_share_directory('waywiser_hwbringup')
     waywiser_twist_safety_dir = get_package_share_directory('waywiser_twist_safety')
-    waywiser_rviz2_dir = get_package_share_directory('waywiser_rviz2')
     teleop_dir = get_package_share_directory('waywiser_teleop')
 
     # args that can be set from the command line or a default will be used
@@ -31,7 +30,7 @@ def generate_launch_description():
     )
     rviz_config_la = DeclareLaunchArgument(
         'rviz_config',
-        default_value=os.path.join(waywiser_rviz2_dir, 'rviz/odom_reference_frame_truck.rviz'),
+        default_value='',
         description='Full path of rviz display config file or path to their directory',
     )
     teleop_config_la = DeclareLaunchArgument(

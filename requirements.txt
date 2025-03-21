@@ -1,0 +1,10 @@
+pygame
+transforms3d
+psutil
+numpy
+lark
+empy==3.3.2
+catkin_pkg
+PyYAML
+jinja2
+typeguard

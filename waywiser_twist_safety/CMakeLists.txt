@@ -30,20 +30,30 @@ foreach(MSG_FILE ${MSG_FILES})
   list(APPEND ROSIDL_FILES msg/${MSG_NAME})
 endforeach()
 
-rosidl_generate_interfaces(${PROJECT_NAME}
+rosidl_generate_interfaces(
+  ${PROJECT_NAME}
   ${ROSIDL_FILES}
-  DEPENDENCIES std_msgs builtin_interfaces
-)
+  DEPENDENCIES
+  std_msgs
+  builtin_interfaces)
 
-rosidl_get_typesupport_target(cpp_typesupport_target
-  ${PROJECT_NAME} rosidl_typesupport_cpp)
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME}
+  rosidl_typesupport_cpp)
 
-add_library(emergency_stop_monitor_core SHARED src/rclcpp_components/emergency_stop_monitor_core.cpp)
-ament_target_dependencies(emergency_stop_monitor_core geometry_msgs rclcpp rclcpp_components sensor_msgs std_msgs)
-rclcpp_components_register_nodes(emergency_stop_monitor_core waywiser_twist_safety::EmergencyStopMonitor)
+add_library(emergency_stop_monitor_core SHARED
+  cpp_src/rclcpp_components/emergency_stop_monitor_core.cpp)
+ament_target_dependencies(
+  emergency_stop_monitor_core
+  geometry_msgs
+  rclcpp
+  rclcpp_components
+  sensor_msgs
+  std_msgs)
+rclcpp_components_register_nodes(emergency_stop_monitor_core
+  waywiser_twist_safety::EmergencyStopMonitor)
 target_link_libraries(emergency_stop_monitor_core "${cpp_typesupport_target}")
 
-add_executable(emergency_stop_monitor src/emergency_stop_monitor.cpp)
+add_executable(emergency_stop_monitor cpp_src/emergency_stop_monitor.cpp)
 target_link_libraries(emergency_stop_monitor emergency_stop_monitor_core)
 
 install(
@@ -63,14 +73,7 @@ ament_export_include_directories(include)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-
-  # the following line skips the linter which checks for copyrights comment the
-  # line when a copyright and license is added to all source files
   set(ament_cmake_copyright_FOUND TRUE)
-
-  # the following line skips cpplint (only works in a git repo) comment the line
-  # when this package is in a git repo and when a copyright and license is added
-  # to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
