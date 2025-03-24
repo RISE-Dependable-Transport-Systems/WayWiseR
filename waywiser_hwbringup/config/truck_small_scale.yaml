@@ -93,6 +93,9 @@ waywise_truck_node:
     trailer_pose_topic: "/semitrailer/rear_axle_pose"
     vehicle_alignment_reference_point_topic: "/truck/vehicle_alignment_reference_point"
     autopilot_center_pose_topic: "/truck/autopilot_center_pose"
+    nav_sat_fix_topic: "/truck/sensors/gnss_fix"
+    battery_voltage_topic: "/truck/sensors/battery_voltage"
+    min_battery_voltage: 19.2
 
 emergency_stop_monitor:
   ros__parameters:

@@ -103,6 +103,8 @@ void WayWiseCar::setup_parameters()
   publish_odom_to_baselink_tf_ = this->declare_parameter("publish_odom_to_baselink_tf", true);
   publish_world_to_odom_tf_ = this->declare_parameter("publish_world_to_odom_tf", false);
   imu_for_position_fusion_ = declare_parameter("imu_for_position_fusion", "");
+  min_battery_voltage_ = this->declare_parameter("min_battery_voltage", 0.0);
+  battery_voltage_topic_ = this->declare_parameter("battery_voltage_topic", "/battery_voltage");
   #endif
 }
 
@@ -131,10 +133,9 @@ void WayWiseCar::setup_publishers()
   }
 
   nav_sat_fix_pub_ = create_publisher<sensor_msgs::msg::NavSatFix>(nav_sat_fix_topic_, 10);
-  enu_refernce_pub_ =
-    create_publisher<geometry_msgs::msg::Vector3>(
-    enu_refernce_topic_,
-    rclcpp::QoS(rclcpp::KeepLast(10)).reliable());
+  enu_refernce_pub_ = create_publisher<geometry_msgs::msg::Vector3>(
+    enu_refernce_topic_, rclcpp::QoS(rclcpp::KeepLast(10)).reliable());
+  battery_voltage_pub_ = create_publisher<std_msgs::msg::Float32>(battery_voltage_topic_, 10);
   #endif
 }
 
@@ -326,6 +327,39 @@ void WayWiseCar::setup_hardware()
     servoController->setServoRange(servo_max_ - servo_min_);
     servoController->setServoCenter(servo_offset_);
     mCarMovementController->setServoController(servoController);
+
+    if (min_battery_voltage_ <= 0.0) {
+      RCLCPP_WARN(
+        get_logger(),
+        "Param 'min_battery_voltage' is not set. Please set a value to get low battery warnings!");
+    } else {
+      RCLCPP_INFO(
+        get_logger(), "Low battery warning is set to %f V", min_battery_voltage_);
+    }
+
+    QObject::connect(
+      mVESCMotorController.get(), &VESCMotorController::gotStatusValues,
+      [&](double rpm, int tachometer, int tachometer_abs, double voltageInput, double temperature,
+      int errorID) {
+        Q_UNUSED(rpm)
+        Q_UNUSED(tachometer)
+        Q_UNUSED(tachometer_abs)
+        Q_UNUSED(temperature)
+        Q_UNUSED(errorID)
+
+        static int count = 0;
+        if (count++ % odom_and_tf_publish_rate_) { // reduce output rate to 1 Hz
+          return;
+        }
+
+        if (min_battery_voltage_ > 0.0 && voltageInput < min_battery_voltage_) {
+          RCLCPP_WARN(
+            get_logger(), "Battery voltage is low: %f V. Please recharge the battery!",
+            voltageInput);
+        }
+
+        publish_battery_voltage(voltageInput);
+      });
   } else {
     // publish periodically with timer when no motorcontroller connected
     // (simulation)
@@ -1047,6 +1081,13 @@ void WayWiseCar::publish_enu_refernce(const llh_t enuRef)
   enuRef_msg.y = enuRef.longitude;
   enuRef_msg.z = enuRef.height;
   enu_refernce_pub_->publish(enuRef_msg);
+}
+
+void WayWiseCar::publish_battery_voltage(double voltage)
+{
+  auto voltage_msg = std_msgs::msg::Float32();
+  voltage_msg.data = voltage;
+  battery_voltage_pub_->publish(voltage_msg);
 }
 #endif
 

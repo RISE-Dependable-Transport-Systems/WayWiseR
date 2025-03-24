@@ -119,6 +119,7 @@ protected:
   virtual void publish_odom_and_tfs();
   void publish_ublox_nav_sat_fix(const ubx_nav_pvt & ubxPvt);
   void publish_enu_refernce(const llh_t enuRef);
+  virtual void publish_battery_voltage(double voltage);
   #endif
 
 
@@ -174,6 +175,8 @@ protected:
   bool publish_world_to_odom_tf_;
   int odom_and_tf_publish_rate_;
   std::string imu_for_position_fusion_;
+  float min_battery_voltage_;
+  std::string battery_voltage_topic_;
   #endif
 
   // Publishers
@@ -190,6 +193,7 @@ protected:
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_pub_;
   rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr nav_sat_fix_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr enu_refernce_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr battery_voltage_pub_;
   #endif
 
   // Subscribers
