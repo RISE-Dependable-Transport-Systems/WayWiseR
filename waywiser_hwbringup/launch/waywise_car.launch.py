@@ -48,7 +48,7 @@ def generate_launch_description():
     # start nodes and use args to set parameters
     waywise_node = Node(
         package='waywiser_core',
-        executable='waywise_car_node',
+        executable='waywise_car_hwap_node',
         name='waywise_car_node',
         parameters=[LaunchConfiguration('vehicle_config')],
         remappings=[('/cmd_vel', '/cmd_vel_out')],

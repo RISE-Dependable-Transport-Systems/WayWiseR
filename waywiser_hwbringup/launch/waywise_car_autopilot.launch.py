@@ -26,8 +26,8 @@ def generate_launch_description():
     # start nodes and use args to set parameters
     waywise_autopilot_node = Node(
         package='waywiser_core',
-        executable='waywise_car_autopilot_node',
-        name='waywise_car_autopilot_node',
+        executable='waywise_car_ap_node',
+        name='waywise_car_node',
         parameters=[
             LaunchConfiguration('vehicle_config'),
             {

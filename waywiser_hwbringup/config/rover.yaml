@@ -24,12 +24,9 @@ waywise_car_node:
     # current_max: 30.0
     publish_odom_to_baselink_tf: true
     odom_publish_rate: 30 # currently same rate for both odom topic and odom->base_link tf
-    enable_imu_for_odom: false
+    imu_for_position_fusion: "vesc"
     enable_lidar: false
     enable_camera: false
-
-waywise_car_autopilot_node:
-  ros__parameters:
-    autopilot_cmd_publish_rate: 30
+    autopilot_twist_publish_rate: 30
     waywise_control_tower_address: "127.0.0.1"
     purepursuit_radius: 1.0

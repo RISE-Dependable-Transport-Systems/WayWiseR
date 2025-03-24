@@ -19,7 +19,7 @@
     standstill_velocity_threshold: 0.05
     odom_topic: "/carla/truck/odometry_local"
     has_trailer: true
-    trailer_base_frame: semitrailer
+    trailer_base_frame: semitrailer_base_link
     trailer_rear_axle_frame: semitrailer_rear_axle_link
     trailer_center_frame: semitrailer_chassis_link
     trailer_rear_end_frame: semitrailer_rear_end_link
@@ -49,7 +49,6 @@
         "semitrailer_rrw_link_joint",
       ]
     truck_trailer_link_joint_name: "truck_trailer_link_joint"
-    invert_trailer_joint_state: true
     emulated_angle_sensors: ["truck_trailer_angle_sensor"]
     truck_trailer_angle_sensor:
       primary_frame: truck_fifth_wheel_link
@@ -81,10 +80,10 @@
       field_of_view: 12.0
       radiation_type: 0 # 0: ULTRASOUND, 1: INFRARED
 
-waywise_truck_autopilot_node:
+waywise_truck_node:
   ros__parameters:
     start_with_autopilot: false
-    autopilot_cmd_publish_rate: 30
+    autopilot_twist_publish_rate: 30
     waywise_control_tower_address: "127.0.0.1"
     waywise_control_tower_port: 14540
     purepursuit_radius: 4.0
@@ -92,7 +91,8 @@ waywise_truck_autopilot_node:
     purepursuit_reverse_gain: -1.1
     adaptive_pure_pursuit: true
     preplanned_route_filepath: "~/workspaces/carla_ws/waywiser/resources/route.xml"
-    publish_joint_states: true
+    joint_states_publish_rate: 10
+    invert_trailer_joint_state: true
     end_goal_alignment_type: 1 # Align {0: REAR_AXLE, 1: FRONT_REAR_END, 2: CENTER} with the end goal
     update_world_position_with_odom: false
     update_world_position_with_tf: true

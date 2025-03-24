@@ -49,7 +49,6 @@
         "semitrailer_rrw_link_joint",
       ]
     truck_trailer_link_joint_name: "truck_trailer_link_joint"
-    invert_trailer_joint_state: true
 
 waywise_truck_node:
   ros__parameters:
@@ -63,6 +62,7 @@ waywise_truck_node:
     publish_odom_to_baselink_tf: true
     publish_world_to_odom_tf: true
     update_world_position_with_odom: false
+    update_world_position_with_tf: false
     odom_publish_rate: 30 # currently same rate for both odom topic and odom->base_link tf
     imu_for_position_fusion: "vesc"
     tof_sensors: [tof_trailer_rear, tof_trailer_right, tof_trailer_left]
@@ -75,12 +75,10 @@ waywise_truck_node:
     # tof_trailer_left:
     #   i2c_addr: 0x31
     #   topic: "/truck/sensors/tof/trailer_left"
-    publish_joint_states: true
-
-waywise_truck_autopilot_node:
-  ros__parameters:
+    joint_states_publish_rate: 10
+    invert_trailer_joint_state: true
     start_with_autopilot: false
-    autopilot_cmd_publish_rate: 30
+    autopilot_twist_publish_rate: 30
     waywise_control_tower_address: "127.0.0.1"
     waywise_control_tower_port: 14540
     purepursuit_radius: 1.5
@@ -88,13 +86,28 @@ waywise_truck_autopilot_node:
     purepursuit_reverse_gain: -1.0
     adaptive_pure_pursuit: true
     preplanned_route_filepath: ""
-    publish_joint_states: false
     end_goal_alignment_type: 1 # Align {0: REAR_AXLE, 1: FRONT_REAR_END, 2: CENTER} with the end goal
-    update_world_position_with_odom: false
-    update_world_position_with_tf: true
     mission_status_topic: "/truck/mission_status"
     autopilot_state_control_topic: "/truck/autopilot_state_control"
     vehicle_pose_topic: "/truck/rear_axle_pose"
     trailer_pose_topic: "/semitrailer/rear_axle_pose"
     vehicle_alignment_reference_point_topic: "/truck/vehicle_alignment_reference_point"
     autopilot_center_pose_topic: "/truck/autopilot_center_pose"
+
+emergency_stop_monitor:
+  ros__parameters:
+    start_with_emergency_stop: true
+    cmd_vel_in_timeout: 0.5
+    emergency_stop_state_publish_rate: 10
+
+onboard_twist_mux:
+  ros__parameters:
+    topics:
+      teleop:
+        topic: teleop_mux_vel
+        timeout: 0.5
+        priority: 100
+      nav2:
+        topic: nav2_vel
+        timeout: 0.5
+        priority: 50

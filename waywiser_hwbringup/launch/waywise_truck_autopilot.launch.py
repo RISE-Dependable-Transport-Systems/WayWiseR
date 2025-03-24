@@ -19,7 +19,7 @@ def generate_launch_description():
     # args that can be set from the command line or a default will be used
     vehicle_config_la = DeclareLaunchArgument(
         'vehicle_config',
-        default_value=os.path.join(hw_bringup_dir, 'config/truck_full_scale.yaml'),
+        default_value=os.path.join(hw_bringup_dir, 'config/truck_small_scale.yaml'),
         description='Full path to params file of truck',
     )
 
@@ -49,7 +49,7 @@ def waywise_autopilot_node_launch(context):
     with open(LaunchConfiguration('vehicle_config').perform(context)) as f:
         config_data = yaml.safe_load(f)
         node_params_dict = config_data['/**']['ros__parameters']
-        node_params_dict.update(config_data['waywise_truck_autopilot_node']['ros__parameters'])
+        node_params_dict.update(config_data['waywise_truck_node']['ros__parameters'])
 
         if 'urdf_file' in node_params_dict:
             urdf_file = os.path.expanduser(node_params_dict['urdf_file'])
@@ -92,8 +92,8 @@ def waywise_autopilot_node_launch(context):
         nodes.append(
             Node(
                 package='waywiser_core',
-                executable='waywise_truck_autopilot_node',
-                name='waywise_truck_autopilot_node',
+                executable='waywise_truck_ap_node',
+                name='waywise_truck_node',
                 output='screen',
                 emulate_tty=True,
                 parameters=[
