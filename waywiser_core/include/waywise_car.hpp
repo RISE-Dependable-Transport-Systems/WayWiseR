@@ -5,23 +5,27 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <QFile>
 #include <QObject>
+#include <QString>
+#include <QXmlStreamReader>
 #include <Eigen/Geometry>
 
-#include "WayWise/core/simplewatchdog.h"
+#include "WayWise/autopilot/purepursuitwaypointfollower.h"
+#include "WayWise/autopilot/waypointfollower.h"
+#include "WayWise/communication/mavsdkvehicleserver.h"
+#include "WayWise/communication/parameterserver.h"
 #include "WayWise/core/coordinatetransforms.h"
+#include "WayWise/core/simplewatchdog.h"
 #include "WayWise/logger/logger.h"
-#include "WayWise/sensors/fusion/sdvpvehiclepositionfuser.h"
-#include "WayWise/sensors/gnss/rtcmclient.h"
-#include "WayWise/sensors/gnss/ubloxrover.h"
-#include "WayWise/sensors/imu/bno055orientationupdater.h"
-#include "WayWise/sensors/imu/imuorientationupdater.h"
 #include "WayWise/vehicles/carstate.h"
 #include "WayWise/vehicles/controller/carmovementcontroller.h"
-#include "WayWise/vehicles/controller/vescmotorcontroller.h"
+#include "WayWise/autopilot/followpoint.h"
+#include "WayWise/sensors/gnss/gnssreceiver.h"
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "geometry_msgs/msg/vector3.hpp"
+#include "mavsdk/mavsdk.h"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
@@ -30,10 +34,34 @@
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "tf2/exceptions.h"
+#include "tf2/utils.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2/LinearMath/Transform.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2_ros/buffer.h"
+#include "tf2_ros/transform_listener.h"
 #include "tf2_ros/transform_broadcaster.h"
 #include "urdf/model.h"
+#include "visualization_msgs/msg/marker_array.hpp"
+
+#ifdef WAYWISE_HW_INTERFACE_
+#include "WayWise/sensors/fusion/sdvpvehiclepositionfuser.h"
+#include "WayWise/sensors/gnss/rtcmclient.h"
+#include "WayWise/sensors/gnss/ubloxrover.h"
+#include "WayWise/sensors/imu/bno055orientationupdater.h"
+#include "WayWise/sensors/imu/imuorientationupdater.h"
+#include "WayWise/vehicles/controller/vescmotorcontroller.h"
+#endif
+
+using namespace std::placeholders;
+
+enum class MissionState
+{
+  Idle,
+  WaitingForRoute,
+  ActiveMission
+};
 
 class WayWiseCar : public QObject, public rclcpp::Node
 {
@@ -54,88 +82,161 @@ protected:
   virtual void setup_publishers();
   virtual void setup_subscribers();
   virtual void setup_timers();
+  virtual void setup_autopilot();
+  void setup_autopilot(QSharedPointer<CarState> carState);
+  #ifdef WAYWISE_HW_INTERFACE_
   virtual void setup_hardware();
-  void setup_hardware(QSharedPointer<CarState> carState);
+  #endif
+  virtual void provide_parameters_to_parameter_server();
 
   // Callback methods
-  virtual void simulation_timer_callback();
+  void autopilot_timer_callback();
+  void autopilot_state_control_callback(const std_msgs::msg::Bool::SharedPtr bool_msg);
+  void enu_reference_callback(const geometry_msgs::msg::Vector3::SharedPtr enuRef_msg);
+  #ifdef WAYWISE_HW_INTERFACE_
+  virtual void odom_publish_timer_callback();
   virtual void twist_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg);
-  virtual void updated_waywise_odomPos_callback(
-    QSharedPointer<VehicleState> vehicleState,
-    double distanceDriven);
+  #else
+  void odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom_msg);
+  #endif
 
   // Utility methods
-  virtual void publish_odom_and_tfs(double timePassed_ms);
-  void publish_ublox_nav_sat_fix(const ubx_nav_pvt & ubxPvt);
-  void publish_enu_refernce(const llh_t enuRef);
-  float clip_min_max(float value, float min_value, float max_value) const;
+  virtual void update_world_positon(geometry_msgs::msg::Pose world_pose);
   bool loadURDFFile();
   Eigen::Vector3d getLinkPosition(
     const urdf::Model & urdfModel,
     const std::string & link_name) const;
+  virtual void publish_joint_states();
   virtual double update_joint_states_msg(
     sensor_msgs::msg::JointState & joint_state_msg,
     double timePassed_ms);
+  QList<PosPoint> read_route_from_XMLFile(const std::string xml_filepath_);
+  void start_waypoint_follower(QList<PosPoint> & waypointList);
+  void stop_waypoint_follower();
+  void update_waypoint_follower_route(QList<PosPoint> & waypointList);
+  void publish_route_markers();
+  #ifdef WAYWISE_HW_INTERFACE_
+  virtual void publish_odom_and_tfs();
+  void publish_ublox_nav_sat_fix(const ubx_nav_pvt & ubxPvt);
+  void publish_enu_refernce(const llh_t enuRef);
+  #endif
+
 
   // ROS parameters
   std::string odom_topic_;
-  float erpm_min_, erpm_max_, speed_to_erpm_factor_;
-  bool invert_servo_output_;
-  float servo_min_, servo_max_, servo_offset_;
+  float speed_to_erpm_factor_;
   float length_, width_, wheelbase_, min_turning_radius_;
-  bool publish_odom_to_baselink_tf_;
-  bool publish_world_to_odom_tf_;
-  int odom_and_tf_publish_rate_;
+  int autopilot_twist_publish_rate_;
+  std::string waywise_control_tower_address_;
+  int waywise_control_tower_port_;
+  float purepursuit_radius_;
   bool update_world_position_with_odom_;
-  bool enable_imu_for_odom_;
-  std::string imu_for_position_fusion_;
+  bool update_world_position_with_tf_;
   float standstill_velocity_threshold_;
-  float max_angular_velocity_;
-  bool publish_joint_states_;
+  double max_angular_velocity_;
+  int joint_states_publish_rate_;
 
   std::string odom_frame_;
   std::string base_frame_;
   std::string world_frame_;
-  std::string rear_axle_frame_;
+  std::string rear_axle_frame_; // this is vehicle reference point for waywise
   std::string center_frame_;
   std::string rear_end_frame_;
 
+  std::vector<double> rear_axle_frame_to_base_frame_offset_;
+  std::vector<double> rear_axle_frame_to_center_frame_offset_;
+  std::vector<double> rear_axle_frame_to_rear_end_frame_offset_;
+
   std::string nav_sat_fix_topic_;
   std::string enu_refernce_topic_;
+  std::string vehicle_pose_topic_;
 
   std::string urdf_file_;
   std::vector<std::string> front_steering_joint_names_;
   std::vector<std::string> front_wheel_joint_names_;
   std::vector<std::string> rear_wheel_joint_names_;
 
+  std::string preplanned_route_filepath_;
+  std::string autopilot_state_control_topic_;
+  bool start_with_autopilot_;
+  float desired_linear_velocity_;
+  std::string mission_status_topic_;
+  int end_goal_alignment_type_;
+  std::string vehicle_alignment_reference_point_topic_;
+  std::string autopilot_center_pose_topic_;
+
+  #ifdef WAYWISE_HW_INTERFACE_
+  double erpm_min_, erpm_max_;
+  bool invert_servo_output_;
+  float servo_min_, servo_max_, servo_offset_;
+
+  bool publish_odom_to_baselink_tf_;
+  bool publish_world_to_odom_tf_;
+  int odom_and_tf_publish_rate_;
+  std::string imu_for_position_fusion_;
+  #endif
+
   // Publishers
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr twist_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr vehicle_pose_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr route_marker_pub_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr mission_status_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr
+    vehicle_alignment_reference_point_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr autopilot_center_pose_pub_;
+  #ifdef WAYWISE_HW_INTERFACE_
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_pub_;
   rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr nav_sat_fix_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr enu_refernce_pub_;
-  rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
+  #endif
 
   // Subscribers
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr autopilot_state_control_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr enu_refernce_sub_;
+  #ifdef WAYWISE_HW_INTERFACE_
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr twist_sub_;
+  #else
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+  #endif
 
   // Timers
-  rclcpp::TimerBase::SharedPtr simulation_timer_;
+  rclcpp::TimerBase::SharedPtr autopilot_timer_;
+  #ifdef WAYWISE_HW_INTERFACE_
+  rclcpp::TimerBase::SharedPtr odom_publish_timer_;
+  #endif
+
+  // Transform buffer and listener
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
   // WayWise components
   QSharedPointer<CarState> mCarState;
+  QSharedPointer<GNSSReceiver> mGNSSReceiver;
   QSharedPointer<CarMovementController> mCarMovementController;
+  QSharedPointer<PurepursuitWaypointFollower> mWaypointFollower;
+  QSharedPointer<MavsdkVehicleServer> mMavsdkVehicleServer;
+  QSharedPointer<FollowPoint> mFollowPoint;
+  QList<PosPoint> mWaypointList;
+  QSharedPointer<SimpleWatchdog> mSimpleWatchdog;
+  #ifdef WAYWISE_HW_INTERFACE_
   QSharedPointer<VESCMotorController> mVESCMotorController;
   QSharedPointer<IMUOrientationUpdater> mIMUOrientationUpdater;
   QSharedPointer<UbloxRover> mUbloxRover;
   QSharedPointer<SDVPVehiclePositionFuser> mSDVPVehiclePositionFuser;
   QSharedPointer<RtcmClient> mRtcmClient;
-  QSharedPointer<SimpleWatchdog> mSimpleWatchdog;
+  #endif
 
   // Internal variables
-  std::chrono::milliseconds mUpdateVehicleStatePeriod;
   urdf::Model urdfModel;
+  MissionState currentMissionState = MissionState::Idle;
+  bool received_first_odom_msg_ = false;
+  #ifdef WAYWISE_HW_INTERFACE_
+  int odom_publish_period_ms_;
+  bool is_in_ww_simulation_mode_ = false;
+  #endif
 
-// private:
 };
 
 #endif  // WAYWISE_CAR_HPP_
