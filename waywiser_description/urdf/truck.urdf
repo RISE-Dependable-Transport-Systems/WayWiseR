@@ -1,20 +1,25 @@
 <robot name="truck" version="1.0">
-  <joint name="truck_chassis_joint" type="fixed">
-    <origin rpy="0.00000 0.00000 0.00000" xyz="0.31460 0.00000 0.93498" />
+  <joint name="truck_base_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 -0.00000 0.00000" />
     <parent link="truck" />
+    <child link="truck_base_link" />
+  </joint>
+  <joint name="truck_chassis_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.93498" />
+    <parent link="truck_base_link" />
     <child link="truck_chassis_link" />
   </joint>
   <joint name="truck_fifth_wheel_link_joint" type="revolute">
     <limit lower="-3.14000" upper="3.14000" effort="0.00000" velocity="0.00000" />
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-1.42640 0.00000 1.21575" />
-    <parent link="truck" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-2.20924 0.00000 0.28077" />
+    <parent link="truck_chassis_link" />
     <child link="truck_fifth_wheel_link" />
     <axis xyz="0.00000 1.00000 0.00000" />
   </joint>
   <joint name="truck_fls_link_joint" type="revolute">
     <limit lower="-3.14000" upper="3.14000" effort="0.00000" velocity="0.00000" />
-    <origin rpy="0.00000 0.00000 0.00000" xyz="1.89388 1.02500 0.51968" />
-    <parent link="truck" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-0.08772 1.02500 -0.00000" />
+    <parent link="truck_front_axle_link" />
     <child link="truck_fls_link" />
     <axis xyz="0.00000 0.00000 1.00000" />
   </joint>
@@ -25,10 +30,20 @@
     <child link="truck_flw_link" />
     <axis xyz="0.00000 1.00000 0.00000" />
   </joint>
+  <joint name="truck_front_axle_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="1.98160 0.00000 -0.41530" />
+    <parent link="truck_chassis_link" />
+    <child link="truck_front_axle_link" />
+  </joint>
+  <joint name="truck_front_end_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="3.47023 0.00000 0.04778" />
+    <parent link="truck_chassis_link" />
+    <child link="truck_front_end_link" />
+  </joint>
   <joint name="truck_frs_link_joint" type="revolute">
     <limit lower="0.00000" upper="0.00000" effort="0.00000" velocity="0.00000" />
-    <origin rpy="0.00000 0.00000 0.00000" xyz="1.89395 -1.02500 0.51968" />
-    <parent link="truck" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00003 -1.02500 0.00000" />
+    <parent link="truck_front_axle_link" />
     <child link="truck_frs_link" />
     <axis xyz="0.00000 0.00000 1.00000" />
   </joint>
@@ -39,62 +54,81 @@
     <child link="truck_frw_link" />
     <axis xyz="0.00000 1.00000 0.00000" />
   </joint>
+  <joint name="truck_gnss_antenna_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-0.10031 -0.66421 2.27828" />
+    <parent link="truck_gnss_chip_link" />
+    <child link="truck_gnss_antenna_link" />
+  </joint>
+  <joint name="truck_gnss_chip_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="2.50483 0.66421 0.57937" />
+    <parent link="truck_chassis_link" />
+    <child link="truck_gnss_chip_link" />
+  </joint>
   <joint name="truck_mlw_link_joint" type="continuous">
     <limit lower="0" upper="0" effort="0.00000" velocity="0.00000" />
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-1.20090 0.93800 0.51968" />
-    <parent link="truck" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.70905 0.93800 -0.00000" />
+    <parent link="truck_rear_axle_link" />
     <child link="truck_mlw_link" />
     <axis xyz="0.00000 1.00000 0.00000" />
   </joint>
   <joint name="truck_mrw_link_joint" type="continuous">
     <limit lower="0" upper="0" effort="0.00000" velocity="0.00000" />
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-1.20090 -0.93800 0.51968" />
-    <parent link="truck" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.70905 -0.93800 0.00000" />
+    <parent link="truck_rear_axle_link" />
     <child link="truck_mrw_link" />
     <axis xyz="0.00000 1.00000 0.00000" />
   </joint>
   <joint name="truck_rear_axle_link_joint" type="fixed">
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-1.87857 -0.00000 0.51968" />
-    <parent link="truck" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-1.96554 -0.00000 -0.41530" />
+    <parent link="truck_chassis_link" />
     <child link="truck_rear_axle_link" />
   </joint>
   <joint name="truck_rear_end_link_joint" type="fixed">
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-3.60090 0.00000 0.93498" />
-    <parent link="truck" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-3.75332 0.00000 0.00000" />
+    <parent link="truck_chassis_link" />
     <child link="truck_rear_end_link" />
   </joint>
   <joint name="truck_rlw_link_joint" type="continuous">
     <limit lower="0" upper="0" effort="0.00000" velocity="0.00000" />
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-2.55624 0.93800 0.51968" />
-    <parent link="truck" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-0.70905 0.93800 0.00000" />
+    <parent link="truck_rear_axle_link" />
     <child link="truck_rlw_link" />
     <axis xyz="0.00000 1.00000 0.00000" />
   </joint>
   <joint name="truck_rrw_link_joint" type="continuous">
     <limit lower="0" upper="0" effort="0.00000" velocity="0.00000" />
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-2.55624 -0.93800 0.51968" />
-    <parent link="truck" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-0.70905 -0.93800 0.00000" />
+    <parent link="truck_rear_axle_link" />
     <child link="truck_rrw_link" />
     <axis xyz="0.00000 1.00000 0.00000" />
   </joint>
   <link name="truck" />
+  <link name="truck_base_link" />
   <link name="truck_chassis_link">
-    <visual name="body">
+    <visual name="chassis">
       <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000" />
-      <material name="mat_13" />
+      <material name="mat_26" />
       <geometry>
-        <mesh filename="package://waywiser_description/meshes/truck/body.dae"
-          scale="0.01000 0.01000 0.01000" />
+        <mesh filename="package://waywiser_description/meshes/truck/chassis.dae"
+          scale="0.01046 0.01000 0.01000" />
+      </geometry>
+    </visual>
+    <visual name="fifth_wheel_base">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00000 0.00000 0.00000" />
+      <material name="mat_26" />
+      <geometry>
+        <mesh filename="package://waywiser_description/meshes/truck/fifth_wheel_base.dae"
+          scale="0.01046 0.01000 0.01000" />
       </geometry>
     </visual>
   </link>
   <link name="truck_fifth_wheel_link">
     <visual name="fifth_wheel">
-      <origin rpy="0.00000 -0.00000 0.00000" xyz="-0.00000 -0.00000 -0.00000" />
+      <origin rpy="0.00000 -0.00000 -0.00000" xyz="0.00000 -0.00000 -0.00000" />
       <material name="mat_0" />
       <geometry>
         <mesh filename="package://waywiser_description/meshes/truck/fifth_wheel.dae"
-          scale="0.01000 0.01000 0.01000" />
+          scale="0.01046 0.01000 0.01000" />
       </geometry>
     </visual>
   </link>
@@ -109,6 +143,8 @@
       </geometry>
     </visual>
   </link>
+  <link name="truck_front_axle_link" />
+  <link name="truck_front_end_link" />
   <link name="truck_frs_link" />
   <link name="truck_frw_link">
     <visual name="frw">
@@ -116,17 +152,19 @@
       <material name="mat_13" />
       <geometry>
         <mesh filename="package://waywiser_description/meshes/truck/front_left_wheel.dae"
-          scale="0.01000 0.01000 0.01000" />
+          scale="0.01046 0.01000 0.01000" />
       </geometry>
     </visual>
   </link>
+  <link name="truck_gnss_antenna_link" />
+  <link name="truck_gnss_chip_link" />
   <link name="truck_mlw_link">
     <visual name="mlw">
       <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 -0.00000" />
       <material name="mat_13" />
       <geometry>
         <mesh filename="package://waywiser_description/meshes/truck/rear_left_wheel.dae"
-          scale="0.01000 0.01000 0.01000" />
+          scale="0.01046 0.01000 0.01000" />
       </geometry>
     </visual>
   </link>
@@ -136,7 +174,7 @@
       <material name="mat_13" />
       <geometry>
         <mesh filename="package://waywiser_description/meshes/truck/rear_left_wheel.dae"
-          scale="0.01000 0.01000 0.01000" />
+          scale="0.01046 0.01000 0.01000" />
       </geometry>
     </visual>
   </link>
@@ -148,7 +186,7 @@
       <material name="mat_13" />
       <geometry>
         <mesh filename="package://waywiser_description/meshes/truck/rear_left_wheel.dae"
-          scale="0.01000 0.01000 0.01000" />
+          scale="0.01046 0.01000 0.01000" />
       </geometry>
     </visual>
   </link>
@@ -158,7 +196,7 @@
       <material name="mat_13" />
       <geometry>
         <mesh filename="package://waywiser_description/meshes/truck/rear_left_wheel.dae"
-          scale="0.01000 0.01000 0.01000" />
+          scale="0.01046 0.01000 0.01000" />
       </geometry>
     </visual>
   </link>
@@ -167,5 +205,8 @@
   </material>
   <material name="mat_13">
     <color rgba="0.51373 0.50196 0.49020 1.00000" />
+  </material>
+  <material name="mat_26">
+    <color rgba="0.74510 0.73725 0.70588 1.00000" />
   </material>
 </robot>

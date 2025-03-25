@@ -1,80 +1,95 @@
 <robot name="semitrailer" version="1.0">
   <joint name="semitrailer_base_link_joint" type="fixed">
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-5.40764 0.00000 -1.19273" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-5.40879 0.00000 -1.21261" />
     <parent link="semitrailer_kingpin_link" />
     <child link="semitrailer_base_link" />
   </joint>
   <joint name="semitrailer_chassis_link_joint" type="fixed">
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-9.61183 0.00000 -0.28836" />
-    <parent link="semitrailer_kingpin_link" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 1.21261" />
+    <parent link="semitrailer_base_link" />
     <child link="semitrailer_chassis_link" />
   </joint>
   <joint name="semitrailer_flw_link_joint" type="continuous">
     <limit lower="0" upper="0" effort="0.00000" velocity="0.00000" />
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-8.24915 0.93800 -0.67305" />
-    <parent link="semitrailer_kingpin_link" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="1.24653 0.93800 -0.00000" />
+    <parent link="semitrailer_rear_axle_link" />
     <child link="semitrailer_flw_link" />
     <axis xyz="0.00000 1.00000 0.00000" />
   </joint>
+  <joint name="semitrailer_front_end_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="6.85188 0.00000 -0.01988" />
+    <parent link="semitrailer_chassis_link" />
+    <child link="semitrailer_front_end_link" />
+  </joint>
   <joint name="semitrailer_frw_link_joint" type="continuous">
     <limit lower="0" upper="0" effort="0.00000" velocity="0.00000" />
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-8.24914 -0.93800 -0.67305" />
-    <parent link="semitrailer_kingpin_link" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="1.24654 -0.93800 -0.00000" />
+    <parent link="semitrailer_rear_axle_link" />
     <child link="semitrailer_frw_link" />
     <axis xyz="0.00000 1.00000 0.00000" />
   </joint>
+  <joint name="semitrailer_left_ultrasonic_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-4.13064 1.30938 0.52382" />
+    <parent link="semitrailer_chassis_link" />
+    <child link="semitrailer_left_ultrasonic_link" />
+  </joint>
   <joint name="semitrailer_mlw_link_joint" type="continuous">
     <limit lower="0" upper="0" effort="0.00000" velocity="0.00000" />
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-9.49231 0.93800 -0.67305" />
-    <parent link="semitrailer_kingpin_link" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00337 0.93800 -0.00000" />
+    <parent link="semitrailer_rear_axle_link" />
     <child link="semitrailer_mlw_link" />
     <axis xyz="0.00000 1.00000 0.00000" />
   </joint>
   <joint name="semitrailer_mrw_link_joint" type="continuous">
     <limit lower="0" upper="0" effort="0.00000" velocity="0.00000" />
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-9.49231 -0.93800 -0.67305" />
-    <parent link="semitrailer_kingpin_link" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00337 -0.93800 -0.00000" />
+    <parent link="semitrailer_rear_axle_link" />
     <child link="semitrailer_mrw_link" />
     <axis xyz="0.00000 1.00000 0.00000" />
   </joint>
   <joint name="semitrailer_rear_axle_link_joint" type="fixed">
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-9.49568 0.00000 -0.67305" />
-    <parent link="semitrailer_kingpin_link" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-4.08804 0.00000 -0.69292" />
+    <parent link="semitrailer_chassis_link" />
     <child link="semitrailer_rear_axle_link" />
   </joint>
   <joint name="semitrailer_rear_end_link_joint" type="fixed">
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-12.27580 0.00000 -0.28836" />
-    <parent link="semitrailer_kingpin_link" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-6.86816 0.00000 -0.30824" />
+    <parent link="semitrailer_chassis_link" />
     <child link="semitrailer_rear_end_link" />
   </joint>
   <joint name="semitrailer_rear_left_end_link_joint" type="fixed">
-    <origin rpy="0.00000 0.00000 -3.14159" xyz="-12.27580 0.93800 -0.28836" />
-    <parent link="semitrailer_kingpin_link" />
+    <origin rpy="0.00000 0.00000 -3.14159" xyz="-6.86816 1.24648 -0.30824" />
+    <parent link="semitrailer_chassis_link" />
     <child link="semitrailer_rear_left_end_link" />
   </joint>
   <joint name="semitrailer_rear_right_end_link_joint" type="fixed">
-    <origin rpy="0.00000 0.00000 -3.14159" xyz="-12.27580 -0.93800 -0.28836" />
-    <parent link="semitrailer_kingpin_link" />
+    <origin rpy="0.00000 0.00000 -3.14159" xyz="-6.86816 -1.24844 -0.30824" />
+    <parent link="semitrailer_chassis_link" />
     <child link="semitrailer_rear_right_end_link" />
+  </joint>
+  <joint name="semitrailer_rear_ultrasonic_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-6.94237 -0.48491 0.49563" />
+    <parent link="semitrailer_chassis_link" />
+    <child link="semitrailer_rear_ultrasonic_link" />
   </joint>
   <joint name="semitrailer_rlw_link_joint" type="continuous">
     <limit lower="0" upper="0" effort="0.00000" velocity="0.00000" />
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-10.74559 0.93800 -0.67305" />
-    <parent link="semitrailer_kingpin_link" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-1.24991 0.93800 -0.00000" />
+    <parent link="semitrailer_rear_axle_link" />
     <child link="semitrailer_rlw_link" />
     <axis xyz="0.00000 1.00000 0.00000" />
   </joint>
   <joint name="semitrailer_rrw_link_joint" type="continuous">
     <limit lower="0" upper="0" effort="0.00000" velocity="0.00000" />
-    <origin rpy="0.00000 0.00000 0.00000" xyz="-10.74558 -0.93800 -0.67305" />
-    <parent link="semitrailer_kingpin_link" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-1.24990 -0.93800 -0.00000" />
+    <parent link="semitrailer_rear_axle_link" />
     <child link="semitrailer_rrw_link" />
     <axis xyz="0.00000 1.00000 0.00000" />
   </joint>
   <link name="semitrailer_base_link" />
   <link name="semitrailer_chassis_link">
     <visual name="body">
-      <origin rpy="0.00000 0.00000 -0.00000" xyz="0.00000 0.00000 0.00000" />
+      <origin rpy="0.00000 0.00000 0.00000" xyz="-4.20420 0.00000 -0.30824" />
       <material name="mat_0.036" />
       <geometry>
         <mesh filename="package://waywiser_description/meshes/semitrailer/body.dae"
@@ -92,6 +107,7 @@
       </geometry>
     </visual>
   </link>
+  <link name="semitrailer_front_end_link" />
   <link name="semitrailer_frw_link">
     <visual name="frw">
       <origin rpy="-0.00000 0.00000 -3.14159" xyz="0.00000 0.00000 0.00000" />
@@ -103,6 +119,7 @@
     </visual>
   </link>
   <link name="semitrailer_kingpin_link" />
+  <link name="semitrailer_left_ultrasonic_link" />
   <link name="semitrailer_mlw_link">
     <visual name="mlw">
       <origin rpy="0.00000 0.00000 -0.00000" xyz="0.00000 0.00000 0.00000" />
@@ -127,6 +144,7 @@
   <link name="semitrailer_rear_end_link" />
   <link name="semitrailer_rear_left_end_link" />
   <link name="semitrailer_rear_right_end_link" />
+  <link name="semitrailer_rear_ultrasonic_link" />
   <link name="semitrailer_rlw_link">
     <visual name="rlw">
       <origin rpy="0.00000 0.00000 -0.00000" xyz="0.00000 0.00000 0.00000" />
