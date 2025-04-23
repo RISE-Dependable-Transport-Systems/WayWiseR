@@ -1,0 +1,13 @@
+/**:
+  ros__parameters:
+    log_interval: 0.3 # seconds
+
+urm14_publisher:
+  ros__parameters:
+    rs485_port: "CH432T_PORT_1" # or "CH432T_PORT_2", specific to CH432T RPi expansion hat
+    urm14_cycle_time: 0.2 # seconds
+    timeout: 0.3 # seconds
+
+urm14_subscriber:
+  ros__parameters:
+    log_interval: 0.3 # seconds
