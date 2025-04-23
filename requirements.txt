@@ -9,3 +9,6 @@ PyYAML
 jinja2
 typeguard
 setuptools
+pyserial
+modbus_tk
+spidev
