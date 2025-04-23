@@ -3,6 +3,7 @@ import modbus_tk.defines as cst
 from modbus_tk import modbus_rtu
 from dfrobot_ch432t import DFRobot_CH432T
 import logging
+import math
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -26,8 +27,6 @@ PARITY = "N"
 STOPBITS = 1
 
 # Set as needed, tested up to 100 Hz
-# SAMPLING_RATE_HZ = 5
-# MEASUREMENT_TIME = 1 / (2 * SAMPLING_RATE_HZ)
 MEASUREMENT_TIME = 0.5  # seconds
 
 
@@ -63,7 +62,7 @@ def initialize_master_bus(port, timeout=MEASUREMENT_TIME):
 
 def write_distance_to_register(master, measurement_time=MEASUREMENT_TIME):
     control_value = safe_modbus_read(master, CONTROL_ADDRESS)
-    if not isinstance(control_value, float):
+    if not math.isnan(control_value):
         # Enable internal temperature compensation
         control_value &= ~TEMPERATURE_COMPENSATION_SELECTION_BIT
         control_value &= ~TEMPERATURE_COMPENSATION_ENABLE_BIT
@@ -80,9 +79,8 @@ def measure_distance(master, measurement_time=MEASUREMENT_TIME):
     write_distance_to_register(master, measurement_time)
     # Read distance register
     distance = safe_modbus_read(master, DISTANCE_ADDRESS)
-    if not isinstance(distance, float):
+    if not math.isnan(distance):
         distance = distance if hex(distance) != hex(0xFFFF) else float("nan")
-    # time.sleep(measurement_time)
     return distance / 10  # Unit is now mm
 
 
