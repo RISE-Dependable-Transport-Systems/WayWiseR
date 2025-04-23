@@ -1,10 +1,24 @@
-## HW specific dependencies
+# HW specific dependencies
 
-### Slamtech lidars
+## URM14 ultrasonic sensor
+
+### Raspberry Pi 4
+
+```bash
+pip install RPi.GPIO
+```
+
+### Raspberry Pi 5
+
+```bash
+pip install rpi-lgpio
+```
+
+## Slamtech lidars
 
     sudo apt-get install ros-humble-rplidar-ros
 
-### Intel realsense camera
+## Intel realsense camera
 
 - Install Intel Realsense SDK and its ROS2 wrapper following the instructions [here](https://github.com/IntelRealSense/realsense-ros?tab=readme-ov-file#installation-on-ubuntu).
 
