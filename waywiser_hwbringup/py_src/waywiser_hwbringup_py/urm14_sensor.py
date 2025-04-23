@@ -81,7 +81,7 @@ def measure_distance(master, measurement_time=MEASUREMENT_TIME):
     # Read distance register
     distance = safe_modbus_read(master, DISTANCE_ADDRESS)
     if not math.isnan(distance):
-        distance = distance if hex(distance) != hex(0xFFFF) else float('nan')
+        distance = distance if distance != 0xFFFF else float('nan')
     return distance / 10  # Unit is now mm
 
 
