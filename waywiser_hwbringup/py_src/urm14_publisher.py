@@ -51,7 +51,7 @@ def main(args=None):
 
     # Create and run the node
     node = URM14PublisherNode()
-    
+
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
