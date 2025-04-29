@@ -11,9 +11,19 @@ class URM14SubscriberNode(Node):
 
         # Declare parameters with default values
         self.declare_parameter('log_interval', 0.3)
+        self.declare_parameter('rs485_port', 'CH432T_PORT_1')
 
         # Get parameters
         self.log_interval = self.get_parameter('log_interval').get_parameter_value().double_value
+        self.port = self.get_parameter('rs485_port').get_parameter_value().string_value
+
+        match self.port:
+            case 'CH432T_PORT_1':
+                self.port = 1
+            case 'CH432T_PORT_2':
+                self.port = 2
+            case _: # The underscore acts as a wildcard - it matches anything
+                raise ValueError(f"Invalid port string: {self.port}. Expected 'CH432T_PORT_1' or 'CH432T_PORT_2'.")
 
         # Create subscriber for distance measurements
         self.subscription = self.create_subscription(
@@ -38,9 +48,9 @@ class URM14SubscriberNode(Node):
     def log_distance(self):
         """Periodically log the latest distance measurement."""
         if self.last_distance is not None and self.last_timestamp is not None:
-            self.get_logger().info(f'Latest distance measurement: {self.last_distance} mm')
+            self.get_logger().info(f'URM14 on port {self.port}: {self.last_distance} mm')
         else:
-            self.get_logger().warn('No distance measurements received yet')
+            self.get_logger().warn(f'No distance measurements received yet from URM14 on port {self.port}')
 
 
 def main(args=None):
@@ -48,7 +58,7 @@ def main(args=None):
 
     # Create and run the node
     node = URM14SubscriberNode()
-    
+
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
