@@ -1,19 +1,5 @@
 # HW specific dependencies
 
-## URM14 ultrasonic sensor
-
-### Raspberry Pi 4
-
-```bash
-pip install RPi.GPIO
-```
-
-### Raspberry Pi 5
-
-```bash
-pip install rpi-lgpio
-```
-
 ## Slamtech lidars
 
     sudo apt-get install ros-humble-rplidar-ros
