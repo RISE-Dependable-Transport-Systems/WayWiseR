@@ -1,0 +1,14 @@
+/**:
+  ros__parameters:
+    log_interval: 0.3 # seconds
+    rs485_port: "CH432T_PORT_1" # Port 1 is right, Port 2 is left, for Sunrise truck.
+    slave_address: "0x0c" # Configure a unique address manually using urm14_sensor.change_slave_id(), then power cycle the sensor.
+
+urm14_publisher:
+  ros__parameters:
+    urm14_cycle_time: 0.19 # seconds
+    timeout: 0.3 # seconds
+
+urm14_subscriber:
+  ros__parameters:
+    log_interval: 0.3 # seconds
