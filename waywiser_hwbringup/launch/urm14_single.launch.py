@@ -13,7 +13,7 @@ def generate_launch_description():
     # Declare a launch argument for the YAML config file
     urm14_config_arg = DeclareLaunchArgument(
         "urm14_config",
-        default_value=os.path.join(hw_bringup_dir, "config", "urm14.yaml"),
+        default_value=os.path.join(hw_bringup_dir, "config", "urm14_port_1.yaml"),
         description="Full path to params file of URM14",
     )
 
