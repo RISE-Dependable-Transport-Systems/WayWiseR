@@ -5,7 +5,6 @@ from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, GroupAction # Reverted GroupAction import
 from launch_ros.actions import PushROSNamespace
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, TextSubstitution
 
 def generate_launch_description():
     # Get the share directory of your package
@@ -21,9 +20,6 @@ def generate_launch_description():
         default_value=multi_config_file, # Default path to your instances config
         description="Full path to the YAML file listing the instances to launch"
     )
-
-    # Get the configuration file path from the launch argument
-    instances_config_file = LaunchConfiguration("instances_config_file")
 
     # List to hold all the launch actions for the different instances
     launch_description_actions = []
@@ -73,11 +69,11 @@ def generate_launch_description():
                 launch_description_actions.append(instance_group)
 
     except FileNotFoundError:
-        print(f"Error: Instances configuration file not found at {config_file_path_str}")
+        print(f"Error: Instances configuration file not found at {multi_config_file}")
         # Return an empty launch description so ROS 2 launch doesn't crash completely
         return LaunchDescription([])
     except yaml.YAMLError as e:
-        print(f"Error parsing YAML file {config_file_path_str}: {e}")
+        print(f"Error parsing YAML file {multi_config_file}: {e}")
         return LaunchDescription([])
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
