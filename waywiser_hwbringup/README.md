@@ -2,7 +2,7 @@
 
 ## URM14 ultrasonic sensor
 
-If running with multiple sensors, make sure to set a unique slave address of each sensor. The default address is `0x0c`. Set for example `0x0d` for the second sensor. This can be done using the function `set_slave_id()`from the `urm14_sensor` module.
+If running with multiple sensors, make sure to set a unique slave address of each sensor. The default address is `0x0c`. Set for example `0x0d` for the second sensor. This can be done using the function `change_slave_id()`from the `urm14_sensor` module.
 
     sudo apt-get install ros-humble-urm14
 
