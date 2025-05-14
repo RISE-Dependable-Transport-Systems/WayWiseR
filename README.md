@@ -1,6 +1,6 @@
 # WayWiseR ﹘ [WayWise](https://github.com/RISE-Dependable-Transport-Systems/WayWise) ❤️ [ROS2](https://docs.ros.org/)
 
-![Workflow build result](https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/actions/workflows/build.yaml/badge.svg)
+![Workflow build result](https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/actions/workflows/build.yaml/badge.svg) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/RISE-Dependable-Transport-Systems/WayWiseR)
 
 WayWise**R** is the integration of WayWise, the rapid prototyping library for connected, autonomous vehicles developed at the RISE Dependable Transport Systems group, with ROS2.
 Both WayWise and WayWiseR are focused on our research projects.
