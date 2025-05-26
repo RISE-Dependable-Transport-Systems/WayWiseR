@@ -13,7 +13,7 @@ find_package(rclpy REQUIRED)
 # Python package
 ament_python_install_package(${PROJECT_NAME}_py PACKAGE_DIR py_src)
 
-install(PROGRAMS py_src/urm14_sensor_array_node.py py_src/urm14_subscriber.py
+install(PROGRAMS py_src/urm14_sensor_array_node.py
   DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
