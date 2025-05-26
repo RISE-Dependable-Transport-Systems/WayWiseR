@@ -1,5 +1,0 @@
-instances:
-  - namespace: /urm14_port_1
-    config_file: config/urm14_port_1.yaml
-  - namespace: /urm14_port_2
-    config_file: config/urm14_port_2.yaml

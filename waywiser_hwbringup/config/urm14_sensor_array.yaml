@@ -1,0 +1,17 @@
+urm14_sensor_array_node:
+  ros__parameters:
+    sensor_names: [ultrasonic_trailer_rear, ultrasonic_trailer_left]
+    ultrasonic_trailer_rear:
+      rs485_port: "CH432T_PORT_1"
+      slave_address: "0x0c"
+      log_interval: 0.3
+      cycle_time: 0.19
+      timeout: 0.3
+      topic: "/truck/sensors/ultrasonic/trailer_rear"
+    ultrasonic_trailer_left:
+      rs485_port: "CH432T_PORT_2"
+      slave_address: "0x0d"
+      log_interval: 0.3
+      cycle_time: 0.19
+      timeout: 0.3
+      topic: "/truck/sensors/ultrasonic/trailer_left"
