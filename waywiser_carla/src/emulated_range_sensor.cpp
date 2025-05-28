@@ -3,7 +3,7 @@
 #include "sensor_msgs/msg/range.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include <opencv2/opencv.hpp>
-#include <cv_bridge/cv_bridge.h>
+#include <cv_bridge/cv_bridge.hpp>
 
 using namespace std::placeholders;
 

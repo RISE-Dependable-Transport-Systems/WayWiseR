@@ -8,3 +8,4 @@ catkin_pkg
 PyYAML
 jinja2
 typeguard
+setuptools
