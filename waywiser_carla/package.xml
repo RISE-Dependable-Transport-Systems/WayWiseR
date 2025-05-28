@@ -20,6 +20,7 @@
   <depend>carla_msgs</depend>
   <depend>tf_transformations</depend>
   <depend>waywiser</depend>
+  <depend>cv_bridge</depend>
   <exec_depend>carla_ros_bridge</exec_depend>
   <exec_depend>carla_spawn_objects</exec_depend>
 
