@@ -10,11 +10,20 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(waywiser_perception REQUIRED)
 
-ament_python_install_package(${PROJECT_NAME}_py PACKAGE_DIR py_src)
+ament_python_install_package(${PROJECT_NAME}_py
+  PACKAGE_DIR py_src/waywiser_hwbringup_py
+)
 
-install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
+install(
+  DIRECTORY launch config
+  DESTINATION share/${PROJECT_NAME}
+)
 
-install(PROGRAMS py_src/depthai_node.py DESTINATION lib/${PROJECT_NAME})
+install(
+  PROGRAMS
+  py_src/waywiser_hwbringup_py/depthai_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

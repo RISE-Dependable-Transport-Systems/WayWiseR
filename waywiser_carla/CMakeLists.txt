@@ -23,59 +23,60 @@ find_package(OpenCV REQUIRED)
 
 # C++ targets
 add_executable(vehicle_odom_transform src/vehicle_odom_transform.cpp)
-ament_target_dependencies(
-  vehicle_odom_transform
+ament_target_dependencies(vehicle_odom_transform
   rclcpp
   tf2_ros
   tf2_geometry_msgs
   geometry_msgs
-  nav_msgs)
+  nav_msgs
+)
 
 add_executable(emulated_angle_sensor src/emulated_angle_sensor.cpp)
-ament_target_dependencies(
-  emulated_angle_sensor
+ament_target_dependencies(emulated_angle_sensor
   rclcpp
   tf2
   tf2_ros
   geometry_msgs
-  std_msgs)
+  std_msgs
+)
 
 # Add the EmulatedRangeSensor executable
 add_executable(emulated_range_sensor src/emulated_range_sensor.cpp)
-ament_target_dependencies(
-  emulated_range_sensor
+ament_target_dependencies(emulated_range_sensor
   rclcpp
   sensor_msgs
   std_msgs
   cv_bridge
-  OpenCV)
+  OpenCV
+)
 
 # Install targets
-install(TARGETS vehicle_odom_transform RUNTIME DESTINATION lib/${PROJECT_NAME})
-install(TARGETS emulated_angle_sensor RUNTIME DESTINATION lib/${PROJECT_NAME})
-install(TARGETS emulated_range_sensor RUNTIME DESTINATION lib/${PROJECT_NAME})
+install(
+  TARGETS vehicle_odom_transform emulated_angle_sensor emulated_range_sensor
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 # Python package
-ament_python_install_package(${PROJECT_NAME}_py PACKAGE_DIR py_src)
+ament_python_install_package(${PROJECT_NAME}_py
+  PACKAGE_DIR py_src/waywiser_carla_py
+)
 
-install(PROGRAMS py_src/carla_osm_tile_server.py
-        DESTINATION lib/${PROJECT_NAME})
-install(PROGRAMS py_src/waywiser_twist_to_carla_control.py
-        DESTINATION lib/${PROJECT_NAME})
-install(PROGRAMS py_src/carla_orchestrator.py DESTINATION lib/${PROJECT_NAME})
+install(
+  PROGRAMS
+  py_src/waywiser_carla_py/carla_osm_tile_server.py
+  py_src/waywiser_carla_py/waywiser_twist_to_carla_control.py
+  py_src/waywiser_carla_py/carla_orchestrator.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
-install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
+install(
+  DIRECTORY launch config
+  DESTINATION share/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-
-  # the following line skips the linter which checks for copyrights comment the
-  # line when a copyright and license is added to all source files
   set(ament_cmake_copyright_FOUND TRUE)
-
-  # the following line skips cpplint (only works in a git repo) comment the line
-  # when this package is in a git repo and when a copyright and license is added
-  # to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()

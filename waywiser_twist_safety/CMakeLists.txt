@@ -30,27 +30,29 @@ foreach(MSG_FILE ${MSG_FILES})
   list(APPEND ROSIDL_FILES msg/${MSG_NAME})
 endforeach()
 
-rosidl_generate_interfaces(
-  ${PROJECT_NAME}
+rosidl_generate_interfaces(${PROJECT_NAME}
   ${ROSIDL_FILES}
-  DEPENDENCIES
-  std_msgs
-  builtin_interfaces)
+  DEPENDENCIES std_msgs builtin_interfaces
+)
 
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME}
-  rosidl_typesupport_cpp)
+  rosidl_typesupport_cpp
+)
 
 add_library(emergency_stop_monitor_core SHARED
-  cpp_src/rclcpp_components/emergency_stop_monitor_core.cpp)
-ament_target_dependencies(
-  emergency_stop_monitor_core
+  cpp_src/rclcpp_components/emergency_stop_monitor_core.cpp
+)
+
+ament_target_dependencies(emergency_stop_monitor_core
   geometry_msgs
   rclcpp
   rclcpp_components
   sensor_msgs
-  std_msgs)
+  std_msgs
+)
 rclcpp_components_register_nodes(emergency_stop_monitor_core
-  waywiser_twist_safety::EmergencyStopMonitor)
+  waywiser_twist_safety::EmergencyStopMonitor
+)
 target_link_libraries(emergency_stop_monitor_core "${cpp_typesupport_target}")
 
 add_executable(emergency_stop_monitor cpp_src/emergency_stop_monitor.cpp)
@@ -60,13 +62,23 @@ install(
   TARGETS emergency_stop_monitor_core
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin)
+  RUNTIME DESTINATION bin
+)
 
-install(TARGETS emergency_stop_monitor RUNTIME DESTINATION lib/${PROJECT_NAME})
+install(
+  TARGETS emergency_stop_monitor
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
 
-install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
+install(
+  DIRECTORY include/
+  DESTINATION include/${PROJECT_NAME}
+)
 
-install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
+install(
+  DIRECTORY launch config
+  DESTINATION share/${PROJECT_NAME}
+)
 
 ament_export_dependencies(rosidl_default_runtime)
 ament_export_include_directories(include)

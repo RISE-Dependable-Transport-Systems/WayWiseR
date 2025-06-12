@@ -9,9 +9,16 @@ endif()
 find_package(ament_cmake REQUIRED)
 
 file(GLOB DISCOVERY_SETUP_FILES "discovery/*.sh")
-install(FILES ${DISCOVERY_SETUP_FILES} DESTINATION discovery)
 
-install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
+install(
+  FILES ${DISCOVERY_SETUP_FILES}
+  DESTINATION discovery
+)
+
+install(
+  DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

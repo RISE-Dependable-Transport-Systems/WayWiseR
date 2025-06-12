@@ -9,17 +9,28 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclpy REQUIRED)
 
-ament_python_install_package(${PROJECT_NAME}_py PACKAGE_DIR py_src)
+ament_python_install_package(${PROJECT_NAME}_py
+  PACKAGE_DIR py_src/waywiser_agrarsense_py
+)
 
 file(GLOB ROS_BRIDGE_FILES "ros_bridge/*")
-install(FILES ${ROS_BRIDGE_FILES} DESTINATION ros_bridge)
-
-install(DIRECTORY launch config ros_bridge DESTINATION share/${PROJECT_NAME})
+install(
+  FILES ${ROS_BRIDGE_FILES}
+  DESTINATION ros_bridge
+)
 
 install(
-  PROGRAMS py_src/agrarsense_orchestrator.py py_src/vehicle_tf_publisher.py
-  py_src/waywiser_twist_to_agrarsense_control.py
-  DESTINATION lib/${PROJECT_NAME})
+  DIRECTORY launch config ros_bridge
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  PROGRAMS
+  py_src/waywiser_agrarsense_py/agrarsense_orchestrator.py
+  py_src/waywiser_agrarsense_py/vehicle_tf_publisher.py
+  py_src/waywiser_agrarsense_py/waywiser_twist_to_agrarsense_control.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
