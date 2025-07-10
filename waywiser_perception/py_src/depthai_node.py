@@ -26,7 +26,7 @@ STEREO_CONFIDENCE_THRESHOLD = (
 )
 
 class DepthAI(Node):
-    def __init__(self, model_name):
+    def __init__(self):
         super().__init__('depthai_node')
 
         # Parameters for topics
@@ -38,7 +38,7 @@ class DepthAI(Node):
         # Retrieve parameters
         self.rgb_topic = self.get_parameter('rgb_topic').get_parameter_value().string_value
         self.detections_topic = self.get_parameter('detections_topic').get_parameter_value().string_value
-        self.model_path = self.get_parameter('model_path').get_parameter_value().string_value
+        self.model_path = os.path.expanduser(self.get_parameter('model_path').get_parameter_value().string_value)
         self.camera_base_frame = self.get_parameter('camera_base_frame').get_parameter_value().string_value
 
         # Publishers
@@ -118,7 +118,7 @@ class DepthAI(Node):
 
         if not os.path.exists(NN_path):
             self.get_logger().info(f'Model file not found at path: {NN_path}')
-            raise FileNotFoundError(f"Model file not found")
+            raise FileNotFoundError(f'Model file not found at path: {NN_path}')
 
         model_name = os.path.basename(NN_path)
         self.get_logger().info(f'Configuring YoloSpatialDetectionNetwork (Model: {model_name})')
@@ -239,7 +239,7 @@ class DepthAI(Node):
 
                         detection_array.detections.append(detection)
                     
-                    self.detection_array_pub.publish(detection_array)
+                    self.detection_array_publisher.publish(detection_array)
 
 def main(args=None):
     rclpy.init(args=args)
