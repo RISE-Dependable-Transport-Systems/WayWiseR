@@ -23,7 +23,7 @@ def generate_launch_description():
     )
     enable_collision_monitor_la = DeclareLaunchArgument(
         'enable_collision_monitor',
-        default_value='True',
+        default_value='False',
         description='Use Nav2 collision monitoring',
     )
 
@@ -56,6 +56,7 @@ def generate_launch_description():
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'enable_collision_monitor': LaunchConfiguration('enable_collision_monitor'),
+            'twist_safety_config': LaunchConfiguration('vehicle_config'),
         }.items(),
     )
 

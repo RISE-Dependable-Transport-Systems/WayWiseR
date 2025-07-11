@@ -33,3 +33,26 @@ waywise_car_autopilot_node:
     autopilot_cmd_publish_rate: 30
     waywise_control_tower_address: "127.0.0.1"
     purepursuit_radius: 1.0
+
+emergency_stop_monitor:
+  ros__parameters:
+    start_with_emergency_stop: true
+    cmd_vel_in_timeout: 0.5
+    emergency_stop_state_publish_rate: 10
+
+onboard_twist_mux:
+  ros__parameters:
+    use_stamped: false
+    topics:
+      teleop:
+        topic: teleop_mux_vel
+        timeout: 0.5
+        priority: 100
+      waywise:
+        topic: waywise_vel
+        timeout: 0.5
+        priority: 60
+      nav2:
+        topic: nav2_vel
+        timeout: 0.5
+        priority: 50
