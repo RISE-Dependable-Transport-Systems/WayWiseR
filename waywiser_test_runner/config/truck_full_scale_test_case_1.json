@@ -1,0 +1,20 @@
+{
+    "track_test_configurations": [
+        {
+            "iterations": 50,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.7,18.5,0.5,0,0,180",
+                    "semitrailer": "-36.7,18.5,1.5,0,0,180"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        }
+    ]
+}

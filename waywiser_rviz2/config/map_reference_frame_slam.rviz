@@ -88,6 +88,8 @@ Visualization Manager:
           Value: false
         front_axle_link:
           Value: false
+        front_bumper_link:
+          Value: false
         imu_link:
           Value: false
         left_front_wheel_link:
@@ -106,6 +108,10 @@ Visualization Manager:
           Value: true
         rear_axle_link:
           Value: false
+        rear_bumper_link:
+          Value: false
+        rear_end_link:
+          Value: false
         right_front_wheel_link:
           Value: false
         right_front_wheel_steering_link:
@@ -118,36 +124,25 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        map: {}
-        odom:
-          base_link:
-            chassis_link:
-              bumper_link: {}
-              camera_bottom_screw_frame:
-                camera_link:
-                  camera_accel_frame:
-                    camera_accel_optical_frame: {}
-                  camera_color_frame:
-                    camera_color_optical_frame: {}
-                  camera_depth_frame:
-                    camera_depth_optical_frame: {}
-                  camera_gyro_frame:
-                    camera_gyro_optical_frame: {}
-                  camera_infra1_frame:
-                    camera_infra1_optical_frame: {}
-                  camera_infra2_frame:
-                    camera_infra2_optical_frame: {}
-              front_axle_link:
-                left_front_wheel_steering_link:
-                  left_front_wheel_link: {}
-                right_front_wheel_steering_link:
-                  right_front_wheel_link: {}
-              imu_link: {}
-              lidar_support_link:
-                lidar_link: {}
-              rear_axle_link:
-                left_rear_wheel_link: {}
-                right_rear_wheel_link: {}
+        map:
+          odom:
+            base_link:
+              chassis_link:
+                camera_link: {}
+                front_axle_link:
+                  left_front_wheel_steering_link:
+                    left_front_wheel_link: {}
+                  right_front_wheel_steering_link:
+                    right_front_wheel_link: {}
+                front_bumper_link: {}
+                imu_link: {}
+                lidar_support_link:
+                  lidar_link: {}
+                rear_axle_link:
+                  left_rear_wheel_link: {}
+                  right_rear_wheel_link: {}
+                rear_bumper_link:
+                  rear_end_link: {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -244,6 +239,11 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
+        front_bumper_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
         imu_link:
           Alpha: 1
           Show Axes: false
@@ -279,6 +279,15 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
+        rear_bumper_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_end_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
         right_front_wheel_link:
           Alpha: 1
           Show Axes: false
@@ -455,8 +464,7 @@ Visualization Manager:
     - Class: rviz_default_plugins/MarkerArray
       Enabled: false
       Name: 3D bounding box markers
-      Namespaces:
-        "": true
+      Namespaces: {}
       Topic:
         Depth: 5
         Durability Policy: Volatile

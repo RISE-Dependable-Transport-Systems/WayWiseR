@@ -180,6 +180,11 @@ set(COMMON_DEPENDENCIES
 ament_target_dependencies(waywiser_car_node ${COMMON_DEPENDENCIES})
 ament_target_dependencies(waywiser_truck_node ${COMMON_DEPENDENCIES})
 
+install(
+  DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
 install(TARGETS waywiser_car_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS waywiser_truck_node DESTINATION lib/${PROJECT_NAME})
 

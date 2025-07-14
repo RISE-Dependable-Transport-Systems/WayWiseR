@@ -11,9 +11,9 @@
                 "walkerAction": "Stationary",
                 "walkerEndAction": "Destroy",
                 "spawnPoint": {
-                    "x": 2260.0,
-                    "y": 2390.0,
-                    "z": 100.0,
+                    "x": 80506.0,
+                    "y": 70569.0,
+                    "z": -2329.0,
                     "roll": -0,
                     "pitch": 0,
                     "yaw": 0,
@@ -29,12 +29,12 @@
             "id": "forwarder",
             "followObject": "true",
             "spawnPoint": {
-                "x": 0.0,
-                "y": 0.0,
-                "z": 10.0,
+                "x": 78057.0,
+                "y": 69260.0,
+                "z": -2350.0,
                 "roll": 0.0,
                 "pitch": 0.0,
-                "yaw": 0.0
+                "yaw": 30.0
             },
             "sensors": [
                 {

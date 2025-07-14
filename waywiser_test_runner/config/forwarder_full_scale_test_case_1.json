@@ -1,0 +1,13 @@
+{
+    "track_test_configurations": [
+        {
+            "iterations": 50,
+            "setup_conditions": {
+                "spawn_point": {
+                    "forwarder": "78057.0,69260.0,-2350.0,0.0,0.0,30.0"
+                },
+                "objects_json_path": "vindeln_objects.json"
+            }
+        }
+    ]
+}

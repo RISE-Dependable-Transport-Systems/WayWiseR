@@ -1,18 +1,18 @@
 track_test_runner_node:
   ros__parameters:
-    use_sim_time: false
-    orchestrate_test_setup: true
+    use_sim_time: true
+    orchestrate_test_setup: false
     track_test_runner_timer_rate: 1.0
     test_config_start_index: 1
-    test_configurations_json_path: "truck_small_scale_track_test_configurations.json"
+    test_configurations_json_path: "truck_full_scale_test_case_example.json"
     rosbag_output_dir: "track_test_data" # relative path
     use_rosbag_recording: true
     mission_status_topic: "/truck/mission_status"
     autopilot_state_control_topic: "/truck/autopilot_state_control"
-    end_test_after_mission_complete: true
-    preplanned_route_filepath: "$WAYWISER_WS/resources/small_scale_route.xml"
-    vehicle_start_position_is_test_start_point: true
+    preplanned_route_filepath: "$WAYWISER_WS/resources/full_scale_route.xml"
+    vehicle_start_position_is_test_start_point: false
     # test_start_point: "-0.24136670548847863, 0.9810376247909707, 0.0, 0.0, 0.0, -0.6382656725442453, 0.7698161671799588"
+    test_start_point: "-38.12, 18.50, 0.53, 0.0, 0.0, 180.0"
     vehicle_pose_topic: "/truck/rear_axle_pose"
     trailer_pose_topic: "/semitrailer/rear_axle_pose"
     emergency_stop_topic: "/emergency_stop/current_state"
@@ -24,7 +24,6 @@ track_test_runner_node:
     test_cooldown_time: 10.0
     halt_test_runner_on_timeout: true
     notify_via_mail_on_timeout: true
-    notify_via_mail_on_completion: true
 
     rear_axle_frame: truck_rear_axle_link
     rear_end_frame: truck_rear_end_link
@@ -35,13 +34,14 @@ track_test_runner_node:
     trailer_hitch_frame: semitrailer_kingpin_link
 
     has_trailer: true
-    length: 0.505
-    width: 0.185
-    wheelbase: 0.2866
-    trailer_length: 0.980
-    trailer_width: 0.187
-    trailer_wheelbase: 0.6150
-    staging_area_margin: 0.1
+    length: 7.07
+    width: 2.59
+    wheelbase: 4.0124
+    trailer_length: 13.72
+    trailer_width: 2.618
+    trailer_wheelbase: 8.61
+    staging_area_margin: 1.4
+
     trace_topic: "/semitrailer/rear_axle_pose"
 
     topics_to_record:

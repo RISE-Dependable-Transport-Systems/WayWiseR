@@ -25,8 +25,6 @@ Panels:
     Name: Time
     SyncMode: 0
     SyncSource: ""
-  - Class: slam_toolbox::SlamToolboxPlugin
-    Name: SlamToolboxPlugin
 Visualization Manager:
   Class: ""
   Displays:
@@ -50,9 +48,13 @@ Visualization Manager:
       Value: true
     - Class: rviz_default_plugins/TF
       Enabled: true
+      Filter (blacklist): ""
+      Filter (whitelist): ""
       Frame Timeout: 15
       Frames:
         All Enabled: false
+        map:
+          Value: true
         odom:
           Value: true
         semitrailer:
@@ -115,56 +117,35 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        odom:
-          semitrailer:
-            {}
-          truck:
-            truck_chassis_link:
-              {}
-            truck_fifth_wheel_link:
-              semitrailer_kingpin_link:
-                semitrailer_base_link:
-                  {}
-                semitrailer_chassis_link:
-                  {}
-                semitrailer_flw_link:
-                  {}
-                semitrailer_frw_link:
-                  {}
-                semitrailer_mlw_link:
-                  {}
-                semitrailer_mrw_link:
-                  {}
-                semitrailer_rear_axle_link:
-                  {}
-                semitrailer_rear_end_link:
-                  {}
-                semitrailer_rear_left_end_link:
-                  {}
-                semitrailer_rear_right_end_link:
-                  {}
-                semitrailer_rlw_link:
-                  {}
-                semitrailer_rrw_link:
-                  {}
-            truck_fls_link:
-              truck_flw_link:
-                {}
-            truck_frs_link:
-              truck_frw_link:
-                {}
-            truck_mlw_link:
-              {}
-            truck_mrw_link:
-              {}
-            truck_rear_axle_link:
-              {}
-            truck_rear_end_link:
-              {}
-            truck_rlw_link:
-              {}
-            truck_rrw_link:
-              {}
+        map:
+          odom:
+            semitrailer: {}
+            truck:
+              truck_chassis_link: {}
+              truck_fifth_wheel_link:
+                semitrailer_kingpin_link:
+                  semitrailer_base_link: {}
+                  semitrailer_chassis_link: {}
+                  semitrailer_flw_link: {}
+                  semitrailer_frw_link: {}
+                  semitrailer_mlw_link: {}
+                  semitrailer_mrw_link: {}
+                  semitrailer_rear_axle_link: {}
+                  semitrailer_rear_end_link: {}
+                  semitrailer_rear_left_end_link: {}
+                  semitrailer_rear_right_end_link: {}
+                  semitrailer_rlw_link: {}
+                  semitrailer_rrw_link: {}
+              truck_fls_link:
+                truck_flw_link: {}
+              truck_frs_link:
+                truck_frw_link: {}
+              truck_mlw_link: {}
+              truck_mrw_link: {}
+              truck_rear_axle_link: {}
+              truck_rear_end_link: {}
+              truck_rlw_link: {}
+              truck_rrw_link: {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -373,7 +354,6 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
-        Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /sensors/camera/depth/points
@@ -434,7 +414,6 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: System Default
-        Filter size: 10
         History Policy: System Default
         Reliability Policy: System Default
         Value: /sensors/camera/color/points
@@ -444,8 +423,7 @@ Visualization Manager:
     - Class: rviz_default_plugins/MarkerArray
       Enabled: false
       Name: 3D bounding box markers
-      Namespaces:
-        {}
+      Namespaces: {}
       Topic:
         Depth: 5
         Durability Policy: Volatile

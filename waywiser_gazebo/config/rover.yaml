@@ -17,11 +17,11 @@
       ["left_front_wheel_joint", "right_front_wheel_joint"]
     rear_wheel_joint_names: ["left_rear_wheel_joint", "right_rear_wheel_joint"]
 
-    length: 0.8
-    width: 0.335
+    length: 0.53
+    width: 0.255
     wheelbase: 0.33
 
-    erpm_min: 1000.0
+    erpm_min: -10000.0
     erpm_max: 10000.0
     speed_to_erpm_factor: 4500.0
     min_turning_radius: 0.92 # wheelbase/tan(max_steering_angle)
@@ -31,10 +31,10 @@
 
     urdf_file: "rover.urdf.xacro"
     urdf_scale: 1.0 # 1:1
+    urdf_extra_args: "sim_mode:=true"
 
     odom_topic: "/rover/odometry"
     vehicle_pose_topic: "/rover/rear_axle_pose"
-    battery_state_topic: "/rover/sensors/battery_state"
     mission_status_topic: "/rover/mission_status"
     autopilot_state_control_topic: "/rover/autopilot_state_control"
     vehicle_alignment_reference_point_topic: "/rover/vehicle_alignment_reference_point"
@@ -44,37 +44,34 @@
 
 waywiser_car_node:
   ros__parameters:
-    vehicle_interface_type: "vesc"
+    vehicle_interface_type: "ext_simulated"
+    gnss_variant: "ext_simulated"
+    gnss_timeout: 3.0
     servo_offset: 0.45
     servo_range: 0.9 # servo_output = servo_offset + [-servo_range/2, servo_range/2]
     #steering_angle_to_servo_gain: -0.950
     invert_servo_output: false
     # TODO: limit erpm also based on current
     # current_max: 30.0
-    publish_odom_to_baselink_tf: true
+    publish_odom_to_baselink_tf: false
     publish_world_to_odom_tf: false
     vehicle_state_poll_rate: 30 # currently same rate for both odom topic and odom->base_link tf
     use_sdvp_position_fusion: false
-    imu_for_sdvp_position_fusion: ""
     min_battery_voltage: 13.6
-    joint_states_publish_rate: 10
     enable_lidar: false
     enable_camera: false
-    invert_steering_joint_state: true
+    joint_states_publish_rate: 10
 
     #autopilot component
-    autopilot_timer_rate: 10
-    enable_mavlink_interface: true
+    autopilot_timer_rate: 30
     waywise_control_tower_address: "127.0.0.1"
-    waywise_control_tower_port: 14540
     purepursuit_radius: 1.0
-    adaptive_pure_pursuit: true
     end_goal_alignment_type: 1 # Align {0: REAR_AXLE, 1: FRONT_REAR_END, 2: CENTER} with the end goal
     end_goal_alignment_threshold: 0.1 # m
 
 emergency_stop_monitor:
   ros__parameters:
-    start_with_emergency_stop: true
+    start_with_emergency_stop: false
     cmd_vel_in_timeout: 0.5
     emergency_stop_state_publish_rate: 10
 
@@ -87,7 +84,7 @@ onboard_twist_mux:
         timeout: 0.5
         priority: 100
       waywise:
-        topic: waywiser_autopilot_vel
+        topic: waywiser_vel
         timeout: 0.5
         priority: 60
       nav2:

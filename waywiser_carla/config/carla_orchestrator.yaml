@@ -1,0 +1,32 @@
+/**:
+  # general parameters
+  ros__parameters:
+    host: localhost
+    port: 2000
+    timeout: 15
+    town: Sunrise_from_Town05
+
+carla_orchestrator_node:
+  ros__parameters:
+    sim_startup_time: 10.0
+    carla_orchestrator_timer_rate: 1.0
+    carla_script_path: "~/workspaces/carla_ws/CarlaUE4.sh"
+    auto_start_simulation: true
+    render_off_screen: false
+    reset_carla_after_exec: false
+    relativemousemode: false
+    carla_ros_bridge:
+      passive: false
+      synchronous_mode: true
+      synchronous_mode_wait_for_vehicle_control_command: false
+      fixed_delta_seconds: 0.01
+      register_all_sensors: true
+    objects_json_path: "dts_truck_semitrailer.json"
+    weather: "ClearNoon"
+    object_ids: ["truck", "semitrailer"]
+    spawn_point:
+      truck: "-43.7,18.5,0.5,0,0,180"
+      semitrailer: "-36.7,18.5,1.5,0,0,180"
+    object_pose_topics:
+      truck: "/truck/rear_axle_pose"
+      semitrailer: "/semitrailer/rear_axle_pose"

@@ -14,9 +14,9 @@ def generate_launch_description():
 
     # args that can be set from the command line or a default will be used
     yolov8_config_la = DeclareLaunchArgument(
-        'yolov8_config',
+        'yolo_config',
         default_value=os.path.join(perception_dir, 'config/yolov8.yaml'),
-        description='Full path to params file of yolov8',
+        description='Full path to params file of yolo',
     )
 
     use_sim_time_la = DeclareLaunchArgument(
@@ -40,11 +40,11 @@ def generate_launch_description():
 
 
 def yolov8_launch(context):
-    config_data = yaml_to_dict(LaunchConfiguration('yolov8_config').perform(context))
-    yolov8_parameters = config_data['yolov8_node']['ros__parameters']
-    yolov8_parameters['model_file_path'] = os.path.expanduser(yolov8_parameters['model_file_path'])
-    if yolov8_parameters['use_tracker']:
-        tracker_config_filepath = os.path.expanduser(yolov8_parameters['tracker_config_filepath'])
+    config_data = yaml_to_dict(LaunchConfiguration('yolo_config').perform(context))
+    yolo_parameters = config_data['yolo_node']['ros__parameters']
+    yolo_parameters['model_file_path'] = os.path.expanduser(yolo_parameters['model_file_path'])
+    if yolo_parameters['use_tracker']:
+        tracker_config_filepath = os.path.expanduser(yolo_parameters['tracker_config_filepath'])
 
         if not tracker_config_filepath.startswith('/'):
             tracker_config_filepath = os.path.join(
@@ -58,14 +58,14 @@ def yolov8_launch(context):
                 f"Tracker config file '{tracker_config_filepath}' does not exist."
             )
         else:
-            yolov8_parameters['tracker_config_filepath'] = tracker_config_filepath
+            yolo_parameters['tracker_config_filepath'] = tracker_config_filepath
 
-    yolov8_node = Node(
+    yolo_node = Node(
         package='waywiser_perception',
-        executable='yolov8_node.py',
-        name='yolov8_node',
+        executable='yolo_node.py',
+        name='yolo_node',
         parameters=[
-            yolov8_parameters,
+            yolo_parameters,
             {
                 'use_sim_time': LaunchConfiguration('use_sim_time'),
             },
@@ -74,7 +74,7 @@ def yolov8_launch(context):
         output='screen',
     )
 
-    return [yolov8_node]
+    return [yolo_node]
 
 
 def yaml_to_dict(path_to_yaml):

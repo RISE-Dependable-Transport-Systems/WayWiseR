@@ -9,46 +9,60 @@ from launch.substitutions import LaunchConfiguration
 
 
 def generate_launch_description():
-    waywiser_gazebo_dir = get_package_share_directory('waywiser_gazebo')
+    waywiser_hwbringup_dir = get_package_share_directory('waywiser_hwbringup')
     waywiser_twist_safety_dir = get_package_share_directory('waywiser_twist_safety')
-    waywiser_slam_dir = get_package_share_directory('waywiser_slam')
-    waywiser_nav2_dir = get_package_share_directory('waywiser_nav2')
-    waywiser_rviz2_dir = get_package_share_directory('waywiser_rviz2')
+    waywiser_teleop_dir = get_package_share_directory('waywiser_teleop')
 
     # args that can be set from the command line or a default will be used
-    use_sim_time_la = DeclareLaunchArgument(
-        'use_sim_time', default_value='True', description='Use simulation/Gazebo clock'
-    )
-    gazebo_world_la = DeclareLaunchArgument(
-        'world',
-        default_value=os.path.join(waywiser_gazebo_dir, 'worlds/car_world.sdf'),
-        description='Full path to gazebo sdf file',
+    vehicle_config_la = DeclareLaunchArgument(
+        'vehicle_config',
+        default_value=os.path.join(waywiser_hwbringup_dir, 'config/rover.yaml'),
+        description='Full path to params file of rover',
     )
     enable_collision_monitor_la = DeclareLaunchArgument(
         'enable_collision_monitor',
-        default_value='True',
+        default_value='False',
         description='Use Nav2 collision monitoring',
     )
     rviz_config_la = DeclareLaunchArgument(
         'rviz_config',
-        default_value=os.path.join(waywiser_rviz2_dir, 'config/map_reference_frame_nav2.rviz'),
+        default_value='odom_reference_frame_rover.rviz',
         description='Full path of rviz display config file or path to their directory',
+    )
+    teleop_config_la = DeclareLaunchArgument(
+        'teleop_config',
+        default_value=os.path.join(waywiser_teleop_dir, 'config/teleop.yaml'),
+        description='Full path to params file',
+    )
+    teleop_la = DeclareLaunchArgument(
+        'teleop',
+        default_value='True',
+        description='Launch teleop',
+    )
+    rviz2_la = DeclareLaunchArgument(
+        'rviz2',
+        default_value='True',
+        description='Launch rviz2',
+    )
+    control_vehicle_node_name_la = DeclareLaunchArgument(
+        'control_vehicle_node',
+        default_value='waywiser_car_node',
+        description='Name of the vehicle node to control',
     )
 
     # include launch files
-    gazebo = IncludeLaunchDescription(
+    rover = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
                 os.path.join(
-                    waywiser_gazebo_dir,
+                    waywiser_hwbringup_dir,
                     'launch',
-                    'gazebo.launch.py',
+                    'rover.launch.py',
                 )
             ]
         ),
         launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'world': LaunchConfiguration('world'),
+            'vehicle_config': LaunchConfiguration('vehicle_config'),
         }.items(),
     )
 
@@ -63,42 +77,11 @@ def generate_launch_description():
             ]
         ),
         launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
             'enable_collision_monitor': LaunchConfiguration('enable_collision_monitor'),
+            'twist_safety_config': LaunchConfiguration('vehicle_config'),
         }.items(),
     )
 
-    slam = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                os.path.join(
-                    waywiser_slam_dir,
-                    'launch',
-                    'slam.launch.py',
-                )
-            ]
-        ),
-        launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-        }.items(),
-    )
-
-    nav2 = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                os.path.join(
-                    waywiser_nav2_dir,
-                    'launch',
-                    'nav2_bringup_all.launch.py',
-                )
-            ]
-        ),
-        launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-        }.items(),
-    )
-
-    # include launch files
     teleop_rviz2 = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -110,8 +93,11 @@ def generate_launch_description():
             ]
         ),
         launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
             'rviz_config': LaunchConfiguration('rviz_config'),
+            'teleop_config': LaunchConfiguration('teleop_config'),
+            'teleop': LaunchConfiguration('teleop'),
+            'rviz2': LaunchConfiguration('rviz2'),
+            'control_vehicle_node': LaunchConfiguration('control_vehicle_node'),
         }.items(),
     )
 
@@ -119,16 +105,17 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # declare launch args
-    ld.add_action(use_sim_time_la)
-    ld.add_action(gazebo_world_la)
+    ld.add_action(vehicle_config_la)
     ld.add_action(enable_collision_monitor_la)
     ld.add_action(rviz_config_la)
+    ld.add_action(teleop_config_la)
+    ld.add_action(teleop_la)
+    ld.add_action(rviz2_la)
+    ld.add_action(control_vehicle_node_name_la)
 
     # start nodes
-    ld.add_action(gazebo)
+    ld.add_action(rover)
     ld.add_action(twist_safety)
-    ld.add_action(slam)
-    ld.add_action(nav2)
     ld.add_action(teleop_rviz2)
 
     return ld

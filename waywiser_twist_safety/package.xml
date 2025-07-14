@@ -6,7 +6,7 @@
 
   <description>Package that manages twist commands to vehicle from different sources using
     twist_mux, nav2 collision monitoring, and emergency stop monitoring. The onboard_twist_mux node
-    subscribes to topics configured in twist_safety_config file, e.g., teleop_mux_vel, waywise_vel
+    subscribes to topics configured in twist_safety_config file, e.g., teleop_mux_vel, waywiser_vel
     etc., and publishes to "onboard_mux_vel" by multiplexing between sunscribed topics according to
     their priorities. Nav2 collision_monitor node performs several collision avoidance related tasks
     using incoming data from the sensors and prevents potential collisions by reducing the linear
