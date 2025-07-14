@@ -1,3 +1,6 @@
+/**:
+  ros__parameters:
+    joy_timeout: 1.0 #seconds
 joy:
   ros__parameters:
     # device_name: Sony Interactive Entertainment Wireless Controller
@@ -40,7 +43,6 @@ joy_emergency_stop:
   ros__parameters:
     emergency_stop_set_joy_button_index: 5
     emergency_stop_clear_joy_button_index: 7
-    joy_emergency_stop_timeout: 1.0 #seconds
 
 twist_angular_correction:
   ros__parameters:

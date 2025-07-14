@@ -1,4 +1,4 @@
-yolov8_node:
+yolo_node:
     ros__parameters:
         model_file_path: "~/workspaces/waywiser_ws/resources/yolov8s-seg.engine"
         device: "cuda:0" # cuda:x/cpu
@@ -19,3 +19,4 @@ yolov8_node:
 
         publish_bbox_3d_markers: True
         rviz_3d_visualization_markers_topic: "/sensors/camera/color/bbox_3d_markers"
+        detections_topic: "/sensors/camera/color/yolov8_detections"

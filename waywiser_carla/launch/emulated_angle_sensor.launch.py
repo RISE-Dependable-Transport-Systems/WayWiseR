@@ -11,17 +11,20 @@ def generate_launch_description():
     waywiser_carla_dir = get_package_share_directory('waywiser_carla')
 
     # args that can be set from the command line or a default will be used
+    use_sim_time_la = DeclareLaunchArgument(
+        'use_sim_time', default_value='True', description='Use simulation clock'
+    )
     config_la = DeclareLaunchArgument(
         'config',
-        default_value=os.path.join(waywiser_carla_dir, 'config/carla_osm_tile_server.yaml'),
-        description='Full path to params file for carla',
+        default_value=os.path.join(waywiser_carla_dir, 'config/truck_full_scale.yaml'),
+        description='Full path to params file of node',
     )
 
-    # start nodes and use args to set parameters
-    carla_osm_tile_server_node = Node(
+    # create nodes
+    emulated_angle_sensor = Node(
         package='waywiser_carla',
-        executable='carla_osm_tile_server.py',
-        name='carla_osm_tile_server_node',
+        executable='emulated_angle_sensor',
+        name='emulated_angle_sensor_node',
         parameters=[
             {'use_sim_time': LaunchConfiguration('use_sim_time')},
             LaunchConfiguration('config'),
@@ -35,9 +38,10 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # declare launch args
+    ld.add_action(use_sim_time_la)
     ld.add_action(config_la)
 
     # start nodes
-    ld.add_action(carla_osm_tile_server_node)
+    ld.add_action(emulated_angle_sensor)
 
     return ld

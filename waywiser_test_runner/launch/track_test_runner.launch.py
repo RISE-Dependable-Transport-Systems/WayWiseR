@@ -12,9 +12,6 @@ def generate_launch_description():
     waywiser_hwbringup_dir = get_package_share_directory('waywiser_hwbringup')
 
     # args that can be set from the command line or a default will be used
-    use_sim_time_la = DeclareLaunchArgument(
-        'use_sim_time', default_value='False', description='Use simulation clock'
-    )
     vehicle_config_la = DeclareLaunchArgument(
         'vehicle_config',
         default_value=os.path.join(waywiser_hwbringup_dir, 'config/truck_small_scale.yaml'),
@@ -42,7 +39,6 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # declare launch args
-    ld.add_action(use_sim_time_la)
     ld.add_action(vehicle_config_la)
     ld.add_action(track_test_runner_config_la)
 

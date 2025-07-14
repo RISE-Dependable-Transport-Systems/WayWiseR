@@ -24,6 +24,12 @@ def generate_launch_description():
         'use_sim_time', default_value='False', description='Use simulation/Gazebo clock'
     )
 
+    control_vehicle_node_name_la = DeclareLaunchArgument(
+        'control_vehicle_node',
+        default_value='',
+        description='Name of the vehicle node to control',
+    )
+
     # start nodes and use args to set parameters
     joy_node = Node(
         package='joy',
@@ -97,6 +103,7 @@ def generate_launch_description():
     # declare launch args
     ld.add_action(teleop_config_la)
     ld.add_action(use_sim_time_la)
+    ld.add_action(control_vehicle_node_name_la)
 
     # start nodes
     ld.add_action(joy_node)
@@ -115,6 +122,9 @@ def twist_keyboard_conditional_launch(context):
         if 'twist_keyboard' in config_data:
             twist_keyboard_params = config_data['twist_keyboard']['ros__parameters']
             enable_twist_keyboard = twist_keyboard_params['enable']
+            control_vehicle_node = LaunchConfiguration('control_vehicle_node').perform(context)
+            if control_vehicle_node != '':
+                twist_keyboard_params['control_vehicle_node'] = control_vehicle_node
             if enable_twist_keyboard:
                 if 'DISPLAY' in os.environ:
                     twist_keyboard_node = Node(

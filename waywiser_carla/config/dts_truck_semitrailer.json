@@ -6,15 +6,18 @@
             "sensors": [
                 {
                     "type": "sensor.pseudo.tf",
-                    "id": "tf"
+                    "id": "tf",
+                    "sensor_tick": 0.0
                 },
                 {
                     "type": "sensor.pseudo.odom",
-                    "id": "odometry"
+                    "id": "odometry",
+                    "sensor_tick": 0.0
                 },
                 {
                     "type": "actor.pseudo.control",
-                    "id": "control"
+                    "id": "control",
+                    "sensor_tick": 0.0
                 }
             ]
         },
@@ -24,39 +27,40 @@
             "sensors": [
                 {
                     "type": "sensor.camera.depth",
-                    "id": "rear_left",
+                    "id": "left_ultrasonic",
                     "spawn_point": {
-                        "x": -6.86816,
-                        "y": 0.938,
-                        "z": 0.904366,
+                        "x": -4.9939,
+                        "y": 1.3438,
+                        "z": 1.7989,
                         "roll": 0.0,
                         "pitch": 0.0,
-                        "yaw": 180.0
+                        "yaw": 90.0
                     },
-                    "image_size_x": 16,
-                    "image_size_y": 16,
-                    "fov": 12.0,
-                    "sensor_tick": 0.02
+                    "image_size_x": 128,
+                    "image_size_y": 128,
+                    "fov": 5.0,
+                    "sensor_tick": 0.0
                 },
                 {
                     "type": "sensor.camera.depth",
-                    "id": "rear_right",
+                    "id": "rear_ultrasonic",
                     "spawn_point": {
-                        "x": -6.86816,
-                        "y": -0.938,
-                        "z": 0.904366,
+                        "x": -7.8185,
+                        "y": -0.4255,
+                        "z": 1.7989,
                         "roll": 0.0,
                         "pitch": 0.0,
                         "yaw": 180.0
                     },
-                    "image_size_x": 16,
-                    "image_size_y": 16,
-                    "fov": 12.0,
-                    "sensor_tick": 0.02
+                    "image_size_x": 128,
+                    "image_size_y": 128,
+                    "fov": 5.0,
+                    "sensor_tick": 0.0
                 },
                 {
                     "type": "sensor.pseudo.tf",
-                    "id": "tf"
+                    "id": "tf",
+                    "sensor_tick": 0.0
                 }
             ]
         }

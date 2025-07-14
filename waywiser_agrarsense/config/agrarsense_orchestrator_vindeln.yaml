@@ -1,0 +1,56 @@
+/**:
+  # general parameters
+  ros__parameters:
+    ros_host_ip: "127.0.0.1"
+    ros_port: 9090
+    map_name: "vindeln" # possible options: playground, vindeln, rovaniemiforest
+    rgbd_to_pointcloud_sources: ["front"]
+    front:
+      attached_to: "forwarder"
+      rgb_camera: "rgb_front"
+      depth_camera: "depth_front"
+
+agrarsense_orchestrator_node:
+  ros__parameters:
+    sim_clock_timeout: 20.0
+    agrarsense_script_path: "~/workspaces/agrarsense_ws/Agrarsense.sh"
+    sim_startup_time: 3.0
+    render_off_screen: false
+    reset_agrarsense_after_exec: true
+    objects_json_path: "vindeln_objects.json"
+    agrarsense_orchestrator_timer_rate: 1.0
+
+    agrarsense_ros_bridge:
+      script_path: "agrarsense_ros_bridge.sh"
+      docker_container_name: "agrarsense_ros_bridge"
+
+    agrarsense_in_command_topic: "/agrarsense/in/commands"
+    workersthreadpool: 16 #By default the Simulator uses maximum number of CPU threads - 1
+    quality_level: "Low" #"Ultra", "Balanced" or "Low"
+    command_publish_delay: 5.0
+    spectator_transform: ""
+    auto_start_simulation: true
+
+    weather_json_path: "clear_noon_summer.json"
+
+    object_ids: ["forwarder"]
+    spawn_point:
+      forwarder: "78057.0,69260.0,-2350.0,0.0,0.0,30.0"
+    setup_request_topic: "/setup_request"
+    setup_status_topic: "/setup_status"
+
+    vehicle_ids: ["forwarder"]
+    vehicle_tf_publisher:
+      forwarder:
+        odom_topic: "/forwarder/odometry"
+        base_link_frame: "base_link"
+        odom_frame: "odom"
+        rear_axle_frame: "rear_axle_link"
+        rear_end_frame: "rear_end_link"
+        rear_axle_frame_to_rear_end_frame_offset: [-2.2104, 0.0000, 0.3917]
+        rear_axle_frame_to_base_frame_offset: [2.7202, 0.0000, -0.6792]
+        max_steering_angle: 45.0
+        erpm_min: 440.0
+        erpm_max: 28000.0
+        speed_to_rpm_factor: 528.0
+        wheelbase: 5.0990

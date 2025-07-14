@@ -13,22 +13,26 @@ def generate_launch_description():
     # args that can be set from the command line or a default will be used
     config_la = DeclareLaunchArgument(
         'config',
-        default_value=os.path.join(waywiser_carla_dir, 'config/carla_osm_tile_server.yaml'),
-        description='Full path to params file for carla',
+        default_value=os.path.join(waywiser_carla_dir, 'config/carla_orchestrator.yaml'),
+        description='Full path to params file for carla orchestrator',
+    )
+    ego_vehicle_role_name_la = DeclareLaunchArgument(
+        'ego_vehicle_role_name',
+        default_value='truck',
+        description='Name of the ego vehicle',
     )
 
-    # start nodes and use args to set parameters
-    carla_osm_tile_server_node = Node(
+    # create nodes
+    carla_orchestrator = Node(
         package='waywiser_carla',
-        executable='carla_osm_tile_server.py',
-        name='carla_osm_tile_server_node',
-        parameters=[
-            {'use_sim_time': LaunchConfiguration('use_sim_time')},
-            LaunchConfiguration('config'),
-        ],
-        arguments=['--ros-args', '--log-level', 'info'],
+        executable='carla_orchestrator.py',
+        name='carla_orchestrator_node',
         output='screen',
-        emulate_tty=True,
+        parameters=[
+            LaunchConfiguration('config'),
+            {'ego_vehicle_role_name': LaunchConfiguration('ego_vehicle_role_name')},
+        ],
+        sigterm_timeout=['30'],
     )
 
     # create launch description
@@ -36,8 +40,9 @@ def generate_launch_description():
 
     # declare launch args
     ld.add_action(config_la)
+    ld.add_action(ego_vehicle_role_name_la)
 
     # start nodes
-    ld.add_action(carla_osm_tile_server_node)
+    ld.add_action(carla_orchestrator)
 
     return ld

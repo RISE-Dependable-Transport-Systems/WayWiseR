@@ -24,9 +24,9 @@ from launch.actions import DeclareLaunchArgument
 from launch.actions import GroupAction
 from launch.actions import SetEnvironmentVariable
 from launch.conditions import IfCondition
-from launch.conditions import LaunchConfigurationEquals
-from launch.conditions import LaunchConfigurationNotEquals
+from launch.substitutions import EqualsSubstitution
 from launch.substitutions import LaunchConfiguration
+from launch.substitutions import NotEqualsSubstitution
 from launch.substitutions import PythonExpression
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.actions import LoadComposableNodes
@@ -300,12 +300,16 @@ def generate_launch_description():
         condition=IfCondition(use_composition),
         actions=[
             LoadComposableNodes(
-                condition=LaunchConfigurationNotEquals('container_name', ''),
+                condition=IfCondition(
+                    NotEqualsSubstitution(LaunchConfiguration('container_name'), '')
+                ),
                 composable_node_descriptions=composable_nodes,
                 target_container=container_name_full,
             ),
             ComposableNodeContainer(
-                condition=LaunchConfigurationEquals('container_name', ''),
+                condition=IfCondition(
+                    EqualsSubstitution(LaunchConfiguration('container_name'), '')
+                ),
                 name='nav2_container',
                 namespace=LaunchConfiguration('namespace'),
                 package='rclcpp_components',

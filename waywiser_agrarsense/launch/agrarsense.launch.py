@@ -3,7 +3,9 @@ import os
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.actions import IncludeLaunchDescription
 from launch.actions import OpaqueFunction
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import yaml
@@ -22,6 +24,7 @@ def generate_launch_description():
 
     # Setup processes, nodes, and launch files
     simulator_launch_action = OpaqueFunction(function=simulator_launch)
+    rgbd_to_pointcloud_launch_action = OpaqueFunction(function=rgbd_to_pointcloud_launch)
 
     # Create launch description
     ld = LaunchDescription()
@@ -31,6 +34,7 @@ def generate_launch_description():
 
     # start nodes
     ld.add_action(simulator_launch_action)
+    ld.add_action(rgbd_to_pointcloud_launch_action)
 
     return ld
 
@@ -85,6 +89,45 @@ def simulator_launch(context):
     )
 
     return [sim_orchestrator_node]
+
+
+def rgbd_to_pointcloud_launch(context):
+    waywiser_perception_dir = get_package_share_directory('waywiser_perception')
+    nodes = []
+    with open(LaunchConfiguration('sim_config').perform(context)) as f:
+        config_data = yaml.safe_load(f)
+        node_params = config_data['/**']['ros__parameters']
+        rgbd_to_pointcloud_sources = node_params['rgbd_to_pointcloud_sources']
+        for rgbd_to_pointcloud_source in rgbd_to_pointcloud_sources:
+            rgbd_to_pointcloud_source_params = node_params[rgbd_to_pointcloud_source]
+            namespace = '/agrarsense/out/sensors'
+
+            nodes.append(
+                IncludeLaunchDescription(
+                    PythonLaunchDescriptionSource(
+                        [
+                            os.path.join(
+                                waywiser_perception_dir,
+                                'launch',
+                                'rgbd_to_pointcloud.launch.py',
+                            )
+                        ]
+                    ),
+                    launch_arguments={
+                        'use_sim_time': LaunchConfiguration('use_sim_time'),
+                        'namespace': namespace,
+                        'rgb_topic': rgbd_to_pointcloud_source_params['rgb_camera'],
+                        'depth_topic': rgbd_to_pointcloud_source_params['depth_camera'] + '_raw',
+                        'rgb_camera_info_topic': rgbd_to_pointcloud_source_params['rgb_camera']
+                        + '/camera_info',
+                        'pointcloud_topic': rgbd_to_pointcloud_source_params['depth_camera']
+                        + '/color/points',
+                        'optical_to_ros_transform': 'False',
+                    }.items(),
+                )
+            )
+
+    return nodes
 
 
 def yaml_to_dict(path_to_yaml):

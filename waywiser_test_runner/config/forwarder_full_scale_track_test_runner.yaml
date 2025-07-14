@@ -1,0 +1,58 @@
+track_test_runner_node:
+  ros__parameters:
+    use_sim_time: true
+    orchestrate_test_setup: false
+    track_test_runner_timer_rate: 1.0
+    test_configurations_json_path: "forwarder_full_scale_test_case_1.json"
+    rosbag_output_dir: "track_test_data" # relative path
+    use_rosbag_recording: true
+    mission_status_topic: "/forwarder/mission_status"
+    autopilot_state_control_topic: "/forwarder/autopilot_state_control"
+    preplanned_route_filepath: "$WAYWISER_WS/resources/straight_route_vindeln.xml"
+    vehicle_start_position_is_test_start_point: false
+    # test_start_point: "-0.24136670548847863, 0.9810376247909707, 0.0, 0.0, 0.0, -0.6382656725442453, 0.7698161671799588"
+    # test_end_point: "0.055, 3.171, 4.247, 0.0, 0.0, 0.949, 0.315"
+    test_start_point: "78057.0,69260.0,-2350.0,0.0,0.0,30.0"
+    # test_end_point: ""
+    vehicle_pose_topic: "/forwarder/rear_axle_pose"
+    emergency_stop_topic: "/emergency_stop/current_state"
+    end_goal_alignment_type: 0 # Align {0: REAR_AXLE, 1: FRONT_REAR_END, 2: CENTER} with the end goal
+    end_goal_alignment_threshold: 0.1 # m
+    continue_test_after_estop_clear: true
+    enuref: [57.713805, 12.890088, 203.59] # [lat, lon, height]
+    test_timeout: 100.0
+    test_cooldown_time: 10.0
+    halt_test_runner_on_timeout: false
+    notify_via_mail_on_timeout: false
+    delay_to_stop_test_with_emergency_stop: 10.0
+    clear_emergency_stop_on_exec_start: true
+
+    rear_axle_frame: rear_axle_link
+    rear_end_frame: rear_end_link
+
+    has_trailer: false
+    length: 9.9865
+    width: 3.6824
+    wheelbase: 5.0990
+    min_turning_radius: 5.099 # wheelbase/tan(max_steering_angle)
+    staging_area_margin: 1.4
+
+    trace_topic: "/forwarder/rear_axle_pose"
+
+    topics_to_record:
+      [
+        "/waywiser_control_cmd",
+        "/cmd_vel_out",
+        "/emergency_stop/current_state",
+        "/emergency_stop/target_state",
+        "/onboard_mux_vel",
+        "/forwarder/autopilot_center_pose",
+        "/forwarder/autopilot_state_control",
+        "/forwarder/mission_status",
+        "/forwarder/odometry",
+        "/forwarder/rear_axle_pose",
+        "/forwarder/vehicle_alignment_reference_point",
+        "/waywiser_vel",
+        "/waywiser_path",
+        "/sensors/camera/color/yolov3_tinyu_detections",
+      ]

@@ -1,0 +1,3204 @@
+{
+    "track_test_configurations": [
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.032311767633885, 18.513008540657996, 0.5, 0 , 0 , 154.59354270292692",
+                    "semitrailer": "-33.46540897132618, 19.48549159565471, 2.5, 0 , 0 , 189.83078573679782"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.63231176763389, 18.513008540657996, 0.5, 0 , 0 , 154.59354270292692",
+                    "semitrailer": "-36.06540897132618, 19.48549159565471, 2.5, 0 , 0 , 189.83078573679782"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.032311767633885, 18.48172429668541, 0.5, 0 , 0 , 205.40645729707308",
+                    "semitrailer": "-33.46540897132618, 17.509241241688702, 2.5, 0 , 0 , 170.16921426320218"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.63231176763389, 18.48172429668541, 0.5, 0 , 0 , 205.40645729707308",
+                    "semitrailer": "-36.06540897132618, 17.509241241688702, 2.5, 0 , 0 , 170.16921426320218"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.404301251450335, 17.88523991221041, 0.5, 0 , 0 , 186.40645729707308",
+                    "semitrailer": "-35.56731771150805, 17.51378703564264, 2.5, 0 , 0 , 176.4611837047113"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.97043503807398, 19.011869436185716, 0.5, 0 , 0 , 167.40645729707308",
+                    "semitrailer": "-34.1635437520379, 19.225640507015314, 2.5, 0 , 0 , 182.62458387204225"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.1060902398741, 18.7348915523645, 0.5, 0 , 0 , 160.40645729707308",
+                    "semitrailer": "-33.40422949242338, 19.355432902879038, 2.5, 0 , 0 , 186.4917086746634"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.58490198919461, 19.053970737676444, 0.5, 0 , 0 , 190.40645729707308",
+                    "semitrailer": "-34.756678649142174, 19.00783051680002, 2.5, 0 , 0 , 178.92272670647034"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.30712066104187, 18.182668034733403, 0.5, 0 , 0 , 174.40645729707308",
+                    "semitrailer": "-35.47691840065646, 18.69661406806311, 2.5, 0 , 0 , 184.68073349064235"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.603598533894946, 17.51566059796038, 0.5, 0 , 0 , 173.40645729707308",
+                    "semitrailer": "-35.76733370777042, 17.885186094879106, 2.5, 0 , 0 , 183.535083073162"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.099501143562186, 18.14858666666569, 0.5, 0 , 0 , 172.40645729707308",
+                    "semitrailer": "-34.284799381608124, 18.730800314646974, 2.5, 0 , 0 , 185.38762441716392"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.083770748316226, 18.346865729254628, 0.5, 0 , 0 , 169.40645729707308",
+                    "semitrailer": "-35.26533035226557, 17.896911760587383, 2.5, 0 , 0 , 176.93478970636832"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.98490198919462, 18.753970737676447, 0.5, 0 , 0 , 190.40645729707308",
+                    "semitrailer": "-34.17279030710061, 18.34989125262925, 2.5, 0 , 0 , 175.92272670647034"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.77043503807398, 18.611869436185714, 0.5, 0 , 0 , 167.40645729707308",
+                    "semitrailer": "-33.97631049562196, 17.99012516615165, 2.5, 0 , 0 , 175.62458387204225"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.900311394823255, 18.75230064002627, 0.5, 0 , 0 , 187.40645729707308",
+                    "semitrailer": "-35.05711712639601, 18.99990647158012, 2.5, 0 , 0 , 181.5800407249386"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.784901989194616, 18.153970737676445, 0.5, 0 , 0 , 190.40645729707308",
+                    "semitrailer": "-34.95667864914218, 18.10783051680002, 2.5, 0 , 0 , 178.92272670647034"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.412813973289815, 19.584405193659304, 0.5, 0 , 0 , 183.40645729707308",
+                    "semitrailer": "-35.618837827438455, 18.66985940733469, 2.5, 0 , 0 , 172.09116080358064"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.16291838231098, 18.644186838526654, 0.5, 0 , 0 , 166.40645729707308",
+                    "semitrailer": "-34.36983614077145, 18.11507262566063, 2.5, 0 , 0 , 176.46710864389206"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.810553492930275, 18.05130225064105, 0.5, 0 , 0 , 184.40645729707308",
+                    "semitrailer": "-35.9539298188615, 18.112292157069326, 2.5, 0 , 0 , 180.21671189488222"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.01607094827662, 19.71706008302577, 0.5, 0 , 0 , 179.40645729707308",
+                    "semitrailer": "-34.156272876561296, 19.518912303725514, 2.5, 0 , 0 , 178.38054040460952"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.81694380701386, 18.403536892610827, 0.5, 0 , 0 , 161.40645729707308",
+                    "semitrailer": "-34.073617330734464, 18.69445928117954, 2.5, 0 , 0 , 183.65769596726096"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.81694380701386, 18.50353689261083, 0.5, 0 , 0 , 161.40645729707308",
+                    "semitrailer": "-34.06012727266305, 18.436411629755163, 2.5, 0 , 0 , 180.65769596726096"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.46291838231098, 18.444186838526655, 0.5, 0 , 0 , 166.40645729707308",
+                    "semitrailer": "-34.66317360139042, 18.631399463815647, 2.5, 0 , 0 , 182.46710864389206"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.79950114356219, 18.848586666665692, 0.5, 0 , 0 , 172.40645729707308",
+                    "semitrailer": "-33.96050660049954, 19.073323094193288, 2.5, 0 , 0 , 182.38762441716392"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.80359853389494, 18.61566059796038, 0.5, 0 , 0 , 173.40645729707308",
+                    "semitrailer": "-34.96682204939003, 18.14957337790673, 2.5, 0 , 0 , 176.535083073162"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.11560021063668, 17.650704212987606, 0.5, 0 , 0 , 181.40645729707308",
+                    "semitrailer": "-34.28901068027298, 18.357523694795173, 2.5, 0 , 0 , 185.8335919272377"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.51055349293028, 17.75130225064105, 0.5, 0 , 0 , 184.40645729707308",
+                    "semitrailer": "-35.708097065628536, 18.646147530583185, 2.5, 0 , 0 , 187.21671189488222"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.1060902398741, 18.434891552364498, 0.5, 0 , 0 , 160.40645729707308",
+                    "semitrailer": "-34.45404410386303, 19.410254839692982, 2.5, 0 , 0 , 189.4917086746634"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.21281397328981, 17.484405193659303, 0.5, 0 , 0 , 183.40645729707308",
+                    "semitrailer": "-33.35498196405106, 17.641882274994686, 2.5, 0 , 0 , 181.09116080358064"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.79482973814841, 18.681436211249835, 0.5, 0 , 0 , 171.40645729707308",
+                    "semitrailer": "-34.98343806664703, 19.238006637658767, 2.5, 0 , 0 , 185.23839633463328"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.490610286169556, 18.986656054770997, 0.5, 0 , 0 , 189.40645729707308",
+                    "semitrailer": "-33.66571456847592, 18.680590108027847, 2.5, 0 , 0 , 176.81084225857444"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.004301251450336, 17.98523991221041, 0.5, 0 , 0 , 186.40645729707308",
+                    "semitrailer": "-34.156493363863504, 18.210737122157294, 2.5, 0 , 0 , 181.4611837047113"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.69574727630476, 18.91943601725231, 0.5, 0 , 0 , 188.40645729707308",
+                    "semitrailer": "-35.85779776406438, 19.188857818500576, 2.5, 0 , 0 , 181.69660368960942"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.11281397328982, 19.184405193659305, 0.5, 0 , 0 , 183.40645729707308",
+                    "semitrailer": "-35.31883782743846, 18.269859407334692, 2.5, 0 , 0 , 172.09116080358064"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.81607094827662, 19.71706008302577, 0.5, 0 , 0 , 179.40645729707308",
+                    "semitrailer": "-35.96069036235636, 19.399547992452888, 2.5, 0 , 0 , 177.38054040460952"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.29950114356219, 18.74858666666569, 0.5, 0 , 0 , 172.40645729707308",
+                    "semitrailer": "-34.466523959300446, 19.092617454409517, 2.5, 0 , 0 , 183.38762441716392"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.816125118909135, 18.783880093974116, 0.5, 0 , 0 , 180.40645729707308",
+                    "semitrailer": "-33.972785715353005, 18.274174418705115, 2.5, 0 , 0 , 175.70164136079273"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.310553492930275, 19.151302250641052, 0.5, 0 , 0 , 184.40645729707308",
+                    "semitrailer": "-33.454520394653, 19.092847591656863, 2.5, 0 , 0 , 179.21671189488222"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.007120661041874, 18.182668034733403, 0.5, 0 , 0 , 174.40645729707308",
+                    "semitrailer": "-35.20056426401129, 18.93432384724273, 2.5, 0 , 0 , 186.68073349064235"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.55639310783996, 18.42437455238227, 0.5, 0 , 0 , 194.40645729707308",
+                    "semitrailer": "-35.76008494526941, 18.340530028272763, 2.5, 0 , 0 , 178.34615064218352"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.50816237132944, 18.56569280369631, 0.5, 0 , 0 , 199.40645729707308",
+                    "semitrailer": "-34.76850283364061, 19.054111522165027, 2.5, 0 , 0 , 182.81915879636313"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.270270225430814, 18.42775244856541, 0.5, 0 , 0 , 157.40645729707308",
+                    "semitrailer": "-33.58846683487238, 18.84706944785082, 2.5, 0 , 0 , 184.98633575683957"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.47862412418249, 19.121390022232873, 0.5, 0 , 0 , 191.40645729707308",
+                    "semitrailer": "-34.66503651694251, 18.85741555459776, 2.5, 0 , 0 , 177.03222792889125"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.45639310783996, 18.124374552382275, 0.5, 0 , 0 , 194.40645729707308",
+                    "semitrailer": "-34.679797723411866, 17.682771018972943, 2.5, 0 , 0 , 175.34615064218352"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.68958574060893, 19.01419922542331, 0.5, 0 , 0 , 170.40645729707308",
+                    "semitrailer": "-34.88031954876596, 18.35197861838578, 2.5, 0 , 0 , 175.08743815247666"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.39574727630476, 19.31943601725231, 0.5, 0 , 0 , 188.40645729707308",
+                    "semitrailer": "-35.554893489974354, 19.349992519297388, 2.5, 0 , 0 , 179.69660368960942"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.21607094827662, 17.81706008302577, 0.5, 0 , 0 , 179.40645729707308",
+                    "semitrailer": "-33.353939258045145, 17.738335530992902, 2.5, 0 , 0 , 179.38054040460952"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.112435009839615, 17.716523641325466, 0.5, 0 , 0 , 176.40645729707308",
+                    "semitrailer": "-34.3373977872999, 18.75454100690538, 2.5, 0 , 0 , 188.9664569737721"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.40712066104187, 17.882668034733403, 0.5, 0 , 0 , 174.40645729707308",
+                    "semitrailer": "-34.6005642640113, 18.63432384724273, 2.5, 0 , 0 , 186.68073349064235"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.38377074831622, 17.946865729254625, 0.5, 0 , 0 , 169.40645729707308",
+                    "semitrailer": "-34.62106314696267, 18.80763338695026, 2.5, 0 , 0 , 187.93478970636832"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.09950114356219, 19.24858666666569, 0.5, 0 , 0 , 172.40645729707308",
+                    "semitrailer": "-35.254721751774184, 19.234510193585624, 2.5, 0 , 0 , 180.38762441716392"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.178624124182484, 18.221390022232875, 0.5, 0 , 0 , 191.40645729707308",
+                    "semitrailer": "-35.356968276936136, 18.43504055645193, 2.5, 0 , 0 , 181.03222792889125"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.51243500983962, 17.616523641325468, 0.5, 0 , 0 , 176.40645729707308",
+                    "semitrailer": "-35.690838008052495, 18.299277317072438, 2.5, 0 , 0 , 185.9664569737721"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.070435038073974, 19.011869436185716, 0.5, 0 , 0 , 167.40645729707308",
+                    "semitrailer": "-34.28646214331424, 18.271111313867685, 2.5, 0 , 0 , 174.62458387204225"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.56291838231098, 18.644186838526654, 0.5, 0 , 0 , 166.40645729707308",
+                    "semitrailer": "-35.759073523612045, 18.712023828326032, 2.5, 0 , 0 , 181.46710864389206"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.715437715240036, 18.550234073196492, 0.5, 0 , 0 , 178.40645729707308",
+                    "semitrailer": "-34.87713811012856, 17.970146717570582, 2.5, 0 , 0 , 175.24449490412803"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.66291838231098, 19.044186838526656, 0.5, 0 , 0 , 166.40645729707308",
+                    "semitrailer": "-35.877620176535245, 19.469845186020944, 2.5, 0 , 0 , 184.46710864389206"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.71422561268831, 17.4833919593675, 0.5, 0 , 0 , 177.40645729707308",
+                    "semitrailer": "-33.854929600333534, 17.594872170948168, 2.5, 0 , 0 , 181.10645504570644"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.9291151609477, 18.828655520359913, 0.5, 0 , 0 , 197.40645729707308",
+                    "semitrailer": "-35.17070402233169, 18.56394093860905, 2.5, 0 , 0 , 176.63763745952204"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.014225612688314, 18.7833919593675, 0.5, 0 , 0 , 177.40645729707308",
+                    "semitrailer": "-34.20312852407117, 17.94128520743604, 2.5, 0 , 0 , 173.10645504570644"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.407715630837025, 19.418243800183337, 0.5, 0 , 0 , 185.40645729707308",
+                    "semitrailer": "-34.69528352149289, 18.07813575501863, 2.5, 0 , 0 , 168.34006357766145"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.40712066104187, 17.882668034733403, 0.5, 0 , 0 , 174.40645729707308",
+                    "semitrailer": "-35.55419964686883, 17.79999825322233, 2.5, 0 , 0 , 179.68073349064235"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.95639310783996, 18.324374552382274, 0.5, 0 , 0 , 194.40645729707308",
+                    "semitrailer": "-35.17114566776929, 18.001903277070806, 2.5, 0 , 0 , 176.34615064218352"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.52724850683704, 18.37199758745869, 0.5, 0 , 0 , 162.40645729707308",
+                    "semitrailer": "-35.79434459993999, 18.928165711308175, 2.5, 0 , 0 , 185.8223734049"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.08490198919461, 18.953970737676446, 0.5, 0 , 0 , 190.40645729707308",
+                    "semitrailer": "-34.361051216096314, 17.838991442223158, 2.5, 0 , 0 , 169.92272670647034"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.316125118909135, 19.283880093974116, 0.5, 0 , 0 , 180.40645729707308",
+                    "semitrailer": "-34.45362870677357, 19.25148327878974, 2.5, 0 , 0 , 179.70164136079273"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.41449638335141, 18.717542545760974, 0.5, 0 , 0 , 182.40645729707308",
+                    "semitrailer": "-33.57000479295586, 19.209773026195492, 2.5, 0 , 0 , 183.96344304081762"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.177386532573244, 18.47942577221026, 0.5, 0 , 0 , 168.40645729707308",
+                    "semitrailer": "-34.35598450765907, 18.361384005745137, 2.5, 0 , 0 , 179.78049133461545"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.31543771524004, 18.850234073196493, 0.5, 0 , 0 , 178.40645729707308",
+                    "semitrailer": "-33.48807904321963, 18.15120282756595, 2.5, 0 , 0 , 174.24449490412803"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.95483885493041, 17.97636813503926, 0.5, 0 , 0 , 165.40645729707308",
+                    "semitrailer": "-34.168734399022824, 18.256173273005984, 2.5, 0 , 0 , 183.30810745974588"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.912813973289815, 17.984405193659303, 0.5, 0 , 0 , 183.40645729707308",
+                    "semitrailer": "-35.06255892783789, 17.664249227025046, 2.5, 0 , 0 , 177.09116080358064"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.01006645212893, 17.74961902683911, 0.5, 0 , 0 , 175.40645729707308",
+                    "semitrailer": "-34.15394310989953, 17.692068919835492, 2.5, 0 , 0 , 179.8245373787141"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.94785781957007, 18.49231112364991, 0.5, 0 , 0 , 195.40645729707308",
+                    "semitrailer": "-34.17013570651613, 19.025042461798545, 2.5, 0 , 0 , 183.44584055167866"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.10771563083702, 17.918243800183333, 0.5, 0 , 0 , 185.40645729707308",
+                    "semitrailer": "-34.28375974763391, 18.59822755553863, 2.5, 0 , 0 , 185.34006357766145"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.407715630837025, 18.818243800183335, 0.5, 0 , 0 , 185.40645729707308",
+                    "semitrailer": "-33.554510527759305, 18.782467112632705, 2.5, 0 , 0 , 179.34006357766145"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.25973117169429, 18.442151934099265, 0.5, 0 , 0 , 203.40645729707308",
+                    "semitrailer": "-34.587716794826555, 18.04510218323913, 2.5, 0 , 0 , 175.15063102556874"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.11891349979061, 18.19708273591569, 0.5, 0 , 0 , 198.40645729707308",
+                    "semitrailer": "-33.382859170774765, 18.905660630092004, 2.5, 0 , 0 , 184.72969461788324"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.81422561268831, 17.4833919593675, 0.5, 0 , 0 , 177.40645729707308",
+                    "semitrailer": "-35.95827818083848, 17.714271249650395, 2.5, 0 , 0 , 182.10645504570644"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.21055349293027, 18.85130225064105, 0.5, 0 , 0 , 184.40645729707308",
+                    "semitrailer": "-34.40178773340286, 18.078050888265146, 2.5, 0 , 0 , 173.21671189488222"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.69482973814841, 19.181436211249835, 0.5, 0 , 0 , 171.40645729707308",
+                    "semitrailer": "-34.8564528991784, 19.261076307705128, 2.5, 0 , 0 , 181.23839633463328"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.99574727630476, 17.819436017252308, 0.5, 0 , 0 , 188.40645729707308",
+                    "semitrailer": "-35.17777749784725, 18.44660201844692, 2.5, 0 , 0 , 184.69660368960942"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.446198917034565, 18.50840352298886, 0.5, 0 , 0 , 164.40645729707308",
+                    "semitrailer": "-33.71104958572384, 19.23713687606392, 2.5, 0 , 0 , 187.14762260745601"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.32724850683704, 18.47199758745869, 0.5, 0 , 0 , 162.40645729707308",
+                    "semitrailer": "-35.64001083970084, 19.383545363093962, 2.5, 0 , 0 , 188.8223734049"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.300311394823254, 18.75230064002627, 0.5, 0 , 0 , 187.40645729707308",
+                    "semitrailer": "-33.511823672264924, 17.92737778016249, 2.5, 0 , 0 , 172.5800407249386"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.79950114356219, 17.84858666666569, 0.5, 0 , 0 , 172.40645729707308",
+                    "semitrailer": "-35.06673266537406, 19.022199933604508, 2.5, 0 , 0 , 190.38762441716392"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.971778603431666, 19.08892383284182, 0.5, 0 , 0 , 192.40645729707308",
+                    "semitrailer": "-34.19205340016559, 18.48826268043739, 2.5, 0 , 0 , 174.13931744852528"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.610066452128926, 18.34961902683911, 0.5, 0 , 0 , 175.40645729707308",
+                    "semitrailer": "-34.758843615469864, 18.053236235689088, 2.5, 0 , 0 , 177.8245373787141"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.95483885493041, 18.97636813503926, 0.5, 0 , 0 , 165.40645729707308",
+                    "semitrailer": "-34.168734399022824, 19.256173273005984, 2.5, 0 , 0 , 183.30810745974588"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.61891349979061, 18.797082735915687, 0.5, 0 , 0 , 198.40645729707308",
+                    "semitrailer": "-34.900496382627914, 18.193873202580157, 2.5, 0 , 0 , 173.72969461788324"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.603598533894946, 18.715660597960383, 0.5, 0 , 0 , 173.40645729707308",
+                    "semitrailer": "-35.766822049390036, 18.24957337790673, 2.5, 0 , 0 , 176.535083073162"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.50816237132944, 18.76569280369631, 0.5, 0 , 0 , 199.40645729707308",
+                    "semitrailer": "-33.76517707027409, 18.6570725690055, 2.5, 0 , 0 , 177.81915879636313"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.562918382310976, 18.344186838526653, 0.5, 0 , 0 , 166.40645729707308",
+                    "semitrailer": "-33.85004185042298, 19.362484767421883, 2.5, 0 , 0 , 189.46710864389206"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.51543771524004, 18.75023407319649, 0.5, 0 , 0 , 178.40645729707308",
+                    "semitrailer": "-34.67713811012857, 18.17014671757058, 2.5, 0 , 0 , 175.24449490412803"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.507120661041874, 17.9826680347334, 0.5, 0 , 0 , 174.40645729707308",
+                    "semitrailer": "-34.70056426401129, 18.734323847242727, 2.5, 0 , 0 , 186.68073349064235"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.21612511890913, 18.683880093974114, 0.5, 0 , 0 , 180.40645729707308",
+                    "semitrailer": "-33.35904148249149, 18.412661655333135, 2.5, 0 , 0 , 177.70164136079273"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.50430125145033, 19.28523991221041, 0.5, 0 , 0 , 186.40645729707308",
+                    "semitrailer": "-33.69878757012401, 18.556870027984036, 2.5, 0 , 0 , 173.4611837047113"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.13876424727591, 18.76040153965299, 0.5, 0 , 0 , 196.40645729707308",
+                    "semitrailer": "-35.38934263177819, 18.238613872555025, 2.5, 0 , 0 , 174.543011241265"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.21422561268831, 18.3833919593675, 0.5, 0 , 0 , 177.40645729707308",
+                    "semitrailer": "-33.363710052588125, 18.73359370250665, 2.5, 0 , 0 , 183.10645504570644"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.18958574060893, 18.11419922542331, 0.5, 0 , 0 , 170.40645729707308",
+                    "semitrailer": "-35.35899155749265, 17.809644970095757, 2.5, 0 , 0 , 178.08743815247666"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.71422561268831, 18.0833919593675, 0.5, 0 , 0 , 177.40645729707308",
+                    "semitrailer": "-35.89248569956157, 18.790738021373045, 2.5, 0 , 0 , 186.10645504570644"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.71422561268831, 18.8833919593675, 0.5, 0 , 0 , 177.40645729707308",
+                    "semitrailer": "-33.85448575819666, 18.755989628732173, 2.5, 0 , 0 , 179.10645504570644"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.69950114356219, 19.048586666665692, 0.5, 0 , 0 , 172.40645729707308",
+                    "semitrailer": "-33.86167760469591, 18.676276026500165, 2.5, 0 , 0 , 177.38762441716392"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.50031139482326, 17.852300640026268, 0.5, 0 , 0 , 187.40645729707308",
+                    "semitrailer": "-35.6566165883446, 17.741605129384826, 2.5, 0 , 0 , 178.5800407249386"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.80712066104187, 18.2826680347334, 0.5, 0 , 0 , 174.40645729707308",
+                    "semitrailer": "-34.95457642612724, 18.319443684377013, 2.5, 0 , 0 , 180.68073349064235"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.59574727630476, 17.71943601725231, 0.5, 0 , 0 , 188.40645729707308",
+                    "semitrailer": "-35.76237596011687, 18.10821607379632, 2.5, 0 , 0 , 182.69660368960942"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.00031139482326, 17.552300640026267, 0.5, 0 , 0 , 187.40645729707308",
+                    "semitrailer": "-35.23110840317619, 18.632237034229775, 2.5, 0 , 0 , 188.5800407249386"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.904301251450335, 18.18523991221041, 0.5, 0 , 0 , 186.40645729707308",
+                    "semitrailer": "-35.054489652784596, 18.291307904089646, 2.5, 0 , 0 , 180.4611837047113"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.05483885493041, 18.876368135039257, 0.5, 0 , 0 , 165.40645729707308",
+                    "semitrailer": "-35.291073016309916, 18.082482634948345, 2.5, 0 , 0 , 174.30810745974588"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.70771563083702, 19.518243800183335, 0.5, 0 , 0 , 185.40645729707308",
+                    "semitrailer": "-35.88742181977529, 18.886326676871448, 2.5, 0 , 0 , 174.34006357766145"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.20430125145033, 18.58523991221041, 0.5, 0 , 0 , 186.40645729707308",
+                    "semitrailer": "-33.398787570124014, 17.856870027984037, 2.5, 0 , 0 , 173.4611837047113"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.98958574060894, 18.21419922542331, 0.5, 0 , 0 , 170.40645729707308",
+                    "semitrailer": "-34.16511282435226, 18.50666180602572, 2.5, 0 , 0 , 183.08743815247666"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.41449638335141, 18.517542545760975, 0.5, 0 , 0 , 182.40645729707308",
+                    "semitrailer": "-35.56278885813977, 18.890545163382022, 2.5, 0 , 0 , 182.96344304081762"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.89061028616956, 17.686656054770996, 0.5, 0 , 0 , 189.40645729707308",
+                    "semitrailer": "-34.11861176259373, 18.691429233578557, 2.5, 0 , 0 , 187.81084225857444"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.50359853389494, 17.51566059796038, 0.5, 0 , 0 , 173.40645729707308",
+                    "semitrailer": "-33.66733370777041, 17.885186094879106, 2.5, 0 , 0 , 183.535083073162"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.98958574060894, 18.914199225423314, 0.5, 0 , 0 , 170.40645729707308",
+                    "semitrailer": "-34.158991557492655, 18.60964497009576, 2.5, 0 , 0 , 178.08743815247666"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.71612511890913, 19.283880093974116, 0.5, 0 , 0 , 180.40645729707308",
+                    "semitrailer": "-35.854049072978405, 19.37092856450078, 2.5, 0 , 0 , 180.70164136079273"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.81543771524004, 19.650234073196494, 0.5, 0 , 0 , 178.40645729707308",
+                    "semitrailer": "-35.98807904321963, 18.95120282756595, 2.5, 0 , 0 , 174.24449490412803"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.70712066104187, 19.182668034733403, 0.5, 0 , 0 , 174.40645729707308",
+                    "semitrailer": "-34.85703775821194, 19.338864347709233, 2.5, 0 , 0 , 181.68073349064235"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.904301251450335, 18.48523991221041, 0.5, 0 , 0 , 186.40645729707308",
+                    "semitrailer": "-35.06731771150805, 18.11378703564264, 2.5, 0 , 0 , 176.4611837047113"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.79574727630476, 18.11943601725231, 0.5, 0 , 0 , 188.40645729707308",
+                    "semitrailer": "-33.98409450668897, 17.55365882671024, 2.5, 0 , 0 , 174.69660368960942"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.012813973289816, 18.084405193659304, 0.5, 0 , 0 , 183.40645729707308",
+                    "semitrailer": "-34.154601888012394, 18.00299962281244, 2.5, 0 , 0 , 179.09116080358064"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.39950114356219, 17.94858666666569, 0.5, 0 , 0 , 172.40645729707308",
+                    "semitrailer": "-33.56652395930045, 18.292617454409516, 2.5, 0 , 0 , 183.38762441716392"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.39574727630476, 18.91943601725231, 0.5, 0 , 0 , 188.40645729707308",
+                    "semitrailer": "-34.64482048543468, 17.879841251689673, 2.5, 0 , 0 , 170.69660368960942"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.01243500983962, 17.916523641325465, 0.5, 0 , 0 , 176.40645729707308",
+                    "semitrailer": "-34.15376554993816, 17.883879412867003, 2.5, 0 , 0 , 179.9664569737721"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.4291151609477, 18.728655520359915, 0.5, 0 , 0 , 197.40645729707308",
+                    "semitrailer": "-35.750088005508715, 17.75199521616449, 2.5, 0 , 0 , 170.63763745952204"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.07862412418248, 18.421390022232874, 0.5, 0 , 0 , 191.40645729707308",
+                    "semitrailer": "-34.2822371266583, 19.1120648997791, 2.5, 0 , 0 , 185.03222792889125"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.371778603431665, 18.08892383284182, 0.5, 0 , 0 , 192.40645729707308",
+                    "semitrailer": "-35.56480999780009, 17.845527147443043, 2.5, 0 , 0 , 177.13931744852528"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.23700120043225, 18.240283244085962, 0.5, 0 , 0 , 163.40645729707308",
+                    "semitrailer": "-35.50923954560434, 18.94216009634966, 2.5, 0 , 0 , 186.98569684709253"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.70359853389494, 19.415660597960382, 0.5, 0 , 0 , 173.40645729707308",
+                    "semitrailer": "-33.91231574745535, 18.474051493731736, 2.5, 0 , 0 , 172.535083073162"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.847857819570066, 18.29231112364991, 0.5, 0 , 0 , 195.40645729707308",
+                    "semitrailer": "-35.07092557840356, 17.989429961495528, 2.5, 0 , 0 , 176.44584055167866"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.31694380701386, 18.703536892610828, 0.5, 0 , 0 , 161.40645729707308",
+                    "semitrailer": "-34.573617330734464, 18.99445928117954, 2.5, 0 , 0 , 183.65769596726096"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.95639310783996, 18.42437455238227, 0.5, 0 , 0 , 194.40645729707308",
+                    "semitrailer": "-35.19052760589257, 17.86380790448661, 2.5, 0 , 0 , 174.34615064218352"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.81243500983962, 19.21652364132547, 0.5, 0 , 0 , 176.40645729707308",
+                    "semitrailer": "-34.98015762385642, 18.58741480308192, 2.5, 0 , 0 , 174.9664569737721"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.215437715240036, 18.45023407319649, 0.5, 0 , 0 , 178.40645729707308",
+                    "semitrailer": "-35.372349068234165, 18.94405903482588, 2.5, 0 , 0 , 184.24449490412803"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.007120661041874, 19.082668034733402, 0.5, 0 , 0 , 174.40645729707308",
+                    "semitrailer": "-34.15457642612724, 19.119443684377014, 2.5, 0 , 0 , 180.68073349064235"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.546198917034566, 18.10840352298886, 0.5, 0 , 0 , 164.40645729707308",
+                    "semitrailer": "-33.77578909100546, 18.480574399253058, 2.5, 0 , 0 , 184.14762260745601"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.29950114356219, 18.74858666666569, 0.5, 0 , 0 , 172.40645729707308",
+                    "semitrailer": "-33.45727487705964, 18.49564088303549, 2.5, 0 , 0 , 178.38762441716392"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.81281397328981, 18.984405193659306, 0.5, 0 , 0 , 183.40645729707308",
+                    "semitrailer": "-34.96369869288981, 19.380606141857164, 2.5, 0 , 0 , 183.09116080358064"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.18502497846192, 18.303499684030697, 0.5, 0 , 0 , 201.40645729707308",
+                    "semitrailer": "-35.49926605818977, 17.753721477834816, 2.5, 0 , 0 , 173.99021591041375"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.69061028616956, 19.186656054770996, 0.5, 0 , 0 , 189.40645729707308",
+                    "semitrailer": "-33.86011046831868, 18.999904596032298, 2.5, 0 , 0 , 177.81084225857444"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.31243500983962, 18.516523641325467, 0.5, 0 , 0 , 176.40645729707308",
+                    "semitrailer": "-33.48015762385642, 17.887414803081917, 2.5, 0 , 0 , 174.9664569737721"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.79950114356219, 18.44858666666569, 0.5, 0 , 0 , 172.40645729707308",
+                    "semitrailer": "-34.95495602397069, 18.315064397917148, 2.5, 0 , 0 , 179.38762441716392"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.004301251450336, 18.48523991221041, 0.5, 0 , 0 , 186.40645729707308",
+                    "semitrailer": "-34.17500301448954, 19.068560395842766, 2.5, 0 , 0 , 184.4611837047113"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.615600210636686, 19.350704212987605, 0.5, 0 , 0 , 181.40645729707308",
+                    "semitrailer": "-35.75707264709778, 19.58089941831537, 2.5, 0 , 0 , 181.8335919272377"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.31543771524004, 17.45023407319649, 0.5, 0 , 0 , 178.40645729707308",
+                    "semitrailer": "-33.458829043150885, 17.70555898263895, 2.5, 0 , 0 , 182.24449490412803"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.05973117169429, 18.542151934099266, 0.5, 0 , 0 , 203.40645729707308",
+                    "semitrailer": "-33.44468624696247, 17.67081828048011, 2.5, 0 , 0 , 171.15063102556874"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.20430125145033, 19.28523991221041, 0.5, 0 , 0 , 186.40645729707308",
+                    "semitrailer": "-34.36098558053306, 19.033065101956836, 2.5, 0 , 0 , 177.4611837047113"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.51612511890914, 18.683880093974114, 0.5, 0 , 0 , 180.40645729707308",
+                    "semitrailer": "-35.653628706773574, 18.651483278789737, 2.5, 0 , 0 , 179.70164136079273"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.983770748316225, 18.746865729254626, 0.5, 0 , 0 , 169.40645729707308",
+                    "semitrailer": "-34.156721747570515, 18.535639550960905, 2.5, 0 , 0 , 178.93478970636832"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.40712066104187, 18.2826680347334, 0.5, 0 , 0 , 174.40645729707308",
+                    "semitrailer": "-34.55419964686883, 18.19999825322233, 2.5, 0 , 0 , 179.68073349064235"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.88377074831622, 18.446865729254625, 0.5, 0 , 0 , 169.40645729707308",
+                    "semitrailer": "-35.06533035226557, 17.99691176058738, 2.5, 0 , 0 , 176.93478970636832"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.30359853389494, 19.315660597960385, 0.5, 0 , 0 , 173.40645729707308",
+                    "semitrailer": "-34.467333707770415, 19.68518609487911, 2.5, 0 , 0 , 183.535083073162"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.684901989194614, 17.753970737676443, 0.5, 0 , 0 , 190.40645729707308",
+                    "semitrailer": "-33.85932216531829, 18.066122456675185, 2.5, 0 , 0 , 181.92272670647034"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.71281397328981, 17.584405193659304, 0.5, 0 , 0 , 183.40645729707308",
+                    "semitrailer": "-33.85498196405106, 17.741882274994687, 2.5, 0 , 0 , 181.09116080358064"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.31449638335141, 18.117542545760973, 0.5, 0 , 0 , 182.40645729707308",
+                    "semitrailer": "-35.49067297333927, 18.84776019452828, 2.5, 0 , 0 , 185.96344304081762"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.607120661041876, 18.182668034733403, 0.5, 0 , 0 , 174.40645729707308",
+                    "semitrailer": "-35.755907535207314, 17.980564438480606, 2.5, 0 , 0 , 178.68073349064235"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.784901989194616, 18.353970737676445, 0.5, 0 , 0 , 190.40645729707308",
+                    "semitrailer": "-34.964371382729034, 18.785461714213838, 2.5, 0 , 0 , 182.92272670647034"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.810553492930275, 18.951302250641053, 0.5, 0 , 0 , 184.40645729707308",
+                    "semitrailer": "-34.961954246844684, 18.654080332986393, 2.5, 0 , 0 , 177.21671189488222"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.616070948276615, 18.017060083025772, 0.5, 0 , 0 , 179.40645729707308",
+                    "semitrailer": "-34.755525831238145, 18.177213216758915, 2.5, 0 , 0 , 181.38054040460952"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.21055349293027, 17.95130225064105, 0.5, 0 , 0 , 184.40645729707308",
+                    "semitrailer": "-34.361954246844675, 17.65408033298639, 2.5, 0 , 0 , 177.21671189488222"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.91543771524004, 18.75023407319649, 0.5, 0 , 0 , 178.40645729707308",
+                    "semitrailer": "-35.064548376480765, 19.124868002468133, 2.5, 0 , 0 , 183.24449490412803"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.514225612688314, 17.883391959367497, 0.5, 0 , 0 , 177.40645729707308",
+                    "semitrailer": "-34.65827818083848, 18.114271249650393, 2.5, 0 , 0 , 182.10645504570644"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.499501143562185, 17.64858666666569, 0.5, 0 , 0 , 172.40645729707308",
+                    "semitrailer": "-33.66652395930044, 17.992617454409515, 2.5, 0 , 0 , 183.38762441716392"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.58377074831622, 18.346865729254628, 0.5, 0 , 0 , 169.40645729707308",
+                    "semitrailer": "-34.77275804497409, 17.777696902589877, 2.5, 0 , 0 , 175.93478970636832"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.515600210636684, 17.450704212987606, 0.5, 0 , 0 , 181.40645729707308",
+                    "semitrailer": "-35.754118542832664, 18.6307590539199, 2.5, 0 , 0 , 189.8335919272377"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.31560021063668, 18.950704212987606, 0.5, 0 , 0 , 181.40645729707308",
+                    "semitrailer": "-34.453597279816215, 18.942041745644637, 2.5, 0 , 0 , 179.8335919272377"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.26291838231098, 18.044186838526652, 0.5, 0 , 0 , 166.40645729707308",
+                    "semitrailer": "-34.457057462404656, 17.9925948181001, 2.5, 0 , 0 , 180.46710864389206"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.178624124182484, 18.921390022232874, 0.5, 0 , 0 , 191.40645729707308",
+                    "semitrailer": "-33.38156610645976, 18.419105171605725, 2.5, 0 , 0 , 175.03222792889125"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.437001200432256, 18.34028324408596, 0.5, 0 , 0 , 163.40645729707308",
+                    "semitrailer": "-35.66790347186468, 17.849916542238592, 2.5, 0 , 0 , 176.98569684709253"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.41891349979061, 18.297082735915687, 0.5, 0 , 0 , 198.40645729707308",
+                    "semitrailer": "-35.66731995685513, 18.767283620289923, 2.5, 0 , 0 , 182.72969461788324"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.070435038073974, 18.611869436185714, 0.5, 0 , 0 , 167.40645729707308",
+                    "semitrailer": "-34.25911559085373, 18.70627659130011, 2.5, 0 , 0 , 181.62458387204225"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.38377074831622, 19.14686572925463, 0.5, 0 , 0 , 169.40645729707308",
+                    "semitrailer": "-35.580907444221495, 19.651588976946897, 2.5, 0 , 0 , 184.93478970636832"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.20771563083702, 18.018243800183335, 0.5, 0 , 0 , 185.40645729707308",
+                    "semitrailer": "-35.3736815356063, 18.579207462156614, 2.5, 0 , 0 , 184.34006357766145"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.389585740608936, 19.314199225423312, 0.5, 0 , 0 , 170.40645729707308",
+                    "semitrailer": "-35.580319548765964, 18.65197861838578, 2.5, 0 , 0 , 175.08743815247666"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.66436751215409, 18.656582059019087, 0.5, 0 , 0 , 193.40645729707308",
+                    "semitrailer": "-35.87144066181117, 18.31419018336944, 2.5, 0 , 0 , 176.24396742125032"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.300311394823254, 17.75230064002627, 0.5, 0 , 0 , 187.40645729707308",
+                    "semitrailer": "-35.47636902184434, 18.357690578100975, 2.5, 0 , 0 , 184.5800407249386"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.81607094827662, 17.31706008302577, 0.5, 0 , 0 , 179.40645729707308",
+                    "semitrailer": "-34.953939258045146, 17.238335530992902, 2.5, 0 , 0 , 179.38054040460952"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.310553492930275, 17.65130225064105, 0.5, 0 , 0 , 184.40645729707308",
+                    "semitrailer": "-34.4646637464289, 18.07043303040866, 2.5, 0 , 0 , 183.21671189488222"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.046198917034566, 18.40840352298886, 0.5, 0 , 0 , 164.40645729707308",
+                    "semitrailer": "-34.25923795775386, 18.4226551872158, 2.5, 0 , 0 , 181.14762260745601"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.715437715240036, 19.350234073196493, 0.5, 0 , 0 , 178.40645729707308",
+                    "semitrailer": "-34.86149151423295, 19.008516703114694, 2.5, 0 , 0 , 177.24449490412803"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.215437715240036, 18.45023407319649, 0.5, 0 , 0 , 178.40645729707308",
+                    "semitrailer": "-33.36827470050619, 17.989263437455755, 2.5, 0 , 0 , 176.24449490412803"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.11055349293027, 19.05130225064105, 0.5, 0 , 0 , 184.40645729707308",
+                    "semitrailer": "-34.25900226730791, 19.351121251273067, 2.5, 0 , 0 , 182.21671189488222"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.61612511890913, 17.783880093974112, 0.5, 0 , 0 , 180.40645729707308",
+                    "semitrailer": "-33.76781374667054, 18.22896576384664, 2.5, 0 , 0 , 183.70164136079273"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.31449638335141, 18.117542545760973, 0.5, 0 , 0 , 182.40645729707308",
+                    "semitrailer": "-33.4546042888075, 18.251802459208122, 2.5, 0 , 0 , 180.96344304081762"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.003598533894944, 17.715660597960383, 0.5, 0 , 0 , 173.40645729707308",
+                    "semitrailer": "-35.21340971007293, 18.56065190953334, 2.5, 0 , 0 , 187.535083073162"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.51281397328981, 19.184405193659305, 0.5, 0 , 0 , 183.40645729707308",
+                    "semitrailer": "-33.662558927837885, 18.86424922702505, 2.5, 0 , 0 , 177.09116080358064"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.81891349979061, 18.69708273591569, 0.5, 0 , 0 , 198.40645729707308",
+                    "semitrailer": "-35.06267282672878, 19.047928029017765, 2.5, 0 , 0 , 181.72969461788324"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.28274989423489, 18.69700879109812, 0.5, 0 , 0 , 158.40645729707308",
+                    "semitrailer": "-34.57978961946151, 19.024847352306008, 2.5, 0 , 0 , 184.15598332086643"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.300311394823254, 17.552300640026267, 0.5, 0 , 0 , 187.40645729707308",
+                    "semitrailer": "-35.47636902184434, 18.157690578100972, 2.5, 0 , 0 , 184.5800407249386"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.49061028616956, 18.586656054770994, 0.5, 0 , 0 , 189.40645729707308",
+                    "semitrailer": "-34.65515287592138, 18.63873610201307, 2.5, 0 , 0 , 179.81084225857444"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-44.27043503807398, 18.311869436185713, 0.5, 0 , 0 , 167.40645729707308",
+                    "semitrailer": "-35.48931474782662, 18.88301420237262, 2.5, 0 , 0 , 185.62458387204225"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.70031139482325, 17.852300640026268, 0.5, 0 , 0 , 187.40645729707308",
+                    "semitrailer": "-33.88694564674498, 18.576667416149597, 2.5, 0 , 0 , 185.5800407249386"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.05973117169429, 18.442151934099265, 0.5, 0 , 0 , 203.40645729707308",
+                    "semitrailer": "-33.42734163613186, 17.688998301894355, 2.5, 0 , 0 , 172.15063102556874"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.014496383351414, 17.71754254576097, 0.5, 0 , 0 , 182.40645729707308",
+                    "semitrailer": "-34.1793004418706, 18.328856794600725, 2.5, 0 , 0 , 184.96344304081762"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.678624124182484, 18.921390022232874, 0.5, 0 , 0 , 191.40645729707308",
+                    "semitrailer": "-34.95916356767996, 17.827121044872612, 2.5, 0 , 0 , 170.03222792889125"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.40712066104187, 18.182668034733403, 0.5, 0 , 0 , 174.40645729707308",
+                    "semitrailer": "-33.55457642612724, 18.219443684377016, 2.5, 0 , 0 , 180.68073349064235"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-42.778624124182485, 18.021390022232872, 0.5, 0 , 0 , 191.40645729707308",
+                    "semitrailer": "-33.99375239613667, 18.830954561041878, 2.5, 0 , 0 , 186.03222792889125"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.10430125145033, 19.48523991221041, 0.5, 0 , 0 , 186.40645729707308",
+                    "semitrailer": "-34.26731771150805, 19.11378703564264, 2.5, 0 , 0 , 176.4611837047113"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.81243500983962, 17.616523641325468, 0.5, 0 , 0 , 176.40645729707308",
+                    "semitrailer": "-35.0373977872999, 18.65454100690538, 2.5, 0 , 0 , 188.9664569737721"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        },
+        {
+            "iterations": 1,
+            "setup_conditions": {
+                "spawn_point": {
+                    "truck": "-43.570435038073974, 17.911869436185714, 0.5, 0 , 0 , 167.40645729707308",
+                    "semitrailer": "-34.77005442636268, 18.244908960959236, 2.5, 0 , 0 , 183.62458387204225"
+                },
+                "spawn_point_frame_ids": {
+                    "truck": "truck",
+                    "semitrailer": "semitrailer"
+                },
+                "weather": "ClearNoon",
+                "objects_json_path": "dts_truck_semitrailer.json",
+                "ego_vehicle_role_name": "truck"
+            }
+        }
+    ]
+}
