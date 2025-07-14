@@ -7,3 +7,4 @@ uint8 ACTIVE = 2
 string sender_id
 builtin_interfaces/Time stamp
 uint8 state
+string reason
