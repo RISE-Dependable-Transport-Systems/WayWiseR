@@ -57,6 +57,11 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(
+  DIRECTORY user_interface/twist_keyboard/
+  DESTINATION share/${PROJECT_NAME}/user_interface/twist_keyboard
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
