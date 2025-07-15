@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+    <class>VehicleNodeDialog</class>
+    <widget class="QDialog" name="VehicleNodeDialog">
+        <property name="geometry">
+            <rect>
+                <x>0</x>
+                <y>0</y>
+                <width>600</width>
+                <height>500</height>
+            </rect>
+        </property>
+        <property name="windowTitle">
+            <string>Select Vehicle Node</string>
+        </property>
+        <property name="modal">
+            <bool>true</bool>
+        </property>
+        <property name="styleSheet">
+            <string notr="true">QDialog {
+                background-color: #1a1d29;
+                color: #e4e6eb;
+                }
+                QLabel {
+                color: #e4e6eb;
+                font-size: 10pt;
+                }
+                QLineEdit {
+                background-color: #232936;
+                border: 1px solid #374151;
+                border-radius: 6px;
+                padding: 8px;
+                color: #e4e6eb;
+                font-size: 10pt;
+                }
+                QLineEdit:focus {
+                border-color: #60a5fa;
+                }
+                QListWidget {
+                background-color: #232936;
+                border: 1px solid #374151;
+                border-radius: 6px;
+                color: #e4e6eb;
+                padding: 4px;
+                }
+                QListWidget::item:selected {
+                background-color: #3b82f6;
+                color: #ffffff;
+                }
+                QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #3b4252, stop:1 #2e3440);
+                border: 1px solid #4c566a;
+                border-radius: 8px;
+                padding: 10px 16px;
+                color: #e4e6eb;
+                font-weight: 600;
+                }
+                QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #4c566a, stop:1 #3b4252);
+                border-color: #60a5fa;
+                }
+                QPushButton:pressed {
+                background: #2e3440;
+                }</string>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout">
+            <item>
+                <widget class="QLabel" name="instruction_label">
+                    <property name="text">
+                        <string>Enter vehicle node name or select from list:</string>
+                    </property>
+                    <property name="font">
+                        <font>
+                            <family>Segoe UI</family>
+                            <pointsize>11</pointsize>
+                            <weight>600</weight>
+                        </font>
+                    </property>
+                </widget>
+            </item>
+            <item>
+                <widget class="QLineEdit" name="input_field">
+                    <property name="font">
+                        <font>
+                            <family>Segoe UI</family>
+                            <pointsize>10</pointsize>
+                        </font>
+                    </property>
+                </widget>
+            </item>
+            <item>
+                <widget class="QPushButton" name="fetch_button">
+                    <property name="text">
+                        <string>Fetch Available Nodes</string>
+                    </property>
+                    <property name="font">
+                        <font>
+                            <family>Segoe UI</family>
+                            <pointsize>10</pointsize>
+                        </font>
+                    </property>
+                </widget>
+            </item>
+            <item>
+                <widget class="QLabel" name="list_label">
+                    <property name="text">
+                        <string>Available nodes:</string>
+                    </property>
+                    <property name="font">
+                        <font>
+                            <family>Segoe UI</family>
+                            <pointsize>10</pointsize>
+                        </font>
+                    </property>
+                </widget>
+            </item>
+            <item>
+                <widget class="QListWidget" name="node_list">
+                    <property name="font">
+                        <font>
+                            <family>Courier New</family>
+                            <pointsize>9</pointsize>
+                        </font>
+                    </property>
+                </widget>
+            </item>
+            <item>
+                <widget class="QLabel" name="status_label">
+                    <property name="text">
+                        <string />
+                    </property>
+                    <property name="font">
+                        <font>
+                            <family>Segoe UI</family>
+                            <pointsize>10</pointsize>
+                        </font>
+                    </property>
+                    <property name="wordWrap">
+                        <bool>true</bool>
+                    </property>
+                </widget>
+            </item>
+            <item>
+                <layout class="QHBoxLayout" name="button_layout">
+                    <item>
+                        <widget class="QPushButton" name="check_button">
+                            <property name="text">
+                                <string>Connect</string>
+                            </property>
+                        </widget>
+                    </item>
+                    <item>
+                        <widget class="QPushButton" name="cancel_button">
+                            <property name="text">
+                                <string>Cancel</string>
+                            </property>
+                        </widget>
+                    </item>
+                </layout>
+            </item>
+        </layout>
+    </widget>
+
+    <resources />
+    <connections />
+</ui>
