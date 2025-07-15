@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 
 import os
-import cv2
 from cv_bridge import CvBridge
-import math
 import depthai as dai
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Quaternion
 
-from waywiser_perception.msg import BoundingBox
 from waywiser_perception.msg import Detection
 from waywiser_perception.msg import DetectionArray
 
@@ -189,6 +186,8 @@ class DepthAI(Node):
                 if in_frames is not None:
                     frame = in_frames.getCvFrame()
 
+                time_stamp = self.get_clock().now().to_msg()
+
                 if frame is None:
                     continue  # Skip to the next iteration if no frame
 
@@ -208,7 +207,7 @@ class DepthAI(Node):
                     detection_array = DetectionArray()
                     detection_array.header = image_msg.header
                     detection_array.header.frame_id = self.camera_base_frame
-                    detection_array.header.stamp = self.get_clock().now().to_msg()
+                    detection_array.header.stamp = time_stamp
 
                     for depthai_detection in in_NN.detections:
                             
@@ -237,7 +236,7 @@ class DepthAI(Node):
 
                         # TODO add 3D dimensions using depth information
 
-                        detection_array.detections.append(detection)
+                            detection_array.detections.append(detection)
                     
                     self.detection_array_publisher.publish(detection_array)
 
@@ -245,7 +244,6 @@ def main(args=None):
     rclpy.init(args=args)
     node = DepthAI()
     try:
-        #rclpy.spin(node)   # no subscribers in the node
         node.capture()
     except KeyboardInterrupt:
         pass
