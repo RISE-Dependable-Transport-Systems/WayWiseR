@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 import os
+
 from cv_bridge import CvBridge
 import depthai as dai
+from geometry_msgs.msg import Quaternion
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
-from geometry_msgs.msg import Quaternion
 
 from waywiser_perception.msg import Detection
 from waywiser_perception.msg import DetectionArray
@@ -18,9 +19,8 @@ MONO_RESOLUTION = (
 )  # 800p improves depth accuracy, but uses more resources
 YOLO_SPATIAL_INPUT_SIZE = (416, 416)  # YOLOv3-tiny input size
 NN_CONFIDENCE_THRESHOLD = 0.5  # Default confidence threshold for the NN
-STEREO_CONFIDENCE_THRESHOLD = (
-    250  # Confidence threshold for disparity calculation (0..255)
-)
+STEREO_CONFIDENCE_THRESHOLD = 250  # Confidence threshold for disparity calculation (0..255)
+
 
 class DepthAI(Node):
     def __init__(self):
@@ -34,13 +34,21 @@ class DepthAI(Node):
 
         # Retrieve parameters
         self.rgb_topic = self.get_parameter('rgb_topic').get_parameter_value().string_value
-        self.detections_topic = self.get_parameter('detections_topic').get_parameter_value().string_value
-        self.model_path = os.path.expanduser(self.get_parameter('model_path').get_parameter_value().string_value)
-        self.camera_base_frame = self.get_parameter('camera_base_frame').get_parameter_value().string_value
+        self.detections_topic = (
+            self.get_parameter('detections_topic').get_parameter_value().string_value
+        )
+        self.model_path = os.path.expanduser(
+            self.get_parameter('model_path').get_parameter_value().string_value
+        )
+        self.camera_base_frame = (
+            self.get_parameter('camera_base_frame').get_parameter_value().string_value
+        )
 
         # Publishers
         self.image_publisher = self.create_publisher(Image, self.rgb_topic, 10)
-        self.detection_array_publisher = self.create_publisher(DetectionArray, self.detections_topic, 10)
+        self.detection_array_publisher = self.create_publisher(
+            DetectionArray, self.detections_topic, 10
+        )
 
         # Bridge to convert ROS images to OpenCV
         self.cv_bridge = CvBridge()
@@ -67,10 +75,10 @@ class DepthAI(Node):
         # --- Define Outputs ---
         self.get_logger().info('Creating output nodes (XLinkOut)...')
         xout_RGB = pipeline.create(dai.node.XLinkOut)
-        xout_RGB.setStreamName("frames")  # Output for NN passthrough frames
+        xout_RGB.setStreamName('frames')  # Output for NN passthrough frames
 
         xout_NN = pipeline.create(dai.node.XLinkOut)
-        xout_NN.setStreamName("detections")  # Output for NN results
+        xout_NN.setStreamName('detections')  # Output for NN results
 
         # --- Configure Nodes ---
 
@@ -91,7 +99,9 @@ class DepthAI(Node):
         mono_right.setBoardSocket(dai.CameraBoardSocket.RIGHT)
 
         # Stereo Camera Configuration
-        self.get_logger().info(f'Configuring StereoDepth (Confidence: {STEREO_CONFIDENCE_THRESHOLD})')
+        self.get_logger().info(
+            f'Configuring StereoDepth (Confidence: {STEREO_CONFIDENCE_THRESHOLD})'
+        )
         stereo.setDepthAlign(
             dai.CameraBoardSocket.RGB
         )  # Align depth map to the perspective of the color camera
@@ -110,7 +120,7 @@ class DepthAI(Node):
         )  # Less efficient, but guarantees that no frames are skipped
 
         # Neural Network (YoloSpatialDetectionNetwork) Configuration
-        
+
         NN_path = self.model_path
 
         if not os.path.exists(NN_path):
@@ -120,7 +130,7 @@ class DepthAI(Node):
         model_name = os.path.basename(NN_path)
         self.get_logger().info(f'Configuring YoloSpatialDetectionNetwork (Model: {model_name})')
 
-        NN.setBlobPath(NN_path) # Set model path 
+        NN.setBlobPath(NN_path)  # Set model path
 
         # Configure NN specific parameters
         NN.setConfidenceThreshold(NN_CONFIDENCE_THRESHOLD)
@@ -138,7 +148,7 @@ class DepthAI(Node):
         NN.setNumClasses(80)
         NN.setCoordinateSize(4)
         NN.setAnchors([10, 14, 23, 27, 37, 58, 81, 82, 135, 169, 344, 319])
-        NN.setAnchorMasks({"side26": [1, 2, 3], "side13": [3, 4, 5]})
+        NN.setAnchorMasks({'side26': [1, 2, 3], 'side13': [3, 4, 5]})
         NN.setIouThreshold(0.5)
 
         # --- Link Nodes (transfer data from device to host via XLink) ---
@@ -166,21 +176,17 @@ class DepthAI(Node):
     def capture(self):
         # We are using context manager here that will dispose the device after we stop using it. This will also check USB and NETWORK interfaces for a device that is available and ready to accept connections
         with dai.Device() as device:
-            self.get_logger().info(f'USB speed: {device.getUsbSpeed()}')    # HIGH = USB2, SUPER = USB3
+            self.get_logger().info(
+                f'USB speed: {device.getUsbSpeed()}'
+            )  # HIGH = USB2, SUPER = USB3
 
             device.startPipeline(self.pipeline)
 
-            queue_color = device.getOutputQueue(
-                name="frames", maxSize=4, blocking=False
-            )
-            queue_NN = device.getOutputQueue(
-                name="detections", maxSize=4, blocking=False
-            )
+            queue_color = device.getOutputQueue(name='frames', maxSize=4, blocking=False)
+            queue_NN = device.getOutputQueue(name='detections', maxSize=4, blocking=False)
 
             while True:
-                in_frames = (
-                    queue_color.get()
-                )  # Blocking - Will wait until new data has arrived
+                in_frames = queue_color.get()  # Blocking - Will wait until new data has arrived
 
                 frame = None
                 if in_frames is not None:
@@ -191,18 +197,15 @@ class DepthAI(Node):
                 if frame is None:
                     continue  # Skip to the next iteration if no frame
 
-                image_msg = self.cv_bridge.cv2_to_imgmsg(
-                    frame, encoding='rgb8'
-                )
+                image_msg = self.cv_bridge.cv2_to_imgmsg(frame, encoding='rgb8')
 
                 self.image_publisher.publish(image_msg)
-                
-                in_NN = queue_NN.get()
-                
-                if in_NN is not None:
 
+                in_NN = queue_NN.get()
+
+                if in_NN is not None:
                     img_height = frame.shape[0]
-                    img_width  = frame.shape[1]
+                    img_width = frame.shape[1]
 
                     detection_array = DetectionArray()
                     detection_array.header = image_msg.header
@@ -210,7 +213,6 @@ class DepthAI(Node):
                     detection_array.header.stamp = time_stamp
 
                     for depthai_detection in in_NN.detections:
-                            
                         detection = Detection()
                         detection.class_id = depthai_detection.label
                         detection.confidence = depthai_detection.confidence
@@ -221,24 +223,38 @@ class DepthAI(Node):
                         y_min = int(depthai_detection.ymin * img_height)
                         y_max = int(depthai_detection.ymax * img_height)
 
-                        detection.bbox_2d.geometric_center_pose.position.x = float((x_min + x_max) / 2)
-                        detection.bbox_2d.geometric_center_pose.position.y = float((y_min + y_max) / 2)
+                        detection.bbox_2d.geometric_center_pose.position.x = float(
+                            (x_min + x_max) / 2
+                        )
+                        detection.bbox_2d.geometric_center_pose.position.y = float(
+                            (y_min + y_max) / 2
+                        )
                         detection.bbox_2d.width = float(x_max - x_min)
                         detection.bbox_2d.height = float(y_max - y_min)
                         detection.bbox_2d.geometric_center_pose.orientation = Quaternion(
                             x=0.0, y=0.0, z=0.0, w=1.0
                         )
 
-                        if hasattr(depthai_detection, 'spatialCoordinates') and depthai_detection.spatialCoordinates.z > 0: # Z=0 often means invalid depth
-                            detection.bbox_3d.geometric_center_pose.position.x = depthai_detection.spatialCoordinates.x / 1000  # convert from [mm] to [m]   
-                            detection.bbox_3d.geometric_center_pose.position.y = depthai_detection.spatialCoordinates.y / 1000
-                            detection.bbox_3d.geometric_center_pose.position.z = depthai_detection.spatialCoordinates.z / 1000
+                        if (
+                            hasattr(depthai_detection, 'spatialCoordinates')
+                            and depthai_detection.spatialCoordinates.z > 0
+                        ):  # Z=0 often means invalid depth
+                            detection.bbox_3d.geometric_center_pose.position.x = (
+                                depthai_detection.spatialCoordinates.x / 1000
+                            )  # convert from [mm] to [m]
+                            detection.bbox_3d.geometric_center_pose.position.y = (
+                                depthai_detection.spatialCoordinates.y / 1000
+                            )
+                            detection.bbox_3d.geometric_center_pose.position.z = (
+                                depthai_detection.spatialCoordinates.z / 1000
+                            )
 
-                        # TODO add 3D dimensions using depth information
+                            # TODO add 3D dimensions using depth information
 
                             detection_array.detections.append(detection)
-                    
+
                     self.detection_array_publisher.publish(detection_array)
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -250,6 +266,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
