@@ -13,3 +13,6 @@ opencv-python==4.11.0.86
 pyserial
 modbus_tk
 spidev
+setuptools
+yagmail
+dotenv
