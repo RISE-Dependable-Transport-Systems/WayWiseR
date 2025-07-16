@@ -73,6 +73,7 @@ ament_python_install_package(${PROJECT_NAME}_py PACKAGE_DIR py_src)
 
 install(PROGRAMS py_src/yolov8_node.py DESTINATION lib/${PROJECT_NAME})
 install(PROGRAMS py_src/rgbd_to_pointcloud.py DESTINATION lib/${PROJECT_NAME})
+install(PROGRAMS py_src/collision_monitor.py DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

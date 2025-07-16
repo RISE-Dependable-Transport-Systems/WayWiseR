@@ -1,0 +1,6 @@
+depthai_node:
+    ros__parameters:
+        rgb_topic: "/sensors/camera/color/image_rect"
+        detections_topic: "/sensors/camera/color/depthai_detections"
+        model_path: "~/workspaces/waywiser_ws/resources/yolo-v3-tiny-tf_openvino_2021.4_6shave.blob"
+        camera_base_frame: "camera_link"
