@@ -23,6 +23,12 @@ STEREO_CONFIDENCE_THRESHOLD = 250  # Confidence threshold for disparity calculat
 
 
 class DepthAI(Node):
+    """
+    Use DepthAI to capture RGB frames and publish them as Image messages.
+
+    This node also publishes DetectionArray messages of detected objects.
+    """
+
     def __init__(self):
         super().__init__('depthai_node')
 
@@ -89,7 +95,8 @@ class DepthAI(Node):
         color.setPreviewSize(1920, 1080)  # 16:9 aspect ratio to capture full FoV
         color.setInterleaved(
             False
-        )  # Planar Format: Each color channel is stored separately. More efficient for some image processing tasks, as it allows easier access to individual color channels
+        )  # Planar Format: Each color channel is stored separately. More efficient for some image
+        # processing tasks, as it allows easier access to individual color channels
 
         # Mono Camera Configuration
         self.get_logger().info(f'Configuring MonoCameras (Resolution: {MONO_RESOLUTION})')
@@ -108,7 +115,9 @@ class DepthAI(Node):
         stereo.setLeftRightCheck(True)
         stereo.setSubpixel(False)  # Improves depth accuracy, but uses more resources
         stereo.setConfidenceThreshold(STEREO_CONFIDENCE_THRESHOLD)
-        # stereo.setMedianFilter(dai.MedianFilter.KERNEL_7x7) # Add median filtering for smoother depth (might blur sharp depth changes), Options: MEDIAN_OFF, KERNEL_3x3, KERNEL_5x5, KERNEL_7x7
+        # stereo.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
+        # Add median filtering for smoother depth (might blur sharp depth changes),
+        # Options: MEDIAN_OFF, KERNEL_3x3, KERNEL_5x5, KERNEL_7x7
 
         # ImageManip Configuration
         self.get_logger().info(f'Configuring ImageManip (Resize: {YOLO_SPATIAL_INPUT_SIZE})')
@@ -136,7 +145,8 @@ class DepthAI(Node):
         NN.setConfidenceThreshold(NN_CONFIDENCE_THRESHOLD)
         NN.input.setBlocking(
             False
-        )  # Non-Blocking, allows more efficient and continuous data flow, useful in real-time processing
+        )  # Non-Blocking, allows more efficient and continuous data flow,
+        # useful in real-time processing
 
         # Spatial detection parameters
         NN.setBoundingBoxScaleFactor(0.1)  # Increasing scale factor reduces performance
@@ -166,7 +176,8 @@ class DepthAI(Node):
         # NN outputs -> Host
         NN.passthrough.link(
             xout_RGB.input
-        )  # Passthrough RGB frames to host# Passthrough frames are synchronised with NN outputs, ensuring zero discrepancy between what the NN sees and what is displayed
+        )  # Passthrough RGB frames to host# Passthrough frames are synchronised with NN outputs,
+        # ensuring zero discrepancy between what the NN sees and what is displayed
         NN.out.link(xout_NN.input)
 
         self.get_logger().info('Pipeline created successfully.')
@@ -174,7 +185,9 @@ class DepthAI(Node):
         return pipeline
 
     def capture(self):
-        # We are using context manager here that will dispose the device after we stop using it. This will also check USB and NETWORK interfaces for a device that is available and ready to accept connections
+        # We are using context manager here that will dispose the device after we stop using it.
+        # This will also check USB and NETWORK interfaces for a device that is available and
+        # ready to accept connections
         with dai.Device() as device:
             self.get_logger().info(
                 f'USB speed: {device.getUsbSpeed()}'

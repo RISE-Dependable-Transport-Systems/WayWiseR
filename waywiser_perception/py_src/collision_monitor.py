@@ -10,6 +10,13 @@ from waywiser_twist_safety.msg import EmergencyStopState
 
 
 class CollisionMonitor(Node):
+    """
+    Node that monitors DetectionArray messages and publishes EmergencyStopState if needed.
+
+    Publishes an EmergencyStopState message if the closest object detected is
+    closer than a specified distance threshold.
+    """
+
     def __init__(self):
         super().__init__('collision_monitor_node')
 
