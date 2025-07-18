@@ -8,10 +8,12 @@ To enable email functionality in WayWiseR nodes (for example, notifications from
 The `.env` file should contain the following variables:
 
     EMAIL_USER=''
-    EMAIL_PASSWORD='' # For Gmail, use an App Password
+    EMAIL_PASSWORD=''
     EMAIL_RECIPIENT=''
     SMTP_SERVER=smtp.gmail.com
-    SMTP_PORT=587
+    SMTP_PORT=465
+
+Note: If you are using Gmail, use an App Password for the `EMAIL_PASSWORD` variable.
 
 ## (Optional) FastDDS discovery server and client setup
 

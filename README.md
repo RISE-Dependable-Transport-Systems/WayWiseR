@@ -47,7 +47,7 @@ Install ROS2 (required):
 
 - [Install ROS2 Humble](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html)
 
-Install MAVSDK 2.0 or newer (required):
+Install MAVSDK latest 2.x version (required, version 3.x is not supported):
 
 - [Download MAVSDK pre-built releses](https://github.com/mavlink/MAVSDK/releases)
 
@@ -61,7 +61,7 @@ Setup workspace and build it (without simulator-related packages):
 
     sudo apt update && sudo apt install -y libunwind-dev libqt5serialport5-dev git build-essential cmake python3-colcon-common-extensions
 
-    export WAYWISER_WS=$HOME/waywiser_ws     #update the environment variable with desired path
+    export WAYWISER_WS=~/waywiser_ws     #update the environment variable with desired path
     export WAYWISER_SKIPPED_PACKAGES="waywiser_agrarsense waywiser_carla waywiser_gazebo"
 
     mkdir -p $WAYWISER_WS/src
@@ -69,9 +69,12 @@ Setup workspace and build it (without simulator-related packages):
     cd $WAYWISER_WS/src/WayWiseR
     git submodule update --init waywiser_core/WayWise
     cd $WAYWISER_WS
+    python -m venv .venv
+    source .venv/bin/activate
+    export PYTHONPATH=.venv/lib/python3.10/site-packages:$PYTHONPATH
     pip install -r src/WayWiseR/requirements.txt
     source /opt/ros/humble/setup.bash
-    rosdep install --from-paths $(colcon list --paths-only | grep -v -w -E  $(echo $WAYWISER_SKIPPED_PACKAGES | tr ' ' '|')) --ignore-src --rosdistro humble -r -y
+    rosdep install --from-paths $(colcon list --paths-only | grep -Evw "$(echo "$WAYWISER_SKIPPED_PACKAGES" | tr ' ' '|')") --ignore-src --rosdistro humble -r -y
     colcon build --symlink-install --packages-skip $WAYWISER_SKIPPED_PACKAGES
 
 To build simulator-related packages such as waywiser_agrarsense, waywiser_carla, and waywiser_gazebo, follow the instructions in the respective packages.
@@ -82,9 +85,14 @@ Add the following environment variables to .bashrc to persist them when a new te
     echo "export WAYWISER_WS=$WAYWISER_WS" >> ~/.bashrc
     echo "export WAYWISER_SKIPPED_PACKAGES=$WAYWISER_SKIPPED_PACKAGES" >> ~/.bashrc
 
-Before sourcing the overlay, it is very important that you open a new terminal, separate from the one where you built the workspace. Sourcing an overlay in the same terminal where you built, or likewise building where an overlay is sourced, may create complex issues.
+To setup the ROS2 environment with the correct python path and source overlay automatically, run the following command:
 
-`source install/local_setup.bash`
+    echo 'export PYTHONPATH=.venv/lib/python3.10/site-packages:$PYTHONPATH' >> .venv/bin/activate
+    echo 'if [ -f "install/setup.bash" ]; then' >> .venv/bin/activate
+    echo ' source "install/setup.bash"' >> .venv/bin/activate
+    echo 'fi' >> .venv/bin/activate
+
+Now activating the virtual environment will automatically set the correct python path and source overlay in each terminal: `source .venv/bin/activate`.
 
 ### Current state
 

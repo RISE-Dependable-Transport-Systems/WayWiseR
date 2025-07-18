@@ -14,11 +14,11 @@ If running with multiple sensors, make sure to set a unique slave address of eac
 
 ## Examples
 
-    ros2 launch waywiser_hwbringup waywise_car.launch.py
-    ros2 launch waywiser_hwbringup waywise_car.launch.py vehicle_config:=./src/WayWiseR/waywiser_hwbringup/config/rover.yaml
-    ros2 launch waywiser_hwbringup waywise_car.launch.py lidar_config:=./src/WayWiseR/waywiser_hwbringup/config/lidar.yaml
-    ros2 launch waywiser_hwbringup waywise_car.launch.py model:=./src/WayWiseR/waywiser_description/urdf/robot.urdf.xacro
-    ros2 launch waywiser_hwbringup waywise_car.launch.py frame_prefix:=prefix_of_your_choice
+    ros2 launch waywiser_hwbringup waywiser_car.launch.py
+    ros2 launch waywiser_hwbringup waywiser_car.launch.py vehicle_config:=./src/WayWiseR/waywiser_hwbringup/config/rover.yaml
+    ros2 launch waywiser_hwbringup waywiser_car.launch.py lidar_config:=./src/WayWiseR/waywiser_hwbringup/config/lidar.yaml
+    ros2 launch waywiser_hwbringup waywiser_car.launch.py model:=./src/WayWiseR/waywiser_description/urdf/robot.urdf.xacro
+    ros2 launch waywiser_hwbringup waywiser_car.launch.py frame_prefix:=prefix_of_your_choice
 
     ros2 launch waywiser_hwbringup waywise_car_autopilot.launch.py
     ros2 launch waywiser_hwbringup waywise_car_autopilot.launch.py vehicle_config:=./src/WayWiseR/waywiser_hwbringup/config/rover.yaml
