@@ -8,10 +8,21 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(xacro REQUIRED)
+find_package(rclpy REQUIRED)
+
+ament_python_install_package(${PROJECT_NAME}_py
+  PACKAGE_DIR py_src/waywiser_description_py
+)
 
 install(
   DIRECTORY urdf sdf meshes scripts
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  PROGRAMS
+  py_src/waywiser_description_py/waywiser_description_utils.py
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
