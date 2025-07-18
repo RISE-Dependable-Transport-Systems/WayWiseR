@@ -16,3 +16,5 @@ spidev
 setuptools
 yagmail
 dotenv
+pymap3d
+shapely
