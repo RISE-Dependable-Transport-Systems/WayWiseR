@@ -1,0 +1,49 @@
+track_test_runner_node:
+  ros__parameters:
+    track_test_runner_timer_rate: 1.0
+    use_simulation_clock: false
+    test_configurations_json_path: "track_test_configurations.json"
+    rosbag_output_dir: "track_test_data" # relative path
+    use_rosbag_recording: true
+    mission_status_topic: "/truck/mission_status"
+    autopilot_state_control_topic: "/truck/autopilot_state_control"
+    end_test_after_mission_complete: true
+    preplanned_route_filepath: "$WAYWISER_WS/resources/small_scale_route.xml"
+    vehicle_start_position_is_test_start_point: false
+    vehicle_start_position_is_test_end_point: false
+    test_start_point: "-0.24136670548847863, 0.9810376247909707, 0.0, 0.0, 0.0, -0.6382656725442453, 0.7698161671799588"
+    # test_end_point: "0.055, 3.171, 4.247, 0.0, 0.0, 0.949, 0.315"
+    # test_start_point: ""
+    test_end_point: ""
+    vehicle_pose_topic: "/truck/rear_axle_pose"
+    trailer_pose_topic: "/semitrailer/rear_axle_pose"
+    emergency_stop_topic: "/emergency_stop/current_state"
+    end_goal_alignment_type: 0 # Align {0: REAR_AXLE, 1: FRONT_REAR_END, 2: CENTER} with the end goal
+    end_goal_alignment_threshold: 0.1 # m
+    continue_test_after_estop_clear: false
+    enuref: [57.713805, 12.890088, 203.59] # [lat, lon, height]
+
+    rear_axle_frame_to_base_frame_offset: [0.1428, 0.0000, -0.0371]
+    rear_axle_frame_to_center_frame_offset: [0.1428, 0.0000, 0.0297]
+    rear_axle_frame_to_rear_end_frame_offset: [-0.1263, 0.0000, 0.0297]
+    rear_axle_frame_to_hitch_frame_offset: [-0.0150, 0.0000, 0.0497]
+    gnss_chip_to_rear_axle_offset: [-0.2949, -0.0400, -0.0789]
+    gnss_antenna_to_gnss_chip_offset: [-0.0119, 0.0400, -0.1240]
+    gnss_chip_orientation_offset: [0.0, 0.0, 0.0]
+
+    trailer_rear_axle_frame_to_trailer_base_frame_offset:
+      [0.2056, -0.0000, -0.0371]
+    trailer_rear_axle_frame_to_trailer_center_frame_offset:
+      [0.2056, -0.0000, 0.0275]
+    trailer_rear_axle_frame_to_trailer_rear_end_frame_offset:
+      [-0.2850, -0.0000, 0.0275]
+    trailer_rear_axle_frame_to_trailer_hitch_frame_offset:
+      [0.6150, -0.0000, 0.0481]
+
+    has_trailer: true
+    length: 0.505
+    width: 0.185
+    wheelbase: 0.2866
+    trailer_length: 0.980
+    trailer_width: 0.187
+    trailer_wheelbase: 0.6150
