@@ -26,10 +26,13 @@ Considering the modularity of ROS2 and WayWise, a project could also do somethin
 Current maintainers are: (firstname.lastname@ri.se):
 
 - Ramana Reddy Avula
-- Marvin Damschen
+- Aria Mirzai
+- Karl Lundgren
+- Ashfaq Farooqui
 
 Previous maintainers:
 
+- Marvin Damschen
 - Rickard Häll
 
 ## How to use it and what to expect
