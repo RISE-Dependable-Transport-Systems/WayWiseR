@@ -7,7 +7,6 @@
   <description>Interface between WayWiser and Agrarsense simulator (built on UE5)</description>
 
   <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
-  <maintainer email="marvin.damschen@ri.se">Marvin Damschen</maintainer>
 
   <license>GPLv3</license>
 
