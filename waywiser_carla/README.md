@@ -1,3 +1,8 @@
+> ⚠️ **ROS 2 Version Requirement**
+>
+> `waywiser_carla` is **officially supported on ROS 2 Humble (native, Python 3.10)**.
+> A **custom ROS 2 Jazzy build with Python 3.10** may work, but it is **untested**. The CARLA ROS bridge for UE 4.6 is **not compatible with ROS 2 Jazzy built with Python 3.12** because `distutils` is no longer included.
+
 ## Carla setup
 
 - Clone the carla-ros-bridge repo (fork from [ros-bridge](https://github.com/carla-simulator/ros-bridge)):
