@@ -11,7 +11,7 @@ from waywiser_hwbringup_py.urm14_sensor_array_manager import initialize_master_b
 from waywiser_hwbringup_py.urm14_sensor_array_manager import measure_distance
 
 
-class URM1SensorArrayNode(Node):
+class URM14SensorArrayNode(Node):
     def __init__(self):
         super().__init__('urm14_sensor_array_node')
 
@@ -162,7 +162,7 @@ def main(args=None):
     node = None
     try:
         # Create and run the node
-        node = URM1SensorArrayNode()
+        node = URM14SensorArrayNode()
 
         if node.sensor_configs:  # Only spin if we have sensors
             rclpy.spin(node)
