@@ -1,6 +1,16 @@
 {
     "name": "WayWiseR",
-    "runArgs": ["--name", "WayWiseR-devcontainer"],
+    // .devcontainer/devcontainer.json
+    "runArgs": [
+    "--name","WayWiseR-devcontainer",
+    "--privileged",
+    "--device=/dev/bus/usb:/dev/bus/usb",
+    "--device-cgroup-rule=c 189:* rwm",
+    "-v","/dev:/dev",
+    "-v","/run/udev:/run/udev:ro",
+    "--security-opt","seccomp=unconfined",
+    "--security-opt","apparmor=unconfined"
+    ],
     "build": {
         "dockerfile": "Dockerfile",
         "args": {

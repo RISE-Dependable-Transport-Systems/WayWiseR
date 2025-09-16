@@ -49,5 +49,6 @@ colcon build --symlink-install --packages-skip $WAYWISER_SKIPPED_PACKAGES
 echo "export WAYWISER_WS=$WAYWISER_WS" >> ~/.bashrc
 echo "export WAYWISER_SKIPPED_PACKAGES=\"$WAYWISER_SKIPPED_PACKAGES\"" >> ~/.bashrc
 echo "source \$WAYWISER_WS/install/local_setup.bash" >> ~/.bashrc
+echo "source \$WAYWISER_WS/.venv/bin/activate" >> ~/.bashrc
 
 echo "✅ WayWiseR devcontainer setup complete. MAVSDK installed from .deb. Open a NEW terminal for the overlay."
