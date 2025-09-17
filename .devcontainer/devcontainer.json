@@ -1,7 +1,6 @@
 {
-    "name": "WayWiseR",
-    // .devcontainer/devcontainer.json
-    "runArgs": [
+  "name": "WayWiseR",
+  "runArgs": [
     "--name","WayWiseR-devcontainer",
     "--privileged",
     "--device=/dev/bus/usb:/dev/bus/usb",
@@ -10,26 +9,24 @@
     "-v","/run/udev:/run/udev:ro",
     "--security-opt","seccomp=unconfined",
     "--security-opt","apparmor=unconfined"
-    ],
-    "build": {
-        "dockerfile": "Dockerfile",
-        "args": {
-            "MAVSDK_VERSION": "2.14.1"
-        }
-    },
-    "workspaceFolder": "/workspaces/WayWiseR",
-    "containerEnv": {
-        "WAYWISER_WS": "/workspaces/waywiser_ws",
-        "WAYWISER_SKIPPED_PACKAGES": "waywiser_agrarsense waywiser_carla waywiser_gazebo",
-        "DEBIAN_FRONTEND": "noninteractive"
-    },
-    "postCreateCommand": "bash .devcontainer/post-create.sh",
-    "postAttachCommand": "bash .devcontainer/post-attach.sh"
-    /* If your WayWise submodule uses SSH (git@...), keep these lines:
-    ,"mounts": ["source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"],
-    "remoteEnv": { "SSH_AUTH_SOCK": "/ssh-agent" }
-    */
-    /* If you plan to run ROS nodes that talk to host network, you may add:
-    ,"runArgs": ["--net=host"]
-    */
+  ],
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "workspaceFolder": "/workspaces/WayWiseR",
+  "containerEnv": {
+    "WAYWISER_WS": "/workspaces/waywiser_ws",
+    "WAYWISER_SKIPPED_PACKAGES": "waywiser_agrarsense waywiser_carla waywiser_gazebo",
+    "DEBIAN_FRONTEND": "noninteractive",
+    "MAVSDK_VERSION": "2.14.1"
+  },
+  "postCreateCommand": "make devcontainer",
+  "postAttachCommand": "make post-attach"
+  /* If your WayWise submodule uses SSH (git@...), keep these lines:
+  ,"mounts": ["source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"],
+  "remoteEnv": { "SSH_AUTH_SOCK": "/ssh-agent" }
+  */
+  /* If you plan to run ROS nodes that talk to host network, you may add:
+  ,"runArgs": ["--net=host"]
+  */
 }
