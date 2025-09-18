@@ -110,10 +110,10 @@ auto: ## Auto-detect: inside container with ROS? -> devcontainer, else host
 	fi
 
 # Host: add ROS repo before installing ROS-related tools
-host: check-os deps-base maybe-ros repo deps-ros-tools maybe-ros-install mavsdk rosdep-setup setup-core build env done ## Full host setup (installs ROS if missing)
+host: check-os deps-base maybe-ros repo deps-ros-tools maybe-udev-luxonis maybe-ros-install mavsdk rosdep-setup setup-core build env done ## Full host setup (installs ROS if missing)
 
 # Devcontainer: ROS is present, but we still add repo so tools resolve on noble/arm
-devcontainer: check-ros deps-base repo deps-ros-tools mavsdk rosdep-setup setup-core build env done ## Devcontainer setup (skips ROS install, installs MAVSDK)
+devcontainer: check-ros deps-base repo deps-ros-tools maybe-udev-luxonis mavsdk rosdep-setup setup-core build env done ## Devcontainer setup (skips ROS install, installs MAVSDK)
 
 # ── Checks & ROS repo + deps split ────────────────────────────────────────────
 .PHONY: check-os check-ros maybe-ros maybe-ros-install repo ros-install
@@ -179,6 +179,45 @@ deps-ros-tools: ## ROS development tools (after ROS apt source)
 	$(APTGET) update
 	$(APTGET) install python3-colcon-common-extensions python3-rosdep python3-vcstool
 	$(call ok,ROS dev tools installed)
+
+# ── Optional Luxonis udev rule flag ────────────────────────────────
+LUXONIS ?= 0   # set to 1 to enable udev rule for Luxonis OAK-D
+
+.PHONY: maybe-udev-luxonis
+maybe-udev-luxonis:
+	@if [ "$(LUXONIS)" = "1" ]; then \
+	  $(call info,Flag LUXONIS=1 → running udev-luxonis); \
+	  $(MAKE) udev-luxonis; \
+	else \
+	  $(call info,Skipping Luxonis udev rule — pass LUXONIS=1 to enable); \
+	fi
+
+# ── UDEV rules for Luxonis OAK-D (host only) ──────────────────────────────────
+UDEV_RULE_FILE := /etc/udev/rules.d/80-movidius.rules
+UDEV_RULE_LINE := SUBSYSTEM=="usb", ATTRS{idVendor}=="03e7", MODE="0666"
+
+.PHONY: udev-luxonis
+udev-luxonis: ## Install udev rule for Luxonis OAK-D (03e7) on the host
+	$(call step,$(EMOJI_CFG) Installing udev rule for Luxonis OAK-D (03e7))
+	# Skip inside containers: udev is a host service
+	if [ "$(IS_CONTAINER)" = yes ]; then
+	  $(call info,Detected container → skipping udev rule \(host-only step\))
+	  exit 0
+	fi
+	if ! command -v udevadm >/dev/null 2>&1; then
+	  $(call warn,udevadm not found — is this a Linux host with udev? Skipping.)
+	  exit 0
+	fi
+	set -e
+	# Create/update rule only if needed
+	if [ ! -f "$(UDEV_RULE_FILE)" ] || ! grep -F '$(UDEV_RULE_LINE)' "$(UDEV_RULE_FILE)" >/dev/null 2>&1; then
+	  echo '$(UDEV_RULE_LINE)' | $(SUDO) tee "$(UDEV_RULE_FILE)" >/dev/null
+	  $(SUDO) udevadm control --reload-rules
+	  $(SUDO) udevadm trigger
+	  $(call ok,Luxonis udev rule installed & udev reloaded)
+	else
+	  $(call ok,Luxonis udev rule already present — nothing to do)
+	fi
 
 # ── Common deps, rosdep, workspace, venv, build -------------------------------
 .PHONY: rosdep-setup setup-core build env done
