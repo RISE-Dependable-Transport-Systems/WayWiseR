@@ -43,19 +43,19 @@ GREY := \033[90m
 RESET:= \033[0m
 
 define say
-	@printf '$(1)\n'
+	$(Q) printf '$(1)\n'
 endef
 define step
-	@printf '$(EMOJI_RUN)  $(BOLD)%s$(RESET)\n' '$(1)'
+	$(Q) printf '$(EMOJI_RUN)  $(BOLD)%s$(RESET)\n' '$(1)'
 endef
 define info
-	@printf '$(EMOJI_INFO)  %s\n' '$(1)'
+	$(Q) printf '$(EMOJI_INFO)  %s\n' '$(1)'
 endef
 define warn
-	@printf '$(EMOJI_WARN)  %s\n' '$(1)'
+	$(Q) printf '$(EMOJI_WARN)  %s\n' '$(1)'
 endef
 define ok
-	@printf '$(EMOJI_OK)  %s\n' '$(1)'
+	$(Q) printf '$(EMOJI_OK)  %s\n' '$(1)'
 endef
 
 # ── Config ─────────────────────────────────────────────────────────────────────
