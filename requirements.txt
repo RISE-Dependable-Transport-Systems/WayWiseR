@@ -1,6 +1,6 @@
 transforms3d
 psutil
-numpy
+numpy<2
 lark
 empy==3.3.2
 catkin_pkg
