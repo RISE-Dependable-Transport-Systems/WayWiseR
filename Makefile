@@ -2,25 +2,17 @@
 # ---------------------------------------------------
 # If ROS 2 already exists (e.g., osrf/ros:jazzy-* base image), we skip ROS install.
 # 'make devcontainer' also installs/updates MAVSDK (moved out of Dockerfile).
-#
-# Usage:
-#   make                # auto-detect container vs host
-#   make devcontainer   # assumes ROS already present in image
-#   make host           # installs ROS if missing
-#   make mavsdk         # (re)install MAVSDK
-#   make clean          # wipe build/install/log
 
-# ── Shell & make behavior ──────────────────────────────────────────────────────
 SHELL := /bin/bash
 .SHELLFLAGS := -eo pipefail -c
 .ONESHELL:
 MAKEFLAGS += --no-builtin-rules --no-print-directory
 
-# Quiet-by-default: `make V=1 ...` to show all commands
+# Quiet by default; use `make V=1 …` for verbose command echo
 ifeq ($(V),1)
-Q :=
+    # verbose: let make echo recipes
 else
-Q := @
+    .SILENT:
 endif
 
 # ── Pretty printing helpers (robust quoting) ───────────────────────────────────
@@ -43,19 +35,19 @@ GREY := \033[90m
 RESET:= \033[0m
 
 define say
-	$(Q) printf '$(1)\n'
+    printf '$(1)\n'
 endef
 define step
-	$(Q) printf '$(EMOJI_RUN)  $(BOLD)%s$(RESET)\n' '$(1)'
+    printf '$(EMOJI_RUN)  $(BOLD)%s$(RESET)\n' '$(1)'
 endef
 define info
-	$(Q) printf '$(EMOJI_INFO)  %s\n' '$(1)'
+    printf '$(EMOJI_INFO)  %s\n' '$(1)'
 endef
 define warn
-	$(Q) printf '$(EMOJI_WARN)  %s\n' '$(1)'
+    printf '$(EMOJI_WARN)  %s\n' '$(1)'
 endef
 define ok
-	$(Q) printf '$(EMOJI_OK)  %s\n' '$(1)'
+    printf '$(EMOJI_OK)  %s\n' '$(1)'
 endef
 
 # ── Config ─────────────────────────────────────────────────────────────────────
