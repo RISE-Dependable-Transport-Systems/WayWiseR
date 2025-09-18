@@ -2,7 +2,7 @@
 
 ## Luxonis OAK-D camera
 
-Make sure to add the `udev` rule for the camera:
+Make sure to add the `udev` rule for the camera on the host (never in a container):
 
 ```bash
 echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="03e7", MODE="0666"' | sudo tee /etc/udev/rules.d/80-movidius.rules

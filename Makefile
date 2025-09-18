@@ -181,16 +181,16 @@ deps-ros-tools: ## ROS development tools (after ROS apt source)
 	$(call ok,ROS dev tools installed)
 
 # ── Optional Luxonis udev rule flag ────────────────────────────────
-LUXONIS ?= 0   # set to 1 to enable udev rule for Luxonis OAK-D
+LUXONIS ?= 0
 
 .PHONY: maybe-udev-luxonis
 maybe-udev-luxonis:
-	@if [ "$(LUXONIS)" = "1" ]; then \
-	  $(call info,Flag LUXONIS=1 → running udev-luxonis); \
-	  $(MAKE) udev-luxonis; \
-	else \
-	  $(call info,Skipping Luxonis udev rule — pass LUXONIS=1 to enable); \
-	fi
+ifeq ($(strip $(LUXONIS)),1)
+	$(call info,Flag LUXONIS=1 → running udev-luxonis)
+	$(MAKE) udev-luxonis
+else
+	$(call info,Skipping Luxonis udev rule — pass LUXONIS=1 to enable)
+endif
 
 # ── UDEV rules for Luxonis OAK-D (host only) ──────────────────────────────────
 UDEV_RULE_FILE := /etc/udev/rules.d/80-movidius.rules
