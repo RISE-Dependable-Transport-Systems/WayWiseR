@@ -196,11 +196,10 @@ setup-core: ## Workspace, submodules, venv, pip, rosdep install
 	if [ -f "$(ROS_SETUP)" ]; then source "$(ROS_SETUP)"; fi
 	mkdir -p "$(WAYWISER_WS)/src"
 	if [ ! -e "$(WAYWISER_WS)/src/WayWiseR" ]; then ln -sfn "$(PWD)" "$(WAYWISER_WS)/src/WayWiseR"; fi
-	git config --global url."https://github.com/".insteadof git@github.com:
 	cd "$(WAYWISER_WS)/src/WayWiseR"
 	git config -f .gitmodules submodule.waywiser_core/WayWise.url https://github.com/RISE-Dependable-Transport-Systems/WayWise.git || true
 	git submodule sync --recursive
-	git submodule update --init --recursive --jobs 4
+	git -c url.https://github.com/.insteadof=git@github.com: submodule update --init --recursive --jobs 4
 	$(call ok,Workspace linked & submodules updated)
 
 	$(call step,$(EMOJI_GEAR) Python venv & requirements)
