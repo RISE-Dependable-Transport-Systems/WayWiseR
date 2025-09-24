@@ -1,0 +1,9 @@
+/**:
+  ros__parameters:
+    camera:
+      i_enable_imu: false
+      i_nn_type: spatial
+      i_restart_on_diagnostics_error: true
+    nn:
+      i_nn_config_path: depthai_ros_driver/yolo
+      i_confidence_threshold: 0.6
