@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+import math
 
+from geometry_msgs.msg import PoseStamped
 from geometry_msgs.msg import Quaternion
 from geometry_msgs.msg import Transform
 from geometry_msgs.msg import TransformStamped
@@ -19,17 +21,15 @@ class VehicleTFPublisher(Node):
         super().__init__('vehicle_tf_publisher')
 
         # Declare parameters
+        self.declare_parameter('role_name', 'forwarder')
         self.declare_parameter('odom_topic', 'odom')
-        self.declare_parameter('input_transform', 'input_transform')
         self.declare_parameter('base_link_frame', 'base_link')
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('publish_rate', 10.0)
 
         # Get parameters
+        self.role_name = self.get_parameter('role_name').get_parameter_value().string_value
         self.odom_topic = self.get_parameter('odom_topic').get_parameter_value().string_value
-        self.input_transform = (
-            self.get_parameter('input_transform').get_parameter_value().string_value
-        )
         self.base_link_frame = (
             self.get_parameter('base_link_frame').get_parameter_value().string_value
         )
@@ -38,18 +38,24 @@ class VehicleTFPublisher(Node):
 
         # Publisher for the odom topic
         self.odom_publisher = self.create_publisher(Odometry, self.odom_topic, 10)
+        self.odom_pose_publisher = self.create_publisher(
+            PoseStamped, f'/agrarsense/out/sensors/{self.role_name}/pose', 10
+        )
 
         # Transform broadcaster for map_to_odom and odom_to_base_link
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # Subscription to the global transform topic
-        self.subscription = self.create_subscription(
-            Transform, self.input_transform, self.global_transform_callback, 10
+        self.base_transform_subscription = self.create_subscription(
+            Transform,
+            f'/agrarsense/out/sensors/{self.role_name}/transform',
+            self.global_base_frame_transform_callback,
+            10,
         )
 
         self.start_position = None
         self.start_rotation = None
-        self.start_rotation_euler = None
+        self.start_yaw = None
         self.prev_time = None
         self.prev_position = None
         self.prev_yaw = None
@@ -63,7 +69,7 @@ class VehicleTFPublisher(Node):
         # Create a timer to publish transforms at a fixed rate
         self.timer = self.create_timer(1.0 / self.publish_rate, self.publish_transforms)
 
-    def global_transform_callback(self, msg):
+    def global_base_frame_transform_callback(self, msg):
         # Convert translation from centimeters to meters
         msg.translation.x /= 100.0
         msg.translation.y /= 100.0
@@ -92,14 +98,14 @@ class VehicleTFPublisher(Node):
                         self.get_logger().info('Odometry position and orientation reference set.')
                         self.start_position = msg.translation
                         self.start_rotation = msg.rotation
-                        self.start_rotation_euler = euler_from_quaternion(
+                        self.start_yaw = euler_from_quaternion(
                             [
                                 msg.rotation.x,
                                 msg.rotation.y,
                                 msg.rotation.z,
                                 msg.rotation.w,
                             ]
-                        )
+                        )[2]
                         self.prev_yaw = 0
 
             self.prev_time = current_time
@@ -110,16 +116,25 @@ class VehicleTFPublisher(Node):
         self.odom_msg.header.stamp = current_time.to_msg()
 
         # Compute relative position and orientation
-        self.odom_msg.pose.pose.position.x = msg.translation.x - self.start_position.x
-        self.odom_msg.pose.pose.position.y = -(msg.translation.y - self.start_position.y)
-        self.odom_msg.pose.pose.position.z = msg.translation.z - self.start_position.z
+        dx = msg.translation.x - self.start_position.x
+        dy = -(msg.translation.y - self.start_position.y)
+        relative_yaw = 0.0
+        if self.start_yaw is not None:
+            self.odom_msg.pose.pose.position.x = dx * math.cos(self.start_yaw) - dy * math.sin(
+                self.start_yaw
+            )
+            self.odom_msg.pose.pose.position.y = dx * math.sin(self.start_yaw) + dy * math.cos(
+                self.start_yaw
+            )
+            self.odom_msg.pose.pose.position.z = msg.translation.z - self.start_position.z
 
-        current_euler = euler_from_quaternion(
-            [msg.rotation.x, msg.rotation.y, msg.rotation.z, msg.rotation.w]
-        )
-
-        # Compute relative yaw angle
-        relative_yaw = -(current_euler[2] - self.start_rotation_euler[2])
+            # Compute relative yaw angle
+            relative_yaw = -(
+                euler_from_quaternion(
+                    [msg.rotation.x, msg.rotation.y, msg.rotation.z, msg.rotation.w]
+                )[2]
+                - self.start_yaw
+            )
         odom_quat = quaternion_from_euler(0, 0, relative_yaw)
         self.odom_msg.pose.pose.orientation.x = odom_quat[0]
         self.odom_msg.pose.pose.orientation.y = odom_quat[1]
@@ -131,18 +146,20 @@ class VehicleTFPublisher(Node):
             dt = (current_time - self.prev_time).nanoseconds * 1e-9
 
             if dt > 0:
-                dx = self.odom_msg.pose.pose.position.x - self.prev_position.x
-                dy = self.odom_msg.pose.pose.position.y - self.prev_position.y
+                dx = msg.translation.x - self.prev_position.x
+                dy = -(msg.translation.y - self.prev_position.y)
                 d_yaw = relative_yaw - self.prev_yaw
 
                 # Compute linear velocity
                 linear_velocity = (dx**2 + dy**2) ** 0.5 / dt
+                if linear_velocity < 0.01:
+                    linear_velocity = 0.0
                 # Compute angular velocity
                 angular_velocity = d_yaw / dt
 
                 # Populate the twist message
                 self.odom_msg.twist.twist.linear.x = linear_velocity
-                self.odom_msg.twist.twist.linear.y = 0.0  # Assuming no lateral movement
+                self.odom_msg.twist.twist.linear.y = 0.0  # Assuming no lateral movement (y-axis)
                 self.odom_msg.twist.twist.linear.z = 0.0  # Assuming no vertical movement
                 self.odom_msg.twist.twist.angular.x = 0.0  # Assuming no roll
                 self.odom_msg.twist.twist.angular.y = 0.0  # Assuming no pitch
@@ -156,11 +173,20 @@ class VehicleTFPublisher(Node):
         # Publish the odom message
         self.odom_publisher.publish(self.odom_msg)
 
+        odom_pose_msg = PoseStamped()
+        odom_pose_msg.header.stamp = current_time.to_msg()
+        odom_pose_msg.header.frame_id = self.odom_frame
+        odom_pose_msg.pose.position.x = self.odom_msg.pose.pose.position.x
+        odom_pose_msg.pose.position.y = self.odom_msg.pose.pose.position.y
+        odom_pose_msg.pose.position.z = self.odom_msg.pose.pose.position.z
+        odom_pose_msg.pose.orientation = self.odom_msg.pose.pose.orientation
+        self.odom_pose_publisher.publish(odom_pose_msg)
+
     def reset_state(self):
         """Reset all state variables to handle clock reset."""
         self.start_position = None
         self.start_rotation = None
-        self.start_rotation_euler = None
+        self.start_yaw = None
         self.prev_time = None
         self.prev_position = None
         self.prev_yaw = None
@@ -206,13 +232,20 @@ class VehicleTFPublisher(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = VehicleTFPublisher()
+
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        node.get_logger().info('User requested shutdown with SIGINT.')
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        # Cleanup on exit
+        try:
+            node.destroy_node()
+        except Exception as e:
+            print(f'Error during node destruction: {e}')
+        # Only shutdown if the context is still valid
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

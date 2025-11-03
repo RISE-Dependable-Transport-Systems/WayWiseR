@@ -1,23 +1,40 @@
 #!/usr/bin/env python3
 
+from enum import auto
+from enum import Enum
 import json
 import os
 import re
-import signal
 import subprocess
 import time
 
-import psutil
+from ament_index_python import get_package_share_directory
 import rclpy
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
+from rclpy.clock import Clock
+from rclpy.clock import ClockType
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
-from rclpy.qos import DurabilityPolicy
-from rclpy.qos import HistoryPolicy
-from rclpy.qos import LivelinessPolicy
-from rclpy.qos import QoSProfile
-from rclpy.qos import ReliabilityPolicy
-from rosgraph_msgs.msg import Clock
-from std_msgs.msg import Bool
+from rosgraph_msgs.msg import Clock as ClockMsg
 from std_msgs.msg import String
+from waywiser_py.waywiser_utils import create_subprocess
+from waywiser_py.waywiser_utils import get_full_file_path
+from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
+from waywiser_py.waywiser_utils import terminate_subprocess
+
+from waywiser_test_runner.msg import SetupState
+
+PACKAGE_NAME = 'waywiser_agrarsense'
+WAYWISER_AGRARSENSE_TEMPDIR = os.path.expanduser('~/.waywiser/agrarsense')
+os.makedirs(WAYWISER_AGRARSENSE_TEMPDIR, exist_ok=True)
+
+
+class AgrarsenseSimulatorState(Enum):
+    UNKNOWN = auto()
+    INITIALIZING = auto()
+    INITIALIZED = auto()
+    CONFIGURING = auto()
+    CONFIGURED = auto()
 
 
 class AgrarsenseOrchestrator(Node):
@@ -27,126 +44,298 @@ class AgrarsenseOrchestrator(Node):
         super().__init__('agrarsense_orchestrator_node')
 
         # Declare parameters
-        self.declare_parameter('sim_script_path', '')
-        self.declare_parameter('ros_bridge_script_path', '')
-        self.declare_parameter('sim_in_command_topic', '/agrarsense/in/commands')
-        self.declare_parameter('docker_container_name', 'agrarsense_ros_bridge')
-        self.declare_parameter('ego_vehicle_identifier', '')
-        self.declare_parameter('sim_startup_time', 2.0)
-        self.declare_parameter('map_name', 'playground')
-        self.declare_parameter('objects_json_path', '')
-        self.declare_parameter('command_publish_delay', 2.0)
-        self.declare_parameter('ros_async', True)
+        self.declare_parameter('agrarsense_script_path', '')
+        self.declare_parameter('ego_vehicle_role_name', '')
         self.declare_parameter('ros_host_ip', '127.0.0.1')
+        self.declare_parameter('ros_port', 9090)
+        self.declare_parameter('map_name', 'playground')
+        self.declare_parameter('sim_startup_time', 2.0)
+        self.declare_parameter('render_off_screen', True)
+        self.declare_parameter('reset_agrarsense_after_exec', False)
+        self.declare_parameter('objects_json_path', '')
+        self.declare_parameter('agrarsense_orchestrator_timer_rate', 1.0)
+
+        self.declare_parameter('agrarsense_ros_bridge.script_path', '')
+        self.declare_parameter(
+            'agrarsense_ros_bridge.docker_container_name', 'agrarsense_ros_bridge'
+        )
+
+        self.declare_parameter('agrarsense_in_command_topic', '/agrarsense/in/commands')
+        self.declare_parameter('command_publish_delay', 2.0)
         self.declare_parameter('workersthreadpool', 16)
-        self.declare_parameter('spectator_rendering', True)
         self.declare_parameter('quality_level', 'Balanced')
+
         self.declare_parameter('spectator_transform', '')
-        self.declare_parameter('sim_configurations_json_path', '')
-        self.declare_parameter('rosbag_output_dir', '')
-        self.declare_parameter('use_rosbag_recording', False)
+        self.declare_parameter('object_ids', [''])
+        self.declare_parameter('setup_request_topic', '/setup_request')
+        self.declare_parameter('setup_status_topic', '/setup_status')
+        self.declare_parameter('weather_json_path', '')
+        self.declare_parameter('sim_clock_timeout', 10.0)
 
         # Get parameters
-        self.sim_script_path = (
-            self.get_parameter('sim_script_path').get_parameter_value().string_value
+        self.object_ids = self.get_parameter('object_ids').get_parameter_value().string_array_value
+        self.spawn_point = {}
+        for object_id in self.object_ids:
+            self.declare_parameter(f'spawn_point.{object_id}', '')
+            self.spawn_point[object_id] = (
+                self.get_parameter(f'spawn_point.{object_id}').get_parameter_value().string_value
+            )
+
+        self.agrarsense_script_path = get_full_file_path(
+            self.get_parameter('agrarsense_script_path').get_parameter_value().string_value
         )
-        self.ros_bridge_script_path = (
-            self.get_parameter('ros_bridge_script_path').get_parameter_value().string_value
+        self.ego_vehicle_role_name = (
+            self.get_parameter('ego_vehicle_role_name').get_parameter_value().string_value
         )
-        self.sim_in_command_topic = (
-            self.get_parameter('sim_in_command_topic').get_parameter_value().string_value
-        )
-        self.docker_container_name = (
-            self.get_parameter('docker_container_name').get_parameter_value().string_value
-        )
-        self.ego_vehicle_identifier = (
-            self.get_parameter('ego_vehicle_identifier').get_parameter_value().string_value
-        )
+        self.ros_host_ip = self.get_parameter('ros_host_ip').get_parameter_value().string_value
+        self.ros_port = self.get_parameter('ros_port').get_parameter_value().integer_value
+        self.map_name = self.get_parameter('map_name').get_parameter_value().string_value
         self.sim_startup_time = (
             self.get_parameter('sim_startup_time').get_parameter_value().double_value
         )
-        self.map_name = self.get_parameter('map_name').get_parameter_value().string_value
+        self.render_off_screen = (
+            self.get_parameter('render_off_screen').get_parameter_value().bool_value
+        )
+        self.reset_agrarsense_after_exec = (
+            self.get_parameter('reset_agrarsense_after_exec').get_parameter_value().bool_value
+        )
         self.objects_json_path = (
             self.get_parameter('objects_json_path').get_parameter_value().string_value
+        )
+        self.agrarsense_orchestrator_timer_rate = (
+            self.get_parameter('agrarsense_orchestrator_timer_rate')
+            .get_parameter_value()
+            .double_value
+        )
+
+        self.agrarsense_ros_bridge_params = {
+            'script_path': get_full_file_path(
+                self.get_parameter('agrarsense_ros_bridge.script_path')
+                .get_parameter_value()
+                .string_value,
+                os.path.join(get_package_share_directory(PACKAGE_NAME), 'ros_bridge'),
+            ),
+            'docker_container_name': self.get_parameter(
+                'agrarsense_ros_bridge.docker_container_name'
+            )
+            .get_parameter_value()
+            .string_value,
+        }
+
+        self.agrarsense_in_command_topic = (
+            self.get_parameter('agrarsense_in_command_topic').get_parameter_value().string_value
         )
         self.command_publish_delay = (
             self.get_parameter('command_publish_delay').get_parameter_value().double_value
         )
-        self.ros_async = self.get_parameter('ros_async').get_parameter_value().bool_value
-        self.ros_host_ip = self.get_parameter('ros_host_ip').get_parameter_value().string_value
         self.workersthreadpool = (
             self.get_parameter('workersthreadpool').get_parameter_value().integer_value
-        )
-        self.spectator_rendering = (
-            self.get_parameter('spectator_rendering').get_parameter_value().bool_value
         )
         self.quality_level = self.get_parameter('quality_level').get_parameter_value().string_value
         self.spectator_transform = (
             self.get_parameter('spectator_transform').get_parameter_value().string_value
         )
-        self.sim_configurations_json_path = (
-            self.get_parameter('sim_configurations_json_path').get_parameter_value().string_value
+        self.setup_request_topic = (
+            self.get_parameter('setup_request_topic').get_parameter_value().string_value
         )
-        self.rosbag_output_dir = (
-            self.get_parameter('rosbag_output_dir').get_parameter_value().string_value
+        self.setup_status_topic = (
+            self.get_parameter('setup_status_topic').get_parameter_value().string_value
         )
-        self.use_rosbag_recording = (
-            self.get_parameter('use_rosbag_recording').get_parameter_value().bool_value
+        self.weather_json_path = (
+            self.get_parameter('weather_json_path').get_parameter_value().string_value
         )
-
-        # Parse the simulation configurations
-        self.sim_configurations = self.parse_sim_configs()
-        self.current_config_index = 0
-        self.current_iter_index = 0
-        self.subprocesses = {}
-
-        self.waywiser_tempdir = os.path.expanduser('~/.waywiser/agrarsense')
-        os.makedirs(self.waywiser_tempdir, exist_ok=True)
+        self.weather_json_path = get_full_file_path(
+            self.weather_json_path,
+            os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
+        )
+        self.sim_clock_timeout = (
+            self.get_parameter('sim_clock_timeout').get_parameter_value().double_value
+        )
 
         # Create subscribers
-        self.clock_subscriber = self.create_subscription(Clock, '/clock', self.clock_callback, 10)
-        self.end_simulation_subscriber = self.create_subscription(
-            Bool, '/agrarsense/end_simulation', self.end_simulation_callback, 10
+        self.out_info_group = MutuallyExclusiveCallbackGroup()
+        self.setup_request_subscriber = self.create_subscription(
+            String,
+            self.setup_request_topic,
+            self.setup_request_callback,
+            RELIABLE_TRANSIENT_LOCAL_QOS,
         )
-
-        self.info_subscriber = self.create_subscription(
+        self.agrarsense_out_info_subscriber = self.create_subscription(
             String,
             '/agrarsense/out/info',
-            self.info_callback,
-            10,  # QoS profile depth
+            self.agrarsense_out_info_callback,
+            10,
+            callback_group=self.out_info_group,
         )
-
+        self.sim_clock_subscriber = self.create_subscription(
+            ClockMsg, '/clock', self.sim_clock_callback, 10
+        )
         # Create publishers
-        self.simulation_ready_publisher = self.create_publisher(
-            Bool, '/carla/simulation_ready', 10
+        self.setup_status_publisher = self.create_publisher(
+            SetupState, self.setup_status_topic, RELIABLE_TRANSIENT_LOCAL_QOS
         )
-        command_publisher_qos_profile = QoSProfile(
-            reliability=ReliabilityPolicy.RELIABLE,
-            history=HistoryPolicy.KEEP_LAST,
-            depth=10,
-            durability=DurabilityPolicy.VOLATILE,
-            lifespan=rclpy.duration.Duration(seconds=0),
-            deadline=rclpy.duration.Duration(seconds=0),
-            liveliness=LivelinessPolicy.AUTOMATIC,
-            liveliness_lease_duration=rclpy.duration.Duration(seconds=0),
-        )
-        self.command_publisher = self.create_publisher(
-            String, self.sim_in_command_topic, command_publisher_qos_profile
+        self.agrarsense_in_command_publisher = self.create_publisher(
+            String, self.agrarsense_in_command_topic, RELIABLE_TRANSIENT_LOCAL_QOS
         )
 
-        # Flags for controlling simulator actions
-        self.sim_paused = False
+        # Create timers
+        self.wall_clock = Clock(clock_type=ClockType.SYSTEM_TIME)
+        self.agrarsense_orchestrator_timer = self.create_timer(
+            1.0 / self.agrarsense_orchestrator_timer_rate,
+            self.agrarsense_orchestrator_timer_callback,
+            clock=self.wall_clock,
+        )
+
+        # Initialize Attributes
+        self.setup_state_name_lookup = {
+            value: name for name, value in SetupState.__dict__.items() if isinstance(value, int)
+        }
+        self.first_clock_received_time = None
+        self.consecutive_stable_clocks_at_startup = 0
+        self.simulator_subprocess = None
+        self.ros_bridge_subprocess = None
+        self.setup_status = SetupState()
+        self.setup_status.state = SetupState.IDLE
+        self.simulation_config_to_process = {}
+        self.configured_map_name = None
+        self.configured_objects_json_path = None
+        self.configured_ego_vehicle_role_name = None
         self.previous_sim_time = None
-        self.spawn_objects_started = False
         self.spawn_objects_pending = set()
+        self.spawn_objects_completed_future = None
+        self.last_command_publish_time = None
+        self.sim_state = AgrarsenseSimulatorState.UNKNOWN
+        self.sim_clock_timeout_timer = None
 
         self.start_agrarsense_ros_bridge()
 
-        self.start_next_simulation()
+    def sim_clock_callback(self, msg):
+        current_sim_time = msg.clock.sec + msg.clock.nanosec * 1e-9
 
-    def info_callback(self, msg):
+        # Check if we have a previous time for comparison
+        if self.previous_sim_time is not None and self.first_clock_received_time is None:
+            time_diff = abs(current_sim_time - self.previous_sim_time)
+
+            # Check if time difference is within threshold
+            if time_diff <= 0.1:
+                self.consecutive_stable_clocks_at_startup += 1
+            else:
+                # Reset counter if time difference exceeds threshold
+                self.consecutive_stable_clocks_at_startup = 0
+
+            # Set first clock received time after 3 consecutive stable messages
+            if self.consecutive_stable_clocks_at_startup >= 3:
+                self.first_clock_received_time = current_sim_time
+                self.get_logger().info(
+                    f'Received first stable clock message at time {current_sim_time}.'
+                )
+
+        if self.first_clock_received_time is not None:
+            # Handle clock reset detection
+            if current_sim_time < self.previous_sim_time:  # Detect clock reset
+                self.first_clock_received_time = None  # Reset first clock time
+                self.consecutive_stable_clocks_at_startup = 0  # Reset counter
+                self.get_logger().info('Detected clock reset!')
+                return
+
+            # Check if we've passed the simulator startup time
+            if (
+                self.sim_state == AgrarsenseSimulatorState.INITIALIZING
+                and current_sim_time - self.first_clock_received_time >= self.sim_startup_time
+            ):
+                # self.sim_started_future.set_result(True)
+                self.update_sim_state(AgrarsenseSimulatorState.INITIALIZED)
+                if self.sim_clock_timeout_timer is not None:
+                    self.sim_clock_timeout_timer.cancel()
+                    self.sim_clock_timeout_timer = None
+
+        # Update the previous time
+        self.previous_sim_time = current_sim_time
+
+    def agrarsense_orchestrator_timer_callback(self):
+        match self.sim_state:
+            case AgrarsenseSimulatorState.UNKNOWN:
+                self.restart_simulation()
+            case AgrarsenseSimulatorState.INITIALIZED:
+                self.configure_simulation()
+            case AgrarsenseSimulatorState.CONFIGURING:
+                if self.spawn_objects_pending:
+                    self.get_logger().info(
+                        f'Spawning objects pending: {self.spawn_objects_pending}'
+                    )
+            case _:
+                pass
+
+        match self.setup_status.state:
+            case SetupState.SETUP_INIT:
+                self.setup_status_publisher.publish(self.setup_status)
+                self.setup_status.state = SetupState.SETUP_ONGOING
+                self.setup_status_publisher.publish(self.setup_status)
+                self.restart_simulation()
+            case SetupState.SETUP_ONGOING:
+                if self.sim_state == AgrarsenseSimulatorState.CONFIGURED:
+                    self.setup_status.state = SetupState.SETUP_COMPLETED
+            case SetupState.SETUP_COMPLETED:
+                self.setup_status_publisher.publish(self.setup_status)
+                self.setup_status.state = SetupState.IDLE
+                self.simulation_config_to_process = {}
+            case _:
+                pass
+
+    def update_sim_state(self, state: AgrarsenseSimulatorState):
+        self.sim_state = state
+        self.get_logger().info(f'Simulator state: {state.name}.')
+
+    def end_simulation(self):
+        if (
+            self.reset_agrarsense_after_exec
+            and self.simulator_subprocess is not None
+            or self.sim_state == AgrarsenseSimulatorState.INITIALIZING
+        ):
+            terminate_subprocess(self.simulator_subprocess)
+            self.simulator_subprocess = None
+            self.sim_state = AgrarsenseSimulatorState.UNKNOWN
+        elif self.sim_state in [
+            AgrarsenseSimulatorState.INITIALIZED,
+            AgrarsenseSimulatorState.CONFIGURING,
+            AgrarsenseSimulatorState.CONFIGURED,
+        ]:
+            self.publish_command('quit')
+
+    def restart_simulation(self):
+        if self.sim_clock_timeout_timer is not None:
+            self.sim_clock_timeout_timer.cancel()
+            self.sim_clock_timeout_timer = None
+            self.get_logger().info('Simulation clock timeout reached. Restarting simulation.')
+
+        self.end_simulation()
+
+        if self.reset_agrarsense_after_exec or self.simulator_subprocess is None:
+            self.initialize_simulation()
+        elif self.sim_state in [
+            AgrarsenseSimulatorState.CONFIGURING,
+            AgrarsenseSimulatorState.CONFIGURED,
+        ]:
+            self.sim_state = AgrarsenseSimulatorState.INITIALIZED
+
+    def setup_request_callback(self, msg):
+        if (
+            self.setup_status.state == SetupState.IDLE
+            or self.setup_status.state == SetupState.SETUP_COMPLETED
+        ):
+            self.simulation_config_to_process = json.loads(msg.data)
+            if 'objects_json_path' in self.simulation_config_to_process:
+                self.simulation_config_to_process['objects_json_path'] = get_full_file_path(
+                    self.simulation_config_to_process['objects_json_path'],
+                    os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
+                )
+            self.get_logger().info(
+                f'Processing setup request: {self.simulation_config_to_process}'
+            )
+            self.setup_status.state = SetupState.SETUP_INIT
+
+    def agrarsense_out_info_callback(self, msg):
         message_data = msg.data
-        # self.get_logger().info(f'Agrarsense info: {msg.data}')
 
         if self.spawn_objects_pending:
             match = re.search(r'Spawned Sensor:.*?\n.*?ID: ([^\s]+)', message_data)
@@ -156,140 +345,150 @@ class AgrarsenseOrchestrator(Node):
                 for obj_id in list(self.spawn_objects_pending):
                     if obj_id == spawned_id:
                         self.spawn_objects_pending.remove(obj_id)
-                        # self.get_logger().info(f"Object '{obj_id}' spawn confirmed.")
 
                 if not self.spawn_objects_pending:
                     self.get_logger().info('All objects spawned successfully.')
-                    self.start_sim_execution()
+                    self.update_sim_state(AgrarsenseSimulatorState.CONFIGURED)
 
-    def parse_sim_configs(self):
-        """Parse the raw simulation configurations from the YAML parameter."""
-        parsed_configs = []
+    def start_agrarsense_ros_bridge(self):
+        """Start the agrarsense ros bridge."""
+        command = [self.agrarsense_ros_bridge_params['script_path']]
+        command.append('--container-name')
+        command.append(f'{self.agrarsense_ros_bridge_params["docker_container_name"]}')
 
-        # Load sim_configurations_json_file
-        if self.sim_configurations_json_path:
-            try:
-                with open(self.sim_configurations_json_path, 'r') as f:
-                    sim_configurations = json.load(f).get('sim_configurations', [])
-                    # Extract spawn points for vehicle.* types
-                    for sim_config in sim_configurations:
-                        parsed_config = {
-                            'iterations': sim_config.get('iterations', 1),
-                            'spawn_point': sim_config.get('spawn_point', {}),
-                            'objects_json_path': sim_config.get(
-                                'objects_json_path', self.objects_json_path
-                            ),
-                            'topics_to_record': sim_config.get('topics_to_record', []),
-                            'ego_vehicle_identifier': sim_config.get(
-                                'ego_vehicle_identifier', self.ego_vehicle_identifier
-                            ),
-                        }
-                        parsed_configs.append(parsed_config)
-            except Exception as e:
-                self.get_logger().error(f'Failed to load objects JSON file: {e}')
+        subprocess_name = 'agrarsense_ros_bridge'
+        self.ros_bridge_subprocess = create_subprocess(self, command, subprocess_name)
+        time.sleep(5.0)  # Wait for the bridge to start
 
-        return parsed_configs
-
-    def create_subprocess(
-        self,
-        command,
-        subprocess_name,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        text=False,
-    ):
-        subprocess_ = subprocess.Popen(
-            command,
-            start_new_session=True,
-            stdout=stdout,
-            stderr=stderr,
-            text=text,
-        )
-        self.get_logger().info(f'Started {subprocess_name} with PID [{subprocess_.pid}].')
-        return subprocess_
-
-    def start_simulator(self):
+    def initialize_simulation(self):
         """Start the Agrarsense simulator."""
-        start_simulator_command = [self.sim_script_path]
-        start_simulator_command.append(f'--{self.map_name}')
+        start_simulator_command = [self.agrarsense_script_path]
+        # start_simulator_command.append(f'--{self.map_name}')
+        # self.configured_map_name = self.map_name
         if self.workersthreadpool > 0:
             start_simulator_command.append(f'--workersthreadpool={self.workersthreadpool}')
-        if not self.spectator_rendering:
+        if self.render_off_screen:
             start_simulator_command.append('--no-spectator-rendering')
-        if not self.ros_async:
-            start_simulator_command.append('--no-ros-async')
         if self.ros_host_ip != '':
             start_simulator_command.append(f'--ros-host-ip={self.ros_host_ip}')
+        if self.ros_port > 0:
+            start_simulator_command.append(f'--ros-port={self.ros_port}')
         if self.quality_level != '':
             start_simulator_command.append(f'--quality-level={self.quality_level}')
 
         subprocess_name = 'simulator'
-        self.subprocesses[subprocess_name] = self.create_subprocess(
-            start_simulator_command, subprocess_name
+        self.simulator_subprocess = create_subprocess(
+            self, start_simulator_command, subprocess_name
         )
         self.get_logger().info(
             'Waiting for the first clock message.'
         )  # will wait for the first clock message to spawn objects
+        self.update_sim_state(AgrarsenseSimulatorState.INITIALIZING)
+        if self.sim_clock_timeout_timer is None:
+            self.sim_clock_timeout_timer = self.create_timer(
+                self.sim_clock_timeout,
+                self.restart_simulation,
+                clock=self.wall_clock,
+            )
 
-    def start_agrarsense_ros_bridge(self):
-        """Start the agrarsense ros bridge."""
-        command = [self.ros_bridge_script_path]
-        command.append('--container-name')
-        command.append(f'{self.docker_container_name}')
-
-        subprocess_name = 'agrarsense_ros_bridge'
-        self.agrarsense_ros_bridge = self.create_subprocess(command, subprocess_name)
-        time.sleep(3.0)  # Wait for the bridge to start
-
-    def start_rosbag_recording(self, topics_to_record):
-        """Start the rosbag_recording node."""
-        command = ['ros2', 'bag', 'record', '--use-sim-time']
-        if self.rosbag_output_dir:
-            output_dir = self.rosbag_output_dir + '/' + str(int(time.time()))
-            if not os.path.exists(self.rosbag_output_dir):
-                os.makedirs(self.rosbag_output_dir)
-            command += ['--output', output_dir]
-        command += topics_to_record
-
-        subprocess_name = 'ros_bag_recorder'
-        self.subprocesses[subprocess_name] = self.create_subprocess(command, subprocess_name)
-
-    def publish_command(self, command):
+    def publish_command(self, command, silent=False):
         """Publish a command to the simulator."""
+        if self.command_publish_delay > 0.0 and self.last_command_publish_time is not None:
+            elapsed_time = time.time() - self.last_command_publish_time
+            remaining_delay = self.command_publish_delay - elapsed_time
+
+            # Only wait if the remaining delay is positive
+            if remaining_delay > 0:
+                time.sleep(remaining_delay)
+
         command_msg = String()
         command_msg.data = command
-        self.command_publisher.publish(command_msg)
-        self.get_logger().info(f'Published command: {command}')
-        time.sleep(self.command_publish_delay)
+        self.agrarsense_in_command_publisher.publish(command_msg)
 
-    def spawn_objects(self, sim_config):
+        if self.command_publish_delay > 0.0:
+            self.last_command_publish_time = time.time()
+
+        if not silent:
+            self.get_logger().info(f'Published command: {command}')
+
+    def configure_simulation(self, _=None):
+        self.update_sim_state(AgrarsenseSimulatorState.CONFIGURING)
+        # configure map
+        map_name = self.map_name
+        if 'map_name' in self.simulation_config_to_process:
+            map_name = self.simulation_config_to_process['map_name']
+        if map_name != self.configured_map_name:
+            self.publish_command(f'loadmap {map_name}')
+        self.configured_map_name = map_name
+
+        # configure weather
+        weather_json_path = self.weather_json_path
+        if 'weather_json_path' in self.simulation_config_to_process:
+            weather_json_path = self.simulation_config_to_process['weather_json_path']
+            weather_json_path = get_full_file_path(
+                weather_json_path,
+                os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
+            )
+
+        if weather_json_path != '':
+            self.publish_command(f'SpawnObjects {weather_json_path}')
+
+        # spawn objects
+        objects_json_path = self.objects_json_path
+        if 'objects_json_path' in self.simulation_config_to_process:
+            objects_json_path = self.simulation_config_to_process['objects_json_path']
+        objects_json_path = get_full_file_path(
+            objects_json_path, os.path.join(get_package_share_directory(PACKAGE_NAME), 'config')
+        )
+        if objects_json_path == '':
+            self.get_logger().warn(
+                f'Invalid objects_json_path: {objects_json_path}. Skipping spawn_objects.'
+            )
+            return
+
+        spawn_objects_config = {}
+        spawn_objects_config['objects_json_path'] = objects_json_path
+
+        spawn_point = self.spawn_point
+        if 'spawn_point' in self.simulation_config_to_process:
+            spawn_point = self.simulation_config_to_process['spawn_point']
+        spawn_objects_config['spawn_point'] = spawn_point
+
+        ego_vehicle_role_name = self.ego_vehicle_role_name
+        if 'ego_vehicle_role_name' in self.simulation_config_to_process:
+            ego_vehicle_role_name = self.simulation_config_to_process['ego_vehicle_role_name']
+        spawn_objects_config['ego_vehicle_role_name'] = ego_vehicle_role_name
+
         self.spawn_objects_pending.clear()
-        update_objects_json_path = False
-        if self.objects_json_path:
+        objects_json_path = spawn_objects_config.get('objects_json_path')
+        if objects_json_path:
+            update_objects_json_path = False
             try:
-                with open(self.objects_json_path, 'r') as file:
+                with open(objects_json_path, 'r', encoding='utf-8') as file:
                     file_data = json.load(file)
 
                     for obj in file_data.get('objects', []):
                         obj_info_id = obj['id']
-                        if obj.get('type', '') == 'vehicle':
+                        if obj.get('type', '') in ['vehicle', 'Walker']:
                             obj_info_id = obj_info_id + '/transform'
                         self.spawn_objects_pending.add(obj_info_id)
 
-                    if not sim_config.get('spawn_point', {}):
-                        self.publish_command(f'SpawnObjects {self.objects_json_path}')
+                    if not spawn_objects_config.get('spawn_point', {}):
+                        self.publish_command(f'SpawnObjects {objects_json_path}')
+                        self.get_logger().info(
+                            f'Spawning objects pending: {self.spawn_objects_pending}'
+                        )
                     else:
                         update_objects_json_path = True
-
             except FileNotFoundError:
-                self.get_logger().error(f'Object file not found: {self.objects_json_path}')
+                self.get_logger().error(f'Object file not found: {objects_json_path}')
             except json.JSONDecodeError:
-                self.get_logger().error(f'Error decoding JSON in file: {self.objects_json_path}')
+                self.get_logger().error(f'Error decoding JSON in file: {objects_json_path}')
 
             if update_objects_json_path:
                 for obj in file_data.get('objects', []):
                     obj_id = obj.get('id')
-                    spawn_point_override = sim_config.get('spawn_point', {}).get(obj_id)
+                    spawn_point_override = spawn_objects_config.get('spawn_point', {}).get(obj_id)
 
                     if spawn_point_override:
                         # Split the string into components and map to spawnPoint keys
@@ -299,170 +498,46 @@ class AgrarsenseOrchestrator(Node):
                         )
 
                 updated_json_path = os.path.join(
-                    self.waywiser_tempdir,
-                    f'{os.path.splitext(os.path.basename(self.objects_json_path))[0]}_'
-                    f'{self.current_config_index}.json',
+                    WAYWISER_AGRARSENSE_TEMPDIR,
+                    f'{os.path.splitext(os.path.basename(objects_json_path))[0]}.json',
                 )
                 try:
-                    with open(updated_json_path, 'w') as file:
+                    with open(updated_json_path, 'w', encoding='utf-8') as file:
                         json.dump(file_data, file, indent=4)
-                    self.get_logger().info(f'Updated objects JSON saved to {updated_json_path}')
-
+                    # self.get_logger().info(f'Updated objects JSON saved to {updated_json_path}')
                     self.publish_command(f'SpawnObjects {updated_json_path}')
+                    self.get_logger().info(
+                        f'Spawning objects pending: {self.spawn_objects_pending}'
+                    )
                 except Exception as e:
                     self.get_logger().error(f'Failed to write updated JSON: {e}')
 
-    def clock_callback(self, msg):
-        current_sim_time = msg.clock.sec + msg.clock.nanosec * 1e-9
+            self.configured_objects_json_path = objects_json_path
+            self.configured_ego_vehicle_role_name = ego_vehicle_role_name
 
-        if self.previous_sim_time is None:
-            self.get_logger().info('Received first clock message.')
-            if current_sim_time < self.sim_startup_time:
-                self.get_logger().info('Waiting for simulator to startup before spawning objects.')
-        elif current_sim_time < self.previous_sim_time:  # Detect clock reset
-            self.spawn_objects_started = False
-            self.get_logger().info('Detected clock reset!')
-
-        # Check if we should spawn the objects
-        if (not self.spawn_objects_started) and (current_sim_time >= self.sim_startup_time):
-            self.spawn_objects_started = True
-
-            self.spawn_objects(self.sim_configurations[self.current_config_index])
-
-        # Update the previous time
-        self.previous_sim_time = current_sim_time
-
-    def end_simulation_callback(self, msg):
-        if msg.data:
-            self.get_logger().info(
-                f'Ending simulation with index [{self.current_config_index}-'
-                f'{self.current_iter_index}].'
-            )
-            self.cleanup_subprocesses()
-            self.current_iter_index += 1
-            if (
-                self.current_iter_index
-                >= self.sim_configurations[self.current_config_index]['iterations']
-            ):
-                self.current_config_index += 1
-                self.current_iter_index = 0
-
-            self.spawn_objects_started = False
-            self.start_next_simulation()
-
-    def start_next_simulation(self):
-        """Load the next simulation configuration and starts the simulation."""
-        if self.current_config_index >= len(self.sim_configurations):
-            self.get_logger().info('All simulations completed.')
-            self.destroy_node()
-            return
-
-        self.get_logger().info(
-            f'Executing simulation with index [{self.current_config_index}-'
-            f'{self.current_iter_index}].'
-        )
-
-        # Setup the simulator
-        self.start_simulator()
-
-    def start_sim_execution(self):
-        sim_config = self.sim_configurations[self.current_config_index]
-
-        if self.spectator_transform != '':
-            self.publish_command(f'TeleportSpectator {self.spectator_transform}')
-
-        # start rosbag recording
-        topics_to_record = sim_config['topics_to_record']
-        if self.use_rosbag_recording and len(topics_to_record) > 0:
-            self.start_rosbag_recording(topics_to_record)
-
-        # publish that simulation is ready
-        msg = Bool()
-        msg.data = True
-        self.simulation_ready_publisher.publish(msg)
-        self.get_logger().info('Published that simultion is ready for execution.')
-
-    def pause_simulation(self):
-        """Command to pause the simulation."""
-        if not self.sim_paused:
-            self.publish_command('pause_simulation')
-            self.sim_paused = True
-            self.get_logger().info('Simulation paused.')
-
-    def unpause_simulation(self):
-        """Command to unpause the simulation."""
-        if self.sim_paused:
-            self.publish_command('unpause_simulation')
-            self.sim_paused = False
-            self.get_logger().info('Simulation unpaused.')
-
-    def end_simulation(self):
-        """Command to end the simulation and terminate the simulator process."""
-        self.publish_command('quit')
-        self.get_logger().info('Ending simulation and shutting down simulator.')
+            # TODO: clear spawn_objects_pending based on feedback from simulator
+            self.spawn_objects_pending.clear()
+            self.update_sim_state(AgrarsenseSimulatorState.CONFIGURED)
+        else:
+            self.get_logger().info('Configured simulator.')
+            self.update_sim_state(AgrarsenseSimulatorState.CONFIGURED)
 
     def destroy_node(self):
         """Override to ensure the simulator process is terminated on shutdown."""
+        docker_container_name = self.agrarsense_ros_bridge_params['docker_container_name']
         try:
-            if self.context.ok():
-                self.get_logger().info('Shutting down AgrarsenseOrchestrator node.')
-            self.cleanup_subprocesses()
-            self.terminate_process(self.agrarsense_ros_bridge)
+            print('Shutting down carla_orchestrator node.')
+            terminate_subprocess(self.simulator_subprocess)
+            terminate_subprocess(self.ros_bridge_subprocess)
 
-            subprocess.run(['docker', 'rm', '-f', self.docker_container_name], check=True)
-            self.get_logger().info(f'Docker container {self.docker_container_name} removed.')
+            subprocess.run(['docker', 'rm', '-f', docker_container_name], check=True)
+            print(f'Docker container {docker_container_name} removed.')
         except subprocess.CalledProcessError as e:
-            self.get_logger().warn(
-                f'Error removing Docker container {self.docker_container_name}: {e}'
-            )
+            print(f'Error removing Docker container {docker_container_name}: {e}')
         except Exception as e:
-            self.get_logger().warn(f'Error during node destruction: {e}')
+            print(f'Error during node destruction: {e}')
         finally:
             super().destroy_node()
-
-    def terminate_process(self, process):
-        """Force terminate a process and its children using psutil."""
-        try:
-            process_ps = psutil.Process(process.pid)
-            child_ps = process_ps.children(recursive=True)
-            log_string = f'Terminating process with PID [{process.pid}]'
-            if len(child_ps) > 0:
-                log_string += f' and its child processes {[child.pid for child in child_ps]}'
-            self.get_logger().info(log_string)
-
-            # Send SIGTERM to the entire process group
-            pgid = os.getpgid(process.pid)  # Get the process group ID
-            os.killpg(pgid, signal.SIGTERM)  # Send SIGTERM to the process group
-
-            # Wait for the main process to terminate
-            process_ps.wait(timeout=10)
-
-            # Forcefully kill remaining processes if still running
-            if process_ps.is_running():
-                process_ps.kill()
-            for child in child_ps:
-                if child.is_running():
-                    child.kill()
-        except psutil.NoSuchProcess:
-            self.get_logger().info(
-                f'Process with PID [{process.pid}] does not exist or already terminated.'
-            )
-        except psutil.TimeoutExpired:
-            self.get_logger().warn(
-                f'Timed out waiting for process [{process.pid}] to terminate. Forcing kill.'
-            )
-            process_ps.kill()
-        except Exception as e:
-            self.get_logger().warn(f'Failed to terminate process {process.pid}: {e}')
-
-    def cleanup_subprocesses(self):
-        """Cleanup subprocesses."""
-        for id_ in list(self.subprocesses.keys()):
-            try:
-                process = self.subprocesses.pop(id_)
-                self.terminate_process(process)
-            except Exception as e:
-                self.get_logger().warn(f'Error cleaning up subprocess {id}: {e}')
 
 
 def main(args=None):
@@ -470,9 +545,11 @@ def main(args=None):
 
     # Initialize and run the AgrarsenseOrchestrator node
     agrarsense_orchestrator_node = AgrarsenseOrchestrator()
+    executor = MultiThreadedExecutor(num_threads=16)
+    executor.add_node(agrarsense_orchestrator_node)
 
     try:
-        rclpy.spin(agrarsense_orchestrator_node)
+        executor.spin()
     except KeyboardInterrupt:
         agrarsense_orchestrator_node.get_logger().info('User requested shutdown with SIGINT.')
     finally:
@@ -480,7 +557,7 @@ def main(args=None):
         try:
             agrarsense_orchestrator_node.destroy_node()
         except Exception as e:
-            agrarsense_orchestrator_node.get_logger().warn(f'Error during node destruction: {e}')
+            print(f'Error during node destruction: {e}')
         # Only shutdown if the context is still valid
         if rclpy.ok():
             rclpy.shutdown()
