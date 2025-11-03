@@ -4,6 +4,7 @@ import math
 
 import rclpy
 from rclpy.node import Node
+from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
 
 from waywiser_perception.msg import DetectionArray
 from waywiser_twist_safety.msg import EmergencyStopState
@@ -42,7 +43,7 @@ class CollisionMonitor(Node):
 
         # Publishers
         self.emergency_stop_publisher = self.create_publisher(
-            EmergencyStopState, self.emergency_stop_topic, 10
+            EmergencyStopState, self.emergency_stop_topic, RELIABLE_TRANSIENT_LOCAL_QOS
         )
 
         # Subscribers
@@ -84,7 +85,7 @@ class CollisionMonitor(Node):
 
         # Process only the closest object
         if closest_detection is not None:
-            distance = int(math.sqrt(min_distance_sq))  # Calculate the actual distance in meters
+            distance = math.sqrt(min_distance_sq)  # Calculate the actual distance in meters
 
             if distance < self.distance_threshold:
                 self.emergency_stop_target_state_msg.stamp = (
@@ -95,16 +96,21 @@ class CollisionMonitor(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-
     node = CollisionMonitor()
 
     try:
-        rclpy.spin(node)  # Ensures callbacks are processed until the node is shut down
+        rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        node.get_logger().info('User requested shutdown with SIGINT.')
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        # Cleanup on exit
+        try:
+            node.destroy_node()
+        except Exception as e:
+            print(f'Error during node destruction: {e}')
+        # Only shutdown if the context is still valid
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

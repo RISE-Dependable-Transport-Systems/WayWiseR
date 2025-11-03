@@ -11,6 +11,7 @@ from cv_bridge import CvBridge
 from geometry_msgs.msg import Quaternion
 import numpy as np
 import rclpy
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy
 from rclpy.qos import QoSHistoryPolicy
@@ -35,11 +36,11 @@ from waywiser_perception.msg import Detection
 from waywiser_perception.msg import DetectionArray
 
 
-class Yolov8Node(Node):
+class YoloNode(Node):
     """Node that provides yolo object detection capabilities."""
 
     def __init__(self) -> None:
-        super().__init__('yolov8_node')
+        super().__init__('yolo_node')
 
         self.declare_parameter('model_file_path', '')
         self.declare_parameter('device', 'cuda:0')
@@ -57,6 +58,7 @@ class Yolov8Node(Node):
         self.declare_parameter('use_tracker', False)
         self.declare_parameter('color_image_topic_as_stream', False)
         self.declare_parameter('tracker_config_filepath', '')
+        self.declare_parameter('detections_topic', 'detections')
 
         self.model_name = self.get_parameter('model_file_path').get_parameter_value().string_value
         self.model = YOLO(self.model_name)
@@ -74,6 +76,9 @@ class Yolov8Node(Node):
         )
         self.color_image_topic_as_stream = (
             self.get_parameter('color_image_topic_as_stream').get_parameter_value().bool_value
+        )
+        self.detections_topic = (
+            self.get_parameter('detections_topic').get_parameter_value().string_value
         )
 
         self.cv_bridge = CvBridge()
@@ -146,6 +151,8 @@ class Yolov8Node(Node):
                     f"Only 'bytetrack' and 'botsort' are supported for now, but got '{tracker_config.tracker_type}'"  # noqa
                 )
 
+        self.plot_colors = Colors()
+
         self.publish_bbox_3d_markers = (
             self.get_parameter('publish_bbox_3d_markers').get_parameter_value().bool_value
         )
@@ -163,9 +170,8 @@ class Yolov8Node(Node):
                 .string_value,
                 10,
             )
-            self.plot_colors = Colors()
 
-        self.detection_array_pub = self.create_publisher(DetectionArray, 'detection_array', 10)
+        self.detection_array_pub = self.create_publisher(DetectionArray, self.detections_topic, 10)
         if self.publish_annotated_image:
             self.processed_image_pub = self.create_publisher(
                 Image,
@@ -177,6 +183,9 @@ class Yolov8Node(Node):
 
     def color_image_callback(self, msg: Image) -> None:
         cv_image = self.cv_bridge.imgmsg_to_cv2(msg)
+        detection_array = DetectionArray()
+        detection_array.header = msg.header
+        detection_array.header.frame_id = self.camera_base_frame
 
         depth_image = self.depth_image  # TODO: check the time diff between depth & color
         if depth_image is not None:
@@ -198,7 +207,6 @@ class Yolov8Node(Node):
                 conf=self.confidence_threshold,
                 device=self.device,
             )
-            results = list(results)
         else:
             results = self.model.predict(
                 source=cv_image,
@@ -207,14 +215,10 @@ class Yolov8Node(Node):
                 conf=self.confidence_threshold,
                 device=self.device,
             )
-
-        results: Results = results[0].cpu()
+        results_list: list[Results] = list(results)
+        results: Results = results_list[0].cpu()
 
         if results.boxes:
-            detection_array = DetectionArray()
-            detection_array.header = msg.header
-            detection_array.header.frame_id = self.camera_base_frame
-
             if self.publish_bbox_3d_markers:
                 visualization_marker_array = MarkerArray()
 
@@ -280,10 +284,10 @@ class Yolov8Node(Node):
                             results.names,
                         )
 
-            self.detection_array_pub.publish(detection_array)
-
             if self.publish_bbox_3d_markers:
                 self.rviz_3d_visualization_markers_pub.publish(visualization_marker_array)
+
+        self.detection_array_pub.publish(detection_array)
 
         if self.publish_annotated_image:
             if results.boxes:
@@ -495,14 +499,25 @@ class CameraIntrinsics:
     cy: float
 
 
-def main():
-    rclpy.init()
-    node = Yolov8Node()
+def main(args=None):
+    rclpy.init(args=args)
+    yolo_node = YoloNode()
+    executor = MultiThreadedExecutor(num_threads=1)
+    executor.add_node(yolo_node)
+
     try:
-        rclpy.spin(node)
+        executor.spin()
+    except KeyboardInterrupt:
+        yolo_node.get_logger().info('User requested shutdown with SIGINT.')
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        # Cleanup on exit
+        try:
+            yolo_node.destroy_node()
+        except Exception as e:
+            print(f'Error during node destruction: {e}')
+        # Only shutdown if the context is still valid
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':
