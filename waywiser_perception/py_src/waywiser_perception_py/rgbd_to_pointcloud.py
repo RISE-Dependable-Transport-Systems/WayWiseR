@@ -116,9 +116,9 @@ class RGBDToPointCloudNode(Node):
             self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough'), dtype=float
         )
         if '16UC1' in msg.encoding:
-            depth_image = depth_image / 1000.0
+            depth_image = depth_image / 1000.0  # Convert from mm to meters
         elif '32FC1' in msg.encoding:
-            pass
+            pass  # Already in meters
         else:
             rclpy.logging.get_logger(self.get_name()).warn(
                 f'Unsupported depth image encoding: {msg.encoding}'

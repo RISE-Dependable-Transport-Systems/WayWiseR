@@ -88,7 +88,7 @@ ament_python_install_package(${PROJECT_NAME}_py
 
 install(
   PROGRAMS
-  py_src/waywiser_perception_py/yolov8_node.py
+  py_src/waywiser_perception_py/yolo_node.py
   py_src/waywiser_perception_py/rgbd_to_pointcloud.py
   py_src/waywiser_perception_py/collision_monitor.py
   DESTINATION lib/${PROJECT_NAME}
