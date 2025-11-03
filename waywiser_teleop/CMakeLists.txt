@@ -16,6 +16,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(waywiser_twist_safety REQUIRED)
+find_package(waywiser REQUIRED)
 
 add_executable(joy_emergency_stop cpp_src/joy_emergency_stop.cpp)
 ament_target_dependencies(joy_emergency_stop
@@ -23,6 +24,7 @@ ament_target_dependencies(joy_emergency_stop
   sensor_msgs
   std_msgs
   waywiser_twist_safety
+  waywiser
 )
 target_include_directories(joy_emergency_stop
   PRIVATE ${waywiser_twist_safety_INCLUDE_DIRS})
