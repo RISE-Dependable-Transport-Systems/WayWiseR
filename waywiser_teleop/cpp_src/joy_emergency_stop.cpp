@@ -5,6 +5,7 @@
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "waywiser_twist_safety/msg/emergency_stop_state.hpp"
+#include "waywiser/waywiser_utils.hpp"
 
 using namespace std::placeholders;
 using namespace waywiser_twist_safety::msg;
@@ -21,16 +22,31 @@ public:
       "emergency_stop_clear_joy_button_index", 7);
     joy_emergency_stop_timeout_ = this->declare_parameter("joy_emergency_stop_timeout", 1.0);
 
+    auto use_sim_time = this->get_parameter("use_sim_time").as_bool();
+    if (use_sim_time) {
+      if (rclcpp::ok() && this->get_clock()->now().nanoseconds() == 0) {
+        RCLCPP_WARN(this->get_logger(), "Waiting for /clock to be published...");
+      }
+
+      while (rclcpp::ok() && this->get_clock()->now().nanoseconds() == 0) {
+        rclcpp::sleep_for(std::chrono::milliseconds(1000));
+      }
+      RCLCPP_INFO(this->get_logger(), "Receiving /clock msgs now.");
+    }
+
     emergency_stop_request_publisher_ = this->create_publisher<EmergencyStopState>(
-      "/emergency_stop/target_state", 10);
+      "/emergency_stop/target_state", QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
 
     joy_subscriber_ = this->create_subscription<sensor_msgs::msg::Joy>(
       "/joy", 10, std::bind(&JoyEmergencyStop::joy_callback, this, _1));
 
-    joy_watchdog_timer_ =
-      this->create_wall_timer(
+    joy_watchdog_timer_ = rclcpp::create_timer(
+      this->get_node_base_interface(),
+      this->get_node_timers_interface(),
+      this->get_clock(), // uses sim time if enabled
       std::chrono::milliseconds((int)std::round(1000.0 * joy_emergency_stop_timeout_)),
-      std::bind(&JoyEmergencyStop::joy_watchdog_callback, this));
+      std::bind(&JoyEmergencyStop::joy_watchdog_callback, this)
+    );
 
     emergency_stop_target_state_msg_.sender_id = "twist_joy";
     emergency_stop_target_state_msg_.state = EmergencyStopState::ACTIVE;
