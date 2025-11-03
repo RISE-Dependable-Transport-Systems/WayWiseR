@@ -6,5 +6,5 @@ if [ -f "$WAYWISER_DOTENV_PATH" ]; then
         export "$key"="$value"
     done < "$WAYWISER_DOTENV_PATH"
 else
-    echo "Warning: .env file not found at $WAYWISER_DOTENV_PATH"
+    echo "Warning: .env file not found at path: $WAYWISER_DOTENV_PATH". Email functionality may not work correctly.
 fi
