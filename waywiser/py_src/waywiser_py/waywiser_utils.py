@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 
 import os
+import signal
+import subprocess
+import time
+from typing import Union
+
+from geometry_msgs.msg import PoseStamped
+import psutil
 from rclpy.qos import DurabilityPolicy
 from rclpy.qos import HistoryPolicy
 from rclpy.qos import QoSProfile
@@ -77,5 +84,183 @@ def send_email(subject, body, email_recipient=None):
         print('Email sent successfully!', flush=True)
     except Exception as e:
         print(f'Error sending email: {e}', flush=True)
+
+
+def create_subprocess(
+    node,
+    command,
+    subprocess_name,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+    text=False,
+):
+    subprocess_ = subprocess.Popen(
+        command,
+        start_new_session=True,
+        stdout=stdout,
+        stderr=stderr,
+        text=text,
+    )
+
+    node.get_logger().info(f'Started {subprocess_name} with PID [{subprocess_.pid}].')
+
+    return subprocess_
+
+
+def cleanup_subprocesses(subprocesses):
+    """Cleanup subprocesses."""
+    for id_ in list(subprocesses.keys()):
+        try:
+            process = subprocesses.pop(id_)
+            terminate_subprocess(process)
+        except Exception as e:
+            print(f'Error cleaning up subprocess {id_}: {e}', flush=True)
+
+
+def terminate_subprocess(process):
+    """Force terminate a process and its children using psutil."""
+
+    def _get_running_processes(processes):
+        """Get list of processes that are still running."""
+        running = []
+        for proc in processes:
+            try:
+                if proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE:
+                    running.append(proc)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        return running
+
+    def _send_signal_to_processes(processes, sig):
+        """Send signal to all processes, handling errors gracefully."""
+        for proc in processes:
+            try:
+                if proc.is_running():
+                    proc.send_signal(sig)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+            except Exception as e:
+                print(f'Error sending signal {sig} to process {proc.pid}: {e}', flush=True)
+
+    def _wait_for_termination(processes, timeout=10):
+        """Wait for all processes to terminate within timeout."""
+        if not processes:
+            return True
+
+        start_time = time.time()
+        check_interval = 0.1
+
+        while time.time() - start_time < timeout:
+            running_processes = _get_running_processes(processes)
+            if not running_processes:
+                return True
+            time.sleep(check_interval)
+
+        return False
+
+    if not process or process.poll() is not None:
+        print(f'Process {process.pid} is not running', flush=True)
+        return True
+    try:
+        main_process = psutil.Process(process.pid)
+        if not main_process.is_running() or main_process.status() == psutil.STATUS_ZOMBIE:
+            print(f'Process {process.pid} already terminated or is zombie', flush=True)
+            # Clean up zombie by calling wait() on the subprocess
+            try:
+                process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                pass
+            return True
+
+        # Get all children before starting termination
+        children = main_process.children(recursive=True)
+        all_processes = [main_process] + children
+
+        print(f'Terminating process {process.pid} with {len(children)} children', flush=True)
+
+        # Step 1: Try graceful termination with SIGINT
+        _send_signal_to_processes(all_processes, signal.SIGINT)
+
+        # Wait for graceful termination
+        if _wait_for_termination(all_processes, timeout=5):
+            print(f'Process {process.pid} terminated gracefully')
+            # Clean up the main subprocess
+            try:
+                process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                pass
+            return True
+
+        # Step 2: Escalate to SIGTERM
+        print(f'Escalating to SIGTERM for process {process.pid}', flush=True)
+        remaining_processes = _get_running_processes(all_processes)
+        _send_signal_to_processes(remaining_processes, signal.SIGTERM)
+
+        if _wait_for_termination(remaining_processes, timeout=5):
+            print(f'Process {process.pid} terminated with SIGTERM')
+            try:
+                process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                pass
+            return True
+
+        # Step 3: First Force kill with SIGKILL
+        print(f'Force killing process {process.pid}', flush=True)
+        remaining_processes = _get_running_processes(all_processes)
+        _send_signal_to_processes(remaining_processes, signal.SIGKILL)
+
+        if _wait_for_termination(remaining_processes, timeout=5):
+            print(f'Process {process.pid} terminated with SIGKILL')
+            try:
+                process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                pass
+            return True
+
+        # Step 4: Final Force kill with SIGKILL
+        print(f'Force killing process {process.pid} again', flush=True)
+        remaining_processes = _get_running_processes(all_processes)
+        _send_signal_to_processes(remaining_processes, signal.SIGKILL)
+
+        # Final wait
+        final_success = _wait_for_termination(remaining_processes, timeout=5)
+
+        # Always try to clean up the main subprocess
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            pass
+
+        if not final_success:
+            remaining = _get_running_processes(all_processes)
+            if remaining:
+                print(f'Warning: {len(remaining)} processes still running after force kill')
+                # Log details about remaining processes
+                for proc in remaining:
+                    try:
+                        print(f'  - PID {proc.pid}: {proc.name()} (status: {proc.status()})')
+                    except Exception:
+                        pass
+                return False
+
+        print(f'Process {process.pid} successfully terminated', flush=True)
+        return True
+    except psutil.NoSuchProcess:
+        print(f'Process {process.pid} no longer exists', flush=True)
+        return True
     except Exception as e:
-        print(f'Error sending email: {e}')
+        print(f'Error terminating process {process.pid}: {e}', flush=True)
+        return False
+
+
+def are_poses_equal(
+    pose1: Union[PoseStamped, None], pose2: Union[PoseStamped, None], tol: float = 1e-6
+) -> bool:
+    """Compares the positions of two PoseStamped messages."""
+    if pose1 is None or pose2 is None:
+        return False
+
+    dx = pose1.pose.position.x - pose2.pose.position.x
+    dy = pose1.pose.position.y - pose2.pose.position.y
+    dz = pose1.pose.position.z - pose2.pose.position.z
+    return (dx * dx + dy * dy + dz * dz) < tol * tol

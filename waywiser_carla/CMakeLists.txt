@@ -20,29 +20,23 @@ find_package(carla_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(waywiser REQUIRED)
 
 # C++ targets
-add_executable(vehicle_odom_transform src/vehicle_odom_transform.cpp)
-ament_target_dependencies(vehicle_odom_transform
-  rclcpp
-  tf2_ros
-  tf2_geometry_msgs
-  geometry_msgs
-  nav_msgs
-)
-
-add_executable(emulated_angle_sensor src/emulated_angle_sensor.cpp)
+add_executable(emulated_angle_sensor cpp_src/emulated_angle_sensor.cpp)
 ament_target_dependencies(emulated_angle_sensor
   rclcpp
   tf2
   tf2_ros
   geometry_msgs
+  tf2_geometry_msgs
   std_msgs
+  waywiser
 )
 
 # Add the EmulatedRangeSensor executable
-add_executable(emulated_range_sensor src/emulated_range_sensor.cpp)
-ament_target_dependencies(emulated_range_sensor
+add_executable(emulated_range_sensor_array cpp_src/emulated_range_sensor_array.cpp)
+ament_target_dependencies(emulated_range_sensor_array
   rclcpp
   sensor_msgs
   std_msgs
@@ -52,7 +46,7 @@ ament_target_dependencies(emulated_range_sensor
 
 # Install targets
 install(
-  TARGETS vehicle_odom_transform emulated_angle_sensor emulated_range_sensor
+  TARGETS emulated_angle_sensor emulated_range_sensor_array
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -64,7 +58,7 @@ ament_python_install_package(${PROJECT_NAME}_py
 install(
   PROGRAMS
   py_src/waywiser_carla_py/carla_osm_tile_server.py
-  py_src/waywiser_carla_py/waywiser_twist_to_carla_control.py
+  py_src/waywiser_carla_py/waywiser_to_carla_control.py
   py_src/waywiser_carla_py/carla_orchestrator.py
   DESTINATION lib/${PROJECT_NAME}
 )
