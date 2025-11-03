@@ -1,21 +1,32 @@
 #!/usr/bin/env python3
-
 import json
 import math
 import os
-import signal
 import subprocess
 import time
 
+from ament_index_python import get_package_share_directory
 import carla
 from geometry_msgs.msg import TransformStamped
-import psutil
 import rclpy
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
-from rosgraph_msgs.msg import Clock
-from std_msgs.msg import Bool
+from std_msgs.msg import String
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 import tf_transformations
+from waywiser_py.waywiser_utils import cleanup_subprocesses
+from waywiser_py.waywiser_utils import create_subprocess
+from waywiser_py.waywiser_utils import get_full_file_path
+from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
+from waywiser_py.waywiser_utils import terminate_subprocess
+
+from waywiser_test_runner.msg import SetupState
+
+WEATHER_PRESETS = {
+    'ClearNoon': carla.WeatherParameters.ClearNoon,
+    'WetCloudySunset': carla.WeatherParameters.WetCloudySunset,
+}
+PACKAGE_NAME = 'waywiser_carla'
 
 
 class CarlaOrchestrator(Node):
@@ -37,7 +48,7 @@ class CarlaOrchestrator(Node):
         self.declare_parameter('relativemousemode', False)
         self.declare_parameter('weather', 'ClearNoon')
         self.declare_parameter('objects_json_path', '')
-        self.declare_parameter('sim_configurations_json_path', '')
+        self.declare_parameter('carla_orchestrator_timer_rate', 1.0)
         self.declare_parameter('carla_ros_bridge.passive', True)
         self.declare_parameter('carla_ros_bridge.synchronous_mode', True)
         self.declare_parameter(
@@ -45,15 +56,30 @@ class CarlaOrchestrator(Node):
         )
         self.declare_parameter('carla_ros_bridge.fixed_delta_seconds', 0.01)
         self.declare_parameter('carla_ros_bridge.register_all_sensors', True)
-        self.declare_parameter('rosbag_output_dir', '')
-        self.declare_parameter('use_rosbag_recording', False)
         self.declare_parameter('static_tf_publishers', [''])
-        self.declare_parameter('mission_status_topic', '')
-        self.declare_parameter('autopilot_state_control_topic', '/autopilot_state_control')
-        self.declare_parameter('end_sim_after_mission_complete', True)
+        self.declare_parameter('setup_request_topic', '/setup_request')
+        self.declare_parameter('setup_status_topic', '/setup_status')
+        self.declare_parameter('auto_start_simulation', False)
+
+        self.declare_parameter('object_ids', [''])
+        self.object_ids = self.get_parameter('object_ids').get_parameter_value().string_array_value
 
         # Get parameters
-        self.carla_script_path = (
+        self.spawn_point = {}
+        # self.object_pose_topics = {}
+        for object_id in self.object_ids:
+            self.declare_parameter(f'spawn_point.{object_id}', '')
+            self.spawn_point[object_id] = (
+                self.get_parameter(f'spawn_point.{object_id}').get_parameter_value().string_value
+            )
+            # self.declare_parameter(f'object_pose_topics.{object_id}', '')
+            # self.object_pose_topics[object_id] = (
+            #     self.get_parameter(f'object_pose_topics.{object_id}')
+            #     .get_parameter_value()
+            #     .string_value
+            # )
+
+        self.carla_script_path = get_full_file_path(
             self.get_parameter('carla_script_path').get_parameter_value().string_value
         )
         self.ego_vehicle_role_name = (
@@ -72,9 +98,6 @@ class CarlaOrchestrator(Node):
         self.reset_carla_after_exec = (
             self.get_parameter('reset_carla_after_exec').get_parameter_value().bool_value
         )
-        self.end_sim_after_mission_complete = (
-            self.get_parameter('end_sim_after_mission_complete').get_parameter_value().bool_value
-        )
         self.relativemousemode = (
             self.get_parameter('relativemousemode').get_parameter_value().bool_value
         )
@@ -82,8 +105,12 @@ class CarlaOrchestrator(Node):
         self.objects_json_path = (
             self.get_parameter('objects_json_path').get_parameter_value().string_value
         )
-        self.sim_configurations_json_path = (
-            self.get_parameter('sim_configurations_json_path').get_parameter_value().string_value
+        self.objects_json_path = get_full_file_path(
+            self.objects_json_path,
+            os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
+        )
+        self.carla_orchestrator_timer_rate = (
+            self.get_parameter('carla_orchestrator_timer_rate').get_parameter_value().double_value
         )
         self.carla_ros_bridge_params = {
             'passive': self.get_parameter('carla_ros_bridge.passive')
@@ -110,11 +137,15 @@ class CarlaOrchestrator(Node):
         self.carla_ros_bridge_params['timeout'] = self.timeout
         self.carla_ros_bridge_params['town'] = self.town
 
-        self.rosbag_output_dir = (
-            self.get_parameter('rosbag_output_dir').get_parameter_value().string_value
+        self.auto_start_simulation = (
+            self.get_parameter('auto_start_simulation').get_parameter_value().bool_value
         )
-        self.use_rosbag_recording = (
-            self.get_parameter('use_rosbag_recording').get_parameter_value().bool_value
+
+        self.setup_request_topic = (
+            self.get_parameter('setup_request_topic').get_parameter_value().string_value
+        )
+        self.setup_status_topic = (
+            self.get_parameter('setup_status_topic').get_parameter_value().string_value
         )
 
         static_tf_publishers_ = (
@@ -143,104 +174,164 @@ class CarlaOrchestrator(Node):
             if '' not in list(tf_publisher_info.values()):
                 self.static_tf_publishers.append(tf_publisher_info)
 
-        if len(self.static_tf_publishers) > 0:
-            self.static_tf_broadcaster = StaticTransformBroadcaster(self)
-        self.mission_status_topic = (
-            self.get_parameter('mission_status_topic').get_parameter_value().string_value
-        )
-        self.autopilot_state_control_topic = (
-            self.get_parameter('autopilot_state_control_topic').get_parameter_value().string_value
-        )
-
-        # Parse the simulation configurations
-        self.sim_configurations = self.parse_sim_configs()
-        self.current_config_index = 0
-        self.current_iter_index = 0
-        self.subprocesses = {}
-        self.simulator_subprocess = None
-
         # Create subscribers
-        self.clock_subscriber = self.create_subscription(Clock, '/clock', self.clock_callback, 10)
-        self.end_simulation_subscriber = self.create_subscription(
-            Bool, '/carla/end_simulation', self.end_simulation_callback, 10
+        self.setup_request_subscriber = self.create_subscription(
+            String,
+            self.setup_request_topic,
+            self.setup_request_callback,
+            RELIABLE_TRANSIENT_LOCAL_QOS,
         )
-        if self.mission_status_topic:
-            self.mission_status_subscriber = self.create_subscription(
-                Bool, self.mission_status_topic, self.mission_status_callback, 10
-            )
 
         # Create publishers
-        self.simulation_ready_publisher = self.create_publisher(
-            Bool, '/carla/simulation_ready', 10
-        )
-        self.autopilot_state_control_publisher = self.create_publisher(
-            Bool, self.autopilot_state_control_topic, 10
+        self.setup_status_publisher = self.create_publisher(
+            SetupState, self.setup_status_topic, RELIABLE_TRANSIENT_LOCAL_QOS
         )
 
-        # Flags for controlling simulator actions
-        self.received_first_clock = False
-
-        self.start_next_simulation()
-
-    def parse_sim_configs(self):
-        """Parse the raw simulation configurations from the YAML parameter."""
-        weather_presets = {
-            'ClearNoon': carla.WeatherParameters.ClearNoon,
-            'WetCloudySunset': carla.WeatherParameters.WetCloudySunset,
+        self.setup_state_name_lookup = {
+            value: name for name, value in SetupState.__dict__.items() if isinstance(value, int)
         }
-        parsed_configs = []
+        if len(self.static_tf_publishers) > 0:
+            self.static_tf_broadcaster = StaticTransformBroadcaster(self)
 
-        # Load sim_configurations_json_file
-        if self.sim_configurations_json_path:
-            try:
-                with open(self.sim_configurations_json_path, 'r') as f:
-                    sim_configurations = json.load(f).get('sim_configurations', [])
-                    # Extract spawn points for vehicle.* types
-                    for sim_config in sim_configurations:
-                        parsed_config = {
-                            'iterations': sim_config.get('iterations', 1),
-                            'weather': weather_presets.get(
-                                sim_config.get('weather', self.weather),
-                                carla.WeatherParameters.ClearNoon,
-                            ),
-                            'spawn_point': sim_config.get('spawn_point', {}),
-                            'objects_json_path': sim_config.get(
-                                'objects_json_path', self.objects_json_path
-                            ),
-                            'topics_to_record': sim_config.get('topics_to_record', []),
-                            'ego_vehicle_role_name': sim_config.get(
-                                'ego_vehicle_role_name', self.ego_vehicle_role_name
-                            ),
-                        }
-                        parsed_configs.append(parsed_config)
-            except Exception as e:
-                self.get_logger().error(f'Failed to load objects JSON file: {e}')
-
-        return parsed_configs
-
-    def mission_status_callback(self, msg):
-        if not msg.data and self.end_sim_after_mission_complete:
-            self.end_current_simulation()
-
-    def create_subprocess(
-        self,
-        command,
-        subprocess_name,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        text=False,
-    ):
-        subprocess_ = subprocess.Popen(
-            command,
-            start_new_session=True,
-            stdout=stdout,
-            stderr=stderr,
-            text=text,
+        # Create timers
+        self.carla_orchestrator_timer = self.create_timer(
+            1.0 / self.carla_orchestrator_timer_rate,
+            self.carla_orchestrator_timer_callback,
         )
-        self.get_logger().info(f'Started {subprocess_name} with PID [{subprocess_.pid}].')
-        return subprocess_
 
-    def setup_simulator(self, weather):
+        # Initialize Attributes
+        self.subprocesses = {}
+        self.simulator_subprocess = None
+        self.setup_status = SetupState()
+        self.setup_status.state = SetupState.IDLE
+        self.simulation_config = {}
+        self.configured_weather = None
+        self.configured_objects_json_path = None
+        self.configured_ego_vehicle_role_name = None
+
+    def carla_orchestrator_timer_callback(self):
+        if self.simulator_subprocess is None and self.auto_start_simulation:
+            self.start_simulation()
+            return
+
+        match self.setup_status.state:
+            case SetupState.SETUP_INIT:
+                self.setup_status_publisher.publish(self.setup_status)
+                self.setup_status.state = SetupState.SETUP_ONGOING
+            case SetupState.SETUP_ONGOING:
+                self.setup_status_publisher.publish(self.setup_status)
+                # restart_simulation = True
+
+                # if (
+                #     self.configured_weather == self.simulation_config['weather']
+                #     and self.configured_objects_json_path
+                #     == self.simulation_config['objects_json_path']
+                #     and self.configured_ego_vehicle_role_name
+                #     == self.simulation_config['ego_vehicle_role_name']
+                # ):
+                #     spawn_point_poses = {}
+                #     for object_id in self.simulation_config['spawn_point'].keys():
+                #         spawn_point_pose = PoseStamped()
+                #         x, y, z, yaw, pitch, roll = map(
+                #             float,
+                #             self.simulation_config['spawn_point'][object_id].split(','),
+                #         )
+                #         spawn_point_pose.pose.position.x = x
+                #         spawn_point_pose.pose.position.y = y
+                #         spawn_point_pose.pose.position.z = 0.0  # Ignore z
+                #         q = tf_transformations.quaternion_from_euler(yaw, pitch, roll)
+                #         spawn_point_pose.pose.orientation = Quaternion(
+                #             x=q[0], y=q[1], z=q[2], w=q[3]
+                #         )
+                #         spawn_point_poses[object_id] = spawn_point_pose
+                #     if all(
+                #         are_poses_equal(
+                #             self.object_poses[object_id], spawn_point_poses[object_id], 0.1
+                #         )
+                #         for object_id in spawn_point_poses.keys()
+                #     ):
+                #         restart_simulation = False
+
+                # if restart_simulation:
+
+                # End any ongoing simulation
+                self.end_current_simulation()
+                self.start_simulation()
+
+                self.setup_status.state = SetupState.SETUP_COMPLETED
+            case SetupState.SETUP_COMPLETED:
+                self.setup_status_publisher.publish(self.setup_status)
+                self.setup_status.state = SetupState.IDLE
+                self.simulation_config = {}
+            case _:
+                pass
+
+    def setup_request_callback(self, msg):
+        if (
+            self.setup_status.state == SetupState.IDLE
+            or self.setup_status.state == SetupState.SETUP_COMPLETED
+        ):
+            self.simulation_config = json.loads(msg.data)
+            if 'objects_json_path' in self.simulation_config:
+                self.simulation_config['objects_json_path'] = get_full_file_path(
+                    self.simulation_config['objects_json_path'],
+                    os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
+                )
+            self.get_logger().info(f'Processing setup request: {self.simulation_config}')
+            self.setup_status.state = SetupState.SETUP_INIT
+
+    def start_simulation(self):
+        # Setup the CARLA simulator and ros bridge
+        if (self.simulator_subprocess is None) or (self.reset_carla_after_exec):
+            self.setup_simulator()
+        self.start_carla_ros_bridge()
+
+        weather_request = self.weather
+        if 'weather' in self.simulation_config:
+            weather_request = self.simulation_config['weather']
+        if weather_request in WEATHER_PRESETS:
+            self.get_logger().info(f'Setting weather to {weather_request}')
+        else:
+            weather_request = 'ClearNoon'
+            self.get_logger().warn(
+                f'Invalid weather request: {weather_request}. Using ClearNoon preset.'
+            )
+        self.carla_world.set_weather(WEATHER_PRESETS[weather_request])
+        self.configured_weather = weather_request
+
+        objects_json_path = self.objects_json_path
+        if 'objects_json_path' in self.simulation_config:
+            objects_json_path = self.simulation_config['objects_json_path']
+        objects_json_path = get_full_file_path(
+            objects_json_path, os.path.join(get_package_share_directory(PACKAGE_NAME), 'config')
+        )
+        if objects_json_path == '':
+            self.get_logger().warn(
+                f'Invalid objects_json_path: {objects_json_path}. Skipping spawn_objects.'
+            )
+            return
+        self.configured_objects_json_path = objects_json_path
+
+        spawn_objects_config = {}
+        spawn_objects_config['objects_json_path'] = objects_json_path
+
+        spawn_point = self.spawn_point
+        if 'spawn_point' in self.simulation_config:
+            spawn_point = self.simulation_config['spawn_point']
+        spawn_objects_config['spawn_point'] = spawn_point
+
+        ego_vehicle_role_name = self.ego_vehicle_role_name
+        if 'ego_vehicle_role_name' in self.simulation_config:
+            ego_vehicle_role_name = self.simulation_config['ego_vehicle_role_name']
+        spawn_objects_config['ego_vehicle_role_name'] = ego_vehicle_role_name
+        self.configured_ego_vehicle_role_name = ego_vehicle_role_name
+
+        self.spawn_objects(spawn_objects_config)
+        self.publish_static_tfs()
+        time.sleep(self.sim_startup_time)
+        self.get_logger().info('Simulation started.')
+
+    def setup_simulator(self):
         """Start the CARLA simulator."""
         if self.carla_script_path:
             start_simulator_command = [self.carla_script_path]
@@ -254,15 +345,13 @@ class CarlaOrchestrator(Node):
                 start_simulator_command.append('-norelativemousemode')
 
             subprocess_name = 'simulator'
-            self.simulator_subprocess = self.create_subprocess(
-                start_simulator_command, subprocess_name
-            )
+            self.simulator_subprocess = create_subprocess(self, start_simulator_command, subprocess_name)
             time.sleep(self.sim_startup_time)
 
         self.client = carla.Client(self.host, self.port)
         self.client.set_timeout(self.timeout)
-        carla_world = self.client.get_world()
-        carla_map = carla_world.get_map()
+        self.carla_world = self.client.get_world()
+        carla_map = self.carla_world.get_map()
         carla_map_name = carla_map.name.split('/')[-1]
         if self.town != carla_map_name:
             if 'simulator' in self.subprocesses:
@@ -272,13 +361,10 @@ class CarlaOrchestrator(Node):
                 )
             else:
                 self.client.load_world(self.town)
-                time.sleep(self.sim_startup_time)
+                time.sleep(2.0)
                 self.get_logger().info(f'Loaded map: {self.town}')
         else:
             self.get_logger().info(f'Simulator is ready with map: {carla_map_name}')
-
-        # Set the weather in CARLA
-        carla_world.set_weather(weather)
 
     def start_carla_ros_bridge(self):
         """Start the carla_ros_bridge node."""
@@ -287,27 +373,14 @@ class CarlaOrchestrator(Node):
             command.extend(['-p', f'{param}:={value}'])
 
         subprocess_name = 'carla_ros_bridge'
-        self.subprocesses[subprocess_name] = self.create_subprocess(command, subprocess_name)
+        self.subprocesses[subprocess_name] = create_subprocess(self, command, subprocess_name)
 
-    def start_rosbag_recording(self, topics_to_record):
-        """Start the rosbag_recording node."""
-        command = ['ros2', 'bag', 'record', '--use-sim-time']
-        if self.rosbag_output_dir:
-            output_dir = self.rosbag_output_dir + '/' + str(int(time.time()))
-            if not os.path.exists(self.rosbag_output_dir):
-                os.makedirs(self.rosbag_output_dir)
-            command += ['--output', output_dir]
-        command += topics_to_record
-
-        subprocess_name = 'ros_bag_recorder'
-        self.subprocesses[subprocess_name] = self.create_subprocess(command, subprocess_name)
-
-    def spawn_objects(self, sim_config, timeout=10):
+    def spawn_objects(self, spawn_objects_config, timeout=10):
         """Start the carla_spawn_objects node."""
         spawn_objects_params = {}
         spawn_objects_params['use_sim_time'] = True
-        spawn_objects_params['objects_definition_file'] = sim_config['objects_json_path']
-        for id_, value in sim_config['spawn_point'].items():
+        spawn_objects_params['objects_definition_file'] = spawn_objects_config['objects_json_path']
+        for id_, value in spawn_objects_config['spawn_point'].items():
             spawn_objects_params['spawn_point_' + id_] = value
 
         command = [
@@ -321,7 +394,8 @@ class CarlaOrchestrator(Node):
             command.extend(['-p', f'{param}:={value}'])
 
         subprocess_name = 'carla_spawn_objects'
-        self.subprocesses[subprocess_name] = self.create_subprocess(
+        self.subprocesses[subprocess_name] = create_subprocess(
+            self,
             ['unbuffer'] + command,
             subprocess_name,
             stdout=subprocess.PIPE,
@@ -356,23 +430,23 @@ class CarlaOrchestrator(Node):
             time.sleep(0.1)
         self.subprocesses['carla_spawn_objects'].stdout.close()
 
-        if sim_config['ego_vehicle_role_name']:
-            objects_json_path = sim_config['objects_json_path']
+        if spawn_objects_config['ego_vehicle_role_name']:
+            objects_json_path = spawn_objects_config['objects_json_path']
             try:
-                with open(objects_json_path, 'r') as f:
+                with open(objects_json_path, 'r', encoding='utf-8') as f:
                     objects = json.load(f).get('objects', [])
                     # Extract spawn points for vehicle.* types
                     for object_ in objects:
-                        if sim_config['ego_vehicle_role_name'] in object_['id']:
+                        if spawn_objects_config['ego_vehicle_role_name'] in object_['id']:
                             sensors = object_['sensors']
                             for sensor in sensors:
                                 if 'actor.pseudo.control' in sensor['type']:
                                     self.set_initial_pose(
-                                        sim_config['ego_vehicle_role_name'], sensor['id']
+                                        spawn_objects_config['ego_vehicle_role_name'], sensor['id']
                                     )
                                     self.get_logger().info(
                                         f'Initialized vehicle control for '
-                                        f'{sim_config["ego_vehicle_role_name"]} with '
+                                        f'{spawn_objects_config["ego_vehicle_role_name"]} with '
                                         f'control id {sensor["id"]}.'
                                     )
                                     break
@@ -396,77 +470,12 @@ class CarlaOrchestrator(Node):
         ]
 
         subprocess_name = 'carla_set_initial_pose'
-        self.subprocesses[subprocess_name] = self.create_subprocess(command, subprocess_name)
-
-    def clock_callback(self, msg):
-        if not self.received_first_clock:
-            self.received_first_clock = True
-            self.execute_simulation()
-
-    def end_simulation_callback(self, msg):
-        if msg.data:
-            self.end_current_simulation()
+        self.subprocesses[subprocess_name] = create_subprocess(self, command, subprocess_name)
 
     def end_current_simulation(self):
-        self.get_logger().info(
-            f'Ending simulation with index [{self.current_config_index}-'
-            f'{self.current_iter_index}].'
-        )
-        self.cleanup_subprocesses()
-        if self.reset_carla_after_exec:
-            self.terminate_process(self.simulator_subprocess)
-
-        self.current_iter_index += 1
-        if (
-            self.current_iter_index
-            >= self.sim_configurations[self.current_config_index]['iterations']
-        ):
-            self.current_config_index += 1
-            self.current_iter_index = 0
-
-        self.received_first_clock = False
-        self.start_next_simulation()
-
-    def start_next_simulation(self):
-        """Load the next simulation configuration and starts the simulation."""
-        if self.current_config_index >= len(self.sim_configurations):
-            self.get_logger().info('All simulations completed.')
-            self.destroy_node()
-            return
-
-        self.get_logger().info(
-            f'Starting simulation with index [{self.current_config_index}-'
-            f'{self.current_iter_index}].'
-        )
-        sim_config = self.sim_configurations[self.current_config_index]
-
-        # Setup the CARLA simulator and ros bridge
-        if (self.simulator_subprocess is None) or (self.reset_carla_after_exec):
-            self.setup_simulator(sim_config['weather'])
-        self.start_carla_ros_bridge()
-
-    def execute_simulation(self):
-        sim_config = self.sim_configurations[self.current_config_index]
-        self.get_logger().info(
-            f'Starting simulation {self.current_config_index} with map {self.town}'
-        )
-
-        # start rosbag recording
-        topics_to_record = sim_config['topics_to_record']
-        if self.use_rosbag_recording and len(topics_to_record) > 0:
-            self.start_rosbag_recording(topics_to_record)
-
-        # spawn objects
-        self.spawn_objects(sim_config)
-
-        self.publish_static_tfs()
-
-        self.get_logger().info('Simulation is ready for execution.')
-        # publish that simulation is ready
-        msg = Bool()
-        msg.data = True
-        self.simulation_ready_publisher.publish(msg)
-        self.autopilot_state_control_publisher.publish(msg)
+        cleanup_subprocesses(self.subprocesses)
+        if self.reset_carla_after_exec and self.simulator_subprocess is not None:
+            terminate_subprocess(self.simulator_subprocess)
 
     def publish_static_tfs(self):
         for static_tf_publisher_info in self.static_tf_publishers:
@@ -492,59 +501,14 @@ class CarlaOrchestrator(Node):
             # Broadcast the static transform
             self.static_tf_broadcaster.sendTransform(transform)
 
-    def terminate_process(self, process):
-        """Force terminate a process and its children using psutil."""
-        try:
-            process_ps = psutil.Process(process.pid)
-            child_ps = process_ps.children(recursive=True)
-            log_string = f'Terminating process with PID [{process.pid}]'
-            if len(child_ps) > 0:
-                log_string += f' and its child processes {[child.pid for child in child_ps]}'
-            self.get_logger().info(log_string)
-
-            # Send SIGTERM to the entire process group
-            pgid = os.getpgid(process.pid)  # Get the process group ID
-            os.killpg(pgid, signal.SIGTERM)  # Send SIGTERM to the process group
-
-            # Wait for the main process to terminate
-            process_ps.wait(timeout=10)
-
-            # Forcefully kill remaining processes if still running
-            if process_ps.is_running():
-                process_ps.kill()
-            for child in child_ps:
-                if child.is_running():
-                    child.kill()
-        except psutil.NoSuchProcess:
-            self.get_logger().info(
-                f'Process with PID [{process.pid}] does not exist or already terminated.'
-            )
-        except psutil.TimeoutExpired:
-            self.get_logger().warn(
-                f'Timed out waiting for process [{process.pid}] to terminate. Forcing kill.'
-            )
-            process_ps.kill()
-        except Exception as e:
-            self.get_logger().warn(f'Failed to terminate process {process.pid}: {e}')
-
-    def cleanup_subprocesses(self):
-        """Cleanup subprocesses."""
-        for id_ in list(self.subprocesses.keys()):
-            try:
-                process = self.subprocesses.pop(id_)
-                self.terminate_process(process)
-            except Exception as e:
-                self.get_logger().warn(f'Error cleaning up subprocess {id_}: {e}')
-
     def destroy_node(self):
         """Override to ensure the subprocesses are terminated on shutdown."""
         try:
-            if self.context.ok():
-                self.get_logger().info('Shutting down carla orchestrator node.')
-            self.cleanup_subprocesses()
-            self.terminate_process(self.simulator_subprocess)
+            print('Shutting down carla_orchestrator node.')
+            cleanup_subprocesses(self.subprocesses)
+            terminate_subprocess(self.simulator_subprocess)
         except Exception as e:
-            self.get_logger().warn(f'Error during node destruction: {e}')
+            print(f'Error during node destruction: {e}')
         finally:
             super().destroy_node()
 
@@ -553,18 +517,20 @@ def main(args=None):
     rclpy.init(args=args)
 
     # Initialize and run the CarlaOrchestrator node
-    sim_orchestrator_node = CarlaOrchestrator()
+    carla_orchestrator_node = CarlaOrchestrator()
+    executor = MultiThreadedExecutor()
+    executor.add_node(carla_orchestrator_node)
 
     try:
-        rclpy.spin(sim_orchestrator_node)
+        executor.spin()
     except KeyboardInterrupt:
-        sim_orchestrator_node.get_logger().info('User requested shutdown with SIGINT.')
+        carla_orchestrator_node.get_logger().info('User requested shutdown with SIGINT.')
     finally:
         # Cleanup on exit
         try:
-            sim_orchestrator_node.destroy_node()
+            carla_orchestrator_node.destroy_node()
         except Exception as e:
-            sim_orchestrator_node.get_logger().warn(f'Error during node destruction: {e}')
+            print(f'Error during node destruction: {e}')
         # Only shutdown if the context is still valid
         if rclpy.ok():
             rclpy.shutdown()
