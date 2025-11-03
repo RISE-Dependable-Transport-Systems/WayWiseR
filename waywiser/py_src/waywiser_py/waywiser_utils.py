@@ -1,7 +1,26 @@
 #!/usr/bin/env python3
 
 import os
+from rclpy.qos import DurabilityPolicy
+from rclpy.qos import HistoryPolicy
+from rclpy.qos import QoSProfile
+from rclpy.qos import ReliabilityPolicy
 import yagmail
+
+RELIABLE_TRANSIENT_LOCAL_QOS = QoSProfile(
+    reliability=ReliabilityPolicy.RELIABLE,
+    durability=DurabilityPolicy.TRANSIENT_LOCAL,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1,
+)
+
+RELIABLE_VOLATILE_QOS = QoSProfile(
+    reliability=ReliabilityPolicy.RELIABLE,
+    durability=DurabilityPolicy.VOLATILE,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1,
+)
+
 
 def get_full_file_path(file_path, package_relative_path=''):
     if file_path == '':
@@ -41,7 +60,7 @@ def send_email(subject, body, email_recipient=None):
 
     # Validate credentials
     if not all([email_user, email_pass, recipient]):
-        print('Email credentials not found. Check your .env file.')
+        print('Email credentials not found. Check your .env file.', flush=True)
         return
 
     try:
@@ -55,6 +74,8 @@ def send_email(subject, body, email_recipient=None):
 
         # Send email
         yag.send(to=recipient, subject=subject, contents=body)
-        print('Email sent successfully!')
+        print('Email sent successfully!', flush=True)
+    except Exception as e:
+        print(f'Error sending email: {e}', flush=True)
     except Exception as e:
         print(f'Error sending email: {e}')
