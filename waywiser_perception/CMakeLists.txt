@@ -91,6 +91,8 @@ install(
   py_src/waywiser_perception_py/yolo_node.py
   py_src/waywiser_perception_py/rgbd_to_pointcloud.py
   py_src/waywiser_perception_py/collision_monitor.py
+  py_src/waywiser_perception_py/camera_info_publisher.py
+  py_src/waywiser_perception_py/rgb_to_grayscale.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
