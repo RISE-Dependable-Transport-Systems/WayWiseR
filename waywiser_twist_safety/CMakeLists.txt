@@ -15,10 +15,8 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(rclcpp_components REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
-
-include_directories(include)
+find_package(waywiser REQUIRED)
 
 # Generate msgs
 set(ROSIDL_FILES)
@@ -30,49 +28,32 @@ foreach(MSG_FILE ${MSG_FILES})
   list(APPEND ROSIDL_FILES msg/${MSG_NAME})
 endforeach()
 
-rosidl_generate_interfaces(${PROJECT_NAME}
+rosidl_generate_interfaces(
+  ${PROJECT_NAME}
   ${ROSIDL_FILES}
-  DEPENDENCIES std_msgs builtin_interfaces
+  DEPENDENCIES
+  std_msgs
+  builtin_interfaces
 )
 
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME}
   rosidl_typesupport_cpp
 )
 
-add_library(emergency_stop_monitor_core SHARED
-  cpp_src/rclcpp_components/emergency_stop_monitor_core.cpp
-)
-
-ament_target_dependencies(emergency_stop_monitor_core
+add_executable(emergency_stop_monitor cpp_src/emergency_stop_monitor.cpp)
+ament_target_dependencies(emergency_stop_monitor
   geometry_msgs
   rclcpp
-  rclcpp_components
   sensor_msgs
   std_msgs
+  waywiser
 )
-rclcpp_components_register_nodes(emergency_stop_monitor_core
-  waywiser_twist_safety::EmergencyStopMonitor
-)
-target_link_libraries(emergency_stop_monitor_core "${cpp_typesupport_target}")
 
-add_executable(emergency_stop_monitor cpp_src/emergency_stop_monitor.cpp)
-target_link_libraries(emergency_stop_monitor emergency_stop_monitor_core)
-
-install(
-  TARGETS emergency_stop_monitor_core
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin
-)
+target_link_libraries(emergency_stop_monitor ${cpp_typesupport_target})
 
 install(
   TARGETS emergency_stop_monitor
   RUNTIME DESTINATION lib/${PROJECT_NAME}
-)
-
-install(
-  DIRECTORY include/
-  DESTINATION include/${PROJECT_NAME}
 )
 
 install(
@@ -81,7 +62,6 @@ install(
 )
 
 ament_export_dependencies(rosidl_default_runtime)
-ament_export_include_directories(include)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
