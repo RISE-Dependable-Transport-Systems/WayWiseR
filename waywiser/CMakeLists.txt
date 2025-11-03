@@ -9,6 +9,8 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclpy REQUIRED)
 
+include_directories(include)
+
 file(GLOB DISCOVERY_SETUP_FILES "discovery/*.sh")
 
 install(
@@ -21,6 +23,8 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
+
 ament_python_install_package(${PROJECT_NAME}_py
   PACKAGE_DIR py_src/waywiser_py
 )
@@ -31,6 +35,7 @@ install(
 )
 
 ament_environment_hooks(load_dotenv.bash)
+ament_export_include_directories(include)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
