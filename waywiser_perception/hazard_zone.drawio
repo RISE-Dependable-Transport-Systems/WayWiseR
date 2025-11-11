@@ -1,92 +1,92 @@
 <mxfile host="65bd71144e">
     <diagram name="Page-1" id="PXel-HwCLAN99CBa_-ef">
-        <mxGraphModel dx="1323" dy="488" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0" adaptiveColors="auto">
+        <mxGraphModel dx="1349" dy="413" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0" adaptiveColors="auto">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
-                <mxCell id="7" value="" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                <mxCell id="7" value="" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="285" y="264" width="160" height="340" as="geometry"/>
                 </mxCell>
-                <mxCell id="42" style="edgeStyle=elbowEdgeStyle;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="9" target="21">
+                <mxCell id="42" style="edgeStyle=elbowEdgeStyle;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;dashed=1;" parent="1" source="9" target="21" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <Array as="points">
                             <mxPoint x="245" y="394"/>
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="9" value="OAK-D Pro W&lt;br&gt;(camera)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                <mxCell id="9" value="OAK-D Pro W&lt;br&gt;(camera)" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="305" y="284" width="120" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="11" value="u-blox F9P&lt;br&gt;(GNSS)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                <mxCell id="11" value="u-blox F9P&lt;br&gt;(GNSS)" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="305" y="364" width="120" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="13" value="&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;VESC&lt;/span&gt;&lt;br style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251);&quot;&gt;&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;(motor controller)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                <mxCell id="13" value="&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;VESC&lt;/span&gt;&lt;br style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251);&quot;&gt;&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;(motor controller)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="305" y="524" width="120" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="14" value="Shuttle (prototype)" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" vertex="1" parent="1">
+                <mxCell id="14" value="Shuttle (prototype)" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="1" vertex="1">
                     <mxGeometry x="335" y="224" width="60" height="30" as="geometry"/>
                 </mxCell>
-                <mxCell id="16" value="" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                <mxCell id="16" value="" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="600" y="264" width="160" height="260" as="geometry"/>
                 </mxCell>
-                <mxCell id="40" style="edgeStyle=elbowEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="17" target="20">
+                <mxCell id="40" style="edgeStyle=elbowEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;dashed=1;" parent="1" source="17" target="20" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <Array as="points">
                             <mxPoint x="880" y="434"/>
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="17" value="OAK-D Pro W (camera)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                <mxCell id="17" value="OAK-D Pro W (camera)" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="620" y="284" width="120" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="37" style="edgeStyle=elbowEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="18" target="20">
+                <mxCell id="37" style="edgeStyle=elbowEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;dashed=1;" parent="1" source="18" target="20" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <Array as="points">
                             <mxPoint x="800" y="424"/>
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="18" value="u-blox F9P&lt;br&gt;(GNSS)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                <mxCell id="18" value="u-blox F9P&lt;br&gt;(GNSS)" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="620" y="364" width="120" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="19" value="Drone&lt;br&gt;(tripod)" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" vertex="1" parent="1">
+                <mxCell id="19" value="Drone&lt;br&gt;(tripod)" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="1" vertex="1">
                     <mxGeometry x="650" y="224" width="60" height="30" as="geometry"/>
                 </mxCell>
-                <mxCell id="41" style="edgeStyle=elbowEdgeStyle;html=1;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="20" target="21">
+                <mxCell id="41" style="edgeStyle=elbowEdgeStyle;html=1;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;dashed=1;" parent="1" source="20" target="21" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="20" value="Raspberry Pi 5 &lt;br&gt;(position fuser)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                <mxCell id="20" value="Raspberry Pi 5 &lt;br&gt;(Position Fuser)" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="620" y="444" width="120" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="35" style="edgeStyle=elbowEdgeStyle;html=1;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="21" target="13">
+                <mxCell id="35" style="edgeStyle=elbowEdgeStyle;html=1;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;dashed=1;" parent="1" source="21" target="13" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <Array as="points">
                             <mxPoint x="245" y="524"/>
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="21" value="&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;Raspberry Pi 5&lt;br&gt;(collision monitor)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                <mxCell id="21" value="&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;Raspberry Pi 5&lt;br&gt;(Collision Monitor)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="305" y="444" width="120" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="26" value="Coordinates (x, y, z) of human (relative to Shuttle)" style="text;html=1;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                <mxCell id="26" value="Coordinates (x, y, z) of human (relative to Shuttle)" style="text;html=1;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
                     <mxGeometry x="165" y="354" width="75" height="70" as="geometry"/>
                 </mxCell>
-                <mxCell id="29" value="Coordinates (x, y, z) of human (relative to Drone)" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                <mxCell id="29" value="Coordinates (x, y, z) of human (relative to Drone)" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
                     <mxGeometry x="880" y="364" width="80" height="69" as="geometry"/>
                 </mxCell>
-                <mxCell id="31" value="Coordinates (x, y, z) of Drone" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                <mxCell id="31" value="Coordinates (x, y, z) of Drone" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
                     <mxGeometry x="800" y="404" width="80" height="46" as="geometry"/>
                 </mxCell>
-                <mxCell id="33" value="Coordinates (x, y, z) of human (relative to Shuttle, but seen from Drone)" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                <mxCell id="33" value="Coordinates (x, y, z) of human (relative to Shuttle, but seen from Drone)" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
                     <mxGeometry x="470" y="489" width="115" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="34" style="edgeStyle=elbowEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="11" target="20">
+                <mxCell id="34" style="edgeStyle=elbowEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;dashed=1;" parent="1" source="11" target="20" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="43" value="Emergency brake signal" style="text;html=1;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                <mxCell id="43" value="Emergency brake signal" style="text;html=1;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
                     <mxGeometry x="165" y="484" width="75" height="70" as="geometry"/>
                 </mxCell>
-                <mxCell id="44" value="Coordinates (x, y, z) of Shuttle" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                <mxCell id="44" value="Coordinates (x, y, z) of Shuttle" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
                     <mxGeometry x="470" y="344" width="115" height="60" as="geometry"/>
                 </mxCell>
             </root>
