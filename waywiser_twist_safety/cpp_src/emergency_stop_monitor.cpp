@@ -107,15 +107,20 @@ private:
         twist_msg.angular.z = 0.0;
         twist_publisher_->publish(twist_msg);
       }
-    } else {
+    } else if (emergency_stop_target_state_msg->state == EmergencyStopState::CLEAR) {
       if (is_emergency_stop_active()) {
         current_emergency_stop_state_msg.state = EmergencyStopState::CLEAR;
         RCLCPP_INFO(
           get_logger(), "Emergency stop CLEARED by %s.",
           emergency_stop_target_state_msg->sender_id.c_str());
       }
+    } else {
+      RCLCPP_WARN(
+        get_logger(),
+        "Received emergency stop request with unknown state %d from %s. Ignoring.",
+        emergency_stop_target_state_msg->state,
+        emergency_stop_target_state_msg->sender_id.c_str());
     }
-
   }
 
   void emergency_stop_state_publisher_timer_callback()
