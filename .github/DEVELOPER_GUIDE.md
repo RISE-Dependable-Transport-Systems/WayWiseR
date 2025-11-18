@@ -8,7 +8,6 @@ Install these VS Code extensions:
 
 - [Python](https://marketplace.visualstudio.com/items?itemName=ms-python.python)
 - [Ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)
-- [isort](https://marketplace.visualstudio.com/items?itemName=ms-python.isort)
 - [C++](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools)
 - [Uncrustify](https://marketplace.visualstudio.com/items?itemName=zachflower.uncrustify)
 - [CMake Language Support](https://marketplace.visualstudio.com/items?itemName=josetr.cmake-language-support-vscode)
@@ -46,16 +45,13 @@ Create or update `.vscode/settings.json` with:
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.codeActionsOnSave": {
       "source.organizeImports": "explicit",
-      "source.fixAll": "explicit",
-      "source.fixAll.ruff": "explicit",
-      "source.organizeImports.ruff": "explicit"
+      "source.fixAll": "explicit"
     }
   },
   "python.analysis.typeCheckingMode": "basic",
   "python.analysis.autoImportCompletions": true,
-  "isort.args": ["--profile", "google"],
   "ruff.configuration": "./.vscode/ruff.toml",
-  "ruff.organizeImports": false,
+  "ruff.organizeImports": true,
   "editor.formatOnSave": true,
   "[cpp]": {
     "editor.defaultFormatter": "zachflower.uncrustify"
