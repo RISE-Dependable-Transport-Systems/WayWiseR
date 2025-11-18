@@ -11,7 +11,7 @@
 - Add CARLA_ROS_BRIDGE_WS environment variable to .bashrc to persist the variable when a new terminal is opened:
 
   ```
-  echo "export CARLA_ROS_BRIDGE_WS=$CARLA_ROS_BRIDGE_WS" >> ~/.bashrc
+  echo "export CARLA_ROS_BRIDGE_WS=$CARLA_ROS_BRIDGE_WS" >> .venv/bin/activate
   ```
 
 - Install carla-ros-bridge specific dependencies from the root directory of the workspace:
