@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
+cmake_policy(SET CMP0071 NEW)
 project(waywiser_twist_safety)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -15,10 +16,8 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(rclcpp_components REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
-
-include_directories(include)
+find_package(waywiser REQUIRED)
 
 # Generate msgs
 set(ROSIDL_FILES)
@@ -35,41 +34,35 @@ rosidl_generate_interfaces(
   ${ROSIDL_FILES}
   DEPENDENCIES
   std_msgs
-  builtin_interfaces)
+  builtin_interfaces
+)
 
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME}
-  rosidl_typesupport_cpp)
-
-add_library(emergency_stop_monitor_core SHARED
-  cpp_src/rclcpp_components/emergency_stop_monitor_core.cpp)
-ament_target_dependencies(
-  emergency_stop_monitor_core
-  geometry_msgs
-  rclcpp
-  rclcpp_components
-  sensor_msgs
-  std_msgs)
-rclcpp_components_register_nodes(emergency_stop_monitor_core
-  waywiser_twist_safety::EmergencyStopMonitor)
-target_link_libraries(emergency_stop_monitor_core "${cpp_typesupport_target}")
+  rosidl_typesupport_cpp
+)
 
 add_executable(emergency_stop_monitor cpp_src/emergency_stop_monitor.cpp)
-target_link_libraries(emergency_stop_monitor emergency_stop_monitor_core)
+ament_target_dependencies(emergency_stop_monitor
+  geometry_msgs
+  rclcpp
+  sensor_msgs
+  std_msgs
+  waywiser
+)
+
+target_link_libraries(emergency_stop_monitor ${cpp_typesupport_target})
 
 install(
-  TARGETS emergency_stop_monitor_core
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin)
+  TARGETS emergency_stop_monitor
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
 
-install(TARGETS emergency_stop_monitor RUNTIME DESTINATION lib/${PROJECT_NAME})
-
-install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
-
-install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
+install(
+  DIRECTORY launch config
+  DESTINATION share/${PROJECT_NAME}
+)
 
 ament_export_dependencies(rosidl_default_runtime)
-ament_export_include_directories(include)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

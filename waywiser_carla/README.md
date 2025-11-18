@@ -3,7 +3,7 @@
 - Clone the carla-ros-bridge repo (fork from [ros-bridge](https://github.com/carla-simulator/ros-bridge)):
 
   ```
-  export CARLA_ROS_BRIDGE_WS=$HOME/carla_ros_bridge_ws     #update the environment variable with desired path
+  export CARLA_ROS_BRIDGE_WS=~/carla_ros_bridge_ws     #update the environment variable with desired path
   mkdir -p $CARLA_ROS_BRIDGE_WS/src
   git clone --recurse-submodules git@github.com:RISE-Dependable-Transport-Systems/carla-ros-bridge.git $CARLA_ROS_BRIDGE_WS/src/carla-ros-bridge
   ```
@@ -11,7 +11,7 @@
 - Add CARLA_ROS_BRIDGE_WS environment variable to .bashrc to persist the variable when a new terminal is opened:
 
   ```
-  echo "export CARLA_ROS_BRIDGE_WS=$CARLA_ROS_BRIDGE_WS" >> ~/.bashrc
+  echo "export CARLA_ROS_BRIDGE_WS=$CARLA_ROS_BRIDGE_WS" >> .venv/bin/activate
   ```
 
 - Install carla-ros-bridge specific dependencies from the root directory of the workspace:

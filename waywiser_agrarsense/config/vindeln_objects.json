@@ -1,0 +1,138 @@
+{
+    "objects": [
+        {
+            "type": "Walker",
+            "model": "Worker",
+            "id": "worker",
+            "parameters": {
+                "walkerType": "Worker",
+                "walkerSpeed": 50,
+                "createTransformTopic": true,
+                "walkerAction": "Stationary",
+                "walkerEndAction": "Destroy",
+                "spawnPoint": {
+                    "x": 80506.0,
+                    "y": 70569.0,
+                    "z": -2329.0,
+                    "roll": -0,
+                    "pitch": 0,
+                    "yaw": 0,
+                    "scaleX": 1,
+                    "scaleY": 1,
+                    "scaleZ": 1
+                }
+            }
+        },
+        {
+            "type": "vehicle",
+            "model": "Forwarder",
+            "id": "forwarder",
+            "followObject": "true",
+            "spawnPoint": {
+                "x": 78057.0,
+                "y": 69260.0,
+                "z": -2350.0,
+                "roll": 0.0,
+                "pitch": 0.0,
+                "yaw": 30.0
+            },
+            "sensors": [
+                {
+                    "type": "sensor",
+                    "model": "RGBCamera",
+                    "name": "rgb_ext_pov",
+                    "id": "rgb_ext_pov",
+                    "attachedToBone": "Root",
+                    "spawnPoint": {
+                        "x": -1600,
+                        "y": 0,
+                        "z": 600,
+                        "roll": 0,
+                        "pitch": -20,
+                        "yaw": 0,
+                        "scaleX": 1,
+                        "scaleY": 1,
+                        "scaleZ": 1
+                    },
+                    "parameters": {
+                        "postProcessingEffects": false,
+                        "enable16BitFormat": true,
+                        "useHDR": true,
+                        "fOV": 90.0,
+                        "targetGamma": 1,
+                        "width": 1280,
+                        "height": 720,
+                        "sendDataToROS": true,
+                        "usePhysicLensDistortionEffect": true,
+                        "useTemporalAA": true,
+                        "useIceLensEffect": false
+                    }
+                },
+                {
+                    "type": "sensor",
+                    "model": "RGBCamera",
+                    "name": "rgb_front",
+                    "id": "rgb_front",
+                    "attachedToBone": "Root",
+                    "spawnPoint": {
+                        "x": 90,
+                        "y": 0,
+                        "z": 120,
+                        "roll": 0,
+                        "pitch": 0,
+                        "yaw": 0,
+                        "scaleX": 1,
+                        "scaleY": 1,
+                        "scaleZ": 1
+                    },
+                    "parameters": {
+                        "postProcessingEffects": true,
+                        "enable16BitFormat": true,
+                        "useHDR": true,
+                        "fOV": 95.0,
+                        "targetGamma": 1,
+                        "width": 640,
+                        "height": 480,
+                        "sendDataToROS": true,
+                        "usePhysicLensDistortionEffect": true,
+                        "useTemporalAA": true,
+                        "useIceLensEffect": false
+                    }
+                },
+                {
+                    "type": "sensor",
+                    "model": "DepthCamera",
+                    "name": "depth_front",
+                    "id": "depth_front",
+                    "attachedToBone": "Root",
+                    "spawnPoint": {
+                        "x": 90,
+                        "y": 0,
+                        "z": 120,
+                        "roll": 0,
+                        "pitch": 0,
+                        "yaw": 0,
+                        "scaleX": 1,
+                        "scaleY": 1,
+                        "scaleZ": 1
+                    },
+                    "parameters": {
+                        "convertToGrayscale": false,
+                        "cameraParameters": {
+                            "postProcessingEffects": true,
+                            "enable16BitFormat": false,
+                            "fOV": 95.0,
+                            "targetGamma": 1,
+                            "width": 640,
+                            "height": 480,
+                            "sendDataToROS": true,
+                            "usePhysicLensDistortionEffect": false,
+                            "useTemporalAA": true,
+                            "useIceLensEffect": false
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}

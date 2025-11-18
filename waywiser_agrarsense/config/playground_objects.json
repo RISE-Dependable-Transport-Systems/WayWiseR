@@ -1,6 +1,29 @@
 {
     "objects": [
         {
+            "type": "Walker",
+            "model": "Worker",
+            "id": "worker",
+            "parameters": {
+                "walkerType": "Worker",
+                "walkerSpeed": 50,
+                "createTransformTopic": true,
+                "walkerAction": "Stationary",
+                "walkerEndAction": "Destroy",
+                "spawnPoint": {
+                    "x": 2260.0,
+                    "y": 2390.0,
+                    "z": 100.0,
+                    "roll": -0,
+                    "pitch": 0,
+                    "yaw": 0,
+                    "scaleX": 1,
+                    "scaleY": 1,
+                    "scaleZ": 1
+                }
+            }
+        },
+        {
             "type": "vehicle",
             "model": "Forwarder",
             "id": "forwarder",
@@ -74,6 +97,39 @@
                         "usePhysicLensDistortionEffect": true,
                         "useTemporalAA": true,
                         "useIceLensEffect": false
+                    }
+                },
+                {
+                    "type": "sensor",
+                    "model": "DepthCamera",
+                    "name": "depth_front",
+                    "id": "depth_front",
+                    "attachedToBone": "Root",
+                    "spawnPoint": {
+                        "x": 90,
+                        "y": 0,
+                        "z": 120,
+                        "roll": 0,
+                        "pitch": 0,
+                        "yaw": 0,
+                        "scaleX": 1,
+                        "scaleY": 1,
+                        "scaleZ": 1
+                    },
+                    "parameters": {
+                        "convertToGrayscale": false,
+                        "cameraParameters": {
+                            "postProcessingEffects": true,
+                            "enable16BitFormat": false,
+                            "fOV": 95.0,
+                            "targetGamma": 1,
+                            "width": 640,
+                            "height": 480,
+                            "sendDataToROS": true,
+                            "usePhysicLensDistortionEffect": false,
+                            "useTemporalAA": true,
+                            "useIceLensEffect": false
+                        }
                     }
                 }
             ]

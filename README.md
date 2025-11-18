@@ -47,7 +47,7 @@ Install ROS2 (required):
 
 - [Install ROS2 Humble](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html)
 
-Install MAVSDK 2.0 or newer (required):
+Install MAVSDK latest 2.x version (required, version 3.x is not supported):
 
 - [Download MAVSDK pre-built releses](https://github.com/mavlink/MAVSDK/releases)
 
@@ -61,7 +61,7 @@ Setup workspace and build it (without simulator-related packages):
 
     sudo apt update && sudo apt install -y libunwind-dev libqt5serialport5-dev git build-essential cmake python3-colcon-common-extensions
 
-    export WAYWISER_WS=$HOME/waywiser_ws     #update the environment variable with desired path
+    export WAYWISER_WS=~/waywiser_ws     #update the environment variable with desired path
     export WAYWISER_SKIPPED_PACKAGES="waywiser_agrarsense waywiser_carla waywiser_gazebo"
 
     mkdir -p $WAYWISER_WS/src
@@ -69,22 +69,25 @@ Setup workspace and build it (without simulator-related packages):
     cd $WAYWISER_WS/src/WayWiseR
     git submodule update --init waywiser_core/WayWise
     cd $WAYWISER_WS
+    python -m venv .venv
+    source .venv/bin/activate
+    export PYTHONPATH=.venv/lib/python3.10/site-packages:$PYTHONPATH
     pip install -r src/WayWiseR/requirements.txt
     source /opt/ros/humble/setup.bash
-    rosdep install --from-paths $(colcon list --paths-only | grep -v -w -E  $(echo $WAYWISER_SKIPPED_PACKAGES | tr ' ' '|')) --ignore-src --rosdistro humble -r -y
+    rosdep install --from-paths $(colcon list --paths-only | grep -Evw "$(echo "$WAYWISER_SKIPPED_PACKAGES" | tr ' ' '|')") --ignore-src --rosdistro humble -r -y
     colcon build --symlink-install --packages-skip $WAYWISER_SKIPPED_PACKAGES
 
 To build simulator-related packages such as waywiser_agrarsense, waywiser_carla, and waywiser_gazebo, follow the instructions in the respective packages.
 
-Add the following environment variables to .bashrc to persist them when a new terminal is opened:
+To persist the environment variables and source the ROS2 overlay automatically in each terminal when activating the virtual environment (using `source .venv/bin/activate`), run the following command:
 
-    echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
-    echo "export WAYWISER_WS=$WAYWISER_WS" >> ~/.bashrc
-    echo "export WAYWISER_SKIPPED_PACKAGES=$WAYWISER_SKIPPED_PACKAGES" >> ~/.bashrc
-
-Before sourcing the overlay, it is very important that you open a new terminal, separate from the one where you built the workspace. Sourcing an overlay in the same terminal where you built, or likewise building where an overlay is sourced, may create complex issues.
-
-`source install/local_setup.bash`
+    echo "source /opt/ros/humble/setup.bash" >> .venv/bin/activate
+    echo "export WAYWISER_WS=$WAYWISER_WS" >> .venv/bin/activate
+    echo "export WAYWISER_SKIPPED_PACKAGES=$WAYWISER_SKIPPED_PACKAGES" >> .venv/bin/activate
+    echo 'export PYTHONPATH=.venv/lib/python3.10/site-packages:$PYTHONPATH' >> .venv/bin/activate
+    echo 'if [ -f "install/setup.bash" ]; then' >> .venv/bin/activate
+    echo ' source "install/setup.bash"' >> .venv/bin/activate
+    echo 'fi' >> .venv/bin/activate
 
 ### Current state
 
@@ -106,6 +109,7 @@ WayWiseR is divided into several ROS2 packages. Make sure to have a look into th
 - **waywiser_rviz2**: Configuration and launch files for RViz2.
 - **waywiser_slam**: Configuration and launch files for [SLAM Toolbox](https://github.com/SteveMacenski/slam_toolbox).
 - **waywiser_teleop**: Configuration and launch files for teleop packages (handling keyboard or gamepad input) and a node to arbitrate between them.
+- **waywiser_test_runner**: Package that orchestrates tests.
 - **waywiser_twist_safety**: Contains configuration and launch files to manage twist commands to vehicle from different sources. It also includes a composable node for emergency stop monitoring.
 
 ## Examples

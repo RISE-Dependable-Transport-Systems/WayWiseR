@@ -1,0 +1,70 @@
+track_test_runner_node:
+  ros__parameters:
+    use_sim_time: true
+    orchestrate_test_setup: false
+    track_test_runner_timer_rate: 1.0
+    test_config_start_index: 1
+    test_configurations_json_path: "truck_full_scale_test_case_example.json"
+    rosbag_output_dir: "track_test_data" # relative path
+    use_rosbag_recording: true
+    mission_status_topic: "/truck/mission_status"
+    autopilot_state_control_topic: "/truck/autopilot_state_control"
+    preplanned_route_filepath: "$WAYWISER_WS/resources/full_scale_route.xml"
+    vehicle_start_position_is_test_start_point: false
+    # test_start_point: "-0.24136670548847863, 0.9810376247909707, 0.0, 0.0, 0.0, -0.6382656725442453, 0.7698161671799588"
+    test_start_point: "-38.12, 18.50, 0.53, 0.0, 0.0, 180.0"
+    vehicle_pose_topic: "/truck/rear_axle_pose"
+    trailer_pose_topic: "/semitrailer/rear_axle_pose"
+    emergency_stop_topic: "/emergency_stop/current_state"
+    end_goal_alignment_type: 0 # Align {0: REAR_AXLE, 1: FRONT_REAR_END, 2: CENTER} with the end goal
+    end_goal_alignment_threshold: 0.1 # m
+    continue_test_after_estop_clear: false
+    enuref: [57.713805, 12.890088, 203.59] # [lat, lon, height]
+    test_timeout: 400.0
+    test_cooldown_time: 10.0
+    halt_test_runner_on_timeout: true
+    notify_via_mail_on_timeout: true
+
+    rear_axle_frame: truck_rear_axle_link
+    rear_end_frame: truck_rear_end_link
+    hitch_frame: truck_fifth_wheel_link
+
+    trailer_rear_axle_frame: semitrailer_rear_axle_link
+    trailer_rear_end_frame: semitrailer_rear_end_link
+    trailer_hitch_frame: semitrailer_kingpin_link
+
+    has_trailer: true
+    length: 7.07
+    width: 2.59
+    wheelbase: 4.0124
+    trailer_length: 13.72
+    trailer_width: 2.618
+    trailer_wheelbase: 8.61
+    staging_area_margin: 1.4
+
+    trace_topic: "/semitrailer/rear_axle_pose"
+
+    topics_to_record:
+      [
+        "/waywiser_control_cmd",
+        "/cmd_vel_out",
+        "/emergency_stop/current_state",
+        "/emergency_stop/target_state",
+        "/onboard_mux_vel",
+        "/semitrailer/rear_axle_pose",
+        "/truck/autopilot_center_pose",
+        "/truck/autopilot_state_control",
+        "/truck/mission_status",
+        "/truck/odometry",
+        "/truck/rear_axle_pose",
+        "/truck/sensors/gnss/nav_pvt_pose",
+        "/truck/sensors/gnss/nav_sat_fix",
+        "/truck/sensors/gnss/nav_sat_info",
+        "/truck/sensors/gnss/rtcm_frequency",
+        "/truck/sensors/ultrasonic/trailer_left",
+        "/truck/sensors/ultrasonic/trailer_rear",
+        "/truck/sensors/trailer_angle",
+        "/truck/vehicle_alignment_reference_point",
+        "/waywiser_vel",
+        "/waywiser_path",
+      ]

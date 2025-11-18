@@ -1,0 +1,225 @@
+<robot name="forwarder" version="1.0">
+  <joint name="crane_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.96436 0.00000 3.04438" />
+    <parent link="rear_chassis_link" />
+    <child link="crane_link" />
+  </joint>
+  <joint name="fl1_wheel_link_joint" type="revolute">
+    <limit lower="-3.14000" upper="3.14000" effort="0.00000" velocity="0.00000" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.78107 1.04566 0.00000" />
+    <parent link="front_axle_link" />
+    <child link="fl1_wheel_link" />
+    <axis xyz="0.00000 1.00000 0.00000" />
+  </joint>
+  <joint name="fl2_wheel_link_joint" type="revolute">
+    <limit lower="-3.14000" upper="3.14000" effort="0.00000" velocity="0.00000" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-0.78107 1.04565 0.00000" />
+    <parent link="front_axle_link" />
+    <child link="fl2_wheel_link" />
+    <axis xyz="0.00000 1.00000 0.00000" />
+  </joint>
+  <joint name="fr1_wheel_link_joint" type="revolute">
+    <limit lower="-3.14000" upper="3.14000" effort="0.00000" velocity="0.00000" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.78107 -1.04566 -0.00000" />
+    <parent link="front_axle_link" />
+    <child link="fr1_wheel_link" />
+    <axis xyz="0.00000 1.00000 0.00000" />
+  </joint>
+  <joint name="fr2_wheel_link_joint" type="revolute">
+    <limit lower="-3.14000" upper="3.14000" effort="0.00000" velocity="0.00000" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-0.78107 -1.04566 0.00000" />
+    <parent link="front_axle_link" />
+    <child link="fr2_wheel_link" />
+    <axis xyz="0.00000 1.00000 0.00000" />
+  </joint>
+  <joint name="front_axle_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-0.15880 0.00000 -1.89274" />
+    <parent link="front_chassis_link" />
+    <child link="front_axle_link" />
+  </joint>
+  <joint name="front_chassis_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="1.98971 0.00000 1.46893" />
+    <parent link="hitch_link" />
+    <child link="front_chassis_link" />
+  </joint>
+  <joint name="front_end_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="2.52363 0.00000 -1.36646" />
+    <parent link="front_chassis_link" />
+    <child link="front_end_link" />
+  </joint>
+  <joint name="hitch_link_joint" type="revolute">
+    <limit lower="-3.14000" upper="3.14000" effort="0.00000" velocity="0.00000" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="2.86877 0.00000 -0.56212" />
+    <parent link="rear_chassis_link" />
+    <child link="hitch_link" />
+    <axis xyz="0.00000 0.00000 1.00000" />
+  </joint>
+  <joint name="rear_axle_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-0.39936 0.00000 -0.98593" />
+    <parent link="rear_chassis_link" />
+    <child link="rear_axle_link" />
+  </joint>
+  <joint name="rear_chassis_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="2.60979 0.00000 0.59423" />
+    <parent link="rear_end_link" />
+    <child link="rear_chassis_link" />
+  </joint>
+  <joint name="rear_end_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-4.93062 0.00000 1.07094" />
+    <parent link="base_link" />
+    <child link="rear_end_link" />
+  </joint>
+  <joint name="rl1_wheel_link_joint" type="revolute">
+    <limit lower="-3.14000" upper="3.14000" effort="0.00000" velocity="0.00000" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.78107 1.04566 0.00000" />
+    <parent link="rear_axle_link" />
+    <child link="rl1_wheel_link" />
+    <axis xyz="0.00000 1.00000 0.00000" />
+  </joint>
+  <joint name="rl2_wheel_link_joint" type="revolute">
+    <limit lower="-3.14000" upper="3.14000" effort="0.00000" velocity="0.00000" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-0.78107 1.04565 -0.00000" />
+    <parent link="rear_axle_link" />
+    <child link="rl2_wheel_link" />
+    <axis xyz="0.00000 1.00000 0.00000" />
+  </joint>
+  <joint name="rr1_wheel_link_joint" type="revolute">
+    <limit lower="-3.14000" upper="3.14000" effort="0.00000" velocity="0.00000" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.78107 -1.04566 -0.00000" />
+    <parent link="rear_axle_link" />
+    <child link="rr1_wheel_link" />
+    <axis xyz="0.00000 1.00000 0.00000" />
+  </joint>
+  <joint name="rr2_wheel_link_joint" type="revolute">
+    <limit lower="-3.14000" upper="3.14000" effort="0.00000" velocity="0.00000" />
+    <origin rpy="0.00000 0.00000 0.00000" xyz="-0.78107 -1.04566 -0.00000" />
+    <parent link="rear_axle_link" />
+    <child link="rr2_wheel_link" />
+    <axis xyz="0.00000 1.00000 0.00000" />
+  </joint>
+  <link name="base_link" />
+  <link name="crane_link">
+    <visual name="crane">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000" />
+      <material name="Main_Back_Mat" />
+      <geometry>
+        <mesh filename="package://waywiser_description/meshes/forwarder/crane.dae"
+          scale="1.00000 1.00000 1.00000" />
+      </geometry>
+    </visual>
+  </link>
+  <link name="fl1_wheel_link">
+    <visual name="fl1_wheel">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000" />
+      <material name="Tires_Mat" />
+      <geometry>
+        <mesh filename="package://waywiser_description/meshes/forwarder/wheel.dae"
+          scale="1.00000 1.00000 1.00000" />
+      </geometry>
+    </visual>
+  </link>
+  <link name="fl2_wheel_link">
+    <visual name="fl2_wheel">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000" />
+      <material name="Tires_Mat" />
+      <geometry>
+        <mesh filename="package://waywiser_description/meshes/forwarder/wheel.dae"
+          scale="1.00000 1.00000 1.00000" />
+      </geometry>
+    </visual>
+  </link>
+  <link name="fr1_wheel_link">
+    <visual name="fr1_wheel">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000" />
+      <material name="Tires_Mat" />
+      <geometry>
+        <mesh filename="package://waywiser_description/meshes/forwarder/wheel.dae"
+          scale="1.00000 1.00000 1.00000" />
+      </geometry>
+    </visual>
+  </link>
+  <link name="fr2_wheel_link">
+    <visual name="fr2_wheel">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000" />
+      <material name="Tires_Mat" />
+      <geometry>
+        <mesh filename="package://waywiser_description/meshes/forwarder/wheel.dae"
+          scale="1.00000 1.00000 1.00000" />
+      </geometry>
+    </visual>
+  </link>
+  <link name="front_axle_link" />
+  <link name="front_chassis_link">
+    <visual name="front_chassis">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000" />
+      <material name="Main_Front_Mat" />
+      <geometry>
+        <mesh filename="package://waywiser_description/meshes/forwarder/front_chassis.dae"
+          scale="1.00000 1.00000 1.00000" />
+      </geometry>
+    </visual>
+  </link>
+  <link name="front_end_link" />
+  <link name="hitch_link" />
+  <link name="rear_axle_link" />
+  <link name="rear_chassis_link">
+    <visual name="rear_chassis">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000" />
+      <material name="Main_Back_Mat" />
+      <geometry>
+        <mesh filename="package://waywiser_description/meshes/forwarder/rear_chassis.dae"
+          scale="1.00000 1.00000 1.00000" />
+      </geometry>
+    </visual>
+  </link>
+  <link name="rear_end_link" />
+  <link name="rl1_wheel_link">
+    <visual name="rl1_wheel">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000" />
+      <material name="Tires_Mat" />
+      <geometry>
+        <mesh filename="package://waywiser_description/meshes/forwarder/wheel.dae"
+          scale="1.00000 1.00000 1.00000" />
+      </geometry>
+    </visual>
+  </link>
+  <link name="rl2_wheel_link">
+    <visual name="rl2_wheel">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000" />
+      <material name="Tires_Mat" />
+      <geometry>
+        <mesh filename="package://waywiser_description/meshes/forwarder/wheel.dae"
+          scale="1.00000 1.00000 1.00000" />
+      </geometry>
+    </visual>
+  </link>
+  <link name="rr1_wheel_link">
+    <visual name="rr1_wheel">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000" />
+      <material name="Tires_Mat" />
+      <geometry>
+        <mesh filename="package://waywiser_description/meshes/forwarder/wheel.dae"
+          scale="1.00000 1.00000 1.00000" />
+      </geometry>
+    </visual>
+  </link>
+  <link name="rr2_wheel_link">
+    <visual name="rr2_wheel">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000" />
+      <material name="Tires_Mat" />
+      <geometry>
+        <mesh filename="package://waywiser_description/meshes/forwarder/wheel.dae"
+          scale="1.00000 1.00000 1.00000" />
+      </geometry>
+    </visual>
+  </link>
+  <material name="Main_Back_Mat">
+    <color rgba="0.80000 0.80000 0.80000 1.00000" />
+  </material>
+  <material name="Main_Front_Mat">
+    <color rgba="0.80000 0.80000 0.80000 1.00000" />
+  </material>
+  <material name="Tires_Mat">
+    <color rgba="0.80000 0.80000 0.80000 1.00000" />
+  </material>
+</robot>

@@ -4,27 +4,21 @@ from pathlib import Path
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import IncludeLaunchDescription
-from launch.actions import OpaqueFunction
-from launch.actions import SetEnvironmentVariable
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+    SetEnvironmentVariable,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch_ros.descriptions import ParameterValue
 
 
 def generate_launch_description():
-    description_dir = get_package_share_directory('waywiser_description')
     gazebo_dir = get_package_share_directory('waywiser_gazebo')
 
     # args that can be set from the command line or a default will be used
-    robot_state_publisher_la = DeclareLaunchArgument(
-        'model',
-        default_value=os.path.join(description_dir, 'urdf/robot.urdf.xacro'),
-        description='Full path to robot urdf file',
-    )
     gazebo_la = DeclareLaunchArgument(
         'world',
         default_value=os.path.join(gazebo_dir, 'worlds/car_world.sdf'),
@@ -50,22 +44,6 @@ def generate_launch_description():
     )
 
     # start nodes and use args to set parameters
-    robot_state_publisher_node = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        name='robot_state_publisher',
-        parameters=[
-            {
-                'robot_description': ParameterValue(
-                    Command(['xacro ', LaunchConfiguration('model'), ' sim_mode:=', 'True']),
-                    value_type=str,
-                ),
-                'use_sim_time': LaunchConfiguration('use_sim_time'),
-                'frame_prefix': LaunchConfiguration('frame_prefix'),
-            }
-        ],
-    )
-
     spawn_robot = Node(
         package='ros_gz_sim',
         executable='create',
@@ -111,14 +89,10 @@ def generate_launch_description():
     ld.add_action(OpaqueFunction(function=set_ign_resources_path))
 
     # declare launch args
-    ld.add_action(robot_state_publisher_la)
     ld.add_action(use_sim_time_la)
     ld.add_action(frame_prefix_la)
     ld.add_action(gazebo_la)
     ld.add_action(gazebo_bridge_la)
-
-    # start robot_state_publisher_node
-    ld.add_action(robot_state_publisher_node)
 
     # run gazebo launch file
     ld.add_action(gazebo)
@@ -152,7 +126,7 @@ def set_ign_resources_path(context):
         if isinstance(input_ign_gazebo_resource_paths, list):
             ign_resources_path.update(set(input_ign_gazebo_resource_paths))
 
-    print('ign_resources_path:{}', ign_resources_path)
+    # print('ign_resources_path:{}', ign_resources_path)
     ign_resources_path_set_action = SetEnvironmentVariable(
         'IGN_GAZEBO_RESOURCE_PATH', ':'.join(ign_resources_path)
     )

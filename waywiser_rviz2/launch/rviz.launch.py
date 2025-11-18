@@ -2,8 +2,7 @@ import os
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import OpaqueFunction
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -40,7 +39,9 @@ def generate_launch_description():
 def launch_setup(context):
     rviz2_dir = get_package_share_directory('waywiser_rviz2')
     default_rviz_config_dir = os.path.join(rviz2_dir, 'config')
-    default_rviz_config_file = os.path.join(default_rviz_config_dir, 'odom_reference_frame.rviz')
+    default_rviz_config_file = os.path.join(
+        default_rviz_config_dir, 'odom_reference_frame_rover.rviz'
+    )
 
     rviz_config_file_full_path = ''
     rviz_config_file_or_dir = LaunchConfiguration('rviz_config').perform(context)
@@ -55,10 +56,16 @@ def launch_setup(context):
         elif os.path.isdir(rviz_config_file_or_dir):
             rviz_config_file_full_path = promt_user(rviz_config_file_or_dir)
         else:
-            print(
-                f'"{rviz_config_file_or_dir}" doesn\'t exist or is neither a file nor a directory. Do you want to proceed with default rviz config files?'  # noqa
+            rviz_config_file_full_path = os.path.join(
+                default_rviz_config_dir, rviz_config_file_or_dir
             )
-            rviz_config_file_full_path = promt_user(default_rviz_config_dir)
+            if os.path.isfile(rviz_config_file_full_path):
+                print(f'Using "{rviz_config_file_full_path}" config file for rviz.')
+            else:
+                print(
+                    f'"{rviz_config_file_or_dir}" doesn\'t exist or is neither a file nor a directory. Do you want to proceed with default rviz config files?'  # noqa
+                )
+                rviz_config_file_full_path = promt_user(default_rviz_config_dir)
     else:
         rviz_config_file_full_path = promt_user(default_rviz_config_dir)
 

@@ -1,3 +1,20 @@
+### Email Configuration
+
+To enable email functionality in WayWiseR nodes (for example, notifications from `waywiser_test_runner`), you need to provide email credentials in a `.env` file and set the environment variable `WAYWISER_DOTENV_PATH` to point to it.
+
+    export WAYWISER_DOTENV_PATH=$WAYWISER_WS/.env
+    echo "export WAYWISER_DOTENV_PATH=$WAYWISER_DOTENV_PATH" >> .venv/bin/activate
+
+The `.env` file should contain the following variables:
+
+    EMAIL_USER=''
+    EMAIL_PASSWORD=''
+    EMAIL_RECIPIENT=''
+    SMTP_SERVER=smtp.gmail.com
+    SMTP_PORT=465
+
+Note: If you are using Gmail, use an App Password for the `EMAIL_PASSWORD` variable.
+
 ## (Optional) FastDDS discovery server and client setup
 
 ### On server

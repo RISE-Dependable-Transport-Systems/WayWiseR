@@ -1,4 +1,3 @@
-pygame
 transforms3d
 psutil
 numpy
@@ -10,3 +9,12 @@ jinja2
 typeguard
 depthai==2.29.0.0
 opencv-python==4.11.0.86
+pyserial
+modbus_tk
+spidev
+setuptools
+yagmail
+dotenv
+pymap3d
+shapely
+PyQt5

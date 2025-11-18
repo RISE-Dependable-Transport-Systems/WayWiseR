@@ -1,0 +1,93 @@
+/**:
+  # general parameters shared by all waywise-related nodes
+  ros__parameters:
+    odom_frame: odom
+    base_frame: base_link
+    world_frame: map
+    rear_axle_frame: rear_axle_link
+    chassis_frame: chassis_link
+    front_end_frame: front_end_link
+    rear_end_frame: rear_end_link
+    left_end_frame: left_end_link
+    right_end_frame: right_end_link
+
+    front_steering_joint_names:
+      ["left_front_wheel_steering_joint", "right_front_wheel_steering_joint"]
+    front_wheel_joint_names:
+      ["left_front_wheel_joint", "right_front_wheel_joint"]
+    rear_wheel_joint_names: ["left_rear_wheel_joint", "right_rear_wheel_joint"]
+
+    length: 0.53
+    width: 0.255
+    wheelbase: 0.33
+
+    erpm_min: -10000.0
+    erpm_max: 10000.0
+    speed_to_erpm_factor: 4500.0
+    min_turning_radius: 0.92 # wheelbase/tan(max_steering_angle)
+    enuref: [57.713805, 12.890088, 203.59] # [lat, lon, height]
+
+    enable_visualization_msgs: true
+
+    urdf_file: "rover.urdf.xacro"
+    urdf_scale: 1.0 # 1:1
+    urdf_extra_args: "sim_mode:=true"
+
+    odom_topic: "/rover/odometry"
+    vehicle_pose_topic: "/rover/rear_axle_pose"
+    mission_status_topic: "/rover/mission_status"
+    autopilot_state_control_topic: "/rover/autopilot_state_control"
+    vehicle_alignment_reference_point_topic: "/rover/vehicle_alignment_reference_point"
+    autopilot_center_pose_topic: "/rover/autopilot_center_pose"
+    emergency_stop_status_topic: "/emergency_stop/current_state"
+    emergency_stop_update_topic: "/emergency_stop/target_state"
+
+waywiser_car_node:
+  ros__parameters:
+    vehicle_interface_type: "ext_simulated"
+    gnss_variant: "ext_simulated"
+    gnss_timeout: 3.0
+    servo_offset: 0.45
+    servo_range: 0.9 # servo_output = servo_offset + [-servo_range/2, servo_range/2]
+    #steering_angle_to_servo_gain: -0.950
+    invert_servo_output: false
+    # TODO: limit erpm also based on current
+    # current_max: 30.0
+    publish_odom_to_baselink_tf: false
+    publish_world_to_odom_tf: false
+    vehicle_state_poll_rate: 30 # currently same rate for both odom topic and odom->base_link tf
+    use_sdvp_position_fusion: false
+    min_battery_voltage: 13.6
+    enable_lidar: false
+    enable_camera: false
+    joint_states_publish_rate: 10
+
+    #autopilot component
+    autopilot_timer_rate: 30
+    waywise_control_tower_address: "127.0.0.1"
+    purepursuit_radius: 1.0
+    end_goal_alignment_type: 1 # Align {0: REAR_AXLE, 1: FRONT_REAR_END, 2: CENTER} with the end goal
+    end_goal_alignment_threshold: 0.1 # m
+
+emergency_stop_monitor:
+  ros__parameters:
+    start_with_emergency_stop: false
+    cmd_vel_in_timeout: 0.5
+    emergency_stop_state_publish_rate: 10
+
+onboard_twist_mux:
+  ros__parameters:
+    use_stamped: false
+    topics:
+      teleop:
+        topic: teleop_mux_vel
+        timeout: 0.5
+        priority: 100
+      waywise:
+        topic: waywiser_vel
+        timeout: 0.5
+        priority: 60
+      nav2:
+        topic: nav2_vel
+        timeout: 0.5
+        priority: 50

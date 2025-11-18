@@ -1,32 +1,87 @@
 /**:
   # general parameters shared by all agrarsense nodes
   ros__parameters:
-    vehicle_identifier: "forwarder"
-    base_frame_id: "forwarder/base_link"
-    odom_frame_id: "forwarder/odom"
-    base_frame: "forwarder/base_link"
-    odom_frame: "forwarder/odom"
-    erpm_min: -30000.0
-    erpm_max: 30000.0
-    length: 6.97
-    width: 2.98
-    wheelbase: 5.2
-    min_turning_radius: 0.58 # wheelbase/tan(max_steering_angle)
-    speed_to_erpm_factor: 4500.0
-    max_angular_velocity: 2.0 # rad/s
-    standstill_velocity_threshold: 0.05
-    odom_topic: "/agrarsense/out/vehicles/forwarder/odometry"
+    base_frame_id: "base_link"
+    odom_frame_id: "odom"
+    base_frame: "base_link"
+    odom_frame: "odom"
+    rear_axle_frame: "rear_axle_link"
+    rear_end_frame: "rear_end_link"
+    front_steering_joint_names: ["hitch_link_joint"]
+    front_wheel_joint_names:
+      ["fl1_link_joint", "fl2_link_joint", "fr1_link_joint", "fr2_link_joint"]
+    rear_wheel_joint_names:
+      ["rl1_link_joint", "rl2_link_joint", "rr1_link_joint", "rr2_link_joint"]
 
-waywiser_twist_to_agrarsense_control:
+    erpm_min: 440.0
+    erpm_max: 28000.0
+    length: 9.9865
+    width: 3.6824
+    wheelbase: 5.0990
+    min_turning_radius: 5.099 # wheelbase/tan(max_steering_angle)
+    speed_to_erpm_factor: 528.0
+    enuref: [57.713805, 12.890088, 203.59] # [lat, lon, height]
+    wheel_diameter: 1.39
+
+    rear_axle_frame_to_base_frame_offset: [2.7202, 0.0000, -0.6792]
+    rear_axle_frame_to_rear_end_frame_offset: [-2.2104, 0.0000, 0.3917]
+
+    enable_visualization_msgs: false
+
+    urdf_file: "forwarder.urdf"
+    urdf_scale: 1.0 # 1:1
+
+    odom_topic: "/forwarder/odometry"
+    vehicle_pose_topic: "/forwarder/rear_axle_pose"
+    rtcm_frequency_topic: "/forwarder/sensors/gnss/rtcm_frequency"
+    nav_sat_diagnostics_topic: "/forwarder/sensors/gnss/nav_sat_diagnostics"
+    nav_pvt_pose_topic: "/forwarder/sensors/gnss/nav_pvt_pose"
+    nav_sat_fix_topic: "/forwarder/sensors/gnss/nav_sat_fix"
+    battery_state_topic: "/forwarder/sensors/battery_state"
+    mission_status_topic: "/forwarder/mission_status"
+    autopilot_state_control_topic: "/forwarder/autopilot_state_control"
+    vehicle_alignment_reference_point_topic: "/forwarder/vehicle_alignment_reference_point"
+    autopilot_center_pose_topic: "/forwarder/autopilot_center_pose"
+    emergency_stop_status_topic: "/emergency_stop/current_state"
+    emergency_stop_update_topic: "/emergency_stop/target_state"
+
+waywiser_car_node:
   ros__parameters:
-    speed_control_threshold: 0.5 # in m/s
-    max_steering_angle: 80.0
-    max_throttle: 1.0
-    max_brake: 1.0
-    speed_control_kp: 0.5
-    speed_control_ki: 0.1
-    speed_control_kd: 0.05
-    speed_control_loop_rate: 20
+    vehicle_interface_type: "ext_simulated"
+    gnss_variant: "ext_simulated"
+    speed_control_type: "closed_loop_pid_speed_control"
+    pid_speed_controller_gains: [1.0, 0.01, 0.05]
+    gnss_timeout: 3.0
+    servo_offset: 0.472
+    servo_range: 0.4 # servo_output = servo_offset + [-servo_range/2, servo_range/2]
+    invert_servo_output: false
+    invert_steering_feedback_from_odom: true
+    waypoint_follower_bypass_mux: false
+    publish_odom_to_baselink_tf: false
+    publish_world_to_odom_tf: false
+    vehicle_state_poll_rate: 10 # currently same rate for both odom topic and odom->base_link tf
+    use_sdvp_position_fusion: false
+    min_battery_voltage: 13.6
+    joint_states_publish_rate: 10
+    invert_trailer_joint_state: true
+    autopilot_timer_rate: 10
+    enable_mavlink_interface: false
+    waywise_control_tower_address: "127.0.0.1"
+    waywise_control_tower_port: 14540
+    purepursuit_radius: 10.0 # m
+    purepursuit_forward_gain: 1.0
+    purepursuit_reverse_gain: -0.4
+    adaptive_pure_pursuit: true
+    end_goal_alignment_type: 0 # Align {0: REAR_AXLE, 1: FRONT_REAR_END, 2: CENTER} with the end goal
+    end_goal_alignment_threshold: 0.1 # m
+    adaptive_approach_speed_enabled: true
+    min_approach_speed: 1.39 # m/s
+    yaw_accuracy_threshold_for_mission: 1.0 # degrees
+    position_accuracy_threshold_for_mission: 0.7 # m
+
+waywiser_to_agrarsense_control:
+  ros__parameters:
+    steering_gain: 45.0
 
 emergency_stop_monitor:
   ros__parameters:
@@ -42,7 +97,7 @@ onboard_twist_mux:
         timeout: 0.5
         priority: 100
       waywise:
-        topic: waywise_vel
+        topic: waywiser_autopilot_vel
         timeout: 0.5
         priority: 60
       nav2:
@@ -59,13 +114,6 @@ collision_monitor:
     base_shift_correction: True
     stop_pub_timeout: 2.0
     polygons: ["PolygonSlow"]
-    PolygonStop:
-      type: "circle"
-      action_type: "stop"
-      max_points: 3
-      visualize: True
-      radius: 10.0
-      polygon_pub_topic: "/agrarsense/out/vehicles/forwarder/polygon_stop"
     PolygonSlow:
       type: "circle"
       action_type: "slowdown"
@@ -74,19 +122,9 @@ collision_monitor:
       visualize: True
       radius: 20.0
       polygon_pub_topic: "/agrarsense/out/vehicles/forwarder/polygon_slowdown"
-    FootprintApproach:
-      type: "circle"
-      radius: 10.0
-      footprint_topic: "/agrarsense/out/vehicles/forwarder/polygon_slowdown"
-      action_type: "approach"
-      time_before_collision: 1.0
-      simulation_time_step: 0.1
-      max_points: 5
-      visualize: True
     observation_sources: ["pointcloud_front"]
-
-waywise_car_autopilot_node:
-  ros__parameters:
-    autopilot_cmd_publish_rate: 30
-    waywise_control_tower_address: "127.0.0.1"
-    purepursuit_radius: 6.0
+    pointcloud_front:
+      type: "pointcloud"
+      topic: "/forwarder/depth_front/color/points"
+      min_height: 0.1
+      max_height: 0.5

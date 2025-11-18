@@ -10,7 +10,7 @@
                 "/cmd_vel_out",
                 "/emergency_stop/current_state",
                 "/emergency_stop/target_state",
-                "/waywise_vel"
+                "/waywiser_vel"
             ]
         }
     ]

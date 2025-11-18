@@ -14,15 +14,25 @@ def generate_launch_description():
         description='namespace for all components',
     )
 
-    rgb_camera_node_name_la = DeclareLaunchArgument(
-        'rgb_camera_node_name',
+    rgb_topic_la = DeclareLaunchArgument(
+        'rgb_topic',
         default_value='camera',
-        description='name for rgb camera node',
+        description='RGB camera image topic (excluding namespace)',
     )
-    depth_camera_node_name_la = DeclareLaunchArgument(
-        'depth_camera_node_name',
+    depth_topic_la = DeclareLaunchArgument(
+        'depth_topic',
         default_value='camera',
-        description='name for depth camera node',
+        description='Depth camera image topic (excluding namespace)',
+    )
+    rgb_camera_info_topic_la = DeclareLaunchArgument(
+        'rgb_camera_info_topic',
+        default_value='camera_info',
+        description='RGB camera info topic (excluding namespace)',
+    )
+    pointcloud_topic_la = DeclareLaunchArgument(
+        'pointcloud_topic',
+        default_value='points',
+        description='Pointcloud topic (excluding namespace)',
     )
     max_depth_meters_la = DeclareLaunchArgument(
         'max_depth_meters',
@@ -60,8 +70,10 @@ def generate_launch_description():
 
     # declare launch arg
     ld.add_action(namespace_la)
-    ld.add_action(rgb_camera_node_name_la)
-    ld.add_action(depth_camera_node_name_la)
+    ld.add_action(rgb_topic_la)
+    ld.add_action(depth_topic_la)
+    ld.add_action(rgb_camera_info_topic_la)
+    ld.add_action(pointcloud_topic_la)
     ld.add_action(max_depth_meters_la)
     ld.add_action(optical_to_ros_transform_la)
     ld.add_action(use_sim_time_la)
@@ -75,22 +87,24 @@ def generate_launch_description():
 
 
 def rgbd_to_pointcloud_launch(context):
-    rgb_camera_node_name = LaunchConfiguration('rgb_camera_node_name').perform(context)
-    depth_camera_node_name = LaunchConfiguration('depth_camera_node_name').perform(context)
+    rgb_topic = LaunchConfiguration('rgb_topic').perform(context)
+    depth_topic = LaunchConfiguration('depth_topic').perform(context)
+    rgb_camera_info_topic = LaunchConfiguration('rgb_camera_info_topic').perform(context)
+    pointcloud_topic = LaunchConfiguration('pointcloud_topic').perform(context)
     namespace = LaunchConfiguration('namespace').perform(context)
 
     rgbd_to_pointcloud_node = Node(
         package='waywiser_perception',
         executable='rgbd_to_pointcloud.py',
-        name=depth_camera_node_name + '_pointcloud',
+        name=depth_topic + '_pointcloud',
         namespace=namespace,
         parameters=[
             {
                 'use_sim_time': LaunchConfiguration('use_sim_time'),
-                'rgb_topic': rgb_camera_node_name + '/image',
-                'depth_topic': depth_camera_node_name + '/image',
-                'pointcloud_topic': depth_camera_node_name + '/color/points',
-                'camera_info_topic': rgb_camera_node_name + '/camera_info',
+                'rgb_topic': rgb_topic,
+                'depth_topic': depth_topic,
+                'pointcloud_topic': pointcloud_topic,
+                'camera_info_topic': rgb_camera_info_topic,
                 'max_depth_meters': LaunchConfiguration('max_depth_meters'),
                 'optical_to_ros_transform': LaunchConfiguration('optical_to_ros_transform'),
             },

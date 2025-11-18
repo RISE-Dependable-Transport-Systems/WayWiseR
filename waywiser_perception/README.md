@@ -31,16 +31,16 @@
 - ```
   rosdep install --from-paths src/WayWiseR/waywiser_perception -y -r --ignore-src
   ```
-- Download yolov8 model from https://docs.ultralytics.com/models/yolov8/
+- Download yolo model from https://docs.ultralytics.com/models/yolo/
 - (Optional) To use TensorRT, export the model using
   ```
   yolo export model={path_to_yolov8_pt_model} format=engine device=0
   ```
-- Provide the model path in yolov8.yaml config file.
+- Provide the model path in yolo.yaml config file.
 
 ## Examples
 
-    ros2 launch waywiser_perception yolov8.launch.py
-    ros2 launch waywiser_perception yolov8.launch.py use_sim_time:=true
-    ros2 launch waywiser_perception yolov8.launch.py yolov8_config:=./src/WayWiseR/waywiser_perception/config/yolov8.yaml
-    ros2 launch waywiser_perception yolov8.launch.py yolov8_config:=config_file_of_your_choice
+    ros2 launch waywiser_perception yolo.launch.py
+    ros2 launch waywiser_perception yolo.launch.py use_sim_time:=true
+    ros2 launch waywiser_perception yolo.launch.py yolo_config:=./src/WayWiseR/waywiser_perception/config/yolov8.yaml
+    ros2 launch waywiser_perception yolo.launch.py yolo_config:=config_file_of_your_choice

@@ -1,3 +1,6 @@
+/**:
+  ros__parameters:
+    joy_timeout: 1.0 #seconds
 joy:
   ros__parameters:
     # device_name: Sony Interactive Entertainment Wireless Controller
@@ -12,15 +15,15 @@ teleop_twist_joy:
     axis_linear: # Forward/Back
       x: 1
     scale_linear:
-      x: 0.5
+      x: 1.5
     scale_linear_turbo:
-      x: 1.0
+      x: 3.0
     axis_angular: # Left/Right
       yaw: 3
     scale_angular:
       yaw: 0.5
     scale_angular_turbo:
-      yaw: 0.5
+      yaw: 1.5
     enable_button: 4
     enable_turbo_button: 6
 
@@ -40,7 +43,6 @@ joy_emergency_stop:
   ros__parameters:
     emergency_stop_set_joy_button_index: 5
     emergency_stop_clear_joy_button_index: 7
-    joy_emergency_stop_timeout: 1.0 #seconds
 
 twist_angular_correction:
   ros__parameters:

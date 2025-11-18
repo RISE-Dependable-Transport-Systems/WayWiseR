@@ -6,6 +6,11 @@
     ros_port: 9090
     map_name: "playground" # possible options: playground, vindeln, rovaniemiforest
     ego_vehicle_identifier: "forwarder"
+    rgbd_to_pointcloud_sources: ["front"]
+    front:
+      attached_to: "forwarder"
+      rgb_camera: "rgb_front"
+      depth_camera: "depth_front"
 
 sim_orchestrator_node:
   ros__parameters:
@@ -18,9 +23,11 @@ sim_orchestrator_node:
     spectator_rendering: true
     quality_level: "Balanced" #"Ultra", "Balanced" or "Low"
     # spectator_transform: "85,2650,1200,0,270,0"
-    sim_startup_time: 5.0
-    command_publish_delay: 2.0
+    sim_startup_time: 10.0
+    command_publish_delay: 5.0
     objects_json_path: "playground_objects.json"
     sim_configurations_json_path: "sim_configurations.json"
     rosbag_output_dir: "sim_data" # relative path
     use_rosbag_recording: false
+    autostart_simulations: true
+    auto_spawn_objects: true

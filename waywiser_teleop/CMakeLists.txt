@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
+cmake_policy(SET CMP0071 NEW)
 project(waywiser_teleop)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -16,26 +17,50 @@ find_package(sensor_msgs REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(waywiser_twist_safety REQUIRED)
+find_package(waywiser REQUIRED)
 
 add_executable(joy_emergency_stop cpp_src/joy_emergency_stop.cpp)
-ament_target_dependencies(joy_emergency_stop rclcpp sensor_msgs std_msgs
-  waywiser_twist_safety)
+ament_target_dependencies(joy_emergency_stop
+  rclcpp
+  sensor_msgs
+  std_msgs
+  waywiser_twist_safety
+  waywiser
+)
 target_include_directories(joy_emergency_stop
   PRIVATE ${waywiser_twist_safety_INCLUDE_DIRS})
 
 add_executable(twist_angular_correction cpp_src/twist_angular_correction.cpp)
-ament_target_dependencies(twist_angular_correction geometry_msgs rclcpp
-  sensor_msgs std_msgs)
+ament_target_dependencies(twist_angular_correction
+  geometry_msgs
+  rclcpp
+  sensor_msgs
+  std_msgs
+)
 
-install(TARGETS joy_emergency_stop RUNTIME DESTINATION lib/${PROJECT_NAME})
-install(TARGETS twist_angular_correction
-  RUNTIME DESTINATION lib/${PROJECT_NAME})
+install(
+  TARGETS joy_emergency_stop twist_angular_correction
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
 
-install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
+install(
+  DIRECTORY launch config
+  DESTINATION share/${PROJECT_NAME}
+)
 
-ament_python_install_package(${PROJECT_NAME}_py PACKAGE_DIR py_src)
+ament_python_install_package(${PROJECT_NAME}_py
+  PACKAGE_DIR py_src/waywiser_teleop_py
+)
 
-install(PROGRAMS py_src/twist_keyboard.py DESTINATION lib/${PROJECT_NAME})
+install(
+  PROGRAMS py_src/waywiser_teleop_py/twist_keyboard.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(
+  DIRECTORY user_interface/twist_keyboard/
+  DESTINATION share/${PROJECT_NAME}/user_interface/twist_keyboard
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

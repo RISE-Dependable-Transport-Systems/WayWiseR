@@ -12,7 +12,7 @@ onboard_twist_mux:
         timeout: 0.5
         priority: 100
       waywise:
-        topic: waywise_vel
+        topic: waywiser_autopilot_vel
         timeout: 0.5
         priority: 60
       nav2:
