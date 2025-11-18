@@ -63,9 +63,14 @@ void PointCloudTransformer::pointCloudCallback(const sensor_msgs::msg::PointClou
         output_frame_, msg->header.frame_id, msg->header.stamp, std::chrono::seconds(
           1));
       RCLCPP_DEBUG(
-        this->get_logger(), "PC Transform - translation: [%f, %f, %f], rotation: [%f,  %f,  %f,  %f]", transform_stamped.transform.translation.x,
-        transform_stamped.transform.translation.y, transform_stamped.transform.translation.z,
-        transform_stamped.transform.rotation.x, transform_stamped.transform.rotation.y, transform_stamped.transform.rotation.z,
+        this->get_logger(),
+        "PC Transform - translation: [%f, %f, %f], rotation: [%f,  %f,  %f,  %f]",
+        transform_stamped.transform.translation.x,
+        transform_stamped.transform.translation.y,
+        transform_stamped.transform.translation.z,
+        transform_stamped.transform.rotation.x,
+        transform_stamped.transform.rotation.y,
+        transform_stamped.transform.rotation.z,
         transform_stamped.transform.rotation.w);
     }
 

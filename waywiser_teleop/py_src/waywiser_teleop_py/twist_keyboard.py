@@ -7,29 +7,22 @@ import time
 import wave
 
 from ament_index_python.packages import get_package_share_directory
-from geometry_msgs.msg import PoseStamped
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import PoseStamped, Twist
 from nav_msgs.msg import Odometry
 import numpy as np
-from PyQt5.QtCore import Qt
-from PyQt5.QtCore import QTimer
-from PyQt5.QtCore import QUrl
+from PyQt5.QtCore import Qt, QTimer, QUrl
 from PyQt5.QtMultimedia import QSoundEffect
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtWidgets import QDialog
-from PyQt5.QtWidgets import QMainWindow
+from PyQt5.QtWidgets import QApplication, QDialog, QMainWindow
 from PyQt5.uic import loadUi
 from rcl_interfaces.srv import GetParameters
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import NavSatFix
-from sensor_msgs.msg import NavSatStatus
+from sensor_msgs.msg import NavSatFix, NavSatStatus
 from std_msgs.msg import Float32
 from tf_transformations import euler_from_quaternion
-from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
 
-from waywiser_core.msg import BatteryState
-from waywiser_core.msg import NavSatDiagnostics
+from waywiser_core.msg import BatteryState, NavSatDiagnostics
+from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
 from waywiser_twist_safety.msg import EmergencyStopState
 
 UI_BASE_PATH = os.path.join(
@@ -551,7 +544,7 @@ class TwistKeyboardUI(QMainWindow):
         self.usage_button.clicked.connect(self.show_usage_guide)
 
     def setup_audio(self):
-        """Setup audio for low battery warning beep."""
+        """Set up audio for low battery warning beep."""
         self.sound_effect = None
         self.temp_wav_file = None
 
@@ -676,17 +669,6 @@ class TwistKeyboardUI(QMainWindow):
 
     def update_display(self):
         """Update the status display with modern UI elements."""
-
-        # Helper function for time formatting
-        def get_time_ago_and_color(stamp):
-            time_since = int((self.node.get_clock().now() - stamp).nanoseconds / 1e9)
-            if time_since > 60:
-                return (f'{time_since // 60}m ago', self.red_color)
-            elif time_since > 1:
-                return (f'{time_since}s ago', self.yellow_color)
-            else:
-                return ('now', self.green_color)
-
         # Define colors
         self.gray_color = '#6b7280'
         self.green_color = '#34d399'
@@ -697,6 +679,16 @@ class TwistKeyboardUI(QMainWindow):
         # Update vehicle status
         self.vehicle_node_label.setText(self.node.control_vehicle_node)
         self.vehicle_node_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
+
+        def get_time_ago_and_color(stamp):
+            # Helper function for time formatting
+            time_since = int((self.node.get_clock().now() - stamp).nanoseconds / 1e9)
+            if time_since > 60:
+                return (f'{time_since // 60}m ago', self.red_color)
+            elif time_since > 1:
+                return (f'{time_since}s ago', self.yellow_color)
+            else:
+                return ('now', self.green_color)
 
         # Emergency stop with color coding
         if self.node.last_emergency_stop_state['msg'] is not None:
@@ -918,7 +910,8 @@ class TwistKeyboardUI(QMainWindow):
 
             msg = self.node.last_nav_sat_diagnostics['msg']
             self.gnss_accuracy_label.setText(
-                f'({msg.horizontal_accuracy:.2f}m, {msg.vertical_accuracy:.2f}m, {msg.heading_accuracy:.2f}°)'
+                f'({msg.horizontal_accuracy:.2f}m, {msg.vertical_accuracy:.2f}m, '
+                f'{msg.heading_accuracy:.2f}°)'
             )
             self.gnss_accuracy_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
             self.gnss_last_rtcm_correction_label.setText(f'{msg.last_rtcm_correction}')

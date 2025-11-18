@@ -4,9 +4,9 @@ import math
 
 import rclpy
 from rclpy.node import Node
-from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
 
 from waywiser_perception.msg import DetectionArray
+from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
 from waywiser_twist_safety.msg import EmergencyStopState
 
 

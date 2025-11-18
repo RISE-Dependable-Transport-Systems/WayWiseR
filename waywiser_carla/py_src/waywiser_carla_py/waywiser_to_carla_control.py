@@ -4,13 +4,13 @@
 from carla_msgs.msg import CarlaEgoVehicleControl
 import rclpy
 from rclpy.node import Node
-from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
 
 from waywiser_core.msg import CarControlCommand
+from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
 
 
 class WaywiserToCarlaControl(Node):
-    """ROS2 node that converts WayWiseR CarControlCommand messages to CarlaEgoVehicleControl messages."""
+    """ROS2 node that converts WayWiseR CarControlCommand msgs to CarlaEgoVehicleControl msgs."""
 
     def __init__(self):
         super().__init__('waywiser_to_carla_control_node')

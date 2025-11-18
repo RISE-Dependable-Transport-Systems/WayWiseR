@@ -5,6 +5,7 @@ from typing import Dict, Optional
 
 from modbus_tk import modbus_rtu
 import modbus_tk.defines as cst
+
 from waywiser_hwbringup_py.dfrobot_ch432t import DFRobot_CH432T
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -32,7 +33,7 @@ DEFAULT_MEASUREMENT_TIME = 0.5  # seconds
 
 
 class URM14SensorArrayManager:
-    """Manager class for handling multiple URM14 sensors with different RS485 ports"""
+    """Manager class for handling multiple URM14 sensors with different RS485 ports."""
 
     def __init__(self):
         self.masters: Dict[str, modbus_rtu.RtuMaster] = {}
@@ -40,14 +41,16 @@ class URM14SensorArrayManager:
 
     def initialize_sensor_port(self, port: str, timeout: float = DEFAULT_MEASUREMENT_TIME) -> bool:
         """
-        Initialize a specific RS485 port for sensor communication
+        Initialize a specific RS485 port for sensor communication.
 
         Args:
             port: RS485 port identifier (e.g., "CH432T_PORT_1", "CH432T_PORT_2")
             timeout: Communication timeout in seconds
 
-        Returns:
+        Returns
+        -------
             bool: True if initialization successful, False otherwise
+
         """
         if port in self.masters:
             logging.warning(f'Port {port} already initialized')
@@ -76,11 +79,11 @@ class URM14SensorArrayManager:
             return False
 
     def get_master_for_port(self, port: str) -> Optional[modbus_rtu.RtuMaster]:
-        """Get the Modbus master for a specific port"""
+        """Get the Modbus master for a specific port."""
         return self.masters.get(port)
 
     def close_all_ports(self):
-        """Close all initialized ports and clean up resources"""
+        """Close all initialized ports and clean up resources."""
         for port, serial_obj in self.serial_objects.items():
             try:
                 if hasattr(serial_obj, 'close'):
@@ -93,7 +96,7 @@ class URM14SensorArrayManager:
         self.serial_objects.clear()
 
     def close_port(self, port: str):
-        """Close a specific port"""
+        """Close a specific port."""
         if port in self.serial_objects:
             try:
                 if hasattr(self.serial_objects[port], 'close'):
@@ -113,14 +116,16 @@ def initialize_master_bus(
     port: str, timeout: float = DEFAULT_MEASUREMENT_TIME
 ) -> Optional[modbus_rtu.RtuMaster]:
     """
-    Initialize or get existing master bus for a specific port
+    Initialize or get existing master bus for a specific port.
 
     Args:
         port: RS485 port identifier
         timeout: Communication timeout
 
-    Returns:
+    Returns
+    -------
         RtuMaster instance or None if initialization failed
+
     """
     print('Initializing sensor port', port)
     if urm14_sensor_array_manager.initialize_sensor_port(port, timeout):
@@ -129,7 +134,7 @@ def initialize_master_bus(
 
 
 def safe_modbus_read(master: modbus_rtu.RtuMaster, slave: int, register: int) -> float:
-    """Safely read a Modbus register with error handling"""
+    """Safely read a Modbus register with error handling."""
     try:
         return master.execute(slave, cst.READ_HOLDING_REGISTERS, register, 1)[0]
     except Exception as e:
@@ -140,7 +145,7 @@ def safe_modbus_read(master: modbus_rtu.RtuMaster, slave: int, register: int) ->
 def safe_modbus_write(
     master: modbus_rtu.RtuMaster, slave: int, register: int, write_value: int
 ) -> bool:
-    """Safely write to a Modbus register with error handling"""
+    """Safely write to a Modbus register with error handling."""
     try:
         master.execute(slave, cst.WRITE_SINGLE_REGISTER, register, output_value=write_value)
         return True
@@ -152,7 +157,7 @@ def safe_modbus_write(
 def write_distance_to_register(
     master: modbus_rtu.RtuMaster, slave: int, measurement_time: float = DEFAULT_MEASUREMENT_TIME
 ):
-    """Configure sensor for distance measurement"""
+    """Configure sensor for distance measurement."""
     control_value = safe_modbus_read(master, slave, CONTROL_ADDRESS)
     if not math.isnan(control_value):
         # Enable internal temperature compensation
@@ -172,15 +177,17 @@ def measure_distance(
     master: modbus_rtu.RtuMaster, slave: int, measurement_time: float = DEFAULT_MEASUREMENT_TIME
 ) -> float:
     """
-    Measure distance from URM14 sensor
+    Measure distance from URM14 sensor.
 
     Args:
         master: Modbus RTU master instance
         slave: Slave address of the sensor
         measurement_time: Time to wait for measurement completion
 
-    Returns:
+    Returns
+    -------
         Distance in millimeters, or NaN if measurement failed
+
     """
     write_distance_to_register(master, slave, measurement_time)
     # Read distance register
@@ -191,19 +198,19 @@ def measure_distance(
 
 
 def measure_internal_temperature(master: modbus_rtu.RtuMaster, slave: int) -> float:
-    """Measure internal temperature of URM14 sensor"""
+    """Measure internal temperature of URM14 sensor."""
     temperature = safe_modbus_read(master, slave, TEMPERATURE_ADDRESS)
     return temperature / 10  # Convert to °C
 
 
 def measure_electrical_noise_level(master: modbus_rtu.RtuMaster, slave: int) -> float:
-    """Measure electrical noise level of URM14 sensor"""
+    """Measure electrical noise level of URM14 sensor."""
     noise = safe_modbus_read(master, slave, NOISE_ADDRESS)
     return noise * 10  # Convert to percentage (0-100%)
 
 
 def change_slave_id(master: modbus_rtu.RtuMaster, new_slave_id: int):
-    """Change the slave ID of a URM14 sensor"""
+    """Change the slave ID of a URM14 sensor."""
     logging.info(f'Attempting to change slave ID to {hex(new_slave_id)}')
     logging.info(f'Writing to register {MODULE_ADDRESS} ({hex(MODULE_ADDRESS)})')
     try:
@@ -222,10 +229,10 @@ def change_slave_id(master: modbus_rtu.RtuMaster, new_slave_id: int):
 
 
 def cleanup_all_sensors():
-    """Clean up all sensor connections"""
+    """Clean up all sensor connections."""
     urm14_sensor_array_manager.close_all_ports()
 
 
 def cleanup_sensor_port(port: str):
-    """Clean up a specific sensor port"""
+    """Clean up a specific sensor port."""
     urm14_sensor_array_manager.close_port(port)

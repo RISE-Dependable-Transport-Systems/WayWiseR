@@ -8,10 +8,7 @@ from typing import Union
 
 from geometry_msgs.msg import PoseStamped
 import psutil
-from rclpy.qos import DurabilityPolicy
-from rclpy.qos import HistoryPolicy
-from rclpy.qos import QoSProfile
-from rclpy.qos import ReliabilityPolicy
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 import yagmail
 
 RELIABLE_TRANSIENT_LOCAL_QOS = QoSProfile(
@@ -47,14 +44,7 @@ def get_full_file_path(file_path, package_relative_path=''):
 
 
 def send_email(subject, body, email_recipient=None):
-    """
-    Send email using credentials from .env file
-
-    Args:
-        subject: Email subject
-        body: Email body content
-        email_recipient: Optional recipient (overrides .env default)
-    """
+    """Send email using credentials from .env file."""
     # Get credentials from .env
     email_user = os.getenv('EMAIL_USER')
     email_pass = os.getenv('EMAIL_PASSWORD')
@@ -256,7 +246,7 @@ def terminate_subprocess(process):
 def are_poses_equal(
     pose1: Union[PoseStamped, None], pose2: Union[PoseStamped, None], tol: float = 1e-6
 ) -> bool:
-    """Compares the positions of two PoseStamped messages."""
+    """Compare the positions of two PoseStamped messages."""
     if pose1 is None or pose2 is None:
         return False
 

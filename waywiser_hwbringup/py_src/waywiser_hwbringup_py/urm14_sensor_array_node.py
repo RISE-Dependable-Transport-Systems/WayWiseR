@@ -6,12 +6,23 @@ from typing import Any, Dict
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32
-from waywiser_hwbringup_py.urm14_sensor_array_manager import cleanup_all_sensors
-from waywiser_hwbringup_py.urm14_sensor_array_manager import initialize_master_bus
-from waywiser_hwbringup_py.urm14_sensor_array_manager import measure_distance
+
+from waywiser_hwbringup_py.urm14_sensor_array_manager import (
+    cleanup_all_sensors,
+    initialize_master_bus,
+    measure_distance,
+)
 
 
 class URM1SensorArrayNode(Node):
+    """
+    ROS 2 node for managing an array of URM14 ultrasonic sensors.
+
+    This node initializes the sensors specified via the 'sensor_names' parameter,
+    sets up Modbus RTU masters for each sensor, and periodically measures distances.
+    Each distance measurement is published to a ROS topic corresponding to the sensor.
+    """
+
     def __init__(self):
         super().__init__('urm14_sensor_array_node')
 
@@ -39,7 +50,7 @@ class URM1SensorArrayNode(Node):
             return
 
     def initialize_sensors(self, sensor_names):
-        """Initialize all specified sensors"""
+        """Initialize all specified sensors."""
         for sensor_name in sensor_names:
             try:
                 # Declare parameters for this sensor
@@ -79,7 +90,8 @@ class URM1SensorArrayNode(Node):
                 master = initialize_master_bus(config['rs485_port'], timeout=config['timeout'])
                 if master is None:
                     self.get_logger().error(
-                        f'Failed to initialize master for urm14 sensor {sensor_name} on port {config["rs485_port"]}'
+                        f'Failed to initialize master for urm14 sensor {sensor_name}'
+                        f'on port {config["rs485_port"]}'
                     )
                     continue
 
@@ -111,7 +123,7 @@ class URM1SensorArrayNode(Node):
                 )
 
     def publish_distance(self, sensor_name: str):
-        """Publish distance measurement for a specific sensor"""
+        """Publish distance measurement for a specific sensor."""
         if sensor_name not in self.sensor_configs:
             self.get_logger().error(f'Sensor {sensor_name} not found in configuration')
             return
@@ -139,7 +151,7 @@ class URM1SensorArrayNode(Node):
             self.get_logger().error(f'Error measuring distance for {sensor_name}: {str(e)}')
 
     def destroy_node(self):
-        """Clean up resources when node is destroyed"""
+        """Clean up resources when node is destroyed."""
         try:
             # Cancel all timers
             for timer in self.sensor_timers.values():

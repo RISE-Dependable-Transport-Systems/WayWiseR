@@ -9,8 +9,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 
-from waywiser_perception.msg import Detection
-from waywiser_perception.msg import DetectionArray
+from waywiser_perception.msg import Detection, DetectionArray
 
 # --- Constants ---
 COLOR_RESOLUTION = dai.ColorCameraProperties.SensorResolution.THE_1080_P

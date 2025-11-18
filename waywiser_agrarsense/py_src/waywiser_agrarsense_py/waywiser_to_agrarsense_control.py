@@ -3,13 +3,13 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
-from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
 
 from waywiser_core.msg import CarControlCommand
+from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
 
 
 class WaywiserToAgrarsenseControl(Node):
-    """ROS2 node that converts WayWiseR CarControlCommand messages to Agrarsense vehicle control messages."""
+    """ROS2 node that converts WayWiseR CarControlCommand messages to Agrarsense control msgs."""
 
     def __init__(self):
         super().__init__('waywiser_to_agrarsense_control')

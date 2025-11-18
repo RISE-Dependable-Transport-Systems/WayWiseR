@@ -8,11 +8,24 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo
 from tf2_ros import StaticTransformBroadcaster
-from tf_transformations import quaternion_from_euler
-from tf_transformations import quaternion_multiply
+from tf_transformations import quaternion_from_euler, quaternion_multiply
 
 
 class CameraInfoPublisher(Node):
+    """
+    ROS 2 node that publishes camera intrinsic parameters and a static transform.
+
+    This node initializes a CameraInfo message based on parameters such as width,
+    height, and field of view. It publishes the CameraInfo on a specified topic
+    and broadcasts a static transform from the base frame to the camera frame.
+
+    The node also supports an optional 'spawn_point' parameter, which is a JSON
+    string specifying the camera's initial position (x, y, z) in centimeters and
+    orientation (roll, pitch, yaw) in degrees. The orientation is converted to a
+    quaternion and combined with a fixed rotation from the camera optical frame to
+    the ROS camera frame.
+    """
+
     def __init__(self):
         super().__init__('camera_info_publisher')
 

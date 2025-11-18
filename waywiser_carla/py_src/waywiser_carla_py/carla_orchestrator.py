@@ -14,12 +14,14 @@ from rclpy.node import Node
 from std_msgs.msg import String
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 import tf_transformations
-from waywiser_py.waywiser_utils import cleanup_subprocesses
-from waywiser_py.waywiser_utils import create_subprocess
-from waywiser_py.waywiser_utils import get_full_file_path
-from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
-from waywiser_py.waywiser_utils import terminate_subprocess
 
+from waywiser_py.waywiser_utils import (
+    cleanup_subprocesses,
+    create_subprocess,
+    get_full_file_path,
+    RELIABLE_TRANSIENT_LOCAL_QOS,
+    terminate_subprocess,
+)
 from waywiser_test_runner.msg import SetupState
 
 WEATHER_PRESETS = {
@@ -345,7 +347,9 @@ class CarlaOrchestrator(Node):
                 start_simulator_command.append('-norelativemousemode')
 
             subprocess_name = 'simulator'
-            self.simulator_subprocess = create_subprocess(self, start_simulator_command, subprocess_name)
+            self.simulator_subprocess = create_subprocess(
+                self, start_simulator_command, subprocess_name
+            )
             time.sleep(self.sim_startup_time)
 
         self.client = carla.Client(self.host, self.port)

@@ -8,6 +8,15 @@ from sensor_msgs.msg import Image
 
 
 class RGBToGrayScale(Node):
+    """
+    ROS 2 node that converts an RGB image topic to depth images in grayscale.
+
+    This node subscribes to an RGB image topic, interprets the pixel values as
+    depth information, and publishes two types of depth images:
+    1. Raw floating-point depth (32FC1)
+    2. 16-bit mono depth (16UC1)
+    """
+
     def __init__(self):
         super().__init__('rgb_to_grayscale')
 

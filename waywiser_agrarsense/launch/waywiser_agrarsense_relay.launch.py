@@ -3,9 +3,7 @@ import os
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import IncludeLaunchDescription
-from launch.actions import OpaqueFunction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -159,7 +157,10 @@ def camera_publishers_launch(context):
                                             'fov': parameters['fOV'],
                                             'camera_frame': f'{role_name}/{sensor["id"]}',
                                             'base_frame': 'base_link',
-                                            'topic_name': f'/agrarsense/out/sensors/{sensor["id"]}/camera_info',
+                                            'topic_name': (
+                                                f'/agrarsense/out/sensors/{sensor["id"]}'
+                                                f'/camera_info'
+                                            ),
                                             'spawn_point': json.dumps(sensor['spawnPoint']),
                                         }
                                     ],
@@ -182,7 +183,10 @@ def camera_publishers_launch(context):
                                             'fov': parameters['fOV'],
                                             'camera_frame': f'{role_name}/{sensor["id"]}',
                                             'base_frame': 'base_link',
-                                            'topic_name': f'/agrarsense/out/sensors/{sensor["id"]}/camera_info',
+                                            'topic_name': (
+                                                f'/agrarsense/out/sensors/{sensor["id"]}/'
+                                                'camera_info'
+                                            ),
                                             'spawn_point': json.dumps(sensor['spawnPoint']),
                                         }
                                     ],
@@ -203,8 +207,12 @@ def camera_publishers_launch(context):
                                                 ),
                                                 'far_plane': 1000.0,
                                                 'frame_id_override': f'{role_name}/{sensor["id"]}',
-                                                'rgb_topic': f'/agrarsense/out/sensors/{sensor["id"]}',
-                                                'depth_topic': f'/agrarsense/out/sensors/{sensor["id"]}',
+                                                'rgb_topic': (
+                                                    f'/agrarsense/out/sensors/{sensor["id"]}'
+                                                ),
+                                                'depth_topic': (
+                                                    f'/agrarsense/out/sensors/{sensor["id"]}'
+                                                ),
                                             }
                                         ],
                                     )

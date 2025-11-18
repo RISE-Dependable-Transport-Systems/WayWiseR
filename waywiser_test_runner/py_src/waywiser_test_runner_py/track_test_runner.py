@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+# Standard library
 from copy import deepcopy
 import json
 import math
@@ -9,44 +10,43 @@ from typing import Union
 import xml.etree.ElementTree as ET
 
 from ament_index_python import get_package_share_directory
-from geometry_msgs.msg import Point
-from geometry_msgs.msg import Pose
-from geometry_msgs.msg import PoseStamped
-from geometry_msgs.msg import TransformStamped
-from geometry_msgs.msg import Twist
-from geometry_msgs.msg import Vector3
+from geometry_msgs.msg import Point, Pose, PoseStamped, TransformStamped, Twist, Vector3
+
+# Third-party
 import matplotlib.pyplot as plt
 from nav_msgs.msg import Path
 import numpy as np
 import pymap3d as pm
+
+# ROS 2 / rclpy
 import rclpy
-from rclpy.clock import Clock
-from rclpy.clock import ClockType
+from rclpy.clock import Clock, ClockType
 from rclpy.node import Node
 from shapely import affinity
 from shapely.geometry import box as shapely_box
-from std_msgs.msg import Bool
-from std_msgs.msg import String
-from tf2_ros import Buffer
-from tf2_ros import ConnectivityException
-from tf2_ros import ExtrapolationException
-from tf2_ros import LookupException
-from tf2_ros import TransformListener
+from std_msgs.msg import Bool, String
+from tf2_ros import (
+    Buffer,
+    ConnectivityException,
+    ExtrapolationException,
+    LookupException,
+    TransformListener,
+)
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 import tf_transformations
-from visualization_msgs.msg import Marker
-from visualization_msgs.msg import MarkerArray
-from waywiser_py.waywiser_utils import are_poses_equal
-from waywiser_py.waywiser_utils import cleanup_subprocesses
-from waywiser_py.waywiser_utils import create_subprocess
-from waywiser_py.waywiser_utils import get_full_file_path
-from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
-from waywiser_py.waywiser_utils import send_email
+from visualization_msgs.msg import Marker, MarkerArray
 
-from waywiser_core.msg import MissionState
-from waywiser_core.msg import PathWithTwists
-from waywiser_test_runner.msg import SetupState
-from waywiser_test_runner.msg import TestState
+# Local packages
+from waywiser_core.msg import MissionState, PathWithTwists
+from waywiser_py.waywiser_utils import (
+    are_poses_equal,
+    cleanup_subprocesses,
+    create_subprocess,
+    get_full_file_path,
+    RELIABLE_TRANSIENT_LOCAL_QOS,
+    send_email,
+)
+from waywiser_test_runner.msg import SetupState, TestState
 from waywiser_twist_safety.msg import EmergencyStopState
 
 PACKAGE_NAME = 'waywiser_test_runner'
@@ -294,9 +294,7 @@ class TrackTestRunner(Node):
             self.get_parameter('notify_via_mail_on_timeout').get_parameter_value().bool_value
         )
         self.notify_via_mail_on_completion = (
-            self.get_parameter('notify_via_mail_on_completion')
-            .get_parameter_value()
-            .bool_value
+            self.get_parameter('notify_via_mail_on_completion').get_parameter_value().bool_value
         )
 
         # Wait for clock to be published if using simulation time
@@ -340,7 +338,10 @@ class TrackTestRunner(Node):
             10,
         )
         self.enu_ref_subscriber = self.create_subscription(
-            Vector3, self.enu_ref_topic, self.enu_ref_callback, RELIABLE_TRANSIENT_LOCAL_QOS
+            Vector3,
+            self.enu_ref_topic,
+            self.enu_ref_callback,
+            RELIABLE_TRANSIENT_LOCAL_QOS,
         )
         self.setup_status_subscriber = self.create_subscription(
             SetupState,
@@ -371,7 +372,9 @@ class TrackTestRunner(Node):
             )
         self.trace_marker_publisher = self.create_publisher(Marker, '/trace_marker', 10)
         self.emergency_stop_publisher = self.create_publisher(
-            EmergencyStopState, '/emergency_stop/target_state', RELIABLE_TRANSIENT_LOCAL_QOS
+            EmergencyStopState,
+            '/emergency_stop/target_state',
+            RELIABLE_TRANSIENT_LOCAL_QOS,
         )
 
         # Create timers
@@ -535,7 +538,9 @@ class TrackTestRunner(Node):
                     if self.notify_via_mail_on_timeout:
                         send_email(
                             subject='Waywiser Test Runner Timeout',
-                            body=f'Test instance {self.current_config_index + 1}-{self.current_iter_idx + 1} timed out after {test_total_wall_time} s.',
+                            body=f'Test instance {self.current_config_index + 1}-'
+                            f'{self.current_iter_idx + 1} timed out after '
+                            f'{test_total_wall_time} s.',
                         )
                     self.is_test_runner_alive = False
                     return
@@ -576,7 +581,9 @@ class TrackTestRunner(Node):
                 )
 
                 transform = self.tf_buffer.lookup_transform(
-                    self.trailer_rear_axle_frame, self.trailer_rear_end_frame, rclpy.time.Time()
+                    self.trailer_rear_axle_frame,
+                    self.trailer_rear_end_frame,
+                    rclpy.time.Time(),
                 )
                 self.trailer_rear_axle_to_rear_end_offset_x = transform.transform.translation.x
                 log_msgs.append(
@@ -584,7 +591,9 @@ class TrackTestRunner(Node):
                 )
 
                 transform = self.tf_buffer.lookup_transform(
-                    self.trailer_rear_axle_frame, self.trailer_hitch_frame, rclpy.time.Time()
+                    self.trailer_rear_axle_frame,
+                    self.trailer_hitch_frame,
+                    rclpy.time.Time(),
                 )
                 self.trailer_rear_axle_to_hitch_offset_x = transform.transform.translation.x
                 log_msgs.append(
@@ -617,11 +626,11 @@ class TrackTestRunner(Node):
             return False
 
     def vehicle_pose_callback(self, msg):
-        """Callback for the vehicle pose subscriber."""
+        """Handle vehicle pose messages."""
         self.vehicle_pose = msg
 
     def trailer_pose_callback(self, msg):
-        """Callback for the trailer pose subscriber."""
+        """Handle trailer pose messages."""
         self.trailer_pose = msg
 
     def parse_test_configs(self):
@@ -649,7 +658,9 @@ class TrackTestRunner(Node):
                             test_start_point.pose.position.z = z
                             test_start_point.pose.orientation = (
                                 tf_transformations.quaternion_from_euler(
-                                    math.radians(roll), math.radians(pitch), math.radians(yaw)
+                                    math.radians(roll),
+                                    math.radians(pitch),
+                                    math.radians(yaw),
                                 )
                             )
 
@@ -662,7 +673,8 @@ class TrackTestRunner(Node):
                         parsed_config = {
                             'iterations': track_test_config.get('iterations', 1),
                             'preplanned_route_filepath': track_test_config.get(
-                                'preplanned_route_filepath', self.preplanned_route_filepath
+                                'preplanned_route_filepath',
+                                self.preplanned_route_filepath,
                             ),
                             'vehicle_start_position_is_test_start_point': track_test_config.get(
                                 'vehicle_start_position_is_test_start_point',
@@ -679,7 +691,7 @@ class TrackTestRunner(Node):
         return parsed_configs
 
     def mission_status_callback(self, msg):
-        """Callback for the mission status subscriber."""
+        """Handle mission status messages."""
         if msg.state in (MissionState.IDLE, MissionState.FOLLOW_ROUTE_FINISHED):
             if self.test_state == TestState.WAITING_FOR_VEHICLE_INIT:
                 self.get_logger().info('Vehicle is initialized.')
@@ -723,7 +735,9 @@ class TrackTestRunner(Node):
                 if self.has_trailer and self.reverse_test_route.twists[0].linear.x < 0.0:
                     vehicle_pose: Union[PoseStamped, None] = self.trailer_pose
                 if are_poses_equal(
-                    vehicle_pose, self.staging_area_pose, tol=self.end_goal_alignment_threshold
+                    vehicle_pose,
+                    self.staging_area_pose,
+                    tol=self.end_goal_alignment_threshold,
                 ):
                     self.update_test_state(TestState.SETUP_COMPLETED)
                     self.get_logger().info('Test setup completed.')
@@ -841,8 +855,12 @@ class TrackTestRunner(Node):
         reference_pose_to_rear_end_offset_x=0.0,
     ):
         """
-        Compute composite bounding dimensions for the articulated vehicle,
-        then publish a hollow (wireframe) bounding box marker.
+        Publish a simple hollow (wireframe) vehicle footprint marker.
+
+        The footprint is a rectangular bounding box centered on a pose derived from
+        the given reference pose. The function computes the footprint center based
+        on vehicle dimensions, optional margins, and an optional yaw offset, then
+        publishes a single visualization marker.
         """
         if reference_pose is None:
             return
@@ -884,7 +902,6 @@ class TrackTestRunner(Node):
 
     def _visualize_path(self, waywiser_path: PathWithTwists, xml_filepath: str):
         """Visualize the path in a non-blocking matplotlib window."""
-
         # Extract coordinates from the path
         x_coords = [pose.pose.position.x for pose in waywiser_path.path.poses]
         y_coords = [pose.pose.position.y for pose in waywiser_path.path.poses]
@@ -929,7 +946,7 @@ class TrackTestRunner(Node):
                 '',
                 xy=(x_coords[i + 1], y_coords[i + 1]),
                 xytext=(x_coords[i], y_coords[i]),
-                arrowprops=dict(arrowstyle='->', color='blue', lw=1.5),
+                arrowprops={'arrowstyle': '->', 'color': 'blue', 'lw': 1.5},
             )
 
         # Set title and labels
@@ -950,7 +967,7 @@ class TrackTestRunner(Node):
                 f'Avg speed: {avg_speed:.2f} m/s',
                 transform=ax.transAxes,
                 verticalalignment='top',
-                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8),
+                bbox={'boxstyle': 'round', 'facecolor': 'wheat', 'alpha': 0.8},
             )
 
         # Make layout tight
@@ -1030,15 +1047,17 @@ class TrackTestRunner(Node):
 
                         # print(f'Before: x_val: {x_val}, y_val: {y_val}, z_val: {z_val}')
 
-                        importedAbsPoint_lat, importedAbsPoint_lon, importedAbsPoint_h = (
-                            pm.enu2geodetic(
-                                x_val,
-                                y_val,
-                                z_val,
-                                imported_enu_ref['latitude'],
-                                imported_enu_ref['longitude'],
-                                imported_enu_ref['height'],
-                            )
+                        (
+                            importedAbsPoint_lat,
+                            importedAbsPoint_lon,
+                            importedAbsPoint_h,
+                        ) = pm.enu2geodetic(
+                            x_val,
+                            y_val,
+                            z_val,
+                            imported_enu_ref['latitude'],
+                            imported_enu_ref['longitude'],
+                            imported_enu_ref['height'],
                         )
                         x_val, y_val, z_val = pm.geodetic2enu(
                             importedAbsPoint_lat,
@@ -1049,7 +1068,8 @@ class TrackTestRunner(Node):
                             self.enuref[2],
                         )
                         # print(
-                        #     f'After: x_val: {x_val}, y_val: {y_val}, z_val: {z_val}, speed: {speed_val}'
+                        #     f'After: x_val: {x_val}, y_val: {y_val}, z_val: '
+                        #     f'{z_val}, speed: {speed_val}'
                         # )
 
                         # Set the computed position in the PoseStamped.
@@ -1096,7 +1116,8 @@ class TrackTestRunner(Node):
                         first_point = waywiser_path.path.poses[0].pose.position
                         second_point = waywiser_path.path.poses[1].pose.position
                         desired_yaw = math.atan2(
-                            second_point.y - first_point.y, second_point.x - first_point.x
+                            second_point.y - first_point.y,
+                            second_point.x - first_point.x,
                         )
                     else:
                         desired_yaw = reference_yaw
@@ -1147,7 +1168,8 @@ class TrackTestRunner(Node):
                         last_point = waywiser_path.path.poses[-1].pose.position
                         second_last_point = waywiser_path.path.poses[-2].pose.position
                         desired_yaw = math.atan2(
-                            last_point.y - second_last_point.y, last_point.x - second_last_point.x
+                            last_point.y - second_last_point.y,
+                            last_point.x - second_last_point.x,
                         )
                     else:
                         desired_yaw = reference_yaw
@@ -1320,7 +1342,8 @@ class TrackTestRunner(Node):
             self.stop_test_wall_timer = None
 
         self.get_logger().info(
-            f'Ending test with index [{self.current_config_index + 1}-{self.current_iter_idx + 1}].'
+            f'Ending test with index [{self.current_config_index + 1}-'
+            f'{self.current_iter_idx + 1}].'
         )
         cleanup_subprocesses(self.subprocesses)
 
@@ -1353,7 +1376,8 @@ class TrackTestRunner(Node):
             return
 
         self.get_logger().info(
-            f'Starting test with index [{self.current_config_index + 1}-{self.current_iter_idx + 1}].'
+            f'Starting test with index [{self.current_config_index + 1}'
+            f'-{self.current_iter_idx + 1}].'
         )
         self.publish_static_tfs()
         self.update_test_state(TestState.TEST_INIT)
@@ -1414,7 +1438,11 @@ class TrackTestRunner(Node):
                 ]
             )[2]
         )
-        test_start_point_str = f'{self.staging_area_pose.pose.position.x:0.2f}, {self.staging_area_pose.pose.position.y:0.2f}, {self.staging_area_pose.pose.position.z:0.2f}, 0, 0, {test_start_point_yaw:0.2f}'
+        test_start_point_str = (
+            f'{self.staging_area_pose.pose.position.x:0.2f}, '
+            f'{self.staging_area_pose.pose.position.y:0.2f}, '
+            f'{self.staging_area_pose.pose.position.z:0.2f}, 0, 0, {test_start_point_yaw:0.2f}'
+        )
         self.get_logger().info(f'Test start point location: {test_start_point_str}')
 
     def get_vehicle_reference_poses_from_combined_center_pose(self, combined_center_pose):

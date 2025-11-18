@@ -29,9 +29,33 @@ install(
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
+  set(AMENT_LINT_AUTO_EXCLUDE
+    ament_cmake_flake8
+    ament_cmake_pep257
+  )
+  find_package(ament_cmake_flake8 REQUIRED)
+  find_package(ament_cmake_pep257 REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
+  set(EXCLUDED_FILES py_src/waywiser_hwbringup_py/dfrobot_ch432t.py)
+
+  # Get all Python files
+  file(GLOB_RECURSE ALL_PYTHON_FILES
+    "py_src/waywiser_hwbringup_py/*.py"
+    "launch/*.py"
+  )
+
+  # Remove the excluded files from the list
+  foreach(EXCLUDED_FILE ${EXCLUDED_FILES})
+    list(FILTER ALL_PYTHON_FILES EXCLUDE REGEX ".*${EXCLUDED_FILE}$")
+  endforeach()
+
+  # Run linters with filtered file list
+  if(ALL_PYTHON_FILES)
+    ament_flake8(${ALL_PYTHON_FILES})
+    ament_pep257(${ALL_PYTHON_FILES})
+  endif()
 endif()
 
 ament_package()
