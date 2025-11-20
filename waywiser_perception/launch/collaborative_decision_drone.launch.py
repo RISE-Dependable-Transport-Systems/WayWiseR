@@ -4,8 +4,6 @@
 # 1. Start OAK-D camera, remap "detections_topic" to "detections_topic_drone" for the next step. Command: "ros2 launch depthai_ros_driver camera.launch.py params_file:=waywiser_hwbringup/config/oak_d.yaml"
 
 # 2. Continuously convert detections_topic_drone (camera-relative coordinates) to global coordinates and publish as detections_topic_global #TODO
-#     - Use coordinatetransforms.h infrastructure from WayWise 
-#     - Access global coordinates of Drone from /nav_sat_fix topic 
 
 import os
 
