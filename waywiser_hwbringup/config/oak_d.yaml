@@ -1,9 +1,19 @@
 /**:
   ros__parameters:
     camera:
-      i_enable_imu: false
+      i_enable_imu: true
       i_nn_type: spatial
       i_restart_on_diagnostics_error: true
     nn:
       i_nn_config_path: depthai_ros_driver/yolo
       i_confidence_threshold: 0.6
+    imu:
+      i_enable_rotation: true
+      i_rot_mode: ROTATION_VECTOR
+      i_enable_acc: true  
+      i_enable_gyro: true  
+      i_message_type: "IMU"  
+      # Synchronised sampling rates accross sensors, important for sensor fusion (default values on BNO086 IMUs)
+      i_acc_freq: 400  
+      i_gyro_freq: 400  
+      i_rot_freq: 400

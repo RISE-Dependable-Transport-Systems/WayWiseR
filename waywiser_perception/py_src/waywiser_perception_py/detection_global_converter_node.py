@@ -32,7 +32,7 @@ def quat_conjugate(q):
 
 
 def quat_mul(q1, q2):
-    # Hamilton product of two quaternions (x,y,z,w) 
+    # Multiplication of two quaternions (x,y,z,w) 
     x1, y1, z1, w1 = q1
     x2, y2, z2, w2 = q2
     x = w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2
@@ -59,18 +59,18 @@ class DetectionGlobalConverter(Node):
     """
     Node that:
     1. Subscribes to camera-relative spatial detections.
-    2. Listens to IMU topic (default: /imu/data) to get quaternion orientation (camera configurations: i_enable_rotation: true and i_rot_mode: "ROTATION_VECTOR").
+    2. Listens to IMU topic (default: /imu/data) to get quaternion orientation (TODO camera configuration: i_enable_rotation: true and i_rot_mode: "ROTATION_VECTOR").
     3. Uses TF2 to transform detection points from the camera frame into the IMU frame.
     4. Rotates those points by the IMU quaternion to align with gravity (world frame).
     5. Publishes a geometry_msgs/PoseArray on 'detections_topic_global' with the transformed positions.
 
-    Note! World -> GPS conversion is currently omitted. Publishes instead the gravity-aligned world frame.
+    TODO World -> GPS conversion is currently omitted. Publishes instead the gravity-aligned world frame.
         - Use /nav_sat_fix position after converting lat/lon to a local cartesian frame like ENU, with the coordinatetransforms.h infrastructure from WayWise. Alternatively, use the robot_localization sensor fusion package to combine IMU and GNSS data.
     """
     def __init__(self):
         super().__init__('detection_global_converter')
 
-        # parameters
+        # Declare arameters
         self.declare_parameter('detections_topic', 'detections_topic_drone')
         self.declare_parameter('global_topic', 'detections_topic_global')
         self.declare_parameter('imu_topic', '/imu/data')
@@ -89,14 +89,12 @@ class DetectionGlobalConverter(Node):
 
         # IMU 
         self.latest_imu = None
-        self._imu_lock = Lock() # Protected by a lock for thread-safety.
+        self._imu_lock = Lock() # Protected by a lock for thread-safety
         self.create_subscription(Imu, imu_topic, self.imu_callback, 10)
 
         # Detections subscriber (expects depthai_ros_msgs/SpatialDetectionArray)
         if SpatialDetectionArray is None:
-            self.get_logger().error(
-                "depthai_ros_msgs.SpatialDetectionArray is not importable. Install the dependency or adapt the node."
-            )
+            raise RuntimeError("depthai_ros_msgs.SpatialDetectionArray is not importable. Install the dependency or adapt the node.")
         self.create_subscription(
             SpatialDetectionArray,
             det_topic,
@@ -118,6 +116,11 @@ class DetectionGlobalConverter(Node):
     def imu_callback(self, msg: Imu):
         with self._imu_lock:
             self.latest_imu = msg
+        # Runtime sanity check: if quaternion norm is ~0, likely rotation vectors are not enabled
+        q = msg.orientation
+        quat_norm = math.sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w)
+        if quat_norm < 1e-3:
+            self.get_logger().warning_once("Received IMU orientation appears unset (quaternion norm ~0). Ensure camera rotation output is enabled.")
 
     def detections_callback(self, msg):
         """
