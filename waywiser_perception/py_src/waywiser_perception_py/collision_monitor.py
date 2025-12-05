@@ -94,7 +94,7 @@ class CollisionMonitor(Node):
             return None
 
     def create_point_stamped(self, position, detection, array_header):
-        """Return PointStamped for position using detection.header if present, else array_header"""
+        """Return PointStamped for position with detection.header if present, else array_header."""
         point_stamped = PointStamped()
         point_stamped.point = position
 
