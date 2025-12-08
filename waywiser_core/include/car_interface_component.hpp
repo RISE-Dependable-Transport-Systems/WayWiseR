@@ -96,7 +96,7 @@ public:
   void activate_emergency_stop(const std::string & sender_id = "", const std::string & reason = "");
   void clear_emergency_stop(const std::string & sender_id = "");
 
-  void updateControlCommand(const geometry_msgs::msg::Twist & twist, double dt);
+  void updateControlCommand(double desired_linear_speed, double desired_angular_speed, double dt);
   void executeControlCommand();
 
 signals:

@@ -177,10 +177,9 @@ void CarInterfaceComponent::clear_emergency_stop(const std::string & sender_id)
   }
 }
 
-void CarInterfaceComponent::updateControlCommand(const geometry_msgs::msg::Twist & twist, double dt)
+void CarInterfaceComponent::updateControlCommand(
+  double desired_linear_speed, double desired_angular_speed, double dt)
 {
-  float desired_speed = 0.0;
-
   if (mEmergencyStopState->is_active()) {
     mCarControlCommand.throttle = 0.0;
     mCarControlCommand.brake = 1.0;
@@ -192,25 +191,26 @@ void CarInterfaceComponent::updateControlCommand(const geometry_msgs::msg::Twist
     static double max_linear_speed = mErpmMax / mSpeedToRPMFactor;
     static double min_linear_speed = mErpmMin / mSpeedToRPMFactor;
 
-    desired_speed = std::clamp(twist.linear.x, -max_linear_speed, max_linear_speed);
-    desired_speed = fabs(desired_speed) >= min_linear_speed ? desired_speed : 0.0;
+    desired_linear_speed = std::clamp(desired_linear_speed, -max_linear_speed, max_linear_speed);
+    desired_linear_speed = fabs(desired_linear_speed) >=
+      min_linear_speed ? desired_linear_speed : 0.0;
 
     switch (mSpeedControlType) {
       case SpeedControlType::OPEN_LOOP_ERPM_CONTROL:
         {
-          mCarControlCommand.throttle = desired_speed / max_linear_speed;
+          mCarControlCommand.throttle = desired_linear_speed / max_linear_speed;
           mCarControlCommand.brake = 0.0;
         } break;
       case SpeedControlType::CLOSED_LOOP_PID_SPEED_CONTROL:
         {
-          if (fabs(desired_speed) > 0.0) {
-            double speed_error = desired_speed - mCarState->getSpeed();
+          if (fabs(desired_linear_speed) > 0.0) {
+            double speed_error = desired_linear_speed - mCarState->getSpeed();
             auto speed_control_signal = std::clamp(
               mPIDSpeedController->compute(speed_error, dt), -1.0, 1.0);
             // qDebug() << "Speed control signal: " << speed_control_signal << ", current speed: " <<
-            // mCarState->getSpeed() << ", desired speed: " << desired_speed << ", speed error: " <<
+            // mCarState->getSpeed() << ", desired speed: " << desired_linear_speed << ", speed error: " <<
             // speed_error;
-            if (desired_speed * speed_control_signal > 0.0) {
+            if (desired_linear_speed * speed_control_signal > 0.0) {
               mCarControlCommand.throttle = speed_control_signal;
               mCarControlCommand.brake = 0.0;
             } else {
@@ -229,20 +229,19 @@ void CarInterfaceComponent::updateControlCommand(const geometry_msgs::msg::Twist
     }
 
     float steering_curvature = 0.0; // 1/r = ω/v
-    if (fabs(desired_speed) > 0.0) {
-      steering_curvature = twist.angular.z / desired_speed;
+    if (fabs(desired_linear_speed) > 0.0) {
+      steering_curvature = desired_angular_speed / desired_linear_speed;
     } else {
-      steering_curvature = twist.angular.z / min_linear_speed;
+      steering_curvature = desired_angular_speed / min_linear_speed;
     }
 
     // NOTE / TODO: WayWise has a sign error here (curvature in wrong direction)
     mCarControlCommand.steering = std::clamp(
       -atan(mCarState->getAxisDistance() * steering_curvature) / mCarState->getMaxSteeringAngle(),
-      -1.0,
-      1.0);
+      -1.0, 1.0);
   }
 
-  mMovementController->setDesiredSpeed(desired_speed);
+  mMovementController->setDesiredSpeed(desired_linear_speed);
   mMovementController->setDesiredSteering(mCarControlCommand.steering);
 }
 

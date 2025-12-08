@@ -578,20 +578,6 @@ void WaywiserCar::twist_callback(const geometry_msgs::msg::Twist::SharedPtr twis
   process_twist_msg(twist_msg);
 }
 
-void WaywiserCar::process_twist_msg(const geometry_msgs::msg::Twist::SharedPtr twist_msg)
-{
-  static auto previousTimeCalled = this->get_clock()->now();
-  auto thisTimeCalled = this->get_clock()->now();
-  double dt = (thisTimeCalled.nanoseconds() - previousTimeCalled.nanoseconds()) / 1e9;
-  previousTimeCalled = thisTimeCalled;
-
-  if (dt > 0.0) {
-    mCarInterfaceComponent->updateControlCommand(*twist_msg, dt);
-    mCarInterfaceComponent->executeControlCommand();
-    car_control_command_pub_->publish(mCarInterfaceComponent->getCarControlCommand().to_msg());
-  }
-}
-
 void WaywiserCar::odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom_msg)
 {
   static xyz_t rear_axle_frame_to_odom_child_frame_offset;
@@ -1033,6 +1019,19 @@ void WaywiserCar::publish_joint_states(double timePassedSinceLastCall_ms)
 }
 
 // ----------------- Utility methods -----------------
+void WaywiserCar::process_twist_msg(const geometry_msgs::msg::Twist::SharedPtr twist_msg)
+{
+  static auto previousTimeCalled = this->get_clock()->now();
+  auto thisTimeCalled = this->get_clock()->now();
+  double dt = (thisTimeCalled.nanoseconds() - previousTimeCalled.nanoseconds()) / 1e9;
+  previousTimeCalled = thisTimeCalled;
+
+  if (dt > 0.0) {
+    mCarInterfaceComponent->updateControlCommand(twist_msg->linear.x, twist_msg->angular.z, dt);
+    mCarInterfaceComponent->executeControlCommand();
+    car_control_command_pub_->publish(mCarInterfaceComponent->getCarControlCommand().to_msg());
+  }
+}
 
 double WaywiserCar::update_joint_states_msg(
   sensor_msgs::msg::JointState & joint_state_msg,

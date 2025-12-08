@@ -88,9 +88,9 @@ protected:
   virtual void publish_joint_states(double timePassed_ms);
 
   // Utility methods
+  void process_twist_msg(const geometry_msgs::msg::Twist::SharedPtr twist_msg);
   virtual double update_joint_states_msg(
     sensor_msgs::msg::JointState & joint_state_msg, double timePassedSinceLastCall_ms);
-  void process_twist_msg(const geometry_msgs::msg::Twist::SharedPtr twist_msg);
 
   // ROS parameters
   std::string urdf_file_;
