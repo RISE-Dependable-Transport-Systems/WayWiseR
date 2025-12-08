@@ -17,11 +17,9 @@ from PyQt5.uic import loadUi
 from rcl_interfaces.srv import GetParameters
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import NavSatFix, NavSatStatus
-from std_msgs.msg import Float32
 from tf_transformations import euler_from_quaternion
 
-from waywiser_core.msg import BatteryState, NavSatDiagnostics
+from waywiser_core.msg import BatteryState, NavSatFixExtended
 from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
 from waywiser_twist_safety.msg import EmergencyStopState
 
@@ -101,30 +99,25 @@ class TwistKeyboard(Node):
             10,
         )
 
-        # Topic names (to be fetched from vehicle node)
+        # Vehicle parameters (to be fetched from vehicle node)
         self.odom_topic = ''
         self.vehicle_pose_topic = ''
         self.battery_state_topic = ''
-        self.rtcm_frequency_topic = ''
-        self.nav_sat_diagnostics_topic = ''
-        self.nav_sat_fix_topic = ''
+        self.nav_sat_fix_extended_topic = ''
+        self.enuref = [0.0, 0.0, 0.0]
 
         # Subscribers (will be created after fetching topics)
         self.odom_subscriber = None
         self.vehicle_pose_subscriber = None
         self.battery_state_subscriber = None
-        self.rtcm_frequency_subscriber = None
-        self.nav_sat_diagnostics_subscriber = None
-        self.nav_sat_fix_subscriber = None
+        self.nav_sat_fix_extended_subscriber = None
 
         # State variables
         self.last_emergency_stop_state = {'msg': None, 'stamp': self.get_clock().now()}
         self.last_odom = {'pose': None, 'twist': None, 'stamp': self.get_clock().now()}
         self.last_vehicle_pose = {'pose': None, 'stamp': self.get_clock().now()}
         self.last_battery_state = {'msg': None, 'stamp': self.get_clock().now()}
-        self.last_nav_sat_diagnostics = {'msg': None, 'stamp': self.get_clock().now()}
-        self.last_nav_sat_fix = {'msg': None, 'stamp': self.get_clock().now()}
-        self.last_rtcm_frequency = {'frequency': None, 'stamp': self.get_clock().now()}
+        self.last_nav_sat_fix_extended = {'msg': None, 'stamp': self.get_clock().now()}
 
         # Current twist command
         self.current_twist = Twist()
@@ -133,8 +126,25 @@ class TwistKeyboard(Node):
         self.keys_pressed = set()
         self.is_actuation_requested = False
 
-    def request_topics_from_vehicle_node(self):
-        """Request topics from the current vehicle node."""
+        # RTCM correction age mapping
+        self.rtcm_correction_age_mapping = {
+            0: 'NA',
+            1: '0-1 s',
+            2: '1-2 s',
+            3: '2-5 s',
+            4: '5-10 s',
+            5: '10-15 s',
+            6: '15-20 s',
+            7: '20-30 s',
+            8: '30-45 s',
+            9: '45-60 s',
+            10: '60-90 s',
+            11: '90-120 s',
+            12: '≥120 s',
+        }
+
+    def request_params_from_vehicle_node(self):
+        """Request params from the current vehicle node."""
         service_name = f'/{self.control_vehicle_node}/get_parameters'
         self.get_logger().info(f"Requesting parameters from '{self.control_vehicle_node}'")
 
@@ -151,9 +161,8 @@ class TwistKeyboard(Node):
             'odom_topic',
             'vehicle_pose_topic',
             'battery_state_topic',
-            'rtcm_frequency_topic',
-            'nav_sat_diagnostics_topic',
-            'nav_sat_fix_topic',
+            'fused_nav_sat_fix_extended_topic',
+            'enuref',
         ]
 
         future = client.call_async(request)
@@ -161,19 +170,22 @@ class TwistKeyboard(Node):
 
         if future.result() is not None:
             vals = future.result().values
-            if len(vals) >= 6:
+            if len(vals) >= 5:
                 self.odom_topic = vals[0].string_value or self.odom_topic
                 self.vehicle_pose_topic = vals[1].string_value or self.vehicle_pose_topic
                 self.battery_state_topic = vals[2].string_value or self.battery_state_topic
-                self.rtcm_frequency_topic = vals[3].string_value or self.rtcm_frequency_topic
-                self.nav_sat_diagnostics_topic = (
-                    vals[4].string_value or self.nav_sat_diagnostics_topic
+                self.nav_sat_fix_extended_topic = (
+                    vals[3].string_value or self.nav_sat_fix_extended_topic
                 )
-                self.nav_sat_fix_topic = vals[5].string_value or self.nav_sat_fix_topic
+                self.enuref = vals[4].double_array_value or self.enuref
 
                 # Create subscribers
                 self._create_subscribers()
                 self.get_logger().info(f"Updated topics from '{self.control_vehicle_node}'")
+            else:
+                self.get_logger().warn(
+                    f"Received {len(vals)} topics instead of 5 from '{self.control_vehicle_node}'"
+                )
 
         self.destroy_client(client)
 
@@ -200,28 +212,14 @@ class TwistKeyboard(Node):
                 BatteryState, self.battery_state_topic, self.battery_state_callback, 10
             )
 
-        if self.rtcm_frequency_topic:
-            if self.rtcm_frequency_subscriber:
-                self.destroy_subscription(self.rtcm_frequency_subscriber)
-            self.rtcm_frequency_subscriber = self.create_subscription(
-                Float32, self.rtcm_frequency_topic, self.rtcm_frequency_callback, 10
-            )
-
-        if self.nav_sat_diagnostics_topic:
-            if self.nav_sat_diagnostics_subscriber:
-                self.destroy_subscription(self.nav_sat_diagnostics_subscriber)
-            self.nav_sat_diagnostics_subscriber = self.create_subscription(
-                NavSatDiagnostics,
-                self.nav_sat_diagnostics_topic,
-                self.nav_sat_diagnostics_callback,
+        if self.nav_sat_fix_extended_topic:
+            if self.nav_sat_fix_extended_subscriber:
+                self.destroy_subscription(self.nav_sat_fix_extended_subscriber)
+            self.nav_sat_fix_extended_subscriber = self.create_subscription(
+                NavSatFixExtended,
+                self.nav_sat_fix_extended_topic,
+                self.nav_sat_fix_extended_callback,
                 10,
-            )
-
-        if self.nav_sat_fix_topic:
-            if self.nav_sat_fix_subscriber:
-                self.destroy_subscription(self.nav_sat_fix_subscriber)
-            self.nav_sat_fix_subscriber = self.create_subscription(
-                NavSatFix, self.nav_sat_fix_topic, self.gnss_fix_callback, 10
             )
 
     def odom_callback(self, msg):
@@ -237,17 +235,9 @@ class TwistKeyboard(Node):
         self.last_battery_state['msg'] = msg
         self.last_battery_state['stamp'] = self.get_clock().now()
 
-    def rtcm_frequency_callback(self, msg):
-        self.last_rtcm_frequency['frequency'] = msg.data
-        self.last_rtcm_frequency['stamp'] = self.get_clock().now()
-
-    def nav_sat_diagnostics_callback(self, msg):
-        self.last_nav_sat_diagnostics['msg'] = msg
-        self.last_nav_sat_diagnostics['stamp'] = self.get_clock().now()
-
-    def gnss_fix_callback(self, msg):
-        self.last_nav_sat_fix['msg'] = msg
-        self.last_nav_sat_fix['stamp'] = self.get_clock().now()
+    def nav_sat_fix_extended_callback(self, msg):
+        self.last_nav_sat_fix_extended['msg'] = msg
+        self.last_nav_sat_fix_extended['stamp'] = self.get_clock().now()
 
     def emergency_stop_state_subscriber_callback(self, msg):
         self.last_emergency_stop_state['msg'] = msg
@@ -604,7 +594,7 @@ class TwistKeyboardUI(QMainWindow):
             vehicle_node = dialog.get_vehicle_node_name()
             if vehicle_node:
                 self.node.control_vehicle_node = vehicle_node
-                self.node.request_topics_from_vehicle_node()
+                self.node.request_params_from_vehicle_node()
 
     def keyPressEvent(self, event):
         """Handle key press events."""
@@ -679,6 +669,12 @@ class TwistKeyboardUI(QMainWindow):
         # Update vehicle status
         self.vehicle_node_label.setText(self.node.control_vehicle_node)
         self.vehicle_node_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
+
+        # Update ENU reference
+        self.enuref_label.setText(
+            f'({self.node.enuref[0]:.6f}°, {self.node.enuref[1]:.6f}°, {self.node.enuref[2]:.2f}m)'
+        )
+        self.enuref_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
 
         def get_time_ago_and_color(stamp):
             # Helper function for time formatting
@@ -788,17 +784,6 @@ class TwistKeyboardUI(QMainWindow):
                 self.battery_label.setText(f'{voltage:.2f} V')
                 self.battery_label.setStyleSheet(f'color: {time_based_color}; font-weight: 700;')
 
-        # RTCM frequency
-        if self.node.last_rtcm_frequency['frequency'] is not None:
-            rtcm_time_label, rtcm_time_based_color = get_time_ago_and_color(
-                self.node.last_rtcm_frequency['stamp']
-            )
-            self.rtcm_time_label.setText(f'Last updated: {rtcm_time_label}')
-            self.rtcm_time_label.setStyleSheet(f'color: {rtcm_time_based_color}; font-size: 9pt;')
-            freq = self.node.last_rtcm_frequency['frequency']
-            self.rtcm_label.setText(f'{freq:.2f} Hz')
-            self.rtcm_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
-
         # Odometry
         if self.node.last_odom['pose'] is not None:
             time_label, time_based_color = get_time_ago_and_color(self.node.last_odom['stamp'])
@@ -861,60 +846,62 @@ class TwistKeyboardUI(QMainWindow):
             )
 
         # GNSS Fix
-        if self.node.last_nav_sat_fix['msg'] is not None:
+        if self.node.last_nav_sat_fix_extended['msg'] is not None:
+            msg = self.node.last_nav_sat_fix_extended['msg']
             time_label, time_based_color = get_time_ago_and_color(
-                self.node.last_nav_sat_fix['stamp']
+                self.node.last_nav_sat_fix_extended['stamp']
             )
-            self.gnss_time_label.setText(f'Last updated: {time_label}')
+            self.gnss_time_label.setText(time_label)
             self.gnss_time_label.setStyleSheet(f'color: {time_based_color}; font-weight: 700;')
 
-            fix_type = self.node.last_nav_sat_fix['msg'].status.status
+            fix_type = msg.fix_type
             fix_text = 'UNKNOWN'
             fix_color = self.gray_color
 
-            if fix_type == NavSatStatus.STATUS_NO_FIX:
+            if fix_type == NavSatFixExtended.FIX_TYPE_NO_FIX:
                 fix_text = 'NO FIX'
                 fix_color = self.red_color
-            elif fix_type == NavSatStatus.STATUS_FIX:
+            elif fix_type == NavSatFixExtended.FIX_TYPE_2D_FIX:
                 fix_text = '2D FIX'
                 fix_color = self.blue_color
-            elif fix_type == NavSatStatus.STATUS_GBAS_FIX:
+            elif fix_type == NavSatFixExtended.FIX_TYPE_3D_FIX:
                 fix_text = '3D FIX'
                 fix_color = self.yellow_color
-            elif fix_type == 111:
+            elif fix_type == NavSatFixExtended.FIX_TYPE_DEAD_RECKONING_ONLY_FIX:
                 fix_text = 'DEAD RECKONING'
                 fix_color = '#942478'
-            elif fix_type == 114:
+            elif fix_type == NavSatFixExtended.FIX_TYPE_GNSS_DR_COMBINED_FIX:
                 fix_text = 'GNSS + DR'
                 fix_color = self.green_color
-            elif fix_type == 115:
+            elif fix_type == NavSatFixExtended.FIX_TYPE_TIME_ONLY_FIX:
                 fix_text = 'TIME ONLY'
                 fix_color = self.red_color
 
             self.gnss_fix_label.setText(fix_text)
             self.gnss_fix_label.setStyleSheet(f'color: {fix_color}; font-weight: 700;')
 
-            lat = self.node.last_nav_sat_fix['msg'].latitude
-            lon = self.node.last_nav_sat_fix['msg'].longitude
-            alt = self.node.last_nav_sat_fix['msg'].altitude
-            self.gnss_pos_label.setText(f'({lat:.6f}°, {lon:.6f}°, {alt:.1f}m)')
+            self.gnss_pos_label.setText(
+                f'({msg.latitude:.6f}°, {msg.longitude:.6f}°, {msg.altitude:.2f}m)'
+            )
             self.gnss_pos_label.setStyleSheet(f'color: {time_based_color}; font-weight: 700;')
 
-        # GNSS diagnostics
-        if self.node.last_nav_sat_diagnostics['msg'] is not None:
-            time_label, time_based_color = get_time_ago_and_color(
-                self.node.last_nav_sat_diagnostics['stamp']
+            self.gnss_head_label.setText(
+                f'{self.node.last_nav_sat_fix_extended["msg"].heading:.1f}°'
             )
-            self.gnssdiag_time_label.setText(f'Last updated: {time_label}')
-            self.gnssdiag_time_label.setStyleSheet(f'color: {time_based_color}; font-weight: 700;')
+            self.gnss_head_label.setStyleSheet(f'color: {time_based_color}; font-weight: 700;')
 
-            msg = self.node.last_nav_sat_diagnostics['msg']
             self.gnss_accuracy_label.setText(
                 f'({msg.horizontal_accuracy:.2f}m, {msg.vertical_accuracy:.2f}m, '
                 f'{msg.heading_accuracy:.2f}°)'
             )
             self.gnss_accuracy_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
-            self.gnss_last_rtcm_correction_label.setText(f'{msg.last_rtcm_correction}')
+
+            if msg.last_rtcm_correction_age > 12:
+                msg.last_rtcm_correction_age = 12
+            gnss_last_rtcm_correction_label_text = self.node.rtcm_correction_age_mapping[
+                msg.last_rtcm_correction_age
+            ]
+            self.gnss_last_rtcm_correction_label.setText(gnss_last_rtcm_correction_label_text)
             self.gnss_last_rtcm_correction_label.setStyleSheet(
                 f'color: {self.green_color}; font-weight: 700;'
             )
