@@ -6,11 +6,17 @@
 #include <limits>
 
 #include "boost/algorithm/string.hpp"
-#include "rclcpp/rclcpp.hpp"
-
+#include "geometry_msgs/msg/pose.hpp"
 #include "geometry_msgs/msg/twist.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include "tf2/exceptions.h"
+#include "tf2/LinearMath/Transform.h"
+#include "tf2/utils.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+
 
 #include "WayWise/autopilot/purepursuitwaypointfollower.h"
+#include "WayWise/sensors/gnss/gnssreceiver.h"
 
 #include "waywiser_core/msg/mission_state.hpp"
 #include "waywiser_core/msg/car_control_command.hpp"
@@ -91,6 +97,23 @@ public:
 private:
   int8_t state = waywiser_twist_safety::msg::EmergencyStopState::UNKNOWN;
 };
+
+inline void update_pospoint_from_pose(
+  QSharedPointer<ObjectState> objectState,
+  const xyz_t pose_frame_to_reference_frame_offset,
+  const geometry_msgs::msg::Pose pose,
+  const PosType posType)
+{
+  PosPoint posPoint = objectState->getPosition(posType);
+  posPoint.setX(pose.position.x);
+  posPoint.setY(pose.position.y);
+  posPoint.setHeight(pose.position.z);
+  posPoint.updateWithOffsetAndYawRotation(
+    -pose_frame_to_reference_frame_offset, tf2::getYaw(pose.orientation));
+  posPoint.setTime(
+    QTime::currentTime().addSecs(-QDateTime::currentDateTime().offsetFromUtc()));
+  objectState->setPosition(posPoint);
+}
 
 inline std::string missionStateToString(MissionState state)
 {

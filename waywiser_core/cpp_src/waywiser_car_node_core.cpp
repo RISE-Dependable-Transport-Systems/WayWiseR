@@ -38,13 +38,13 @@ void WaywiserCar::initialize_node(
   mCarAutopilotComponent = carAutopilotComponent;
 
   setup_parameters();
+
   mCarInterfaceComponent->setup_vehicle_interface();
 
-  mGNSSReceiver = mCarInterfaceComponent->getGnssReceiver();
   mEmergencyStopState = mCarInterfaceComponent->getEmergencyStopState();
 
   if (enable_autopilot_component_) {
-    mCarAutopilotComponent->setupAutopilot(mGNSSReceiver, mEmergencyStopState);
+    mCarAutopilotComponent->setupAutopilot(mEmergencyStopState);
     if (mCarAutopilotComponent->getEnableMavlinkInterface()) {
       mCarAutopilotComponent->provideParametersToParameterServer();
     }
@@ -91,16 +91,11 @@ void WaywiserCar::setup_parameters()
   rear_end_frame_ = declare_parameter("rear_end_frame", base_frame_);
   left_end_frame_ = declare_parameter("left_end_frame", base_frame_);
   right_end_frame_ = declare_parameter("right_end_frame", base_frame_);
-  gnss_chip_frame_ = declare_parameter("gnss_chip_frame", base_frame_);
-  gnss_antenna_frame_ = declare_parameter("gnss_antenna_frame", base_frame_);
 
   battery_state_topic_ = declare_parameter("battery_state_topic", "/battery_state");
   odom_topic_ = declare_parameter("odom_topic", "/odom");
-  nav_sat_fix_topic_ = declare_parameter("nav_sat_fix_topic", "/nav_sat_fix");
-  nav_sat_diagnostics_topic_ =
-    declare_parameter("nav_sat_diagnostics_topic", "/nav_sat_diagnostics");
-  rtcm_frequency_topic_ = declare_parameter("rtcm_frequency_topic", "/rtcm_frequency");
-  enu_refernce_topic_ = declare_parameter("enu_refernce_topic", "/enu_refernce");
+  fused_nav_sat_fix_extended_topic_ = declare_parameter(
+    "fused_nav_sat_fix_extended_topic", "/nav_sat_fix_extended");
   vehicle_pose_topic_ = declare_parameter("vehicle_pose_topic", "/car_pose");
   emergency_stop_update_topic_ =
     declare_parameter("emergency_stop_update_topic", "/emergency_stop/target_state");
@@ -134,7 +129,8 @@ void WaywiserCar::setup_parameters()
   enable_visualization_msgs_ = declare_parameter("enable_visualization_msgs", false);
   publish_odom_to_baselink_tf_ = declare_parameter("publish_odom_to_baselink_tf", true);
   publish_world_to_odom_tf_ = declare_parameter("publish_world_to_odom_tf", false);
-  invert_steering_feedback_from_odom_ = declare_parameter("invert_steering_feedback_from_odom", false);
+  invert_steering_feedback_from_odom_ = declare_parameter(
+    "invert_steering_feedback_from_odom", false);
 
   joint_states_publish_rate_ = declare_parameter("joint_states_publish_rate", 0);
   wheel_diameter_ = declare_parameter("wheel_diameter", 1.0);
@@ -158,16 +154,10 @@ void WaywiserCar::setup_parameters()
   max_target_speed = mCarInterfaceComponent->getErpmMax() /
     mCarInterfaceComponent->getSpeedToRPMFactor();
 
-  mCarInterfaceComponent->setUseSdvpPositionFusion(
-    declare_parameter("use_sdvp_position_fusion", false));
-  if (mCarInterfaceComponent->getUseSdvpPositionFusion()) {
-    mCarInterfaceComponent->setImuVariant(
-      get_imu_variant_param(this, "imu_for_sdvp_position_fusion"));
-  }
+  mCarInterfaceComponent->setImuVariant(
+    get_imu_variant_param(this, "imu_variant"));
   mCarInterfaceComponent->setVehicleInterfaceType(
     get_vehicle_interface_type_param(this, "vehicle_interface_type"));
-  mCarInterfaceComponent->setGnssReceiverVariant(
-    get_receiver_variant_param(this, "gnss_variant"));
   mCarInterfaceComponent->setSpeedControlType(
     get_speed_control_type_param(this, "speed_control_type"));
 
@@ -180,21 +170,6 @@ void WaywiserCar::setup_parameters()
 
   mCarInterfaceComponent->setVehicleStatePollRate(
     declare_parameter("vehicle_state_poll_rate", 10));
-  mCarInterfaceComponent->setPositionFusionInputTimerRate(
-    declare_parameter("position_fusion_input_timer_rate", 10));
-  mCarInterfaceComponent->setGnssPrintVerbose(
-    declare_parameter("gnss_print_verbose", false));
-  mCarInterfaceComponent->setGnssSensorFusionImuAutoalign(
-    declare_parameter("gnss_sensor_fusion_imu_autoalign", true));
-  mCarInterfaceComponent->setGnssSensorFusionForceRecalibrate(
-    declare_parameter("gnss_sensor_fusion_force_recalibrate", false));
-  mCarInterfaceComponent->setGnssMeasurementRate(
-    declare_parameter("gnss_measurement_rate", 5));
-  mCarInterfaceComponent->setGnssPriorityMessageRate(
-    declare_parameter("gnss_priority_message_rate", 10));
-  mCarInterfaceComponent->setGnssDynamicModel(
-    static_cast<DynamicModel>(
-      declare_parameter("gnss_dynamic_model", 12)));
 
   std::map<std::string, std::tuple<int, int>> tof_sensors_info;
   for (const auto & tof_sensor_name : tof_sensor_names_) {
@@ -208,7 +183,6 @@ void WaywiserCar::setup_parameters()
     tof_sensor_topics_[tof_sensor_name] = topic_name;
   }
   mCarInterfaceComponent->setToFSensorsInfo(tof_sensors_info);
-  mCarInterfaceComponent->setGnssTimeout(declare_parameter("gnss_timeout", 3.0));
 
   std::ostringstream log_stream;
   log_stream << "CarInterfaceComponent offset parameters:\n";
@@ -236,37 +210,14 @@ void WaywiserCar::setup_parameters()
   log_stream << "rear_axle_frame_to_rear_end_frame_offset: " << vector3_param->c_str() << "\n";
   mCarInterfaceComponent->setRearAxleToRearEndOffset(vector3_param->to_type<xyz_t>());
 
-  // GNSS antenna to GNSS chip
-  vector3_param = get_vector3_param(this, "gnss_antenna_to_gnss_chip_offset");
-  if (!vector3_param && mUrdfModel) {
-    vector3_param = getFramePositionOffset(mUrdfModel, gnss_chip_frame_, gnss_antenna_frame_);
-  }
-  log_stream << "gnss_antenna_to_gnss_chip_offset: " << vector3_param->c_str() << "\n";
-  mCarInterfaceComponent->setGnssAntennaToGnssChipOffset(vector3_param->to_type<xyz_t>());
-
-  // GNSS chip to rear axle
-  vector3_param = get_vector3_param(this, "gnss_chip_to_rear_axle_offset");
-  if (!vector3_param && mUrdfModel) {
-    vector3_param = getFramePositionOffset(mUrdfModel, rear_axle_frame_, gnss_chip_frame_);
-  }
-  log_stream << "gnss_chip_to_rear_axle_offset: " << vector3_param->c_str() << "\n";
-  mCarInterfaceComponent->setGnssChipToRearAxleOffset(vector3_param->to_type<xyz_t>());
-
-  // GNSS chip orientation
-  vector3_param = get_vector3_param(this, "gnss_chip_orientation_offset");
-  if (!vector3_param && mUrdfModel) {
-    vector3_param = getFrameRotationOffset(mUrdfModel, rear_axle_frame_, gnss_chip_frame_);
-  }
-  log_stream << "gnss_chip_orientation_offset: " << vector3_param->c_str() << "\n";
-  mCarInterfaceComponent->setGnssChipOrientationOffset(vector3_param->to_type<xyz_t>());
-
   // Output log_stream
   RCLCPP_INFO_STREAM(get_logger(), log_stream.str());
 
   vector3_param = get_vector3_param(this, "enuref");
   if (vector3_param) {
-    mCarInterfaceComponent->setEnuReference(vector3_param->to_type<llh_t>());
+    enuref_ = vector3_param->to_type<llh_t>();
   }
+  mCarState->setEnuRef(enuref_);
 
   if (enable_autopilot_component_) {
     waypoint_follower_bypass_mux_ = declare_parameter("waypoint_follower_bypass_mux", false);
@@ -352,45 +303,6 @@ void WaywiserCar::setup_publishers()
       break;
   }
 
-  switch (mCarInterfaceComponent->getGnssReceiverVariant()) {
-    case RECEIVER_VARIANT::UBLX_ZED_F9P:
-    case RECEIVER_VARIANT::UBLX_ZED_F9R:
-      {
-        nav_sat_fix_pub_ = create_publisher<sensor_msgs::msg::NavSatFix>(nav_sat_fix_topic_, 10);
-        nav_sat_diagnostics_pub_ =
-          create_publisher<waywiser_core::msg::NavSatDiagnostics>(nav_sat_diagnostics_topic_, 10);
-        rtcm_frequency_pub_ = create_publisher<std_msgs::msg::Float32>(rtcm_frequency_topic_, 10);
-
-        QSharedPointer<UbloxRover> mUbloxRover =
-          qSharedPointerDynamicCast<UbloxRover>(mGNSSReceiver);
-        if (mUbloxRover) {
-          QObject::connect(
-            mUbloxRover.get(), &UbloxRover::txNavPvt, this, &WaywiserCar::publish_nav_sat_data);
-          QObject::connect(
-            mUbloxRover.get(), &UbloxRover::updatedEnuReference,
-            [&](const llh_t enuRef) {
-              geometry_msgs::msg::Vector3 enu_refernce_msg;
-              enu_refernce_msg.x = enuRef.latitude;
-              enu_refernce_msg.y = enuRef.longitude;
-              enu_refernce_msg.z = enuRef.height;
-              enu_refernce_pub_->publish(enu_refernce_msg);
-            });
-        }
-
-        QObject::connect(
-          mCarInterfaceComponent->getRtcmClient().get(), &RtcmClient::rtcmData,
-          [&](const QByteArray & data) {
-            Q_UNUSED(data)
-            publish_rtcm_frequency();
-          });
-      } break;
-    default:
-      break;
-  }
-
-  enu_refernce_pub_ = create_publisher<geometry_msgs::msg::Vector3>(
-    enu_refernce_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
-
   vehicle_pose_pub_ = create_publisher<geometry_msgs::msg::PoseStamped>(
     vehicle_pose_topic_, 10);
   emergency_stop_update_pub_ = create_publisher<waywiser_twist_safety::msg::EmergencyStopState>(
@@ -452,13 +364,13 @@ void WaywiserCar::setup_publishers()
 
     QObject::connect(
       mCarAutopilotComponent.get(), &CarAutopilotComponent::gnssFixAccuracyAssertionFailed,
-      [&]() {
+      [&](GnssFixStatus gnssFixStatus) {
         if (!mEmergencyStopState->is_active()) {
           std::stringstream emergency_stop_reason;
           emergency_stop_reason << "GNSS accuracy dropped below thresholds: " <<
-            std::fixed << std::setprecision(2) << mGNSSReceiver->getGnssFixAccuracy().horizontal <<
+            std::fixed << std::setprecision(2) << gnssFixStatus.horizontalAccuracy <<
             " m and " << std::fixed << std::setprecision(2) <<
-            mGNSSReceiver->getGnssFixAccuracy().heading << " deg.";
+            gnssFixStatus.headingAccuracy << " deg.";
 
           auto emergency_stop_msg = waywiser_twist_safety::msg::EmergencyStopState();
           emergency_stop_msg.state = waywiser_twist_safety::msg::EmergencyStopState::ACTIVE;
@@ -487,6 +399,11 @@ void WaywiserCar::setup_subscribers()
     default:
       break;
   }
+
+  fused_nav_sat_fix_extended_sub_ =
+    this->create_subscription<waywiser_core::msg::NavSatFixExtended>(
+    fused_nav_sat_fix_extended_topic_, 10, std::bind(
+      &WaywiserCar::fused_nav_sat_fix_extended_callback, this, _1));
 
   twist_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
     "/cmd_vel", 10, std::bind(&WaywiserCar::twist_callback, this, _1));
@@ -525,27 +442,6 @@ void WaywiserCar::setup_timers()
     );
   }
 
-  switch (mCarInterfaceComponent->getGnssReceiverVariant()) {
-    case RECEIVER_VARIANT::EXTERNAL:
-      {
-        external_fused_position_update_timer_ = rclcpp::create_timer(
-          this->get_node_base_interface(),
-          this->get_node_timers_interface(),
-          this->get_clock(), // uses sim time if enabled
-          std::chrono::milliseconds(
-            (int)std::round(
-              1000.0 * mCarInterfaceComponent->getGnssTimeout()
-            )),
-          [this]() {
-            external_fused_position_update_timer_->cancel();
-            emit externalFusedPositionTimeout();
-          }
-        );
-      } break;
-    default:
-      break;
-  }
-
   if (enable_autopilot_component_) {
     autopilot_state_machine_timer_ = rclcpp::create_timer(
       this->get_node_base_interface(),
@@ -574,26 +470,10 @@ void WaywiserCar::node_management_timer_callback()
     return;
   }
 
-  if (mCarInterfaceComponent->getGnssReceiverVariant() == RECEIVER_VARIANT::EXTERNAL) {
-    try {
-      geometry_msgs::msg::TransformStamped map_to_base_link_msg_tfs = tf_buffer_->lookupTransform(
-        world_frame_, rear_axle_frame_, this->get_clock()->now(),
-        tf2::durationFromSec(timePassedSinceLastCall_ms / 1000.0));
-
-      PosPoint currentPosition = mCarState->getPosition(PosType::fused);
-      currentPosition.setX(map_to_base_link_msg_tfs.transform.translation.x);
-      currentPosition.setY(map_to_base_link_msg_tfs.transform.translation.y);
-      currentPosition.setHeight(map_to_base_link_msg_tfs.transform.translation.z);
-      currentPosition.setYaw(
-        tf2::getYaw(map_to_base_link_msg_tfs.transform.rotation) * (180.0 / M_PI));
-      currentPosition.setTime(
-        QTime::currentTime().addSecs(-QDateTime::currentDateTime().offsetFromUtc()));
-      mCarState->setPosition(currentPosition);
-      external_fused_position_update_timer_->reset();
-      emit updatedFusedPositionExternally(currentPosition);
-    } catch (tf2::TransformException & ex) {
-      // do nothing
-    }
+  if (mCarInterfaceComponent->getVehicleInterfaceType() == VehicleInterfaceType::EXT_SIMULATED &&
+    !received_first_odom_msg_)
+  {
+    return;
   }
 
   // publish world pose
@@ -692,7 +572,7 @@ void WaywiserCar::emergency_stop_status_callback(
 void WaywiserCar::twist_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg)
 {
   if (waypoint_follower_bypass_mux_ && mCarAutopilotComponent->isActive()) {
-    mCarAutopilotComponent->stopWaypointFollower();
+    mCarAutopilotComponent->stopWaypointFollower();  // autopilot is overriden by twist message
   }
 
   process_twist_msg(twist_msg);
@@ -759,16 +639,8 @@ void WaywiserCar::odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom_ms
     }
   }
 
-  geometry_msgs::msg::Pose odom_pose = odom_msg->pose.pose;
-  PosPoint currentPosition = mCarState->getPosition(PosType::odom);
-  currentPosition.setX(odom_pose.position.x);
-  currentPosition.setY(odom_pose.position.y);
-  currentPosition.setHeight(odom_pose.position.z);
-  currentPosition.updateWithOffsetAndYawRotation(
-    -rear_axle_frame_to_odom_child_frame_offset, tf2::getYaw(odom_pose.orientation));
-  currentPosition.setTime(
-    QTime::currentTime().addSecs(-QDateTime::currentDateTime().offsetFromUtc()));
-  mCarState->setPosition(currentPosition);
+  update_pospoint_from_pose(
+    mCarState, rear_axle_frame_to_odom_child_frame_offset, odom_msg->pose.pose, PosType::odom);
 
   geometry_msgs::msg::Twist current_twist = odom_msg->twist.twist;
   mCarState->setVelocity(
@@ -793,8 +665,6 @@ void WaywiserCar::odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom_ms
     steering = -steering;
   }
   mCarState->setSteering(steering);
-
-  emit updatedOdomPositionExternally(currentPosition);
 }
 
 void WaywiserCar::path_with_twists_callback(const waywiser_core::msg::PathWithTwists::SharedPtr msg)
@@ -814,77 +684,78 @@ void WaywiserCar::path_with_twists_callback(const waywiser_core::msg::PathWithTw
   mCarAutopilotComponent->updateWaypointFollowerRoute(waypointList);
 }
 
+void WaywiserCar::fused_nav_sat_fix_extended_callback(
+  const waywiser_core::msg::NavSatFixExtended::SharedPtr msg)
+{
+  static xyz_t nav_sat_frame_to_rear_axle_frame_offset;
+  static bool nav_sat_frame_to_rear_axle_frame_offset_available;
+  if (!nav_sat_frame_to_rear_axle_frame_offset_available) {
+    if (msg->header.frame_id != rear_axle_frame_) { // rear_axle_frame_ is the vehicle reference point for waywise
+      if (msg->header.frame_id == base_frame_) {
+        nav_sat_frame_to_rear_axle_frame_offset =
+          mCarInterfaceComponent->getRearAxleToBaseOffset();
+      } else if (msg->header.frame_id == chassis_frame_) {
+        nav_sat_frame_to_rear_axle_frame_offset = mCarState->getRearAxleToCenterOffset();
+      } else if (msg->header.frame_id == rear_end_frame_) {
+        nav_sat_frame_to_rear_axle_frame_offset = mCarState->getRearAxleToRearEndOffset();
+      } else if (mUrdfModel) {
+        nav_sat_frame_to_rear_axle_frame_offset = getFramePositionOffset(
+          mUrdfModel, msg->header.frame_id, rear_axle_frame_).to_type<xyz_t>();
+      } else {
+        static bool transform_warning_logged_ = false;
+        try {
+          geometry_msgs::msg::TransformStamped rear_axle_frame_to_nav_sat_frame_msg_tfs =
+            tf_buffer_->lookupTransform(
+            rear_axle_frame_, msg->header.frame_id, tf2::TimePointZero);
+          nav_sat_frame_to_rear_axle_frame_offset = {
+            rear_axle_frame_to_nav_sat_frame_msg_tfs.transform.translation.x,
+            rear_axle_frame_to_nav_sat_frame_msg_tfs.transform.translation.y,
+            rear_axle_frame_to_nav_sat_frame_msg_tfs.transform.translation.z
+          };
+          if (transform_warning_logged_) {
+            RCLCPP_INFO(
+              get_logger(), "Transform from %s to %s is available now.",
+              msg->header.frame_id.c_str(), rear_axle_frame_.c_str());
+            transform_warning_logged_ = false;
+          }
+        } catch (tf2::TransformException & ex) {
+          if (!transform_warning_logged_) {
+            RCLCPP_WARN(
+              get_logger(), "Transform from %s to %s not available yet!",
+              msg->header.frame_id.c_str(), rear_axle_frame_.c_str());
+            transform_warning_logged_ = true;
+          }
+          return;
+        }
+      }
+      nav_sat_frame_to_rear_axle_frame_offset_available = true;
+    }
+  }
+
+  xyz_t xyz = coordinateTransforms::llhToEnu(
+    mCarState->getEnuRef(),
+    {msg->latitude, msg->longitude, msg->altitude});
+  PosPoint posPoint = mCarState->getPosition(PosType::fused);
+  posPoint.setXYZ(xyz);
+  posPoint.updateWithOffsetAndYawRotation(
+    -nav_sat_frame_to_rear_axle_frame_offset,
+    coordinateTransforms::yawNEDtoENU(msg->heading) * M_PI / 180.0);
+  posPoint.setTime(
+    QTime::currentTime().addSecs(-QDateTime::currentDateTime().offsetFromUtc()));
+  mCarState->setPosition(posPoint);
+
+  GnssFixStatus gnssFixStatus;
+  gnssFixStatus.isFusedOnChip = msg->is_fused_on_chip;
+  gnssFixStatus.fixType = static_cast<GNSS_FIX_TYPE>(msg->fix_type);
+  gnssFixStatus.horizontalAccuracy = msg->horizontal_accuracy;
+  gnssFixStatus.verticalAccuracy = msg->vertical_accuracy;
+  gnssFixStatus.headingAccuracy = msg->heading_accuracy;
+  gnssFixStatus.lastRtcmCorrectionAge = msg->last_rtcm_correction_age;
+  gnssFixStatus.numSatellites = msg->num_satellites;
+  mCarAutopilotComponent->setGnssFixStatus(gnssFixStatus);
+}
+
 // ----------------- Publish helper methods -----------------
-void WaywiserCar::publish_nav_sat_data(const ubx_nav_pvt & ubxPvt)
-{
-  // Publish navSatDiagnostics
-  waywiser_core::msg::NavSatDiagnostics nav_sat_diagnostics_msg;
-  nav_sat_diagnostics_msg.horizontal_accuracy = ubxPvt.h_acc;
-  nav_sat_diagnostics_msg.vertical_accuracy = ubxPvt.v_acc;
-  nav_sat_diagnostics_msg.heading_accuracy = ubxPvt.head_acc;
-  nav_sat_diagnostics_msg.last_rtcm_correction =
-    Ublox::getLastCorrectionAgeText(ubxPvt.last_correction_age).toStdString();
-  nav_sat_diagnostics_msg.num_satellites = ubxPvt.num_sv;
-  nav_sat_diagnostics_pub_->publish(nav_sat_diagnostics_msg);
-
-  // Publish navSatFix
-  sensor_msgs::msg::NavSatFix nav_sat_fix_msg;
-  nav_sat_fix_msg.header.stamp = this->now();
-  nav_sat_fix_msg.header.frame_id = world_frame_;
-  nav_sat_fix_msg.status.status = -2;   // Unknown status (added in jazzy sensor_msgs)
-  if (ubxPvt.fix_type == 3) {   // 3D fix
-    nav_sat_fix_msg.status.status = sensor_msgs::msg::NavSatStatus::STATUS_GBAS_FIX;
-  } else if (ubxPvt.fix_type == 2) {   // 2D fix
-    nav_sat_fix_msg.status.status = sensor_msgs::msg::NavSatStatus::STATUS_FIX;
-  } else if (ubxPvt.fix_type == 1) {   // Dead reckoning only
-    nav_sat_fix_msg.status.status = 111;   // WayWiseR specific status
-  } else if (ubxPvt.fix_type == 4) {   // GNSS + dead reckoning combined
-    nav_sat_fix_msg.status.status = 114;   // WayWiseR specific status
-  } else if (ubxPvt.fix_type == 5) {   // Time only fix
-    nav_sat_fix_msg.status.status = 115;   // WayWiseR specific status
-  } else if (ubxPvt.fix_type == 0) {     // No fix
-    nav_sat_fix_msg.status.status = sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX;
-  }
-  nav_sat_fix_msg.status.service = sensor_msgs::msg::NavSatStatus::SERVICE_GPS;
-  nav_sat_fix_msg.latitude = ubxPvt.lat;   // Latitude in degrees
-  nav_sat_fix_msg.longitude = ubxPvt.lon;   // Longitude in degrees
-  nav_sat_fix_msg.altitude = ubxPvt.height;   // Altitude in meters
-  nav_sat_fix_msg.position_covariance[0] = ubxPvt.h_acc * ubxPvt.h_acc;   // East variance (m^2)
-  nav_sat_fix_msg.position_covariance[4] = ubxPvt.h_acc * ubxPvt.h_acc;   // North variance (m^2)
-  nav_sat_fix_msg.position_covariance[8] = ubxPvt.v_acc * ubxPvt.v_acc;   // Up variance (m^2)
-  nav_sat_fix_msg.position_covariance_type =
-    sensor_msgs::msg::NavSatFix::COVARIANCE_TYPE_DIAGONAL_KNOWN;
-  nav_sat_fix_pub_->publish(nav_sat_fix_msg);
-}
-
-void WaywiserCar::publish_rtcm_frequency()
-{
-  static std::deque<double> frequency_samples_;
-  static std::chrono::steady_clock::time_point last_call_time_;
-
-  auto current_time = std::chrono::steady_clock::now();
-  double current_frequency = 0.0;
-  auto time_diff = current_time - last_call_time_;
-  double time_diff_seconds = std::chrono::duration<double>(time_diff).count();
-  if (time_diff_seconds > 0.0) {
-    current_frequency = 1.0 / time_diff_seconds;
-  }
-  last_call_time_ = current_time;
-
-  frequency_samples_.push_back(current_frequency);
-  if (frequency_samples_.size() > 3) {
-    frequency_samples_.pop_front();
-  }
-
-  double averaged_frequency = std::accumulate(
-    frequency_samples_.begin(), frequency_samples_.end(),
-    0.0) / frequency_samples_.size();
-
-  std_msgs::msg::Float32 rtcm_frequency_msg;
-  rtcm_frequency_msg.data = averaged_frequency;
-  rtcm_frequency_pub_->publish(rtcm_frequency_msg);
-}
-
 void WaywiserCar::publish_odom()
 {
   PosPoint odom_position = mCarState->getPosition(PosType::odom);
@@ -963,28 +834,26 @@ void WaywiserCar::publish_tfs()
     map_to_odom_msg_tfs.child_frame_id = odom_frame_;
     map_to_odom_msg_tfs.header.stamp = now();
 
-    if (mGNSSReceiver->getReceiverVariant() != RECEIVER_VARIANT::WAYWISE_SIMULATED) {
-      tf2::Transform odom_to_base_link_tf2_tf, map_to_base_link_tf2_tf;
+    tf2::Transform odom_to_base_link_tf2_tf, map_to_base_link_tf2_tf;
 
-      tf2::fromMsg(odom_to_base_link_msg_tf, odom_to_base_link_tf2_tf);
+    tf2::fromMsg(odom_to_base_link_msg_tf, odom_to_base_link_tf2_tf);
 
-      PosPoint world_to_base_link_position = mCarState->posInVehicleFrameToPosPointENU(
-        mCarInterfaceComponent->getRearAxleToBaseOffset(), PosType::fused);
-      auto map_to_base_link_msg_tf = geometry_msgs::msg::Transform();
-      map_to_base_link_msg_tf.translation.x = world_to_base_link_position.getX();
-      map_to_base_link_msg_tf.translation.y = world_to_base_link_position.getY();
-      map_to_base_link_msg_tf.translation.z = world_to_base_link_position.getHeight();
-      double worldYawRad_ = world_to_base_link_position.getYaw() * M_PI / 180.0;
-      map_to_base_link_msg_tf.rotation.x = 0.0;
-      map_to_base_link_msg_tf.rotation.y = 0.0;
-      map_to_base_link_msg_tf.rotation.z = sin(worldYawRad_ / 2.0);
-      map_to_base_link_msg_tf.rotation.w = cos(worldYawRad_ / 2.0);
-      tf2::fromMsg(map_to_base_link_msg_tf, map_to_base_link_tf2_tf);
+    PosPoint world_to_base_link_position = mCarState->posInVehicleFrameToPosPointENU(
+      mCarInterfaceComponent->getRearAxleToBaseOffset(), PosType::fused);
+    auto map_to_base_link_msg_tf = geometry_msgs::msg::Transform();
+    map_to_base_link_msg_tf.translation.x = world_to_base_link_position.getX();
+    map_to_base_link_msg_tf.translation.y = world_to_base_link_position.getY();
+    map_to_base_link_msg_tf.translation.z = world_to_base_link_position.getHeight();
+    double worldYawRad_ = world_to_base_link_position.getYaw() * M_PI / 180.0;
+    map_to_base_link_msg_tf.rotation.x = 0.0;
+    map_to_base_link_msg_tf.rotation.y = 0.0;
+    map_to_base_link_msg_tf.rotation.z = sin(worldYawRad_ / 2.0);
+    map_to_base_link_msg_tf.rotation.w = cos(worldYawRad_ / 2.0);
+    tf2::fromMsg(map_to_base_link_msg_tf, map_to_base_link_tf2_tf);
 
-      tf2::toMsg(
-        map_to_base_link_tf2_tf * odom_to_base_link_tf2_tf.inverse(),
-        map_to_odom_msg_tfs.transform);
-    }
+    tf2::toMsg(
+      map_to_base_link_tf2_tf * odom_to_base_link_tf2_tf.inverse(),
+      map_to_odom_msg_tfs.transform);
 
     // -- Publish Transform
     tf_pub_->sendTransform(map_to_odom_msg_tfs);
@@ -1164,18 +1033,6 @@ void WaywiserCar::publish_joint_states(double timePassedSinceLastCall_ms)
 }
 
 // ----------------- Utility methods -----------------
-void WaywiserCar::update_world_positon(geometry_msgs::msg::Pose world_pose)
-{
-  PosPoint currentPosition = mCarState->getPosition(PosType::fused);
-  currentPosition.setX(world_pose.position.x);
-  currentPosition.setY(world_pose.position.y);
-  currentPosition.setHeight(world_pose.position.z);
-  currentPosition.setYaw(tf2::getYaw(world_pose.orientation) * (180.0 / M_PI));
-  currentPosition.setTime(
-    QTime::currentTime().addSecs(
-      -QDateTime::currentDateTime().offsetFromUtc()));
-  mCarState->setPosition(currentPosition);
-}
 
 double WaywiserCar::update_joint_states_msg(
   sensor_msgs::msg::JointState & joint_state_msg,

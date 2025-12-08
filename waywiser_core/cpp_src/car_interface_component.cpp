@@ -2,23 +2,13 @@
 #include "moc_car_interface_component.cpp"
 
 CarInterfaceComponent::CarInterfaceComponent(
-  QObject * parent, const QSharedPointer<CarState> & carState, bool autoActuateMotorAndServo)
-: QObject(parent)
+  QObject * parentQObject, const QSharedPointer<CarState> & carState,
+  bool autoActuateMotorAndServo)
+: QObject(parentQObject)
 {
+  mParentQObject = parentQObject;
   mCarState = carState;
   mAutoActuateMotorAndServo = autoActuateMotorAndServo;
-}
-
-CarInterfaceComponent::~CarInterfaceComponent()
-{
-  if (mGNSSReceiver && (mGNSSReceiver->getReceiverVariant() == RECEIVER_VARIANT::UBLX_ZED_F9P ||
-    mGNSSReceiver->getReceiverVariant() == RECEIVER_VARIANT::UBLX_ZED_F9R))
-  {
-    QSharedPointer<UbloxRover> mUbloxRover = qSharedPointerDynamicCast<UbloxRover>(mGNSSReceiver);
-    if (mUbloxRover) {
-      mUbloxRover->aboutToShutdown();
-    }
-  }
 }
 
 void CarInterfaceComponent::reset()
@@ -31,17 +21,10 @@ void CarInterfaceComponent::reset()
   mCarControlCommand.brake = 1.0;
   mCarControlCommand.steering = 0.0;
 
-  mExternalFusedPositionBackupConnections.clear();
   mEmergencyStopState->set_clear();
 
   mCarState->setVelocity({0.0, 0.0, 0.0});
   mCarState->setSteering(0.0);
-
-  auto initial_yaw_offset = getGnssChipOrientationOffset().z;
-  auto pospoint = PosPoint();
-  pospoint.setYaw(initial_yaw_offset);
-  pospoint.setType(PosType::odom);
-  mCarState->setPosition(pospoint);
 }
 
 void CarInterfaceComponent::setup_vehicle_interface()
@@ -157,174 +140,6 @@ void CarInterfaceComponent::setup_vehicle_interface()
       break;
   }
 
-  // --- Positioning setup ---
-  // GNSS (with fused IMU when using u-blox F9R)
-  switch (mGnssReceiverVariant) {
-    case RECEIVER_VARIANT::UBLX_ZED_F9P:
-    case RECEIVER_VARIANT::UBLX_ZED_F9R:
-      {
-        QSharedPointer<UbloxRover> mUbloxRover = QSharedPointer<UbloxRover>::create(mCarState);
-        foreach(const QSerialPortInfo & portInfo, QSerialPortInfo::availablePorts()) {
-          // qDebug()<<portInfo.manufacturer();
-          if (portInfo.manufacturer().toLower().replace("-", "").contains("ublox")) {
-            mUbloxRover->setReceiverVariant(mGnssReceiverVariant);
-
-            if (mGnssReceiverVariant == RECEIVER_VARIANT::UBLX_ZED_F9R) {
-              mUbloxRover->setDynamicModel(mGnssDynamicModel);
-              mUbloxRover->setPrintVerbose(mGnssPrintVerbose);
-              mUbloxRover->setESFAlgAutoMntAlgOn(mGnssSensorFusionImuAutoalign);
-              mUbloxRover->setForceRecalibrateSensors(mGnssSensorFusionForceRecalibrate);
-              mUbloxRover->setGNSSMeasurementRate(mGnssMeasurementRate);
-              mUbloxRover->setNavPrioMessageRate(mGnssPriorityMessageRate);
-              mUbloxRover->setSpeedDataInputRate(mPositionFusionInputTimerRate);
-            }
-
-            if (mUbloxRover->connectSerial(portInfo)) {
-              qDebug() << "UbloxRover connected to:" << portInfo.systemLocation();
-
-              mUbloxRover->setAntennaToChipOffset(
-                mGnssAntennaToGnssChipOffset.x,
-                mGnssAntennaToGnssChipOffset.y,
-                mGnssAntennaToGnssChipOffset.z);
-              mUbloxRover->setChipToRearAxleOffset(
-                mGnssChipToRearAxleOffset.x,
-                mGnssChipToRearAxleOffset.y,
-                mGnssChipToRearAxleOffset.z);
-              mUbloxRover->setChipOrientationOffset(
-                mGnssChipOrientationOffset.x,
-                mGnssChipOrientationOffset.y,
-                mGnssChipOrientationOffset.z);
-
-              if (mUseSdvpPositionFusion) {
-                QObject::connect(
-                  mUbloxRover.get(), &UbloxRover::updatedGNSSPositionAndYaw,
-                  mSDVPVehiclePositionFuser.get(),
-                  &SDVPVehiclePositionFuser::correctPositionAndYawGNSS);
-              } else {
-                QObject::connect(
-                  mUbloxRover.get(), &UbloxRover::txNavPvt,
-                  [&](const ubx_nav_pvt & ubxPvt) {
-                    Q_UNUSED(ubxPvt)
-
-                    PosPoint currentPosition = mCarState->getPosition(PosType::GNSS);
-                    currentPosition.setType(PosType::fused);
-                    mCarState->setPosition(currentPosition);
-                  });
-              }
-
-              // -- NTRIP/TCP client setup for feeding RTCM data into GNSS receiver
-              mRtcmClient.reset(new RtcmClient(this));
-              QObject::connect(
-                mUbloxRover.get(), &UbloxRover::gotNmeaGga,
-                mRtcmClient.get(), &RtcmClient::forwardNmeaGgaToServer);
-              QObject::connect(
-                mRtcmClient.get(), &RtcmClient::rtcmData,
-                mUbloxRover.get(), &UbloxRover::writeRtcmToUblox);
-              if (mRtcmClient->connectWithInfoFromFile("./rtcmServerInfo.txt")) {
-                qDebug() << "RtcmClient: connected to" << QString(
-                  mRtcmClient->getCurrentHost() + ":" +
-                  QString::number(mRtcmClient->getCurrentPort()));
-              } else {
-                qDebug() << "RtcmClient: not connected";
-              }
-
-              mGNSSReceiver = mUbloxRover;
-              mGNSSReceiver->setEnuRef(mEnuReference);
-
-              if (mGNSSReceiver->getReceiverVariant() == RECEIVER_VARIANT::UBLX_ZED_F9R) {
-                connect(
-                  &mPositionFusionInputTimer, &QTimer::timeout,
-                  mGNSSReceiver.get(), &GNSSReceiver::readVehicleSpeedForPositionFusion);
-                mPositionFusionInputTimer.start(1000 / mPositionFusionInputTimerRate);
-              }
-            }
-          }
-        }
-        if (mGNSSReceiver == nullptr) {
-          qDebug() <<
-            "Configured GNSS receiver is not available! Simulating GNSS receiver using WayWise.";
-          mGnssReceiverVariant = RECEIVER_VARIANT::WAYWISE_SIMULATED;
-        }
-      } break;
-    case RECEIVER_VARIANT::EXTERNAL:
-      {
-        mGNSSReceiver.reset(new GNSSReceiver(mCarState));
-        mGNSSReceiver->setReceiverVariant(RECEIVER_VARIANT::EXTERNAL);
-        mGNSSReceiver->setEnuRef(mEnuReference);
-
-        QObject::connect(
-          parent(), SIGNAL(externalFusedPositionTimeout()), this,
-          SLOT(on_external_fused_position_timeout()));
-
-        QObject::connect(
-          parent(), SIGNAL(updatedFusedPositionExternally(PosPoint)), this,
-          SLOT(on_updated_fused_position_externally(PosPoint)));
-      } break;
-    default:
-      break;
-  }
-
-  if (mGnssReceiverVariant == RECEIVER_VARIANT::WAYWISE_SIMULATED) {
-    mGNSSReceiver.reset(new GNSSReceiver(mCarState));
-    mGNSSReceiver->setReceiverVariant(RECEIVER_VARIANT::WAYWISE_SIMULATED);
-    mGNSSReceiver->setReceiverState(RECEIVER_STATE::READY);
-    mGNSSReceiver->setEnuRef(mEnuReference);
-    mGNSSReceiver->setGnssFixAccuracy({0.0, 0.0, 0.0}); // TODO: estimate accuracy
-
-    QObject::connect(
-      mMovementController.get(), &MovementController::updatedOdomPositionAndYaw,
-      [&](QSharedPointer<VehicleState> vehicleState, double distanceDriven) {
-        Q_UNUSED(distanceDriven)
-
-        update_fused_position(vehicleState->getPosition(PosType::odom));
-      });
-
-    QObject::connect(
-      parent(), SIGNAL(updatedOdomPositionExternally(PosPoint)), this,
-      SLOT(update_fused_position(PosPoint)));
-  }
-
-  // Position Fuser
-  if (mUseSdvpPositionFusion) {
-    mSDVPVehiclePositionFuser.reset(new SDVPVehiclePositionFuser(this));
-
-    // IMU
-    switch (mImuVariant) {
-      case ImuVariant::VESC:
-        {
-          if (mVESCMotorController->isSerialConnected()) {
-            mIMUOrientationUpdater = mVESCMotorController->getIMUOrientationUpdater(mCarState);
-            QObject::connect(
-              mIMUOrientationUpdater.get(), &IMUOrientationUpdater::updatedIMUOrientation,
-              mSDVPVehiclePositionFuser.get(),
-              &SDVPVehiclePositionFuser::correctPositionAndYawIMU);
-            qDebug() << "Using vesc IMU for position fusion.";
-          } else {
-            qDebug() <<
-              "vesc IMU is configured for position fusion but VESCMotorController is not connected.";
-          }
-        } break;
-      case ImuVariant::BNO055:
-        {
-          mIMUOrientationUpdater.reset(new BNO055OrientationUpdater(mCarState, "/dev/i2c-1"));
-          QObject::connect(
-            mIMUOrientationUpdater.get(), &IMUOrientationUpdater::updatedIMUOrientation,
-            mSDVPVehiclePositionFuser.get(),
-            &SDVPVehiclePositionFuser::correctPositionAndYawIMU);
-          qDebug() << "Using bno055 IMU for position fusion.";
-        } break;
-      default:
-        qDebug() << "Unknown IMU variant is requested for position fusion!";
-        break;
-    }
-
-    // Odometry
-    QObject::connect(
-      mMovementController.get(), &MovementController::updatedOdomPositionAndYaw,
-      mSDVPVehiclePositionFuser.get(),
-      &SDVPVehiclePositionFuser::correctPositionAndYawOdom);
-  }
-
   // ToF Sensors
   for (const auto & pair : mToFSensorsInfo) {
     std::string tof_sensor_name = pair.first;
@@ -337,61 +152,6 @@ void CarInterfaceComponent::setup_vehicle_interface()
       });
     mToFSensors[tof_sensor_name] = tof_sensor;
   }
-}
-
-void CarInterfaceComponent::on_updated_fused_position_externally(PosPoint position)
-{
-  Q_UNUSED(position)
-
-  mGNSSReceiver->setReceiverState(RECEIVER_STATE::READY);
-  mGNSSReceiver->setGnssFixAccuracy({0.0, 0.0, 0.0});       // TODO: estimate accuracy
-
-  switch (mGNSSReceiver->getReceiverVariant()) {
-    case RECEIVER_VARIANT::WAYWISE_SIMULATED:
-      {
-        qDebug() << "Receiving external position updates.";
-        mGNSSReceiver->setReceiverVariant(RECEIVER_VARIANT::EXTERNAL);
-        for (const auto & conn : mExternalFusedPositionBackupConnections) {
-          QObject::disconnect(conn);
-        }
-        mExternalFusedPositionBackupConnections.clear();
-      } break;
-    default:
-      break;
-  }
-}
-
-void CarInterfaceComponent::on_external_fused_position_timeout()
-{
-  qDebug() <<
-    "External position update timed out. Switching to waywise simulated position updater.";
-  mGNSSReceiver->setReceiverVariant(RECEIVER_VARIANT::WAYWISE_SIMULATED);
-  mGNSSReceiver->setReceiverState(RECEIVER_STATE::READY);
-  mGNSSReceiver->setGnssFixAccuracy({0.0, 0.0, 0.0});           // TODO: estimate accuracy
-  if (!mExternalFusedPositionBackupConnections.isEmpty()) {
-    for (const auto & conn : mExternalFusedPositionBackupConnections) {
-      QObject::disconnect(conn);
-    }
-    mExternalFusedPositionBackupConnections.clear();
-  }
-  mExternalFusedPositionBackupConnections.append(
-    QObject::connect(
-      mMovementController.get(), &MovementController::updatedOdomPositionAndYaw,
-      [&](QSharedPointer<VehicleState> vehicleState, double distanceDriven) {
-        Q_UNUSED(distanceDriven)
-
-        update_fused_position(vehicleState->getPosition(PosType::odom));
-      }));
-  mExternalFusedPositionBackupConnections.append(
-    QObject::connect(
-      parent(), SIGNAL(updatedOdomPositionExternally(PosPoint)), this,
-      SLOT(update_fused_position(PosPoint))));
-}
-
-void CarInterfaceComponent::update_fused_position(PosPoint position)
-{
-  position.setType(PosType::fused);
-  mCarState->setPosition(position);
 }
 
 void CarInterfaceComponent::activate_emergency_stop(

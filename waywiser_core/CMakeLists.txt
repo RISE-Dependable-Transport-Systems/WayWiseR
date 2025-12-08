@@ -74,7 +74,15 @@ set(COMMON_WAYWISE_SOURCES
   WayWise/communication/parameterserver.cpp
   WayWise/sensors/camera/gimbal.h
   WayWise/core/simplewatchdog.cpp
+)
+
+set(WAYWISE_LOCALIZATION_SOURCES
   WayWise/sensors/gnss/gnssreceiver.cpp
+  WayWise/sensors/gnss/rtcm3_simple.cpp
+  WayWise/sensors/gnss/rtcmclient.cpp
+  WayWise/sensors/gnss/ublox.cpp
+  WayWise/sensors/gnss/ubloxrover.cpp
+  WayWise/sensors/fusion/sdvpvehiclepositionfuser.cpp
 )
 
 set(COMMON_WAYWISE_AP_SOURCES
@@ -88,10 +96,8 @@ set(COMMON_WAYWISE_AP_SOURCES
   WayWise/communication/vehicleserver.h
   WayWise/communication/vehicleconnections/vehicleconnection.cpp
   WayWise/communication/mavlinkparameterserver.cpp
-  WayWise/sensors/gnss/rtcm3_simple.cpp
-  WayWise/sensors/gnss/rtcmclient.cpp
-  WayWise/sensors/gnss/ublox.cpp
-  WayWise/sensors/gnss/ubloxrover.cpp
+  WayWise/routeplanning/routeutils.cpp
+  WayWise/routeplanning/routeutils.h
 )
 
 set(WAYWISE_CAR_SOURCES
@@ -103,11 +109,6 @@ set(WAYWISE_CAR_SOURCES
   WayWise/external/pi-bno055/i2c_bno055.c
   WayWise/external/VL53L0X/tof.h
   WayWise/external/VL53L0X/tof.c
-  WayWise/sensors/fusion/sdvpvehiclepositionfuser.cpp
-  WayWise/sensors/gnss/rtcm3_simple.cpp
-  WayWise/sensors/gnss/rtcmclient.cpp
-  WayWise/sensors/gnss/ublox.cpp
-  WayWise/sensors/gnss/ubloxrover.cpp
   WayWise/sensors/imu/bno055orientationupdater.cpp
   WayWise/sensors/imu/imuorientationupdater.cpp
   WayWise/sensors/tof/vl53l0xtofsensor.cpp
@@ -126,12 +127,21 @@ set(WAYWISE_TRUCK_SOURCES
 )
 
 add_executable(
+  waywiser_localization_node
+  cpp_src/waywiser_localization_node.cpp
+  cpp_src/localization_component.cpp
+  ${COMMON_WAYWISE_SOURCES}
+  ${WAYWISE_LOCALIZATION_SOURCES}
+)
+
+add_executable(
   waywiser_car_node
   cpp_src/waywiser_car_node.cpp
   cpp_src/waywiser_car_node_core.cpp
   cpp_src/car_autopilot_component.cpp
   cpp_src/car_interface_component.cpp
   ${COMMON_WAYWISE_SOURCES}
+  ${WAYWISE_LOCALIZATION_SOURCES}
   ${WAYWISE_CAR_SOURCES}
   ${COMMON_WAYWISE_AP_SOURCES}
 )
@@ -146,12 +156,21 @@ add_executable(
   cpp_src/car_autopilot_component.cpp
   cpp_src/car_interface_component.cpp
   ${COMMON_WAYWISE_SOURCES}
+  ${WAYWISE_LOCALIZATION_SOURCES}
   ${WAYWISE_CAR_SOURCES}
   ${WAYWISE_TRUCK_SOURCES}
   ${COMMON_WAYWISE_AP_SOURCES}
 )
 
-set(COMMON_LIBRARIES
+set(LOCALIZATION_LIBRARIES
+  Qt5::Core
+  Qt5::SerialPort
+  Qt5::Network
+  urdf::urdf
+  ${cpp_typesupport_target}
+)
+
+set(CAR_LIBRARIES
   Qt5::Core
   Qt5::SerialPort
   Qt5::Network
@@ -161,17 +180,35 @@ set(COMMON_LIBRARIES
   ${cpp_typesupport_target}
 )
 
-target_link_libraries(waywiser_car_node ${COMMON_LIBRARIES})
-target_link_libraries(waywiser_truck_node ${COMMON_LIBRARIES})
+set(TRUCK_LIBRARIES
+  ${CAR_LIBRARIES}
+)
 
-set(COMMON_DEPENDENCIES
+target_link_libraries(waywiser_localization_node ${LOCALIZATION_LIBRARIES})
+target_link_libraries(waywiser_car_node ${CAR_LIBRARIES})
+target_link_libraries(waywiser_truck_node ${TRUCK_LIBRARIES})
+
+set(LOCALIZATION_DEPENDENCIES
+  geometry_msgs
+  nav_msgs
+  rclcpp
+  sensor_msgs
+  std_msgs
+  tf2_geometry_msgs
+  tf2_ros
+  waywiser
+  waywiser_description
+  waywiser_twist_safety
+)
+
+set(CAR_DEPENDENCIES
+  geometry_msgs
+  nav_msgs
   rclcpp
   std_msgs
-  nav_msgs
-  geometry_msgs
-  tf2_ros
   sensor_msgs
   tf2_geometry_msgs
+  tf2_ros
   tf2_sensor_msgs
   visualization_msgs
   waywiser
@@ -179,16 +216,23 @@ set(COMMON_DEPENDENCIES
   waywiser_twist_safety
 )
 
-ament_target_dependencies(waywiser_car_node ${COMMON_DEPENDENCIES})
-ament_target_dependencies(waywiser_truck_node ${COMMON_DEPENDENCIES})
+set(TRUCK_DEPENDENCIES
+  ${CAR_DEPENDENCIES}
+)
+
+ament_target_dependencies(waywiser_localization_node ${LOCALIZATION_DEPENDENCIES})
+ament_target_dependencies(waywiser_car_node ${CAR_DEPENDENCIES})
+ament_target_dependencies(waywiser_truck_node ${TRUCK_DEPENDENCIES})
 
 install(
   DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(TARGETS waywiser_localization_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS waywiser_car_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS waywiser_truck_node DESTINATION lib/${PROJECT_NAME})
+)
 
 install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
 

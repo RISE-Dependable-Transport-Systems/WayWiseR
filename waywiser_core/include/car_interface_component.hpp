@@ -9,10 +9,6 @@
 
 #include "WayWise/core/coordinatetransforms.h"
 #include "WayWise/logger/logger.h"
-#include "WayWise/sensors/fusion/sdvpvehiclepositionfuser.h"
-#include "WayWise/sensors/gnss/gnssreceiver.h"
-#include "WayWise/sensors/gnss/rtcmclient.h"
-#include "WayWise/sensors/gnss/ubloxrover.h"
 #include "WayWise/sensors/imu/bno055orientationupdater.h"
 #include "WayWise/sensors/imu/imuorientationupdater.h"
 #include "WayWise/sensors/tof/tofsensor.h"
@@ -31,9 +27,9 @@ class CarInterfaceComponent : public QObject
 public:
   // Constructor and destructor
   CarInterfaceComponent(
-    QObject * parent, const QSharedPointer<CarState> & carState,
+    QObject * parentQObject, const QSharedPointer<CarState> & carState,
     bool autoActuateMotorAndServo = true);
-  virtual ~CarInterfaceComponent();
+  virtual ~CarInterfaceComponent() {}
   virtual void reset();
 
   // Setters
@@ -50,24 +46,11 @@ public:
   void setInvertServoOutput(bool value) {mInvertServoOutput = value;}
   void setServoOffset(float value) {mServoOffset = value;}
   void setServoRange(float value) {mServoRange = value;}
-  void setUseSdvpPositionFusion(bool value) {mUseSdvpPositionFusion = value;}
   void setMinBatteryVoltage(float value) {mMinBatteryVoltage = value;}
   void setImuVariant(ImuVariant value) {mImuVariant = value;}
   void setVehicleInterfaceType(VehicleInterfaceType value) {mVehicleInterfaceType = value;}
-  void setGnssReceiverVariant(RECEIVER_VARIANT value) {mGnssReceiverVariant = value;}
   void setSpeedControlType(SpeedControlType value) {mSpeedControlType = value;}
   void setVehicleStatePollRate(int value) {mVehicleStatePollRate = value;}
-  void setPositionFusionInputTimerRate(int value) {mPositionFusionInputTimerRate = value;}
-  void setGnssPrintVerbose(bool value) {mGnssPrintVerbose = value;}
-  void setGnssSensorFusionImuAutoalign(bool value) {mGnssSensorFusionImuAutoalign = value;}
-  void setGnssSensorFusionForceRecalibrate(bool value) {mGnssSensorFusionForceRecalibrate = value;}
-  void setGnssMeasurementRate(int value) {mGnssMeasurementRate = value;}
-  void setGnssPriorityMessageRate(int value) {mGnssPriorityMessageRate = value;}
-  void setGnssDynamicModel(DynamicModel value) {mGnssDynamicModel = value;}
-  void setGnssAntennaToGnssChipOffset(xyz_t value) {mGnssAntennaToGnssChipOffset = value;}
-  void setGnssChipToRearAxleOffset(xyz_t value) {mGnssChipToRearAxleOffset = value;}
-  void setGnssChipOrientationOffset(xyz_t value) {mGnssChipOrientationOffset = value;}
-  void setEnuReference(llh_t value) {mEnuReference = value;}
   void setPIDSpeedControllerGains(float kp, float ki, float kd)
   {
     mPIDSpeedControllerKp = kp; mPIDSpeedControllerKi = ki; mPIDSpeedControllerKd = kd;
@@ -76,7 +59,6 @@ public:
   {
     mToFSensorsInfo = value;
   }
-  void setGnssTimeout(float value) {mGnssTimeout = value;}
 
   // Getters
   float getLength() const {return mLength;}
@@ -92,37 +74,21 @@ public:
   bool getInvertServoOutput() const {return mInvertServoOutput;}
   float getServoOffset() const {return mServoOffset;}
   float getServoRange() const {return mServoRange;}
-  bool getUseSdvpPositionFusion() const {return mUseSdvpPositionFusion;}
   float getMinBatteryVoltage() const {return mMinBatteryVoltage;}
   ImuVariant getImuVariant() const {return mImuVariant;}
   VehicleInterfaceType getVehicleInterfaceType() const {return mVehicleInterfaceType;}
-  RECEIVER_VARIANT getGnssReceiverVariant() const {return mGnssReceiverVariant;}
   SpeedControlType getSpeedControlType() const {return mSpeedControlType;}
   int getVehicleStatePollRate() const {return mVehicleStatePollRate;}
-  int getPositionFusionInputTimerRate() const {return mPositionFusionInputTimerRate;}
-  bool getGnssPrintVerbose() const {return mGnssPrintVerbose;}
-  bool getGnssSensorFusionImuAutoalign() const {return mGnssSensorFusionImuAutoalign;}
-  bool getGnssSensorFusionForceRecalibrate() const {return mGnssSensorFusionForceRecalibrate;}
-  int getGnssMeasurementRate() const {return mGnssMeasurementRate;}
-  int getGnssPriorityMessageRate() const {return mGnssPriorityMessageRate;}
-  DynamicModel getGnssDynamicModel() const {return mGnssDynamicModel;}
-  xyz_t getGnssAntennaToGnssChipOffset() const {return mGnssAntennaToGnssChipOffset;}
-  xyz_t getGnssChipToRearAxleOffset() const {return mGnssChipToRearAxleOffset;}
-  xyz_t getGnssChipOrientationOffset() const {return mGnssChipOrientationOffset;}
-  llh_t getEnuReference() const {return mEnuReference;}
   std::map<std::string, std::tuple<int, int>> getToFSensorsInfo() const
   {
     return mToFSensorsInfo;
   }
-  float getGnssTimeout() const {return mGnssTimeout;}
 
-  QSharedPointer<GNSSReceiver> getGnssReceiver() const {return mGNSSReceiver;}
   QSharedPointer<EmergencyStopState> getEmergencyStopState() const {return mEmergencyStopState;}
   QSharedPointer<MovementController> getMovementController() const
   {
     return mMovementController;
   }
-  QSharedPointer<RtcmClient> getRtcmClient() const {return mRtcmClient;}
   CarControlCommand getCarControlCommand() const {return mCarControlCommand;}
 
   // Utility methods
@@ -138,9 +104,6 @@ signals:
   void tof_distance_received(std::string sensor_name, double distance);
 
 public slots:
-  void update_fused_position(PosPoint position);
-  void on_updated_fused_position_externally(PosPoint position);
-  void on_external_fused_position_timeout();
 
 protected:
   // Parameters
@@ -156,56 +119,37 @@ protected:
   float mServoRange = 1.0;
   float mMinBatteryVoltage = 0.0; // [V]
 
-  bool mUseSdvpPositionFusion = false;
   ImuVariant mImuVariant = ImuVariant::UNKNOWN;
   VehicleInterfaceType mVehicleInterfaceType = VehicleInterfaceType::WAYWISE_SIMULATED;
-  RECEIVER_VARIANT mGnssReceiverVariant = RECEIVER_VARIANT::WAYWISE_SIMULATED;
   SpeedControlType mSpeedControlType = SpeedControlType::OPEN_LOOP_ERPM_CONTROL;
 
   bool mAutoActuateMotorAndServo = true;
   int mVehicleStatePollRate = 10; // [Hz]
-  int mPositionFusionInputTimerRate = 10; // [Hz]
-  bool mGnssPrintVerbose = false;
-  bool mGnssSensorFusionImuAutoalign = false;
-  bool mGnssSensorFusionForceRecalibrate = false;
-  int mGnssMeasurementRate = 5; // [Hz]
-  int mGnssPriorityMessageRate = 10; // [Hz]
-  DynamicModel mGnssDynamicModel = DynamicModel::AUTOMOT;
 
   float mPIDSpeedControllerKp = 1.0;
   float mPIDSpeedControllerKi = 0.0;
   float mPIDSpeedControllerKd = 0.0;
-  float mGnssTimeout = 3.0;
 
   xyz_t mRearAxleToBaseOffset;
   xyz_t mRearAxleToCenterOffset;
   xyz_t mRearAxleToRearEndOffset;
-  xyz_t mGnssAntennaToGnssChipOffset;
-  xyz_t mGnssChipToRearAxleOffset;
-  xyz_t mGnssChipOrientationOffset;
-  llh_t mEnuReference = {57.713805, 12.890088, 203.59}; // [lat, lon, height]
 
   std::map<std::string, std::tuple<int, int>> mToFSensorsInfo;
 
   // WayWise components
   QSharedPointer<CarState> mCarState;
-  QSharedPointer<GNSSReceiver> mGNSSReceiver;
   QSharedPointer<EmergencyStopState> mEmergencyStopState;
   QSharedPointer<MovementController> mMovementController;
-  QSharedPointer<RtcmClient> mRtcmClient;
-
   QSharedPointer<VESCMotorController> mVESCMotorController;
   QSharedPointer<IMUOrientationUpdater> mIMUOrientationUpdater;
-  QSharedPointer<SDVPVehiclePositionFuser> mSDVPVehiclePositionFuser;
 
   // Internal variables
-  QTimer mPositionFusionInputTimer = QTimer();
+  QObject * mParentQObject;
   QTimer mWaywiseSimulationTimer = QTimer();
   float mCurrentBatteryVoltage = 0.0;
   QSharedPointer<PIDController> mPIDSpeedController;
   CarControlCommand mCarControlCommand;
   std::map<std::string, QSharedPointer<ToFSensor>> mToFSensors;
-  QList<QMetaObject::Connection> mExternalFusedPositionBackupConnections;
 };
 
 #endif  // CAR_INTERFACE_COMPONENT_HPP_

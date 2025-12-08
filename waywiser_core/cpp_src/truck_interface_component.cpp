@@ -18,13 +18,6 @@ TruckInterfaceComponent::~TruckInterfaceComponent()
 void TruckInterfaceComponent::reset()
 {
   mTruckState->setTrailerAngle(0.0);
-  if (mHasTrailer) {
-    auto initial_yaw_offset = getGnssChipOrientationOffset().z;
-    auto pospoint = PosPoint();
-    pospoint.setYaw(initial_yaw_offset);
-    pospoint.setType(PosType::odom);
-    mTruckState->getTrailingVehicle()->setPosition(pospoint);
-  }
   CarInterfaceComponent::reset();
 }
 

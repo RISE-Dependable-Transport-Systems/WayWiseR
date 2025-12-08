@@ -14,9 +14,7 @@ public:
   : CarAutopilotComponent(parent, truckState) {mTruckState = truckState;}
   virtual ~TruckAutopilotComponent() {}
 
-  virtual void setupAutopilot(
-    QSharedPointer<GNSSReceiver> gNSSReceiver,
-    QSharedPointer<EmergencyStopState> emergencyStopState) override;
+  virtual void setupAutopilot(QSharedPointer<EmergencyStopState> emergencyStopState) override;
 
   // Setters
   void setPurePursuitForwardGain(float gain) {mPurePursuitForwardGain = gain;}
