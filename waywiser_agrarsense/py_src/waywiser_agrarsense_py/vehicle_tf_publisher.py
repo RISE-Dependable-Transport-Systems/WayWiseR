@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
 import math
+import time
 
-from geometry_msgs.msg import PoseStamped
-from geometry_msgs.msg import Quaternion
-from geometry_msgs.msg import Transform
-from geometry_msgs.msg import TransformStamped
-from geometry_msgs.msg import Vector3
+from geometry_msgs.msg import Transform, TransformStamped
 from nav_msgs.msg import Odometry
 import rclpy
 from rclpy.node import Node
 from tf2_ros import TransformBroadcaster
-from tf_transformations import euler_from_quaternion
-from tf_transformations import quaternion_from_euler
+from tf_transformations import euler_from_quaternion, quaternion_from_euler
 
 
 class VehicleTFPublisher(Node):
@@ -22,27 +18,38 @@ class VehicleTFPublisher(Node):
 
         # Declare parameters
         self.declare_parameter('role_name', 'forwarder')
-        self.declare_parameter('odom_topic', 'odom')
-        self.declare_parameter('base_link_frame', 'base_link')
+        self.declare_parameter('world_frame', 'map')
         self.declare_parameter('odom_frame', 'odom')
+        self.declare_parameter('base_link_frame', 'base_link')
+        self.declare_parameter('odom_topic', 'odom')
         self.declare_parameter('publish_rate', 10.0)
+        self.declare_parameter('yaw_offset', 0.0)
 
         # Get parameters
         self.role_name = self.get_parameter('role_name').get_parameter_value().string_value
-        self.odom_topic = self.get_parameter('odom_topic').get_parameter_value().string_value
+        self.world_frame = self.get_parameter('world_frame').get_parameter_value().string_value
+        self.odom_frame = self.get_parameter('odom_frame').get_parameter_value().string_value
         self.base_link_frame = (
             self.get_parameter('base_link_frame').get_parameter_value().string_value
         )
-        self.odom_frame = self.get_parameter('odom_frame').get_parameter_value().string_value
+        self.odom_topic = self.get_parameter('odom_topic').get_parameter_value().string_value
         self.publish_rate = self.get_parameter('publish_rate').get_parameter_value().double_value
+        self.yaw_offset = self.get_parameter('yaw_offset').get_parameter_value().double_value
+
+        # Wait for sim time if needed
+        use_sim_time = self.get_parameter('use_sim_time').get_parameter_value().bool_value
+        if use_sim_time:
+            if rclpy.ok() and self.get_clock().now().nanoseconds == 0:
+                self.get_logger().warn('Waiting for /clock to be published...')
+            while rclpy.ok() and self.get_clock().now().nanoseconds == 0:
+                time.sleep(1.0)
+                rclpy.spin_once(self)
+            self.get_logger().info('Receiving /clock msgs now.')
 
         # Publisher for the odom topic
         self.odom_publisher = self.create_publisher(Odometry, self.odom_topic, 10)
-        self.odom_pose_publisher = self.create_publisher(
-            PoseStamped, f'/agrarsense/out/sensors/{self.role_name}/pose', 10
-        )
 
-        # Transform broadcaster for map_to_odom and odom_to_base_link
+        # Transform broadcaster
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # Subscription to the global transform topic
@@ -53,6 +60,13 @@ class VehicleTFPublisher(Node):
             10,
         )
 
+        # Create a timer to publish transforms at a fixed rate
+        self.timer = self.create_timer(1.0 / self.publish_rate, self.publish_transforms)
+
+        # Initialize variables
+        self.vehicle_transform = TransformStamped()
+        self.vehicle_transform.header.frame_id = self.world_frame
+        self.vehicle_transform.child_frame_id = self.role_name
         self.start_position = None
         self.start_rotation = None
         self.start_yaw = None
@@ -65,9 +79,6 @@ class VehicleTFPublisher(Node):
         self.odom_msg = Odometry()
         self.odom_msg.header.frame_id = self.odom_frame
         self.odom_msg.child_frame_id = self.base_link_frame
-
-        # Create a timer to publish transforms at a fixed rate
-        self.timer = self.create_timer(1.0 / self.publish_rate, self.publish_transforms)
 
     def global_base_frame_transform_callback(self, msg):
         # Convert translation from centimeters to meters
@@ -173,14 +184,16 @@ class VehicleTFPublisher(Node):
         # Publish the odom message
         self.odom_publisher.publish(self.odom_msg)
 
-        odom_pose_msg = PoseStamped()
-        odom_pose_msg.header.stamp = current_time.to_msg()
-        odom_pose_msg.header.frame_id = self.odom_frame
-        odom_pose_msg.pose.position.x = self.odom_msg.pose.pose.position.x
-        odom_pose_msg.pose.position.y = self.odom_msg.pose.pose.position.y
-        odom_pose_msg.pose.position.z = self.odom_msg.pose.pose.position.z
-        odom_pose_msg.pose.orientation = self.odom_msg.pose.pose.orientation
-        self.odom_pose_publisher.publish(odom_pose_msg)
+        # Create a World -> Vehicle transform
+        self.vehicle_transform.transform = msg
+        roll, pitch, yaw = euler_from_quaternion(
+            [msg.rotation.x, msg.rotation.y, msg.rotation.z, msg.rotation.w]
+        )
+        quat = quaternion_from_euler(roll, pitch, yaw + self.yaw_offset)
+        self.vehicle_transform.transform.rotation.x = quat[0]
+        self.vehicle_transform.transform.rotation.y = quat[1]
+        self.vehicle_transform.transform.rotation.z = quat[2]
+        self.vehicle_transform.transform.rotation.w = quat[3]
 
     def reset_state(self):
         """Reset all state variables to handle clock reset."""
@@ -192,41 +205,12 @@ class VehicleTFPublisher(Node):
         self.prev_yaw = None
 
     def publish_transforms(self):
-        current_time = self.get_clock().now()
-
-        # If start_position is not set, publish transform with default values (0)
         if self.start_position is None:
-            start_position = Vector3()
-            start_rotation = Quaternion()
-        else:
-            start_position = self.start_position
-            start_rotation = self.start_rotation
+            return
 
-        # Publish the map_to_odom transform
-        map_to_odom = TransformStamped()
-        map_to_odom.header.stamp = current_time.to_msg()
-        map_to_odom.header.frame_id = 'map'
-        map_to_odom.child_frame_id = self.odom_frame
-        map_to_odom.transform.translation.x = start_position.x
-        map_to_odom.transform.translation.y = start_position.y
-        map_to_odom.transform.translation.z = start_position.z
-        map_to_odom.transform.rotation = start_rotation
-
-        # Broadcast the map_to_odom transform
-        self.tf_broadcaster.sendTransform(map_to_odom)
-
-        # Publish the odom_to_base_link transform
-        odom_to_base_link = TransformStamped()
-        odom_to_base_link.header.stamp = current_time.to_msg()
-        odom_to_base_link.header.frame_id = self.odom_frame
-        odom_to_base_link.child_frame_id = self.base_link_frame
-        odom_to_base_link.transform.translation.x = self.odom_msg.pose.pose.position.x
-        odom_to_base_link.transform.translation.y = self.odom_msg.pose.pose.position.y
-        odom_to_base_link.transform.translation.z = self.odom_msg.pose.pose.position.z
-        odom_to_base_link.transform.rotation = self.odom_msg.pose.pose.orientation
-
-        # Broadcast the odom_to_base_link transform
-        self.tf_broadcaster.sendTransform(odom_to_base_link)
+        # Publish the map_to_vehicle transform
+        self.vehicle_transform.header.stamp = self.get_clock().now().to_msg()
+        self.tf_broadcaster.sendTransform(self.vehicle_transform)
 
 
 def main(args=None):
