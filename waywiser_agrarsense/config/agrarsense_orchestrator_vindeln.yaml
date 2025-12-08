@@ -42,15 +42,9 @@ agrarsense_orchestrator_node:
     vehicle_ids: ["forwarder"]
     vehicle_tf_publisher:
       forwarder:
-        odom_topic: "/forwarder/odometry"
-        base_link_frame: "base_link"
+        world_frame: "map"
         odom_frame: "odom"
-        rear_axle_frame: "rear_axle_link"
-        rear_end_frame: "rear_end_link"
-        rear_axle_frame_to_rear_end_frame_offset: [-2.2104, 0.0000, 0.3917]
-        rear_axle_frame_to_base_frame_offset: [2.7202, 0.0000, -0.6792]
-        max_steering_angle: 45.0
-        erpm_min: 440.0
-        erpm_max: 28000.0
-        speed_to_rpm_factor: 528.0
-        wheelbase: 5.0990
+        base_link_frame: "base_link"
+        odom_topic: "/forwarder/odometry"
+        publish_rate: 10.0
+        yaw_offset: 0.0

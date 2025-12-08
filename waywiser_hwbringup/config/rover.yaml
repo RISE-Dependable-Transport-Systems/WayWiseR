@@ -55,7 +55,7 @@ waywiser_car_node:
     publish_world_to_odom_tf: false
     vehicle_state_poll_rate: 30 # currently same rate for both odom topic and odom->base_link tf
     use_sdvp_position_fusion: false
-    imu_for_sdvp_position_fusion: ""
+    imu_variant: ""
     min_battery_voltage: 13.6
     joint_states_publish_rate: 10
     enable_lidar: false

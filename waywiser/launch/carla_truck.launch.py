@@ -2,8 +2,7 @@ import os
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
@@ -14,6 +13,7 @@ def generate_launch_description():
     waywiser_core_dir = get_package_share_directory('waywiser_core')
     waywiser_teleop_dir = get_package_share_directory('waywiser_teleop')
     waywiser_twist_safety_dir = get_package_share_directory('waywiser_twist_safety')
+    waywiser_hwbringup_dir = get_package_share_directory('waywiser_hwbringup')
 
     # args that can be set from the command line or a default will be used
     use_sim_time_la = DeclareLaunchArgument(
@@ -68,6 +68,11 @@ def generate_launch_description():
         'control_vehicle_node',
         default_value='waywiser_truck_node',
         description='Name of the vehicle node to control',
+    )
+    localization_node_name_la = DeclareLaunchArgument(
+        'localization_node_name',
+        default_value='waywiser_truck_localization_node',
+        description='Name of the node to be launched',
     )
 
     # include launch files
@@ -125,15 +130,47 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             [
                 os.path.join(
-                    waywiser_core_dir,
+                    waywiser_hwbringup_dir,
                     'launch',
-                    'waywiser_truck.launch.py',
+                    'truck.launch.py',
                 )
             ]
         ),
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'vehicle_config': LaunchConfiguration('vehicle_config'),
+        }.items(),
+    )
+
+    waywiser_truck_localization_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(
+                    waywiser_core_dir,
+                    'launch',
+                    'waywiser_localization.launch.py',
+                )
+            ]
+        ),
+        launch_arguments={
+            'localization_config': LaunchConfiguration('vehicle_config'),
+            'localization_node_name': LaunchConfiguration('localization_node_name'),
+        }.items(),
+    )
+
+    tfs_to_navsatfixfused = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(
+                    waywiser_core_dir,
+                    'launch',
+                    'tfs_to_navsatfixfused.launch.py',
+                )
+            ]
+        ),
+        launch_arguments={
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'config': LaunchConfiguration('vehicle_config'),
         }.items(),
     )
 
@@ -204,12 +241,15 @@ def generate_launch_description():
     ld.add_action(teleop_la)
     ld.add_action(rviz2_la)
     ld.add_action(control_vehicle_node_name_la)
+    ld.add_action(localization_node_name_la)
 
     # start nodes
     ld.add_action(carla_orchestrator)
     ld.add_action(waywiser_carla_relay)
     ld.add_action(twist_safety)
     ld.add_action(waywiser_truck)
+    ld.add_action(waywiser_truck_localization_launch)
+    ld.add_action(tfs_to_navsatfixfused)
     ld.add_action(emulated_angle_sensor)
     ld.add_action(emulated_range_sensor_array)
     ld.add_action(teleop_rviz2)

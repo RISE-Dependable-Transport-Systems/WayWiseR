@@ -46,7 +46,6 @@ waywiser_car_node:
   ros__parameters:
     vehicle_interface_type: "ext_simulated"
     gnss_variant: "ext_simulated"
-    gnss_timeout: 3.0
     servo_offset: 0.45
     servo_range: 0.9 # servo_output = servo_offset + [-servo_range/2, servo_range/2]
     #steering_angle_to_servo_gain: -0.950

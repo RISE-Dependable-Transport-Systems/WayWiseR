@@ -107,8 +107,7 @@ waywiser_truck_node:
     gnss_print_verbose: true
     gnss_sensor_fusion_imu_autoalign: false
     gnss_sensor_fusion_force_recalibrate: false
-    gnss_measurement_rate: 5 # Hz
-    gnss_priority_message_rate: 10 # Hz
+    gnss_message_rate: 10 # Hz
     gnss_dynamic_model: 12
     # Dynamic model selection:
     #  0: Portable

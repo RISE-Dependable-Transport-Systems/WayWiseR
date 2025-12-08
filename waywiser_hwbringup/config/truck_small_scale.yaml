@@ -10,6 +10,8 @@
     hitch_frame: truck_fifth_wheel_link
     gnss_chip_frame: truck_gnss_chip_link
     gnss_antenna_frame: truck_gnss_antenna_link
+    gnss_reference_frame: truck_rear_axle_link
+    imu_frame: truck_gnss_chip_link
 
     trailer_base_frame: semitrailer_base_link
     trailer_rear_axle_frame: semitrailer_rear_axle_link
@@ -36,7 +38,7 @@
         "semitrailer_rrw_link_joint",
       ]
     truck_trailer_link_joint_name: "truck_trailer_link_joint"
-    has_trailer: true
+    has_trailer: false
     length: 0.505
     width: 0.185
     wheelbase: 0.2866
@@ -54,16 +56,14 @@
 
     urdf_file: "semitruck.urdf.xacro"
     urdf_scale: 0.071429 # 1:14
-    urdf_extra_args: "has_trailer:=true"
+    urdf_extra_args: "has_trailer:=false"
 
     odom_topic: "/truck/odometry"
     vehicle_pose_topic: "/truck/rear_axle_pose"
     trailer_pose_topic: "/semitrailer/rear_axle_pose"
     angle_sensor_topic: "/truck/sensors/trailer_angle"
     rtcm_frequency_topic: "/truck/sensors/gnss/rtcm_frequency"
-    nav_sat_diagnostics_topic: "/truck/sensors/gnss/nav_sat_diagnostics"
     nav_pvt_pose_topic: "/truck/sensors/gnss/nav_pvt_pose"
-    nav_sat_fix_topic: "/truck/sensors/gnss/nav_sat_fix"
     battery_state_topic: "/truck/sensors/battery_state"
     mission_status_topic: "/truck/mission_status"
     autopilot_state_control_topic: "/truck/autopilot_state_control"
@@ -71,6 +71,8 @@
     autopilot_center_pose_topic: "/truck/autopilot_center_pose"
     emergency_stop_status_topic: "/emergency_stop/current_state"
     emergency_stop_update_topic: "/emergency_stop/target_state"
+    fused_nav_sat_fix_extended_topic: "/truck/sensors/gnss/fused_nav_sat_fix_extended"
+    imu_topic: "/truck/sensors/imu"
 
     urm14_sensor_array_config: urm14_sensor_array.yaml
 
@@ -85,9 +87,7 @@ waywiser_truck_node:
     publish_odom_to_baselink_tf: true
     publish_world_to_odom_tf: true
     vehicle_state_poll_rate: 30 # currently same rate for both odom topic and odom->base_link tf
-    use_sdvp_position_fusion: false
-    is_gnss_position_fused: true
-    imu_for_sdvp_position_fusion: "vesc" # "vesc" or "bno055" or ""
+    imu_variant: "vesc" # "vesc" or "bno055" or "waywise_simulated"
     # tof_sensors: [tof_trailer_rear, tof_trailer_right, tof_trailer_left]
     # tof_trailer_rear:
     #   i2c_addr: 0x29
@@ -102,28 +102,6 @@ waywiser_truck_node:
     angle_sensor_offset: 94.043
     joint_states_publish_rate: 10
     invert_trailer_joint_state: true
-    gnss_variant: "UBLOX_ZED_F9R" # "UBLOX_ZED_F9P" or "UBLOX_ZED_F9R"
-    position_fusion_input_timer_rate: 10
-    gnss_print_verbose: true
-    gnss_sensor_fusion_imu_autoalign: false
-    gnss_sensor_fusion_force_recalibrate: false
-    gnss_measurement_rate: 5 # Hz
-    gnss_priority_message_rate: 10 # Hz
-    gnss_dynamic_model: 12
-    # Dynamic model selection:
-    #  0: Portable
-    #  2: Stationary
-    #  3: Pedestrian
-    #  4: Automotive
-    #  5: Sea
-    #  6: Airborne (<1g acceleration)
-    #  7: Airborne (<2g acceleration)
-    #  8: Airborne (<4g acceleration)
-    #  9: Wrist-worn watch
-    # 10: Motorbike
-    # 11: Robotic lawn mower
-    # 12: E-scooter
-    # 13: Rail vehicles (trains, trams)
 
     #autopilot component
     autopilot_timer_rate: 10
@@ -138,6 +116,32 @@ waywiser_truck_node:
     end_goal_alignment_threshold: 0.1 # m
     yaw_accuracy_threshold_for_mission: 1.0 # degrees
     position_accuracy_threshold_for_mission: 0.05 # m
+
+waywiser_truck_localization_node:
+  ros__parameters:
+    use_sdvp_position_fusion: false
+    publish_world_to_fused_tf: false
+    gnss_variant: "UBLOX_ZED_F9P" # "UBLOX_ZED_F9P" or "UBLOX_ZED_F9R"
+    gnss_print_verbose: true
+    gnss_sensor_fusion_imu_autoalign: false
+    gnss_sensor_fusion_force_recalibrate: false
+    gnss_message_rate: 10 # Hz
+    position_fusion_input_timer_rate: 10
+    gnss_dynamic_model: 0
+    # Dynamic model selection:
+    #  0: Portable
+    #  2: Stationary
+    #  3: Pedestrian
+    #  4: Automotive
+    #  5: Sea
+    #  6: Airborne (<1g acceleration)
+    #  7: Airborne (<2g acceleration)
+    #  8: Airborne (<4g acceleration)
+    #  9: Wrist-worn watch
+    # 10: Motorbike
+    # 11: Robotic lawn mower
+    # 12: E-scooter
+    # 13: Rail vehicles (trains, trams)
     gnss_chip_orientation_offset: [0.0, 0.0, 180.0] # [roll, pitch, yaw]
 
 emergency_stop_monitor:

@@ -7,24 +7,30 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from waywiser_py.waywiser_utils import get_full_file_path
 import yaml
+
+from waywiser_py.waywiser_utils import get_full_file_path
 
 
 def generate_launch_description():
     waywiser_core_dir = get_package_share_directory('waywiser_core')
-    hw_bringup_dir = get_package_share_directory('waywiser_hwbringup')
+    waywiser_hwbringup_dir = get_package_share_directory('waywiser_hwbringup')
 
     # args that can be set from the command line or a default will be used
     vehicle_config_la = DeclareLaunchArgument(
         'vehicle_config',
-        default_value=os.path.join(hw_bringup_dir, 'config/truck_small_scale.yaml'),
+        default_value=os.path.join(waywiser_hwbringup_dir, 'config/truck_small_scale.yaml'),
         description='Full path to params file of truck',
     )
     frame_prefix_la = DeclareLaunchArgument(
         'frame_prefix',
         default_value='/',
         description='Prefix to publish robot transforms in',
+    )
+    localization_node_name_la = DeclareLaunchArgument(
+        'localization_node_name',
+        default_value='waywiser_truck_localization_node',
+        description='Name of the node to be launched',
     )
 
     # include launch files
@@ -44,6 +50,22 @@ def generate_launch_description():
         }.items(),
     )
 
+    waywiser_truck_localization_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(
+                    waywiser_core_dir,
+                    'launch',
+                    'waywiser_localization.launch.py',
+                )
+            ]
+        ),
+        launch_arguments={
+            'localization_config': LaunchConfiguration('vehicle_config'),
+            'localization_node_name': LaunchConfiguration('localization_node_name'),
+        }.items(),
+    )
+
     # create opaque functions to launch nodes using context
     urm14_ultrasonic_array_launch_action = OpaqueFunction(function=urm14_ultrasonic_array_launch)
 
@@ -53,9 +75,11 @@ def generate_launch_description():
     # declare launch arg
     ld.add_action(vehicle_config_la)
     ld.add_action(frame_prefix_la)
+    ld.add_action(localization_node_name_la)
 
     # start nodes
     ld.add_action(waywiser_truck_launch)
+    ld.add_action(waywiser_truck_localization_launch)
     ld.add_action(urm14_ultrasonic_array_launch_action)
 
     return ld

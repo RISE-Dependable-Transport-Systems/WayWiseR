@@ -2,8 +2,7 @@ import os
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
@@ -84,6 +83,11 @@ def generate_launch_description():
         default_value='waywiser_car_node',
         description='Name of the vehicle node to control',
     )
+    localization_node_name_la = DeclareLaunchArgument(
+        'localization_node_name',
+        default_value='waywiser_car_localization_node',
+        description='Name of the node to be launched',
+    )
 
     # include launch files
     agrarsense_orchestrator = IncludeLaunchDescription(
@@ -133,6 +137,38 @@ def generate_launch_description():
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'vehicle_config': LaunchConfiguration('vehicle_config'),
+        }.items(),
+    )
+
+    waywiser_car_localization = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(
+                    waywiser_core_dir,
+                    'launch',
+                    'waywiser_localization.launch.py',
+                )
+            ]
+        ),
+        launch_arguments={
+            'localization_config': LaunchConfiguration('vehicle_config'),
+            'localization_node_name': LaunchConfiguration('localization_node_name'),
+        }.items(),
+    )
+
+    tfs_to_navsatfixfused = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(
+                    waywiser_core_dir,
+                    'launch',
+                    'tfs_to_navsatfixfused.launch.py',
+                )
+            ]
+        ),
+        launch_arguments={
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'config': LaunchConfiguration('vehicle_config'),
         }.items(),
     )
 
@@ -221,11 +257,14 @@ def generate_launch_description():
     ld.add_action(yolo_config_la)
     ld.add_action(collision_monitor_config_la)
     ld.add_action(control_vehicle_node_name_la)
+    ld.add_action(localization_node_name_la)
 
     # start nodes
     ld.add_action(agrarsense_orchestrator)
     ld.add_action(waywiser_agrarsense_relay)
     ld.add_action(waywiser_car)
+    ld.add_action(waywiser_car_localization)
+    ld.add_action(tfs_to_navsatfixfused)
     ld.add_action(twist_safety)
     ld.add_action(teleop_rviz2)
     ld.add_action(yolo)
