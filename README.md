@@ -91,7 +91,7 @@ To persist the environment variables and source the ROS2 overlay automatically i
 
 ### Current state
 
-The current state presents a foundation that our research projects [AGRARSENSE](https://www.ri.se/en/what-we-do/projects/agrarsense) and [SUNRISE](https://www.ri.se/en/what-we-do/projects/safety-assurance-framework-for-connected-automated-mobility-systems) will build upon during 2024 to investigate safety-critical situational awareness in the forestry and road vehicle contexts, respectively.
+The current state presents the core platform that our research projects [AGRARSENSE](https://www.ri.se/en/what-we-do/projects/agrarsense) and [SUNRISE](https://www.ri.se/en/what-we-do/projects/safety-assurance-framework-for-connected-automated-mobility-systems) have used throughout 2024–2025 to investigate safety-critical situational awareness in the forestry and road vehicle contexts, respectively.
 
 ## Organization
 
