@@ -91,6 +91,7 @@ void WaywiserCar::setup_parameters()
   rear_end_frame_ = declare_parameter("rear_end_frame", base_frame_);
   left_end_frame_ = declare_parameter("left_end_frame", base_frame_);
   right_end_frame_ = declare_parameter("right_end_frame", base_frame_);
+  imu_frame_ = declare_parameter("imu_frame", base_frame_);
 
   battery_state_topic_ = declare_parameter("battery_state_topic", "/battery_state");
   odom_topic_ = declare_parameter("odom_topic", "/odom");
@@ -113,6 +114,7 @@ void WaywiserCar::setup_parameters()
     declare_parameter("emergency_stop_status_topic", "/emergency_stop/current_state");
   autopilot_state_control_topic_ =
     declare_parameter("autopilot_state_control_topic", "/autopilot_state_control");
+  imu_topic_ = declare_parameter("imu_topic", "/imu");
 
   tof_sensor_names_ = this->declare_parameter<std::vector<std::string>>(
     "tof_sensors", {}, rcl_interfaces::msg::ParameterDescriptor{});
@@ -302,6 +304,15 @@ void WaywiserCar::setup_publishers()
     default:
       break;
   }
+
+  imu_pub_ = create_publisher<sensor_msgs::msg::Imu>(imu_topic_, 10);
+  QObject::connect(
+    mCarInterfaceComponent->getIMUOrientationUpdater().get(),
+    &IMUOrientationUpdater::updatedIMUOrientation,
+    [&](QSharedPointer<ObjectState> objectState) {
+      Q_UNUSED(objectState)
+      publish_imu_data();
+    });
 
   vehicle_pose_pub_ = create_publisher<geometry_msgs::msg::PoseStamped>(
     vehicle_pose_topic_, 10);
@@ -1016,6 +1027,21 @@ void WaywiserCar::publish_joint_states(double timePassedSinceLastCall_ms)
     joint_state_pub_->publish(joint_state_msg);
     timePassedSinceLastUpdate_ms = 0.0;
   }
+}
+
+void WaywiserCar::publish_imu_data()
+{
+  sensor_msgs::msg::Imu imu_msg;
+  imu_msg.header.stamp = this->now();
+  imu_msg.header.frame_id = imu_frame_;
+
+  double yawRad = mCarState->getPosition(PosType::IMU).getYaw() * M_PI / 180.0;
+  imu_msg.orientation.x = 0.0;
+  imu_msg.orientation.y = 0.0;
+  imu_msg.orientation.z = sin(yawRad / 2.0);
+  imu_msg.orientation.w = cos(yawRad / 2.0);
+
+  imu_pub_->publish(imu_msg);
 }
 
 // ----------------- Utility methods -----------------

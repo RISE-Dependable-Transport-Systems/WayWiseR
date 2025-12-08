@@ -140,6 +140,44 @@ void CarInterfaceComponent::setup_vehicle_interface()
       break;
   }
 
+  // IMU
+  switch (mImuVariant) {
+    case ImuVariant::VESC:
+      {
+        if (mVESCMotorController && mVESCMotorController->isSerialConnected()) {
+          mIMUOrientationUpdater = mVESCMotorController->getIMUOrientationUpdater(mCarState);
+          qDebug() << "Vesc IMU is configured.";
+        } else {
+          qDebug() <<
+            "vesc IMU is configured, but serial connection is not available! Using waywise simulation instead.";
+          mImuVariant = ImuVariant::WAYWISE_SIMULATED;
+        }
+      } break;
+    case ImuVariant::BNO055:
+      {
+        mIMUOrientationUpdater.reset(new IMUOrientationUpdater(mCarState));
+        qDebug() << "BNO055 IMU is configured.";
+      } break;
+    default:
+      break;
+  }
+
+  if (mImuVariant == ImuVariant::WAYWISE_SIMULATED) {
+    mIMUOrientationUpdater.reset(new IMUOrientationUpdater(mCarState));
+
+    QObject::connect(
+      &mWaywiseSimulationTimer, &QTimer::timeout,
+      [&]() {
+        mIMUOrientationUpdater->simulationStep();
+      }
+    );
+    if (mVehicleInterfaceType != VehicleInterfaceType::WAYWISE_SIMULATED) {
+      const int pollPeriodMs = 1000 / mVehicleStatePollRate;
+      mWaywiseSimulationTimer.start(pollPeriodMs);
+    }
+    qDebug() << "Waywise simulated IMU is configured.";
+  }
+
   // ToF Sensors
   for (const auto & pair : mToFSensorsInfo) {
     std::string tof_sensor_name = pair.first;

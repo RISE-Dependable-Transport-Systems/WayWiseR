@@ -24,7 +24,7 @@
 
 
 enum class VehicleInterfaceType {WAYWISE_SIMULATED, EXT_SIMULATED, VESC};
-enum class ImuVariant {UNKNOWN, BNO055, VESC};
+enum class ImuVariant {UNKNOWN, BNO055, VESC, WAYWISE_SIMULATED};
 enum class SpeedControlType {OPEN_LOOP_ERPM_CONTROL, CLOSED_LOOP_PID_SPEED_CONTROL};
 
 struct CarControlCommand
@@ -194,6 +194,8 @@ inline ImuVariant get_imu_variant_param(rclcpp::Node * node, const std::string &
     return ImuVariant::VESC;
   } else if (str == "bno055") {
     return ImuVariant::BNO055;
+  } else if (str == "waywise_simulated") {
+    return ImuVariant::WAYWISE_SIMULATED;
   }
   return ImuVariant::UNKNOWN;
 }

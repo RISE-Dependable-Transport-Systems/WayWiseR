@@ -13,6 +13,7 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/u_int8.hpp"
@@ -86,6 +87,7 @@ protected:
   void publish_route_markers();
   void publish_autopilot_markers();
   virtual void publish_joint_states(double timePassed_ms);
+  void publish_imu_data();
 
   // Utility methods
   void process_twist_msg(const geometry_msgs::msg::Twist::SharedPtr twist_msg);
@@ -107,6 +109,7 @@ protected:
   std::string rear_end_frame_;
   std::string left_end_frame_;
   std::string right_end_frame_;
+  std::string imu_frame_;
 
   std::string battery_state_topic_;
   std::string odom_topic_;
@@ -114,6 +117,7 @@ protected:
   std::string vehicle_pose_topic_;
   std::string emergency_stop_update_topic_;
   std::string car_control_command_topic_;
+  std::string imu_topic_;
 
   std::string mission_status_topic_;
   std::string vehicle_alignment_reference_point_topic_;
@@ -156,6 +160,7 @@ protected:
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr route_marker_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr autopilot_marker_pub_;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
 
   // Subscribers
   rclcpp::Subscription<waywiser_core::msg::NavSatFixExtended>::SharedPtr

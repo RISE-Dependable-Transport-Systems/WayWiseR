@@ -90,6 +90,10 @@ public:
     return mMovementController;
   }
   CarControlCommand getCarControlCommand() const {return mCarControlCommand;}
+  QSharedPointer<IMUOrientationUpdater> getIMUOrientationUpdater() const
+  {
+    return mIMUOrientationUpdater;
+  }
 
   // Utility methods
   virtual void setup_vehicle_interface();
