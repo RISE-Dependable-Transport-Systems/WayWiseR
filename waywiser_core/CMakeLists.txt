@@ -162,6 +162,10 @@ add_executable(
   ${COMMON_WAYWISE_AP_SOURCES}
 )
 
+add_executable(tfs_to_navsatfixfused_node
+  cpp_src/tfs_to_navsatfixfused_node.cpp
+)
+
 set(LOCALIZATION_LIBRARIES
   Qt5::Core
   Qt5::SerialPort
@@ -184,9 +188,15 @@ set(TRUCK_LIBRARIES
   ${CAR_LIBRARIES}
 )
 
+set(TFS_TO_NAVSATFIXFUSED_LIBRARIES
+  Qt5::Core
+  ${cpp_typesupport_target}
+)
+
 target_link_libraries(waywiser_localization_node ${LOCALIZATION_LIBRARIES})
 target_link_libraries(waywiser_car_node ${CAR_LIBRARIES})
 target_link_libraries(waywiser_truck_node ${TRUCK_LIBRARIES})
+target_link_libraries(tfs_to_navsatfixfused_node ${TFS_TO_NAVSATFIXFUSED_LIBRARIES})
 
 set(LOCALIZATION_DEPENDENCIES
   geometry_msgs
@@ -220,9 +230,19 @@ set(TRUCK_DEPENDENCIES
   ${CAR_DEPENDENCIES}
 )
 
+set(TFS_TO_NAVSATFIXFUSED_DEPENDENCIES
+  rclcpp
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  waywiser
+  waywiser_twist_safety
+)
+
 ament_target_dependencies(waywiser_localization_node ${LOCALIZATION_DEPENDENCIES})
 ament_target_dependencies(waywiser_car_node ${CAR_DEPENDENCIES})
 ament_target_dependencies(waywiser_truck_node ${TRUCK_DEPENDENCIES})
+ament_target_dependencies(tfs_to_navsatfixfused_node ${TFS_TO_NAVSATFIXFUSED_DEPENDENCIES})
 
 install(
   DIRECTORY launch
@@ -232,6 +252,7 @@ install(
 install(TARGETS waywiser_localization_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS waywiser_car_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS waywiser_truck_node DESTINATION lib/${PROJECT_NAME})
+install(TARGETS tfs_to_navsatfixfused_node DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
