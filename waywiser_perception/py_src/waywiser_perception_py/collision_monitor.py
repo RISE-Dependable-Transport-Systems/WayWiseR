@@ -2,13 +2,14 @@
 
 import math
 
-import rclpy
-import tf2_ros
 from geometry_msgs.msg import PointStamped
+import rclpy
 from rclpy.duration import Duration
 from rclpy.node import Node
+import tf2_ros
 from tf2_ros import TransformException
 from vision_msgs.msg import Detection3DArray
+
 from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
 from waywiser_twist_safety.msg import EmergencyStopState
 
