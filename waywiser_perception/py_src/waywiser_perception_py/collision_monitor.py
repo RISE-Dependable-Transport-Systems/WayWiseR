@@ -33,6 +33,7 @@ class CollisionMonitor(Node):
         self.declare_parameter('emergency_stop_topic', '/emergency_stop')
         self.declare_parameter('class_ids_to_stop', [str()])  # Class IDs published as strings
         self.declare_parameter('tf_timeout_sec', 0.5)
+        self.declare_parameter('reference_frame', 'base_link')
 
         # Retrieve parameters
         self.distance_threshold = (
@@ -46,6 +47,9 @@ class CollisionMonitor(Node):
         )
         self.class_ids_to_stop = set(
             self.get_parameter('class_ids_to_stop').get_parameter_value().string_array_value
+        )
+        self.reference_frame = (
+            self.get_parameter('reference_frame').get_parameter_value().string_value
         )
 
         # TF2
@@ -89,7 +93,7 @@ class CollisionMonitor(Node):
 
     def transform_point(self, point_stamped):
         try:
-            return self.tf_buffer.transform(point_stamped, 'base_link', self.tf_timeout)
+            return self.tf_buffer.transform(point_stamped, self.reference_frame, self.tf_timeout)
         except TransformException as e:
             self.get_logger().warning(f'TF transform failed: {e}')
             return None
