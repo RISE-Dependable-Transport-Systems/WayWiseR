@@ -6,6 +6,7 @@ from geometry_msgs.msg import PointStamped
 import rclpy
 from rclpy.duration import Duration
 from rclpy.node import Node
+import tf2_geometry_msgs  # noqa: F401
 import tf2_ros
 from tf2_ros import TransformException
 from vision_msgs.msg import Detection3DArray
@@ -30,7 +31,8 @@ class CollisionMonitor(Node):
         # Parameters for topics
         self.declare_parameter('distance_threshold', 1.32)
         self.declare_parameter('detections_topic', '/oak/nn/spatial_detections')
-        self.declare_parameter('emergency_stop_topic', '/emergency_stop')
+        self.declare_parameter('emergency_stop_status_topic', '/emergency_stop/current_state')
+        self.declare_parameter('emergency_stop_update_topic', '/emergency_stop/target_state')
         self.declare_parameter('class_ids_to_stop', [str()])  # Class IDs published as strings
         self.declare_parameter('tf_timeout_sec', 0.5)
         self.declare_parameter('reference_frame', 'base_link')
@@ -42,8 +44,11 @@ class CollisionMonitor(Node):
         self.detections_topic = (
             self.get_parameter('detections_topic').get_parameter_value().string_value
         )
-        self.emergency_stop_topic = (
-            self.get_parameter('emergency_stop_topic').get_parameter_value().string_value
+        self.emergency_stop_status_topic = (
+            self.get_parameter('emergency_stop_status_topic').get_parameter_value().string_value
+        )
+        self.emergency_stop_update_topic = (
+            self.get_parameter('emergency_stop_update_topic').get_parameter_value().string_value
         )
         self.class_ids_to_stop = set(
             self.get_parameter('class_ids_to_stop').get_parameter_value().string_array_value
@@ -63,18 +68,26 @@ class CollisionMonitor(Node):
 
         # Publishers
         self.emergency_stop_publisher = self.create_publisher(
-            EmergencyStopState, self.emergency_stop_topic, RELIABLE_TRANSIENT_LOCAL_QOS
+            EmergencyStopState, self.emergency_stop_update_topic, RELIABLE_TRANSIENT_LOCAL_QOS
         )
 
         # Subscribers
         self.detection_array_subscriber = self.create_subscription(
             Detection3DArray, self.detections_topic, self.detection_array_callback, 10
         )
+        self.emergency_stop_status_subscriber = self.create_subscription(
+            EmergencyStopState,
+            self.emergency_stop_status_topic,
+            self.emergency_stop_status_subscriber_callback,
+            10,
+        )
 
         # Initialise emergency_stop_target_state_msg
         self.emergency_stop_target_state_msg = EmergencyStopState()
         self.emergency_stop_target_state_msg.sender_id = 'collision_monitor'
         self.emergency_stop_target_state_msg.state = EmergencyStopState.ACTIVE
+
+        self.emergency_stop_current_state = EmergencyStopState.UNKNOWN
 
         self.get_logger().info(f'Subscribed to {self.detections_topic}')
 
@@ -139,13 +152,16 @@ class CollisionMonitor(Node):
                 best.pose.pose.position, detection, msg.header
             )  # best.pose.pose.position is a Point with x,y,z
 
-            # Transform the point into the target frame
-            transformed = self.transform_point(point_stamped)
-            if transformed is None:
-                continue  # Skip detection if transform fails
+            p = point_stamped.point
+            if point_stamped.header.frame_id != self.reference_frame:
+                # Transform the point into the target frame
+                transformed = self.transform_point(point_stamped)
+                if transformed is None:
+                    continue  # Skip detection if transform fails
 
-            # Calculate squared distance in the target frame
-            p = transformed.point
+                # Calculate squared distance in the target frame
+                p = transformed.point
+
             current_distance_sq = p.x**2 + p.y**2 + p.z**2
 
             # If detection is closer than the current minimum, update
@@ -157,7 +173,10 @@ class CollisionMonitor(Node):
         # Process only the closest object (already transformed distance used)
         if closest_detection is not None and closest_best is not None:
             distance = math.sqrt(min_distance_sq)  # Actual distance in meters
-            if distance < self.distance_threshold:
+            if (
+                distance < self.distance_threshold
+                and self.emergency_stop_current_state != EmergencyStopState.ACTIVE
+            ):
                 self.emergency_stop_target_state_msg.reason = (
                     f'Object class {closest_best.hypothesis.class_id} detected at '
                     f'{distance:.2f} m with score {closest_best.hypothesis.score:.2f}'
@@ -166,6 +185,13 @@ class CollisionMonitor(Node):
                     msg.header.stamp
                 )  # Forwarding time stamp of detections
                 self.emergency_stop_publisher.publish(self.emergency_stop_target_state_msg)
+                self.get_logger().info(
+                    f'Emergency stop triggered for class {closest_best.hypothesis.class_id}'
+                    f' at {distance:.2f} m from {self.reference_frame}'
+                )
+
+    def emergency_stop_status_subscriber_callback(self, msg):
+        self.emergency_stop_current_state = msg.state
 
 
 def main(args=None):
