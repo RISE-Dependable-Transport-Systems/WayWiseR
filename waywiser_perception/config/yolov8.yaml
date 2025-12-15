@@ -6,7 +6,7 @@ yolo_node:
         prediction_verbose: True
         color_image_topic: "/sensors/camera/color/image_rect"
         publish_annotated_image: True
-        annotated_color_image_topic: "/sensors/camera/color/yolov8_annotated_image"
+        annotated_color_image_topic: "/sensors/camera/color/yolo_annotated_image"
         camera_base_frame: "camera_link"
 
         depth_image_topic: "/sensors/camera/aligned_depth_to_color/image_rect"
@@ -19,4 +19,4 @@ yolo_node:
 
         publish_bbox_3d_markers: True
         rviz_3d_visualization_markers_topic: "/sensors/camera/color/bbox_3d_markers"
-        detections_topic: "/sensors/camera/color/yolov8_detections"
+        detections_topic: "/sensors/camera/detections"
