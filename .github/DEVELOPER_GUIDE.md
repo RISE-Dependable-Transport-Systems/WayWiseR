@@ -27,6 +27,10 @@ line-length = 99
 # Select E (PEP8), W (warnings), F (pyflakes), C (complexity), Q (quotes), I (imports)
 select = ["E", "F", "W", "C", "Q", "I"]
 
+[lint.flake8-quotes]
+inline-quotes = "single"
+docstring-quotes = "double"
+
 [format]
 quote-style = "single"
 docstring-code-format = true
@@ -90,6 +94,6 @@ To run tests, build the workspace and then do:
 
 ```bash
 cd $WAYWISER_WS
-colcon test --base-paths src/WayWiseR/
+colcon test --base-paths src/WayWiseR/ --packages-skip $WAYWISER_SKIPPED_PACKAGES
 colcon test-result --verbose
 ```
