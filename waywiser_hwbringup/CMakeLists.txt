@@ -22,7 +22,6 @@ install(
 
 install(
   PROGRAMS
-  py_src/waywiser_hwbringup_py/depthai_node.py
   py_src/waywiser_hwbringup_py/urm14_sensor_array_node.py
   DESTINATION lib/${PROJECT_NAME}
 )

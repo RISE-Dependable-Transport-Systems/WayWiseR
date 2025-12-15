@@ -26,10 +26,6 @@ def generate_launch_description():
         description='name for camera node',
     )
 
-    use_sim_time_la = DeclareLaunchArgument(
-        'use_sim_time', default_value='False', description='Use simulation/Gazebo clock'
-    )
-
     log_level_la = DeclareLaunchArgument(
         'log_level', default_value='info', description='Log level'
     )
@@ -58,7 +54,6 @@ def generate_launch_description():
     # declare launch arg
     ld.add_action(namespace_la)
     ld.add_action(camera_node_name_la)
-    ld.add_action(use_sim_time_la)
     ld.add_action(log_level_la)
     ld.add_action(camera_config_la)
     ld.add_action(container_la)

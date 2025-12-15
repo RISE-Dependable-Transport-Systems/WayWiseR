@@ -1,9 +1,16 @@
 /**:
   ros__parameters:
+    publish_color_pointcloud: true
     camera:
       i_enable_imu: true
+      i_enable_ir: true
+      i_enable_sync: true
       i_nn_type: spatial
+      i_pipeline_type: RGBD
       i_restart_on_diagnostics_error: true
+      i_publish_tf_from_calibration: true
+      i_tf_base_frame: camera
+      i_tf_parent_frame: camera_link
     nn:
       i_nn_config_path: depthai_ros_driver/yolo
     imu:
@@ -16,3 +23,6 @@
       i_acc_freq: 400
       i_gyro_freq: 400
       i_rot_freq: 400
+    stereo:
+      i_align_depth: true
+      i_subpixel: true
