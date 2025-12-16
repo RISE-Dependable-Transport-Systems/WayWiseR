@@ -20,19 +20,16 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import GroupAction
-from launch.actions import SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument, GroupAction, SetEnvironmentVariable
 from launch.conditions import IfCondition
-from launch.substitutions import EqualsSubstitution
-from launch.substitutions import LaunchConfiguration
-from launch.substitutions import NotEqualsSubstitution
-from launch.substitutions import PythonExpression
-from launch_ros.actions import ComposableNodeContainer
-from launch_ros.actions import LoadComposableNodes
-from launch_ros.actions import Node
-from launch_ros.descriptions import ComposableNode
-from launch_ros.descriptions import ParameterFile
+from launch.substitutions import (
+    EqualsSubstitution,
+    LaunchConfiguration,
+    NotEqualsSubstitution,
+    PythonExpression,
+)
+from launch_ros.actions import ComposableNodeContainer, LoadComposableNodes, Node
+from launch_ros.descriptions import ComposableNode, ParameterFile
 from nav2_common.launch import RewrittenYaml
 
 

@@ -7,9 +7,9 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-import yaml
 
 from waywiser_py.waywiser_utils import get_full_file_path
+import yaml
 
 
 def generate_launch_description():

@@ -3,15 +3,11 @@
 import struct
 
 import cv2
-from cv_bridge import CvBridge
-from cv_bridge import CvBridgeError
+from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import CameraInfo
-from sensor_msgs.msg import Image
-from sensor_msgs.msg import PointCloud2
-from sensor_msgs.msg import PointField
+from sensor_msgs.msg import CameraInfo, Image, PointCloud2, PointField
 
 
 class RGBDToPointCloudNode(Node):

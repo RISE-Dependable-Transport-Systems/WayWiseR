@@ -2,10 +2,10 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from waywiser_description_py.waywiser_description_utils import get_robot_state_publisher_node
-import yaml
 
+from waywiser_description_py.waywiser_description_utils import get_robot_state_publisher_node
 from waywiser_py.waywiser_utils import get_full_file_path
+import yaml
 
 
 def generate_launch_description():

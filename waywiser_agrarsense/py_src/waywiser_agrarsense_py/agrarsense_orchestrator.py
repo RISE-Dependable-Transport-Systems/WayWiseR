@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-from enum import auto
-from enum import Enum
+from enum import auto, Enum
 import json
 import os
 import re
@@ -11,17 +10,18 @@ import time
 from ament_index_python import get_package_share_directory
 import rclpy
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
-from rclpy.clock import Clock
-from rclpy.clock import ClockType
+from rclpy.clock import Clock, ClockType
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rosgraph_msgs.msg import Clock as ClockMsg
 from std_msgs.msg import String
-from waywiser_py.waywiser_utils import create_subprocess
-from waywiser_py.waywiser_utils import get_full_file_path
-from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
-from waywiser_py.waywiser_utils import terminate_subprocess
 
+from waywiser_py.waywiser_utils import (
+    create_subprocess,
+    get_full_file_path,
+    RELIABLE_TRANSIENT_LOCAL_QOS,
+    terminate_subprocess,
+)
 from waywiser_test_runner.msg import SetupState
 
 PACKAGE_NAME = 'waywiser_agrarsense'
