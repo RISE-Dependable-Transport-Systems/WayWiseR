@@ -37,7 +37,7 @@ docstring-code-format = true
 docstring-code-line-length = 99
 
 [lint.isort]
-known-first-party = ["waywiser_core", "waywiser_py", "waywiser_test_runner", "waywiser_twist_safety"]
+known-first-party = ["waywiser_core", "waywiser_py", "waywiser_description_py", "waywiser_test_runner", "waywiser_twist_safety", "yaml"]
 known-third-party = ["rclpy", "ament_index_python", "matplotlib", "numpy", "pymap3d", "shapely", "tf_transformations"]
 force-sort-within-sections = true
 order-by-type = false
