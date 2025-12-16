@@ -11,6 +11,12 @@
       i_publish_tf_from_calibration: true
       i_tf_base_frame: camera
       i_tf_parent_frame: camera_link
+    rgb:
+      i_fps: 5.0
+    right:
+      i_fps: 5.0
+    left:
+      i_fps: 5.0
     nn:
       i_nn_config_path: depthai_ros_driver/yolo
     imu:
