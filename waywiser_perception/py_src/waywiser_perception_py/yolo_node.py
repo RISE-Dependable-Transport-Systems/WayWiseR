@@ -13,27 +13,16 @@ import numpy as np
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
-from rclpy.qos import QoSDurabilityPolicy
-from rclpy.qos import QoSHistoryPolicy
-from rclpy.qos import QoSProfile
-from rclpy.qos import QoSReliabilityPolicy
-from sensor_msgs.msg import CameraInfo
-from sensor_msgs.msg import Image
+from rclpy.qos import QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
+from sensor_msgs.msg import CameraInfo, Image
 from ultralytics.engine.results import Results
 from ultralytics.models.yolo.model import YOLO
-from ultralytics.trackers import BOTSORT
-from ultralytics.trackers import BYTETracker
-from ultralytics.utils import IterableSimpleNamespace
-from ultralytics.utils import yaml_load
+from ultralytics.trackers import BOTSORT, BYTETracker
+from ultralytics.utils import IterableSimpleNamespace, YAML
 from ultralytics.utils.checks import check_yaml
-from ultralytics.utils.plotting import Annotator
-from ultralytics.utils.plotting import Colors
-from visualization_msgs.msg import Marker
-from visualization_msgs.msg import MarkerArray
-
-from waywiser_perception.msg import BoundingBox
-from waywiser_perception.msg import Detection
-from waywiser_perception.msg import DetectionArray
+from ultralytics.utils.plotting import Annotator, Colors
+from vision_msgs.msg import BoundingBox3D, Detection3D, Detection3DArray, ObjectHypothesisWithPose
+from visualization_msgs.msg import Marker, MarkerArray
 
 
 class YoloNode(Node):
@@ -140,7 +129,7 @@ class YoloNode(Node):
             tracker_config_filepath = check_yaml(
                 (self.get_parameter('tracker_config_filepath').get_parameter_value().string_value)
             )
-            tracker_config = IterableSimpleNamespace(**yaml_load(tracker_config_filepath))
+            tracker_config = IterableSimpleNamespace(**YAML.load(tracker_config_filepath))
 
             if tracker_config.tracker_type == 'bytetrack':
                 self.tracker = BYTETracker(args=tracker_config, frame_rate=1)
@@ -171,7 +160,9 @@ class YoloNode(Node):
                 10,
             )
 
-        self.detection_array_pub = self.create_publisher(DetectionArray, self.detections_topic, 10)
+        self.detection_array_pub = self.create_publisher(
+            Detection3DArray, self.detections_topic, 10
+        )
         if self.publish_annotated_image:
             self.processed_image_pub = self.create_publisher(
                 Image,
@@ -183,7 +174,7 @@ class YoloNode(Node):
 
     def color_image_callback(self, msg: Image) -> None:
         cv_image = self.cv_bridge.imgmsg_to_cv2(msg)
-        detection_array = DetectionArray()
+        detection_array = Detection3DArray()
         detection_array.header = msg.header
         detection_array.header.frame_id = self.camera_base_frame
 
@@ -218,7 +209,7 @@ class YoloNode(Node):
         results_list: list[Results] = list(results)
         results: Results = results_list[0].cpu()
 
-        if results.boxes:
+        if results.boxes is not None:
             if self.publish_bbox_3d_markers:
                 visualization_marker_array = MarkerArray()
 
@@ -229,23 +220,30 @@ class YoloNode(Node):
                 )
 
             for index, box_data in enumerate(results.boxes):
-                detection = Detection()
-                detection.class_id = int(box_data.cls)
-                detection.confidence = float(box_data.conf)
+                detection = Detection3D()
+                object_hypothesis = ObjectHypothesisWithPose()
+                object_hypothesis.pose.pose.position.x = float(box_data.xywh[0][0])
+                object_hypothesis.pose.pose.position.y = float(box_data.xywh[0][1])
+                object_hypothesis.pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
+                object_hypothesis.hypothesis.score = float(box_data.conf)
+                object_hypothesis.hypothesis.class_id = f'{int(box_data.cls.item())}'
 
-                detection.bbox_2d.geometric_center_pose.position.x = float(box_data.xywh[0][0])
-                detection.bbox_2d.geometric_center_pose.position.y = float(box_data.xywh[0][1])
-                detection.bbox_2d.width = float(box_data.xywh[0][2])
-                detection.bbox_2d.height = float(box_data.xywh[0][3])
-                detection.bbox_2d.geometric_center_pose.orientation = Quaternion(
-                    x=0.0, y=0.0, z=0.0, w=1.0
-                )
+                detection.header = msg.header
+                detection.bbox.center.position.x = float(box_data.xywh[0][0])
+                detection.bbox.center.position.y = float(box_data.xywh[0][1])
+                detection.bbox.center.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
+                detection.bbox.size.x = float(box_data.xywh[0][2])
+                detection.bbox.size.y = float(box_data.xywh[0][3])
 
                 if box_data.is_track:
-                    detection.track_id = int(box_data.id)
+                    detection.id = f'{int(box_data.id.item())}'
 
-                if self.depth_image is not None and self.depth_camera_intrinsics is not None:
-                    object_mask_clone = np.copy(object_mask)
+                if (
+                    self.depth_image is not None
+                    and self.depth_camera_intrinsics is not None
+                    and object_mask is not None
+                ):
+                    object_mask_clone = object_mask.copy()
                     if results.masks:
                         seg_mask = results.masks[index].cpu().data.numpy().transpose(1, 2, 0)
                         seg_mask = cv2.resize(seg_mask, (image_width, image_height))
@@ -253,20 +251,24 @@ class YoloNode(Node):
                             object_mask_clone, seg_mask.astype(bool)
                         )
 
-                    detection.bbox_3d = self.generate_3d_bbox(
-                        detection.bbox_2d, depth_image, object_mask_clone
-                    )
+                    bbox_3d = self.generate_3d_bbox(box_data, depth_image, object_mask_clone)
+                    if bbox_3d is not None:
+                        detection.bbox = bbox_3d
+                        object_hypothesis.pose.pose = detection.bbox.center
+                    else:
+                        continue
 
-                    if self.publish_bbox_3d_markers:
+                    if self.publish_bbox_3d_markers and box_data.id is not None:
                         visualization_marker_array.markers.append(
                             self.generate_rviz_3d_visualization_marker(
-                                detection.bbox_3d,
+                                detection.bbox,
                                 msg.header,
-                                self.plot_colors(detection.class_id, True),
-                                detection.track_id,
+                                self.plot_colors(int(box_data.cls), True),
+                                int(box_data.id),
                             )
                         )
 
+                detection.results.append(object_hypothesis)
                 detection_array.detections.append(detection)
 
                 if self.publish_annotated_image:
@@ -377,30 +379,21 @@ class YoloNode(Node):
         # Create a CameraIntrinsics object
         self.depth_camera_intrinsics = CameraIntrinsics(fx=fx, fy=fy, cx=cx, cy=cy)
 
-    def generate_3d_bbox(
-        self, bbox_2d: BoundingBox, depth_image: np.ndarray, object_mask: np.ndarray
-    ):
-        bbox_3d = BoundingBox()
-        bbox_3d.geometric_center_pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
+    def generate_3d_bbox(self, box_data, depth_image: np.ndarray, object_mask: np.ndarray):
+        bbox_3d = BoundingBox3D()
+        bbox_3d.center.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
 
-        bbox_2d_center_position = bbox_2d.geometric_center_pose.position
-        width_2d = bbox_2d.width
-        height_2d = bbox_2d.height
+        bbox_2d_center_x = box_data.xywh[0][0].item()
+        bbox_2d_center_y = box_data.xywh[0][1].item()
+        width_2d = box_data.xywh[0][2].item()
+        height_2d = box_data.xywh[0][3].item()
 
         # Get bounding box coordinates, ensuring they are within the image dimensions
         image_height, image_width = depth_image.shape[:2]
-        bbox_x_min = np.clip(
-            int(round(bbox_2d_center_position.x - width_2d / 2.0)), 0, image_width - 1
-        )
-        bbox_x_max = np.clip(
-            int(round(bbox_2d_center_position.x + width_2d / 2.0)), 0, image_width - 1
-        )
-        bbox_y_min = np.clip(
-            int(round(bbox_2d_center_position.y - height_2d / 2.0)), 0, image_height - 1
-        )
-        bbox_y_max = np.clip(
-            int(round(bbox_2d_center_position.y + height_2d / 2.0)), 0, image_height - 1
-        )
+        bbox_x_min = np.clip(int(round(bbox_2d_center_x - width_2d / 2.0)), 0, image_width - 1)
+        bbox_x_max = np.clip(int(round(bbox_2d_center_x + width_2d / 2.0)), 0, image_width - 1)
+        bbox_y_min = np.clip(int(round(bbox_2d_center_y - height_2d / 2.0)), 0, image_height - 1)
+        bbox_y_max = np.clip(int(round(bbox_2d_center_y + height_2d / 2.0)), 0, image_height - 1)
 
         # Create bbox mask and apply to object mask
         bbox_mask = np.zeros_like(depth_image, dtype=bool)
@@ -431,38 +424,40 @@ class YoloNode(Node):
 
             # project bbox center to 3d
             optical_3d_geometric_center_x = (
-                (bbox_2d_center_position.x - self.depth_camera_intrinsics.cx)
+                (bbox_2d_center_x - self.depth_camera_intrinsics.cx)
                 * optical_3d_geometric_center_z
                 / self.depth_camera_intrinsics.fx
             )
             optical_3d_geometric_center_y = (
-                (bbox_2d_center_position.y - self.depth_camera_intrinsics.cy)
+                (bbox_2d_center_y - self.depth_camera_intrinsics.cy)
                 * optical_3d_geometric_center_z
                 / self.depth_camera_intrinsics.fy
             )
 
-            bbox_3d.width = (
+            bbox_3d.size.x = (
                 width_2d * optical_3d_geometric_center_z / self.depth_camera_intrinsics.fx
             )
-            bbox_3d.height = (
+            bbox_3d.size.y = (
                 height_2d * optical_3d_geometric_center_z / self.depth_camera_intrinsics.fy
             )
 
             # estimate depth size based on available point cloud
             closest_distance_to_object_from_camera = np.min(object_depth_values)
-            bbox_3d.depth = max(
+            bbox_3d.size.z = max(
                 2 * (optical_3d_geometric_center_z - closest_distance_to_object_from_camera), 0.1
             )
 
             # camera base reference frame
-            bbox_3d.geometric_center_pose.position.x = optical_3d_geometric_center_z
-            bbox_3d.geometric_center_pose.position.y = -optical_3d_geometric_center_x
-            bbox_3d.geometric_center_pose.position.z = -optical_3d_geometric_center_y
+            bbox_3d.center.position.x = optical_3d_geometric_center_z
+            bbox_3d.center.position.y = -optical_3d_geometric_center_x
+            bbox_3d.center.position.z = -optical_3d_geometric_center_y
 
-        return bbox_3d
+            return bbox_3d
+        else:
+            return None
 
     def generate_rviz_3d_visualization_marker(
-        self, bbox_3d: BoundingBox, header, color_rgb, object_id
+        self, bbox_3d: BoundingBox3D, header, color_rgb, object_id
     ):
         visualization_marker = Marker()
 
@@ -475,12 +470,12 @@ class YoloNode(Node):
         )
 
         # Set the pose of the marker
-        visualization_marker.pose = bbox_3d.geometric_center_pose
+        visualization_marker.pose = bbox_3d.center
 
         # Set the scale of the marker
-        visualization_marker.scale.x = bbox_3d.depth
-        visualization_marker.scale.y = bbox_3d.width
-        visualization_marker.scale.z = bbox_3d.height
+        visualization_marker.scale.x = bbox_3d.size.z
+        visualization_marker.scale.y = bbox_3d.size.x
+        visualization_marker.scale.z = bbox_3d.size.y
 
         # Set the color and transparency of the marker
         visualization_marker.color.r = float(color_rgb[0]) / 255.0

@@ -20,15 +20,27 @@ Install these VS Code extensions:
 Create or update `.vscode/ruff.toml` with:
 
 ```toml
+# Allow lines to be as long as 99
 line-length = 99
 
 [lint]
-select = ["E"]
+# Select E (PEP8), W (warnings), F (pyflakes), C (complexity), Q (quotes), I (imports)
+select = ["E", "F", "W", "C", "Q", "I"]
+
+[lint.flake8-quotes]
+inline-quotes = "single"
+docstring-quotes = "double"
 
 [format]
 quote-style = "single"
 docstring-code-format = true
 docstring-code-line-length = 99
+
+[lint.isort]
+known-first-party = ["waywiser_core", "waywiser_py", "waywiser_test_runner", "waywiser_twist_safety"]
+known-third-party = ["rclpy", "ament_index_python", "matplotlib", "numpy", "pymap3d", "shapely", "tf_transformations"]
+force-sort-within-sections = true
+order-by-type = false
 ```
 
 ## Configure Uncrustify for C++
@@ -82,6 +94,6 @@ To run tests, build the workspace and then do:
 
 ```bash
 cd $WAYWISER_WS
-colcon test --base-paths src/WayWiseR/
+colcon test --base-paths src/WayWiseR/ --packages-skip $WAYWISER_SKIPPED_PACKAGES
 colcon test-result --verbose
 ```

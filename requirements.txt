@@ -1,13 +1,14 @@
 transforms3d
 psutil
-numpy
+numpy<2
 lark
 empy==3.3.2
 catkin_pkg
 PyYAML
 jinja2
 typeguard
-depthai==2.29.0.0
+depthai==2.30.0.0
+ultralytics==8.3.235
 opencv-python==4.11.0.86
 pyserial
 modbus_tk

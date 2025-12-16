@@ -1,6 +1,8 @@
 collision_monitor_node:
   ros__parameters:
-    detections_topic: "/sensors/camera/color/yolov3_tinyu_detections"
-    distance_threshold: 13.2 # [m]
-    emergency_stop_topic: "/emergency_stop/target_state"
-    class_ids_to_stop: [0] # 0=Person
+    detections_topic: "/sensors/camera/detections"
+    distance_threshold: 3.0 # [m]
+    emergency_stop_status_topic: "/emergency_stop/current_state"
+    emergency_stop_update_topic: "/emergency_stop/target_state"
+    class_ids_to_stop: ["0"] # "0"=Person for YOLO, "15"=Person for MobileNet
+    reference_frame: camera_link

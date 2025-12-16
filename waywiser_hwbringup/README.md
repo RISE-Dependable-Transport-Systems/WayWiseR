@@ -8,6 +8,10 @@ If running with multiple sensors, make sure to set a unique slave address of eac
 
     sudo apt-get install ros-humble-rplidar-ros
 
+## DepthAI camera
+
+    sudo apt-get install ros-humble-depthai-ros
+
 ## Intel realsense camera
 
 - Install Intel Realsense SDK and its ROS2 wrapper following the instructions [here](https://github.com/IntelRealSense/realsense-ros?tab=readme-ov-file#installation-on-ubuntu).

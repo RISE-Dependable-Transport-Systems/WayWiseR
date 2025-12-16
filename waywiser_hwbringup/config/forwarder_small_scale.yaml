@@ -1,0 +1,167 @@
+/**:
+  # general parameters shared by all waywise-related nodes
+  ros__parameters:
+    odom_frame: odom
+    base_frame: truck
+    world_frame: map
+    rear_axle_frame: truck_rear_axle_link
+    chassis_frame: truck_chassis_link
+    rear_end_frame: truck_rear_end_link
+    hitch_frame: truck_fifth_wheel_link
+    gnss_chip_frame: truck_gnss_chip_link
+    gnss_antenna_frame: truck_gnss_antenna_link
+
+    trailer_base_frame: semitrailer_base_link
+    trailer_rear_axle_frame: semitrailer_rear_axle_link
+    trailer_center_frame: semitrailer_chassis_link
+    trailer_rear_end_frame: semitrailer_rear_end_link
+    trailer_hitch_frame: semitrailer_kingpin_link
+
+    front_steering_joint_names: ["truck_fls_link_joint", "truck_frs_link_joint"]
+    front_wheel_joint_names: ["truck_flw_link_joint", "truck_frw_link_joint"]
+    rear_wheel_joint_names:
+      [
+        "truck_mlw_link_joint",
+        "truck_mrw_link_joint",
+        "truck_rlw_link_joint",
+        "truck_rrw_link_joint",
+      ]
+    trailer_wheel_joint_names:
+      [
+        "semitrailer_flw_link_joint",
+        "semitrailer_frw_link_joint",
+        "semitrailer_mlw_link_joint",
+        "semitrailer_mrw_link_joint",
+        "semitrailer_rlw_link_joint",
+        "semitrailer_rrw_link_joint",
+      ]
+    truck_trailer_link_joint_name: "truck_trailer_link_joint"
+    has_trailer: false
+    length: 0.953
+    width: 0.249
+    wheelbase: 0.537
+    wheel_diameter: 0.115
+
+    erpm_min: 4000.0
+    erpm_max: 32000.0
+    speed_to_erpm_factor: 10780.0
+    min_turning_radius: 0.605 # wheelbase/tan(max_steering_angle)
+    enuref: [57.713805, 12.890088, 203.59] # [lat, lon, height]
+
+    enable_visualization_msgs: true
+
+    urdf_file: "semitruck.urdf.xacro"
+    urdf_scale: 0.071429 # 1:14
+    urdf_extra_args: "has_trailer:=false"
+
+    odom_topic: "/truck/odometry"
+    vehicle_pose_topic: "/truck/rear_axle_pose"
+    trailer_pose_topic: "/semitrailer/rear_axle_pose"
+    angle_sensor_topic: "/truck/sensors/trailer_angle"
+    rtcm_frequency_topic: "/truck/sensors/gnss/rtcm_frequency"
+    nav_sat_diagnostics_topic: "/truck/sensors/gnss/nav_sat_diagnostics"
+    nav_pvt_pose_topic: "/truck/sensors/gnss/nav_pvt_pose"
+    nav_sat_fix_topic: "/truck/sensors/gnss/nav_sat_fix"
+    battery_state_topic: "/truck/sensors/battery_state"
+    mission_status_topic: "/truck/mission_status"
+    autopilot_state_control_topic: "/truck/autopilot_state_control"
+    vehicle_alignment_reference_point_topic: "/truck/vehicle_alignment_reference_point"
+    autopilot_center_pose_topic: "/truck/autopilot_center_pose"
+    emergency_stop_status_topic: "/emergency_stop/current_state"
+    emergency_stop_update_topic: "/emergency_stop/target_state"
+
+    rear_axle_frame_to_base_frame_offset: [0.0, 0.0, 0.0] # [x, y, z]
+    rear_axle_frame_to_center_frame_offset: [0.0, 0.0, 0.0] # [x, y, z]
+    rear_axle_frame_to_rear_end_frame_offset: [-0.32, 0.0, 0.0] # [x, y, z]
+
+waywiser_truck_node:
+  ros__parameters:
+    vehicle_interface_type: "vesc"
+    servo_offset: 0.472
+    servo_range: 0.4 # servo_output = servo_offset + [-servo_range/2, servo_range/2]
+    invert_servo_output: false
+    # TODO: limit erpm also based on current
+    # current_max: 30.0
+    publish_odom_to_baselink_tf: true
+    publish_world_to_odom_tf: true
+    vehicle_state_poll_rate: 30 # currently same rate for both odom topic and odom->base_link tf
+    use_sdvp_position_fusion: false
+    is_gnss_position_fused: true
+    imu_for_sdvp_position_fusion: "vesc" # "vesc" or "bno055" or ""
+    # tof_sensors: [tof_trailer_rear, tof_trailer_right, tof_trailer_left]
+    # tof_trailer_rear:
+    #   i2c_addr: 0x29
+    #   topic: "/truck/sensors/tof/trailer_rear"
+    # tof_trailer_right:
+    #   i2c_addr: 0x30
+    #   topic: "/truck/sensors/tof/trailer_right"
+    # tof_trailer_left:
+    #   i2c_addr: 0x31
+    #   topic: "/truck/sensors/tof/trailer_left"
+    min_battery_voltage: 13.6
+    angle_sensor_offset: 94.043
+    joint_states_publish_rate: 10
+    invert_trailer_joint_state: true
+    gnss_variant: "UBLOX_ZED_F9R" # "UBLOX_ZED_F9P" or "UBLOX_ZED_F9R"
+    position_fusion_input_timer_rate: 10
+    gnss_print_verbose: true
+    gnss_sensor_fusion_imu_autoalign: false
+    gnss_sensor_fusion_force_recalibrate: false
+    gnss_measurement_rate: 5 # Hz
+    gnss_priority_message_rate: 10 # Hz
+    gnss_dynamic_model: 12
+    # Dynamic model selection:
+    #  0: Portable
+    #  2: Stationary
+    #  3: Pedestrian
+    #  4: Automotive
+    #  5: Sea
+    #  6: Airborne (<1g acceleration)
+    #  7: Airborne (<2g acceleration)
+    #  8: Airborne (<4g acceleration)
+    #  9: Wrist-worn watch
+    # 10: Motorbike
+    # 11: Robotic lawn mower
+    # 12: E-scooter
+    # 13: Rail vehicles (trains, trams)
+
+    #autopilot component
+    start_with_autopilot: false
+    autopilot_timer_rate: 10
+    enable_mavlink_interface: true
+    waywise_control_tower_address: "192.168.111.111"
+    waywise_control_tower_port: 14540
+    purepursuit_radius: 2.0
+    purepursuit_forward_gain: 5.0
+    purepursuit_reverse_gain: -5.0
+    adaptive_pure_pursuit: true
+    end_goal_alignment_type: 0 # Align {0: REAR_AXLE, 1: FRONT_REAR_END, 2: CENTER} with the end goal
+    end_goal_alignment_threshold: 0.1 # m
+    yaw_accuracy_threshold_for_mission: 1.0 # degrees
+    position_accuracy_threshold_for_mission: 0.05 # m
+    gnss_chip_orientation_offset: [0.0, 0.0, 0.0] # [roll, pitch, yaw]
+    gnss_antenna_to_gnss_chip_offset: [-0.1945, 0.0, 0.0] # [x, y, z]
+    gnss_chip_to_rear_axle_offset: [0.0, 0.0, -0.137] # [x, y, z]
+
+emergency_stop_monitor:
+  ros__parameters:
+    start_with_emergency_stop: true
+    cmd_vel_in_timeout: 0.5
+    emergency_stop_state_publish_rate: 10
+
+onboard_twist_mux:
+  ros__parameters:
+    use_stamped: false
+    topics:
+      teleop:
+        topic: teleop_mux_vel
+        timeout: 0.5
+        priority: 100
+      waywise:
+        topic: waywiser_autopilot_vel
+        timeout: 0.5
+        priority: 60
+      nav2:
+        topic: nav2_vel
+        timeout: 0.5
+        priority: 50

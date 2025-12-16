@@ -31,7 +31,7 @@
 - ```
   rosdep install --from-paths src/WayWiseR/waywiser_perception -y -r --ignore-src
   ```
-- Download yolo model from https://docs.ultralytics.com/models/yolo/
+- Download yolo model from https://docs.ultralytics.com/models/
 - (Optional) To use TensorRT, export the model using
   ```
   yolo export model={path_to_yolov8_pt_model} format=engine device=0
