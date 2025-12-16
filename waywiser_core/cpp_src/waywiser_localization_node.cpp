@@ -68,6 +68,7 @@ public:
     publish_world_to_fused_tf_ = this->declare_parameter("publish_world_to_fused_tf", false);
     gnss_variant_ = get_receiver_variant_param(this, "gnss_variant");
     gnss_print_verbose_ = this->declare_parameter("gnss_print_verbose", false);
+    gnss_sensor_fusion_on_chip_ = this->declare_parameter("gnss_sensor_fusion_on_chip", true);
     gnss_sensor_fusion_imu_autoalign_ = this->declare_parameter(
       "gnss_sensor_fusion_imu_autoalign", false);
     gnss_sensor_fusion_force_recalibrate_ = this->declare_parameter(
@@ -125,6 +126,7 @@ public:
     mLocalizationComponent->setGnssVariant(gnss_variant_);
     mLocalizationComponent->setPositionFusionInputTimerRate(position_fusion_input_timer_rate_);
     mLocalizationComponent->setGnssPrintVerbose(gnss_print_verbose_);
+    mLocalizationComponent->setGnssFusionOnChip(gnss_sensor_fusion_on_chip_);
     mLocalizationComponent->setGnssSensorFusionImuAutoalign(gnss_sensor_fusion_imu_autoalign_);
     mLocalizationComponent->setGnssSensorFusionForceRecalibrate(
       gnss_sensor_fusion_force_recalibrate_);
@@ -431,6 +433,7 @@ private:
 
   RECEIVER_VARIANT gnss_variant_;
   bool gnss_print_verbose_;
+  bool gnss_sensor_fusion_on_chip_; // only used for Ublox F9R
   bool gnss_sensor_fusion_imu_autoalign_; // only used for Ublox F9R
   bool gnss_sensor_fusion_force_recalibrate_; // only used for Ublox F9R
   int gnss_message_rate_;   // [Hz]

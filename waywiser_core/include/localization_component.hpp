@@ -37,6 +37,7 @@ public:
   void setGnssVariant(RECEIVER_VARIANT value) {mGnssVariant = value;}
   void setPositionFusionInputTimerRate(int value) {mPositionFusionInputTimerRate = value;}
   void setGnssPrintVerbose(bool value) {mGnssPrintVerbose = value;}
+  void setGnssFusionOnChip(bool value) {mGnssFusionOnChip = value;}
   void setGnssSensorFusionImuAutoalign(bool value) {mGnssSensorFusionImuAutoalign = value;}
   void setGnssSensorFusionForceRecalibrate(bool value) {mGnssSensorFusionForceRecalibrate = value;}
   void setGnssMessageRate(int value) {mGnssMessageRate = value;}
@@ -50,6 +51,7 @@ public:
   RECEIVER_VARIANT getGnssVariant() const {return mGnssVariant;}
   int getPositionFusionInputTimerRate() const {return mPositionFusionInputTimerRate;}
   bool getGnssPrintVerbose() const {return mGnssPrintVerbose;}
+  bool getGnssFusionOnChip() const {return mGnssFusionOnChip;}
   bool getGnssSensorFusionImuAutoalign() const {return mGnssSensorFusionImuAutoalign;}
   bool getGnssSensorFusionForceRecalibrate() const {return mGnssSensorFusionForceRecalibrate;}
   int getGnssMessageRate() const {return mGnssMessageRate;}
@@ -71,6 +73,7 @@ protected:
   RECEIVER_VARIANT mGnssVariant = RECEIVER_VARIANT::WAYWISE_SIMULATED;
   int mPositionFusionInputTimerRate = 10; // [Hz]
   bool mGnssPrintVerbose = false;
+  bool mGnssFusionOnChip = true; // only used for Ublox F9R
   bool mGnssSensorFusionImuAutoalign = false;
   bool mGnssSensorFusionForceRecalibrate = false;
   int mGnssMessageRate = 5; // [Hz]

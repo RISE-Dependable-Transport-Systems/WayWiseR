@@ -54,6 +54,7 @@ void LocalizationComponent::setup_localization()
 
             if (mGnssVariant == RECEIVER_VARIANT::UBLX_ZED_F9R) {
               mUbloxRover->setPrintVerbose(mGnssPrintVerbose);
+              mUbloxRover->setFusionOnChip(mGnssFusionOnChip);
               mUbloxRover->setESFAlgAutoMntAlgOn(mGnssSensorFusionImuAutoalign);
               mUbloxRover->setForceRecalibrateSensors(mGnssSensorFusionForceRecalibrate);
               mUbloxRover->setSpeedDataInputRate(mPositionFusionInputTimerRate);

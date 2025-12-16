@@ -121,8 +121,9 @@ waywiser_truck_localization_node:
   ros__parameters:
     use_sdvp_position_fusion: false
     publish_world_to_fused_tf: false
-    gnss_variant: "UBLOX_ZED_F9P" # "UBLOX_ZED_F9P" or "UBLOX_ZED_F9R"
+    gnss_variant: "UBLOX_ZED_F9R" # "UBLOX_ZED_F9P" or "UBLOX_ZED_F9R"
     gnss_print_verbose: true
+    gnss_sensor_fusion_on_chip: true
     gnss_sensor_fusion_imu_autoalign: false
     gnss_sensor_fusion_force_recalibrate: false
     gnss_message_rate: 10 # Hz
