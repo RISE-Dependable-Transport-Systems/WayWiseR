@@ -6,3 +6,4 @@ octomap_server:
     sensor_model/miss: 0.4 # probability for free voxel (default: 0.4)
     sensor_model/min: 0.12 # minimum occupancy probability (default: 0.1192)
     sensor_model/max: 0.97 # maximum occupancy probability (default: 0.971)
+    frame_id: 'camera_link'

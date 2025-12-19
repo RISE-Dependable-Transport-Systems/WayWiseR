@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 import numpy as np
-import rclpy
-import tf2_ros
 from octomap import OcTree, point3d
 from octomap_msgs.msg import Octomap
+import rclpy
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 from rclpy.time import Time
+import tf2_ros
 from tf2_ros import TransformException
 
 
@@ -26,22 +26,23 @@ class OcclusionAnalysis(Node):
         super().__init__('occlusion_analysis')
 
         # Parameters
+        self.declare_parameter('tf_timeout_sec', 0.5)
         self.declare_parameter('reference_frame', 'base_link')  # origin for analysis
         self.declare_parameter('octomap_frame_fallback', 'map')
         self.declare_parameter('octomap_topic', '/octomap_full')
         self.declare_parameter('search_radius', 5.0)  # radius in meters
-        self.declare_parameter('tf_timeout_sec', 0.5)
         self.declare_parameter('analysis_rate', 1.0)  # Hz
         self.declare_parameter('angular_resolution', 5.0)  # degrees
+
+        self.tf_timeout_sec = self.get_parameter('tf_timeout_sec', 0.5)
 
         # Get string parameters with type safety
         self.reference_frame = self.get_string_parameter('reference_frame', 'base_link')
         self.octomap_frame_fallback = self.get_string_parameter('octomap_frame_fallback', 'map')
         self.octomap_topic = self.get_string_parameter('octomap_topic', '/octomap_full')
 
-        # Get numerical parameters with type safety
+        # Get float parameters with type safety
         self.search_radius = self.get_float_parameter('search_radius', 5.0)
-        self.tf_timeout_sec = self.get_float_parameter('tf_timeout_sec', 0.5)
         self.analysis_rate = self.get_float_parameter('analysis_rate', 1.0)
         self.angular_resolution = np.radians(self.get_float_parameter('angular_resolution', 5.0))
 

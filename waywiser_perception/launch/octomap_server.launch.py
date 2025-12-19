@@ -21,6 +21,9 @@ def generate_launch_description():
         default_value='/sensors/camera/color/points',
         description='PointCloud2 topic published by the OAK-D driver',
     )
+    use_sim_time_la = DeclareLaunchArgument(
+        'use_sim_time', default_value='False', description='Use simulation/Gazebo clock'
+    )
 
     # OctoMap’s ROS2 server builds the 3D occupancy map (octree) and consumes the PointCloud2
     octomap_server = Node(
@@ -28,10 +31,15 @@ def generate_launch_description():
         executable='octomap_server_node',
         name='octomap_server',
         output='screen',
-        parameters=[LaunchConfiguration('octomap_config')],
+        parameters=[
+            LaunchConfiguration('octomap_config'),
+            {
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+            },
+        ],
         remappings=[
-            # remap OctoMap's 'pointcloud' input to the OAK-D point cloud topic
-            ('pointcloud', LaunchConfiguration('cloud_topic')),
+            # remap OctoMap's 'cloud_in' input to the OAK-D point cloud topic
+            ('cloud_in', LaunchConfiguration('cloud_topic')),
         ],
     )
 
@@ -41,6 +49,7 @@ def generate_launch_description():
     # declare launch args
     ld.add_action(octomap_config_la)
     ld.add_action(cloud_topic_la)
+    ld.add_action(use_sim_time_la)
 
     # start nodes
     ld.add_action(octomap_server)
