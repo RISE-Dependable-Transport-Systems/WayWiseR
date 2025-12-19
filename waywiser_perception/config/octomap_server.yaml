@@ -1,0 +1,8 @@
+octomap_server:
+  ros__parameters:
+    resolution: 0.05 # voxel size in meters (default: 0.05)
+    sensor_model/max_range: 5.0 # sensor range in meters, limit to reduce noise (default: -1 = unlimited)
+    sensor_model/hit: 0.7 # probability for occupied voxel (default: 0.7)
+    sensor_model/miss: 0.4 # probability for free voxel (default: 0.4)
+    sensor_model/min: 0.12 # minimum occupancy probability (default: 0.1192)
+    sensor_model/max: 0.97 # maximum occupancy probability (default: 0.971)
