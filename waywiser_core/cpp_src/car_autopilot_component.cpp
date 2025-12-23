@@ -26,6 +26,7 @@ void CarAutopilotComponent::setupAutopilot(QSharedPointer<EmergencyStopState> em
         QHostAddress(QString::fromStdString(mWaywiseControlTowerAddress)),
         mWaywiseControlTowerPort));
     mMavsdkVehicleServer->setMovementController(mAutopilotMovementController);
+    mMavsdkVehicleServer->setTransferLogs(false); // TODO: make this configurable
   }
 
   // --- Autopilot ---
