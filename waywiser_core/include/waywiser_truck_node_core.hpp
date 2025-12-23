@@ -18,9 +18,9 @@ class WaywiserTruck : public WaywiserCar
 
 public:
   WaywiserTruck(
-    const rclcpp::NodeOptions & options = rclcpp::NodeOptions(),
-    const std::string & node_name = "waywiser_truck_node")
-  : WaywiserCar(options, node_name) {}
+    const std::string & node_name = "waywiser_truck_node",
+    const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
+  : WaywiserCar(node_name, options) {}
 
   virtual ~WaywiserTruck() = default;
 

@@ -3,6 +3,9 @@
 
 void WaywiserTruck::initialize_node()
 {
+  node_logger_ = this->get_logger();
+  qInstallMessageHandler(qtMessageHandler);
+
   mTruckState.reset(new TruckState());
   has_trailer_ = this->declare_parameter("has_trailer", false);
   mTruckInterfaceComponent.reset(
@@ -80,7 +83,8 @@ void WaywiserTruck::setup_parameters()
     }
     log_stream << "trailer_rear_axle_frame_to_trailer_base_frame_offset: " <<
       vector3_param->c_str() << "\n";
-    mTruckInterfaceComponent->setTrailerRearAxleToTrailerBaseOffset(vector3_param->to_type<xyz_t>());
+    mTruckInterfaceComponent->setTrailerRearAxleToTrailerBaseOffset(
+      vector3_param->to_type<xyz_t>());
 
     // Trailer rear axle to trailer rear end
     vector3_param =
@@ -117,7 +121,8 @@ void WaywiserTruck::setup_parameters()
     }
     log_stream << "trailer_rear_axle_frame_to_trailer_hitch_frame_offset: " <<
       vector3_param->c_str() << "\n";
-    mTruckInterfaceComponent->setTrailerRearAxleToTrailerHitchOffset(vector3_param->to_type<xyz_t>());
+    mTruckInterfaceComponent->setTrailerRearAxleToTrailerHitchOffset(
+      vector3_param->to_type<xyz_t>());
 
     // Output log_stream
     RCLCPP_INFO_STREAM(get_logger(), log_stream.str());

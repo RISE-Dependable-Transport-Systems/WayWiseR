@@ -10,8 +10,9 @@ class TruckAutopilotComponent : public CarAutopilotComponent
 
 public:
   // Constructor and destructor
-  TruckAutopilotComponent(QObject * parent, const QSharedPointer<TruckState> truckState)
-  : CarAutopilotComponent(parent, truckState) {mTruckState = truckState;}
+  TruckAutopilotComponent(
+    QObjectNode * parentQObjectNode, const QSharedPointer<TruckState> truckState)
+  : CarAutopilotComponent(parentQObjectNode, truckState) {mTruckState = truckState;}
   virtual ~TruckAutopilotComponent() {}
 
   virtual void setupAutopilot(QSharedPointer<EmergencyStopState> emergencyStopState) override;

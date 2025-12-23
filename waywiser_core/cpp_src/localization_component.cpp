@@ -2,10 +2,10 @@
 #include "moc_localization_component.cpp"
 
 LocalizationComponent::LocalizationComponent(
-  QObject * parentQObject, const QSharedPointer<ObjectState> & objectState)
-: QObject(parentQObject)
+  QObjectNode * parentQObjectNode, const QSharedPointer<ObjectState> & objectState)
+: QObject(parentQObjectNode)
 {
-  mParentQObject = parentQObject;
+  mParentQObjectNode = parentQObjectNode;
   mObjectState = objectState;
   mGNSSReceiver.reset(new GNSSReceiver(mObjectState));
 }
@@ -35,6 +35,11 @@ void LocalizationComponent::reset()
   mObjectState->setPosition(pospoint);
   pospoint.setType(PosType::fused);
   mObjectState->setPosition(pospoint);
+
+  for (auto connection : mQMetaObjectConnections) {
+    QObject::disconnect(connection);
+  }
+  mQMetaObjectConnections.clear();
 }
 
 void LocalizationComponent::setup_localization()
@@ -64,10 +69,14 @@ void LocalizationComponent::setup_localization()
               qDebug() << "UbloxRover connected to:" << portInfo.systemLocation();
 
               if (mGnssVariant == RECEIVER_VARIANT::UBLX_ZED_F9R) {
-                connect(
-                  &mPositionFusionInputTimer, &QTimer::timeout,
-                  mUbloxRover.get(), &UbloxRover::readObjectSpeedForPositionFusion);
-                mPositionFusionInputTimer.start(1000 / mPositionFusionInputTimerRate);
+                mPositionFusionInputTimer = rclcpp::create_timer(
+                  mParentQObjectNode->get_node_base_interface(),
+                  mParentQObjectNode->get_node_timers_interface(),
+                  mParentQObjectNode->get_clock(), // uses sim time if enabled
+                  std::chrono::milliseconds(
+                    (int)std::round(1000.0 / mPositionFusionInputTimerRate)
+                  ),
+                  std::bind(&UbloxRover::readObjectSpeedForPositionFusion, mUbloxRover.get()));
               }
 
               // -- NTRIP/TCP client setup for feeding RTCM data into GNSS receiver
@@ -103,14 +112,15 @@ void LocalizationComponent::setup_localization()
   if (mGnssVariant == RECEIVER_VARIANT::WAYWISE_SIMULATED) {
     mGNSSReceiver->setReceiverState(RECEIVER_STATE::READY);
 
-    QObject::connect(
-      mObjectState.get(), &ObjectState::positionUpdated,
-      [&](PosType type) {
-        if (type == PosType::odom) {
-          mGNSSReceiver->simulationStep();
+    mQMetaObjectConnections.emplace_back(
+      QObject::connect(
+        mObjectState.get(), &ObjectState::positionUpdated,
+        [&](PosType type) {
+          if (type == PosType::odom) {
+            mGNSSReceiver->simulationStep();
+          }
         }
-      }
-    );
+    ));
   }
 
   mGNSSReceiver->setAntennaToChipOffset(
@@ -130,45 +140,50 @@ void LocalizationComponent::setup_localization()
   if (mUseSdvpPositionFusion) {
     // Position Fuser
     mSDVPVehiclePositionFuser.reset(new SDVPVehiclePositionFuser(this));
-    QObject::connect(
-      mGNSSReceiver.get(), &GNSSReceiver::updatedGNSSPositionAndYaw,
-      mSDVPVehiclePositionFuser.get(),
-      &SDVPVehiclePositionFuser::correctPositionAndYawGNSS);
 
-    QObject::connect(
-      mObjectState.get(), &ObjectState::positionUpdated,
-      [&](PosType type) {
-        switch (type) {
-          case PosType::odom:
-            {
-              // Odometry fusion
-              PosPoint odomPos = mObjectState->getPosition(type);
-              static xyz_t lastOdomXyz;
-              mSDVPVehiclePositionFuser->correctPositionAndYawOdom(
-                mObjectState,
-                QLineF(QPointF(lastOdomXyz.x, lastOdomXyz.y), odomPos.getPoint()).length());
-              lastOdomXyz = odomPos.getXYZ();
-            } break;
-          case PosType::IMU:
-            {
-              // IMU fusion
-              mSDVPVehiclePositionFuser->correctPositionAndYawIMU(mObjectState);
-            } break;
-          default:
-            break;
+    mQMetaObjectConnections.emplace_back(
+      QObject::connect(
+        mGNSSReceiver.get(), &GNSSReceiver::updatedGNSSPositionAndYaw,
+        mSDVPVehiclePositionFuser.get(),
+        &SDVPVehiclePositionFuser::correctPositionAndYawGNSS));
+
+
+    mQMetaObjectConnections.emplace_back(
+      QObject::connect(
+        mObjectState.get(), &ObjectState::positionUpdated,
+        [&](PosType type) {
+          switch (type) {
+            case PosType::odom:
+              {
+                // Odometry fusion
+                PosPoint odomPos = mObjectState->getPosition(type);
+                static xyz_t lastOdomXyz;
+                mSDVPVehiclePositionFuser->correctPositionAndYawOdom(
+                  mObjectState,
+                  QLineF(QPointF(lastOdomXyz.x, lastOdomXyz.y), odomPos.getPoint()).length());
+                lastOdomXyz = odomPos.getXYZ();
+              } break;
+            case PosType::IMU:
+              {
+                // IMU fusion
+                mSDVPVehiclePositionFuser->correctPositionAndYawIMU(mObjectState);
+              } break;
+            default:
+              break;
+          }
         }
-      }
-    );
+    ));
   } else {
-    QObject::connect(
-      mObjectState.get(), &ObjectState::positionUpdated,
-      [&](PosType type) {
-        if (type == PosType::GNSS) {
-          PosPoint fusedPos = mObjectState->getPosition(type);
-          fusedPos.setType(PosType::fused);
-          mObjectState->setPosition(fusedPos);
+    mQMetaObjectConnections.emplace_back(
+      QObject::connect(
+        mObjectState.get(), &ObjectState::positionUpdated,
+        [&](PosType type) {
+          if (type == PosType::GNSS) {
+            PosPoint fusedPos = mObjectState->getPosition(type);
+            fusedPos.setType(PosType::fused);
+            mObjectState->setPosition(fusedPos);
+          }
         }
-      }
-    );
+    ));
   }
 }

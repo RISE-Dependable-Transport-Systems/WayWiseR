@@ -2,9 +2,9 @@
 #include "moc_truck_interface_component.cpp"
 
 TruckInterfaceComponent::TruckInterfaceComponent(
-  QObject * parent, const QSharedPointer<TruckState> truckState, bool hasTrailer,
+  QObjectNode * parentQObjectNode, const QSharedPointer<TruckState> truckState, bool hasTrailer,
   bool autoActuateMotorAndServo)
-: CarInterfaceComponent(parent, truckState, autoActuateMotorAndServo)
+: CarInterfaceComponent(parentQObjectNode, truckState, autoActuateMotorAndServo)
 {
   mTruckState = truckState;
   mHasTrailer = hasTrailer;
@@ -45,7 +45,7 @@ void TruckInterfaceComponent::setup_vehicle_interface()
           mAngleSensorUpdater.reset(new AS5600Updater(mTruckState, mAngleSensorOffset));
           if (!mAngleSensorUpdater->isConnected()) {
             mTruckState->setSimulateTrailer(true);
-            qDebug() << "AS5600 not connected. Trailer angle will be simulated.";
+            qWarning() << "AS5600 not connected. Trailer angle will be simulated.";
           }
         } break;
       default:

@@ -35,6 +35,7 @@
 #include "waywiser_core/msg/path_with_twists.hpp"
 #include "waywiser_twist_safety/msg/emergency_stop_state.hpp"
 
+#include "qobject_node.hpp"
 #include "car_autopilot_component.hpp"
 #include "car_interface_component.hpp"
 #include "waywiser_core_utils.hpp"
@@ -43,15 +44,15 @@
 
 using namespace std::placeholders;
 
-class WaywiserCar : public QObject, public rclcpp::Node
+class WaywiserCar : public QObjectNode
 {
   Q_OBJECT
 
 public:
   WaywiserCar(
-    const rclcpp::NodeOptions & options = rclcpp::NodeOptions(),
-    const std::string & node_name = "waywiser_car_node")
-  : QObject(), Node(node_name, options) {}
+    const std::string & node_name = "waywiser_car_node",
+    const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
+  : QObjectNode(node_name, options) {}
 
   virtual ~WaywiserCar() = default;
 
@@ -93,6 +94,7 @@ protected:
   void process_twist_msg(const geometry_msgs::msg::Twist::SharedPtr twist_msg);
   virtual double update_joint_states_msg(
     sensor_msgs::msg::JointState & joint_state_msg, double timePassedSinceLastCall_ms);
+  static void qtMessageHandler(QtMsgType type, const QMessageLogContext &, const QString & msg);
 
   // ROS parameters
   std::string urdf_file_;
@@ -185,6 +187,7 @@ protected:
   QSharedPointer<EmergencyStopState> mEmergencyStopState;
 
   // Internal variables
+  static rclcpp::Logger node_logger_;
   QSharedPointer<CarInterfaceComponent> mCarInterfaceComponent;
   QSharedPointer<CarAutopilotComponent> mCarAutopilotComponent;
   QSharedPointer<urdf::Model> mUrdfModel;

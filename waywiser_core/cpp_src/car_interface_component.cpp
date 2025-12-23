@@ -2,11 +2,11 @@
 #include "moc_car_interface_component.cpp"
 
 CarInterfaceComponent::CarInterfaceComponent(
-  QObject * parentQObject, const QSharedPointer<CarState> & carState,
+  QObjectNode * parentQObjectNode, const QSharedPointer<CarState> & carState,
   bool autoActuateMotorAndServo)
-: QObject(parentQObject)
+: QObject(parentQObjectNode)
 {
-  mParentQObject = parentQObject;
+  mParentQObjectNode = parentQObjectNode;
   mCarState = carState;
   mAutoActuateMotorAndServo = autoActuateMotorAndServo;
 }
@@ -39,16 +39,13 @@ void CarInterfaceComponent::setup_vehicle_interface()
   mEmergencyStopState.reset(new EmergencyStopState());
 
   // --- Movement control setup ---
+  mCarMovementController.reset(new CarMovementController(mCarState, mAutoActuateMotorAndServo));
+
   switch (mVehicleInterfaceType) {
     case VehicleInterfaceType::VESC:
     case VehicleInterfaceType::WAYWISE_SIMULATED:
       {
-        QSharedPointer<CarMovementController> carMovementController =
-          QSharedPointer<CarMovementController>(
-          new CarMovementController(
-            mCarState,
-            mAutoActuateMotorAndServo));
-        carMovementController->setSpeedToRPMFactor(mSpeedToRPMFactor);
+        mCarMovementController->setSpeedToRPMFactor(mSpeedToRPMFactor);
 
         // setup and connect VESC, simulate movements if unable to connect
         if (mVehicleInterfaceType == VehicleInterfaceType::VESC) {
@@ -63,7 +60,7 @@ void CarInterfaceComponent::setup_vehicle_interface()
           }
 
           if (mVESCMotorController->isSerialConnected()) {
-            carMovementController->setMotorController(mVESCMotorController);
+            mCarMovementController->setMotorController(mVESCMotorController);
             // convert Hz to ms and set VESC polling rate
             mVESCMotorController->setPollValuesPeriod(1000 / mVehicleStatePollRate);
 
@@ -72,7 +69,7 @@ void CarInterfaceComponent::setup_vehicle_interface()
             servoController->setInvertOutput(mInvertServoOutput);
             servoController->setServoCenter(mServoOffset);
             servoController->setServoRange(mServoRange);
-            carMovementController->setServoController(servoController);
+            mCarMovementController->setServoController(servoController);
 
             if (mMinBatteryVoltage <= 0.0) {
               qWarning() << "Low battery protection is not configured!";
@@ -107,10 +104,11 @@ void CarInterfaceComponent::setup_vehicle_interface()
 
         if (mVehicleInterfaceType == VehicleInterfaceType::WAYWISE_SIMULATED) {
           qWarning() << "Simulating vehicle movement using WayWise.";
+        }
       } break;
     case VehicleInterfaceType::EXT_SIMULATED:
       {
-        mMovementController.reset(new MovementController(mCarState));
+        // pass
       } break;
     default:
       qWarning() << "Unknown vehicle interface type is requested!";
@@ -167,6 +165,19 @@ void CarInterfaceComponent::setup_vehicle_interface()
       });
     mToFSensors[tof_sensor_name] = tof_sensor;
   }
+
+  // WayWise simulation timer
+  if (mVehicleInterfaceType == VehicleInterfaceType::WAYWISE_SIMULATED ||
+    mImuVariant == ImuVariant::WAYWISE_SIMULATED)
+  {
+    mWaywiseSimulationTimer = rclcpp::create_timer(
+      mParentQObjectNode->get_node_base_interface(),
+      mParentQObjectNode->get_node_timers_interface(),
+      mParentQObjectNode->get_clock(), // uses sim time if enabled
+      std::chrono::milliseconds(1000 / mVehicleStatePollRate),
+      std::bind(&CarInterfaceComponent::waywise_simulation_timer_callback, this)
+    );
+  }
 }
 
 void CarInterfaceComponent::activate_emergency_stop(
@@ -174,8 +185,8 @@ void CarInterfaceComponent::activate_emergency_stop(
   const std::string & reason)
 {
   if (!mEmergencyStopState->is_active()) {
-    mMovementController->setDesiredSpeed(0.0);
-    mMovementController->setDesiredSteering(0.0);
+    mCarMovementController->setDesiredSpeed(0.0);
+    mCarMovementController->setDesiredSteering(0.0);
     mEmergencyStopState->set_active();
     qWarning() << QString("Emergency stop ACTIVATED%1.%2")
       .arg(sender_id.empty() ? "" : " by " + QString::fromStdString(sender_id))
@@ -256,8 +267,8 @@ void CarInterfaceComponent::updateControlCommand(
       -1.0, 1.0);
   }
 
-  mMovementController->setDesiredSpeed(desired_linear_speed);
-  mMovementController->setDesiredSteering(mCarControlCommand.steering);
+  mCarMovementController->setDesiredSpeed(desired_linear_speed);
+  mCarMovementController->setDesiredSteering(mCarControlCommand.steering);
 }
 
 void CarInterfaceComponent::executeControlCommand()
@@ -267,6 +278,18 @@ void CarInterfaceComponent::executeControlCommand()
     motorErpm = std::clamp(mCarControlCommand.throttle * mErpmMax, -mErpmMax, mErpmMax);
     motorErpm = fabs(motorErpm) >= mErpmMin ? motorErpm : 0.0;
   }
-  mMovementController->actuateDriveMotor(motorErpm);
-  mMovementController->actuateSteeringServo(mCarControlCommand.steering);
+  mCarMovementController->actuateDriveMotor(motorErpm);
+  mCarMovementController->actuateSteeringServo(mCarControlCommand.steering);
+}
+
+void CarInterfaceComponent::waywise_simulation_timer_callback()
+{
+  static int pollPeriodMs = 1000 / mVehicleStatePollRate;
+  if (mVehicleInterfaceType == VehicleInterfaceType::WAYWISE_SIMULATED) {
+    mCarMovementController->simulationStep(pollPeriodMs);
+  }
+
+  if (mImuVariant == ImuVariant::WAYWISE_SIMULATED) {
+    mIMUOrientationUpdater->simulationStep();
+  }
 }

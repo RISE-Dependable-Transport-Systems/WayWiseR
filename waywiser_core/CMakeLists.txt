@@ -130,6 +130,7 @@ add_executable(
   waywiser_localization_node
   cpp_src/waywiser_localization_node.cpp
   cpp_src/localization_component.cpp
+  cpp_src/qobject_node.cpp
   ${COMMON_WAYWISE_SOURCES}
   ${WAYWISE_LOCALIZATION_SOURCES}
 )
@@ -140,6 +141,7 @@ add_executable(
   cpp_src/waywiser_car_node_core.cpp
   cpp_src/car_autopilot_component.cpp
   cpp_src/car_interface_component.cpp
+  cpp_src/qobject_node.cpp
   ${COMMON_WAYWISE_SOURCES}
   ${WAYWISE_LOCALIZATION_SOURCES}
   ${WAYWISE_CAR_SOURCES}
@@ -155,6 +157,7 @@ add_executable(
   cpp_src/truck_interface_component.cpp
   cpp_src/car_autopilot_component.cpp
   cpp_src/car_interface_component.cpp
+  cpp_src/qobject_node.cpp
   ${COMMON_WAYWISE_SOURCES}
   ${WAYWISE_LOCALIZATION_SOURCES}
   ${WAYWISE_CAR_SOURCES}

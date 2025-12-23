@@ -14,7 +14,7 @@ class TruckInterfaceComponent : public CarInterfaceComponent
 public:
   // Constructor and destructor
   TruckInterfaceComponent(
-    QObject * parent, const QSharedPointer<TruckState> truckState, bool hasTrailer,
+    QObjectNode * parentQObjectNode, const QSharedPointer<TruckState> truckState, bool hasTrailer,
     bool autoActuateMotorAndServo = true);
   virtual ~TruckInterfaceComponent();
   virtual void reset() override;

@@ -17,6 +17,7 @@
 #include "WayWise/vehicles/controller/carmovementcontroller.h"
 #include "WayWise/vehicles/controller/vescmotorcontroller.h"
 
+#include "qobject_node.hpp"
 #include "waywiser_core_utils.hpp"
 
 
@@ -27,7 +28,7 @@ class CarInterfaceComponent : public QObject
 public:
   // Constructor and destructor
   CarInterfaceComponent(
-    QObject * parentQObject, const QSharedPointer<CarState> & carState,
+    QObjectNode * parentQObjectNode, const QSharedPointer<CarState> & carState,
     bool autoActuateMotorAndServo = true);
   virtual ~CarInterfaceComponent() {}
   virtual void reset();
@@ -87,13 +88,16 @@ public:
   QSharedPointer<EmergencyStopState> getEmergencyStopState() const {return mEmergencyStopState;}
   QSharedPointer<MovementController> getMovementController() const
   {
-    return mMovementController;
+    return mCarMovementController;
   }
   CarControlCommand getCarControlCommand() const {return mCarControlCommand;}
   QSharedPointer<IMUOrientationUpdater> getIMUOrientationUpdater() const
   {
     return mIMUOrientationUpdater;
   }
+
+  // Callback methods
+  void waywise_simulation_timer_callback();
 
   // Utility methods
   virtual void setup_vehicle_interface();
@@ -143,13 +147,13 @@ protected:
   // WayWise components
   QSharedPointer<CarState> mCarState;
   QSharedPointer<EmergencyStopState> mEmergencyStopState;
-  QSharedPointer<MovementController> mMovementController;
+  QSharedPointer<CarMovementController> mCarMovementController;
   QSharedPointer<VESCMotorController> mVESCMotorController;
   QSharedPointer<IMUOrientationUpdater> mIMUOrientationUpdater;
 
   // Internal variables
-  QObject * mParentQObject;
-  QTimer mWaywiseSimulationTimer = QTimer();
+  QObjectNode * mParentQObjectNode;
+  rclcpp::TimerBase::SharedPtr mWaywiseSimulationTimer = nullptr;
   float mCurrentBatteryVoltage = 0.0;
   QSharedPointer<PIDController> mPIDSpeedController;
   CarControlCommand mCarControlCommand;

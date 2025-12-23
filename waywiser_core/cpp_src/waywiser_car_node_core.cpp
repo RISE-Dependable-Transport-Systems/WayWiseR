@@ -1,8 +1,13 @@
 #include "waywiser_car_node_core.hpp"
 #include "moc_waywiser_car_node_core.cpp"
 
+rclcpp::Logger WaywiserCar::node_logger_ = rclcpp::get_logger("waywiser_car_node");
+
 void WaywiserCar::initialize_node()
 {
+  node_logger_ = this->get_logger();
+  qInstallMessageHandler(qtMessageHandler);
+
   mCarState.reset(new CarState());
   mCarInterfaceComponent.reset(new CarInterfaceComponent(this, mCarState, false));
   enable_autopilot_component_ = declare_parameter("enable_autopilot_component", true);
@@ -305,14 +310,17 @@ void WaywiserCar::setup_publishers()
       break;
   }
 
-  imu_pub_ = create_publisher<sensor_msgs::msg::Imu>(imu_topic_, 10);
-  QObject::connect(
-    mCarInterfaceComponent->getIMUOrientationUpdater().get(),
-    &IMUOrientationUpdater::updatedIMUOrientation,
-    [&](QSharedPointer<ObjectState> objectState) {
-      Q_UNUSED(objectState)
-      publish_imu_data();
-    });
+  auto imuOrientationUpdater = mCarInterfaceComponent->getIMUOrientationUpdater();
+  if (imuOrientationUpdater && imu_topic_ != "") {
+    imu_pub_ = create_publisher<sensor_msgs::msg::Imu>(imu_topic_, 10);
+    QObject::connect(
+      mCarInterfaceComponent->getIMUOrientationUpdater().get(),
+      &IMUOrientationUpdater::updatedIMUOrientation,
+      [&](QSharedPointer<ObjectState> objectState) {
+        Q_UNUSED(objectState)
+        publish_imu_data();
+      });
+  }
 
   vehicle_pose_pub_ = create_publisher<geometry_msgs::msg::PoseStamped>(
     vehicle_pose_topic_, 10);
@@ -1113,4 +1121,9 @@ double WaywiserCar::update_joint_states_msg(
   }
 
   return wheel_position;
+}
+
+void WaywiserCar::qtMessageHandler(QtMsgType type, const QMessageLogContext &, const QString & msg)
+{
+  qtMessageToLogger(node_logger_, type, msg);
 }

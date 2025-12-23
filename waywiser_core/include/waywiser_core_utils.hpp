@@ -242,4 +242,26 @@ inline SpeedControlType get_speed_control_type_param(
   return SpeedControlType::OPEN_LOOP_ERPM_CONTROL;
 }
 
+inline void qtMessageToLogger(const rclcpp::Logger & logger, QtMsgType type, const QString & msg)
+{
+  std::string text = msg.toStdString();
+  switch (type) {
+    case QtCriticalMsg:
+      RCLCPP_ERROR(logger, "%s", msg.toStdString().c_str());
+      break;
+    case QtWarningMsg:
+      RCLCPP_WARN(logger, "%s", msg.toStdString().c_str());
+      break;
+    case QtInfoMsg:
+      RCLCPP_INFO(logger, "%s", msg.toStdString().c_str());
+      break;
+    case QtDebugMsg:
+      RCLCPP_DEBUG(logger, "%s", msg.toStdString().c_str());
+      break;
+    default:
+      break;
+  }
+}
+
+
 #endif  // WAYWISER_CORE_UTILS_HPP_

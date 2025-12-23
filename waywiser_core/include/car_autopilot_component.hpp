@@ -18,6 +18,7 @@
 
 #include "mavsdk/mavsdk.h"
 
+#include "qobject_node.hpp"
 #include "waywiser_core_utils.hpp"
 
 class CarAutopilotComponent : public QObject
@@ -26,8 +27,8 @@ class CarAutopilotComponent : public QObject
 
 public:
   // Constructor and destructor
-  CarAutopilotComponent(QObject * parentQObject, const QSharedPointer<CarState> carState)
-  : QObject(parentQObject), mCarState(carState), mParentQObject(parentQObject) {}
+  CarAutopilotComponent(QObjectNode * parentQObjectNode, const QSharedPointer<CarState> carState)
+  : QObject(parentQObjectNode), mCarState(carState), mParentQObjectNode(parentQObjectNode) {}
   virtual ~CarAutopilotComponent() {}
 
   virtual void setupAutopilot(QSharedPointer<EmergencyStopState> emergencyStopState);
@@ -116,7 +117,7 @@ protected:
   QSharedPointer<FollowPoint> mFollowPoint;
 
   // Internal variables
-  QObject * mParentQObject;
+  QObjectNode * mParentQObjectNode;
   QList<PosPoint> mWaypointList;
   MissionState currentMissionState = MissionState::WaitingForVehicleInit;
   GnssFixStatus mGnssFixStatus;

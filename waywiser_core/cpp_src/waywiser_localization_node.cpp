@@ -15,6 +15,7 @@
 #include "tf2_ros/transform_listener.h"
 #include "tf2_ros/transform_broadcaster.h"
 
+#include "qobject_node.hpp"
 #include "localization_component.hpp"
 #include "waywiser_core_utils.hpp"
 #include "waywiser/waywiser_utils.hpp"
@@ -24,16 +25,19 @@
 
 using namespace std::placeholders;
 
-class WaywiserLocalization : public QObject, public rclcpp::Node
+class WaywiserLocalization : public QObjectNode
 {
   Q_OBJECT
 
 public:
   WaywiserLocalization(
-    const rclcpp::NodeOptions & options = rclcpp::NodeOptions(),
-    const std::string & node_name = "waywiser_localization_node")
-  : QObject(), Node(node_name, options)
+    const std::string & node_name = "waywiser_localization_node",
+    const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
+  : QObjectNode(node_name, options)
   {
+    node_logger_ = this->get_logger();
+    qInstallMessageHandler(qtMessageHandler);
+
     // Check if the ROS clock is available
     auto use_sim_time = this->get_parameter("use_sim_time").as_bool();
     if (use_sim_time) {
@@ -44,7 +48,7 @@ public:
       while (rclcpp::ok() && this->get_clock()->now().nanoseconds() == 0) {
         rclcpp::sleep_for(std::chrono::milliseconds(1000));
       }
-      RCLCPP_INFO(this->get_logger(), "Receiving /clock msgs now.");
+      RCLCPP_WARN(this->get_logger(), "Receiving /clock msgs now.");
     }
 
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
@@ -79,6 +83,8 @@ public:
     use_sdvp_position_fusion_ = this->declare_parameter("use_sdvp_position_fusion", false);
     position_fusion_input_timer_rate_ = this->declare_parameter(
       "position_fusion_input_timer_rate", 10);
+    ext_startup_timeout_ = this->declare_parameter(
+      "ext_startup_timeout", 5.0);
 
     std::ostringstream log_stream;
     log_stream << "\nLocalizationComponent offset parameters:\n";
@@ -136,8 +142,18 @@ public:
     mLocalizationComponent->setChipToBaseOffset(gnss_chip_to_reference_point_offset_);
     mLocalizationComponent->setGnssChipOrientationOffset(gnss_chip_orientation_offset_);
 
-    mLocalizationComponent->setup_localization();
     mLocalizationComponent->reset(); // TODO: detect and call this also with sim clock reset
+    mLocalizationComponent->setup_localization();
+
+    if (gnss_variant_ == RECEIVER_VARIANT::EXTERNAL) {
+      ext_startup_watchdog_timer_ = rclcpp::create_timer(
+        this->get_node_base_interface(),
+        this->get_node_timers_interface(),
+        this->get_clock(), // uses sim time if enabled
+        std::chrono::milliseconds((int) ext_startup_timeout_ * 1000),
+        std::bind(&WaywiserLocalization::ext_startup_watchdog_timer_callback, this)
+      );
+    }
 
     // Subscribers
     if (imu_topic_ != "") {
@@ -201,11 +217,13 @@ public:
         break;
     }
 
+    startup_time_ = this->now();
+
     RCLCPP_INFO(get_logger(), "%s is initialized!", this->get_name());
   }
 
 private:
-  // Callback methods
+// Callback methods
   void imu_callback(const sensor_msgs::msg::Imu::SharedPtr imu_msg)
   {
     static tf2::Quaternion imu_frame_to_base_frame_rotation;
@@ -308,12 +326,25 @@ private:
     const waywiser_core::msg::NavSatFixExtended::SharedPtr msg)
   {
     auto gnssReceiver = mLocalizationComponent->getGnssReceiver();
-    if (gnssReceiver->getReceiverState() != RECEIVER_STATE::READY) {
+    if (gnssReceiver->getReceiverVariant() == RECEIVER_VARIANT::WAYWISE_SIMULATED) {
+      mLocalizationComponent->setGnssVariant(RECEIVER_VARIANT::EXTERNAL);
+      mLocalizationComponent->reset();
+      mLocalizationComponent->setup_localization();
+      gnssReceiver = mLocalizationComponent->getGnssReceiver();
+      gnssReceiver->setReceiverState(RECEIVER_STATE::READY);
+      RCLCPP_WARN(
+        get_logger(), "Started receiving GNSS data from topic '%s'.",
+        nav_sat_fix_extended_topic_.c_str());
+    } else if (gnssReceiver->getReceiverState() != RECEIVER_STATE::READY) {
       gnssReceiver->setReceiverState(RECEIVER_STATE::READY);
       RCLCPP_INFO(
         get_logger(), "Started receiving GNSS data from topic '%s'.",
         nav_sat_fix_extended_topic_.c_str());
     }
+    if (ext_startup_watchdog_timer_ && !ext_startup_watchdog_timer_->is_canceled()) {
+      ext_startup_watchdog_timer_->cancel();
+    }
+
     gnssReceiver->simulationStep(
       [&](QTime time, QSharedPointer<ObjectState> objectState) {
         Q_UNUSED(time)
@@ -338,7 +369,20 @@ private:
     );
   }
 
-  // Utility methods
+  void ext_startup_watchdog_timer_callback()
+  {
+    RCLCPP_WARN(
+      get_logger(),
+      "Timedout waiting for external nav_sat_fix_extended topic '%s'. Falling back to WayWise simulation.",
+      nav_sat_fix_extended_topic_.c_str());
+    ext_startup_watchdog_timer_->cancel();
+
+    mLocalizationComponent->setGnssVariant(RECEIVER_VARIANT::WAYWISE_SIMULATED);
+    mLocalizationComponent->reset();
+    mLocalizationComponent->setup_localization();
+  }
+
+// Utility methods
   void publish_fused_nav_sat_fix_extended_data(const GnssFixStatus & gnssFixStatus)
   {
     PosPoint gnssPos = mObjectState->getPosition(PosType::GNSS);
@@ -418,7 +462,12 @@ private:
     rtcm_frequency_pub_->publish(rtcm_frequency_msg);
   }
 
-  // Parameters
+  static void qtMessageHandler(QtMsgType type, const QMessageLogContext &, const QString & msg)
+  {
+    qtMessageToLogger(node_logger_, type, msg);
+  }
+
+// Parameters
   std::string urdf_file_;
   std::string world_frame_;
   std::string gnss_reference_frame_;
@@ -430,6 +479,7 @@ private:
   std::string imu_topic_;
   std::string odom_topic_;
   bool publish_world_to_fused_tf_;
+  double ext_startup_timeout_;
 
   RECEIVER_VARIANT gnss_variant_;
   bool gnss_print_verbose_;
@@ -445,28 +495,36 @@ private:
   xyz_t gnss_chip_orientation_offset_;
   llh_t enuref_;   // [lat, lon, height]
 
-  // Publishers
+// Publishers
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_pub_;
   rclcpp::Publisher<waywiser_core::msg::NavSatFixExtended>::SharedPtr
     fused_nav_sat_fix_extended_pub_;
   rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr rtcm_frequency_pub_;
 
-  // Subscribers
+// Subscribers
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<waywiser_core::msg::NavSatFixExtended>::SharedPtr nav_sat_fix_extended_sub_;
 
-  // Transform buffer and listener
+// Transform buffer and listener
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
-  // WayWise & WayWiseR components
+// Timers
+  rclcpp::TimerBase::SharedPtr ext_startup_watchdog_timer_;
+
+// WayWise & WayWiseR components
   QSharedPointer<ObjectState> mObjectState;
   QSharedPointer<LocalizationComponent> mLocalizationComponent;
 
-  // Internal variables
+// Internal variables
+  static rclcpp::Logger node_logger_;
   QSharedPointer<urdf::Model> mUrdfModel;
+  rclcpp::Time startup_time_;
 };
+
+rclcpp::Logger WaywiserLocalization::node_logger_ =
+  rclcpp::get_logger("waywiser_localization_node");
 
 int main(int argc, char * argv[])
 {

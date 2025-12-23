@@ -16,6 +16,7 @@
 #include "WayWise/sensors/gnss/ubloxrover.h"
 #include "WayWise/vehicles/objectstate.h"
 
+#include "qobject_node.hpp"
 #include "waywiser_core_utils.hpp"
 
 
@@ -26,7 +27,7 @@ class LocalizationComponent : public QObject
 public:
   // Constructor and destructor
   LocalizationComponent(
-    QObject * parentQObject, const QSharedPointer<ObjectState> & objectState);
+    QObjectNode * parentQObjectNode, const QSharedPointer<ObjectState> & objectState);
   virtual ~LocalizationComponent();
   virtual void reset();
 
@@ -89,8 +90,9 @@ protected:
   QSharedPointer<SDVPVehiclePositionFuser> mSDVPVehiclePositionFuser;
 
   // Internal variables
-  QObject * mParentQObject;
-  QTimer mPositionFusionInputTimer = QTimer();
+  QObjectNode * mParentQObjectNode;
+  rclcpp::TimerBase::SharedPtr mPositionFusionInputTimer = nullptr;
+  std::vector<QMetaObject::Connection> mQMetaObjectConnections;
 };
 
 #endif  // LOCALIZATION_COMPONENT_HPP_
