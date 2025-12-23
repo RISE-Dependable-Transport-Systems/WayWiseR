@@ -32,7 +32,7 @@ public:
       while (rclcpp::ok() && this->get_clock()->now().nanoseconds() == 0) {
         rclcpp::sleep_for(std::chrono::milliseconds(1000));
       }
-      RCLCPP_INFO(this->get_logger(), "Receiving /clock msgs now.");
+      RCLCPP_WARN(this->get_logger(), "Receiving /clock msgs now.");
     }
 
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
@@ -107,7 +107,7 @@ private:
       xyz.z = map_to_object_msg_tfs.transform.translation.z;
       yawRad = tf2::getYaw(map_to_object_msg_tfs.transform.rotation);
       if (transform_warning_logged) {
-        RCLCPP_INFO(
+        RCLCPP_WARN(
           get_logger(), "Transform from %s to %s is available now.",
           world_frame_.c_str(), tf_object_frame_.c_str());
         transform_warning_logged = false;

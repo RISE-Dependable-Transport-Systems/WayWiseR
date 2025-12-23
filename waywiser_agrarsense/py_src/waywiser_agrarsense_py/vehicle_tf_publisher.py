@@ -44,7 +44,7 @@ class VehicleTFPublisher(Node):
             while rclpy.ok() and self.get_clock().now().nanoseconds == 0:
                 time.sleep(1.0)
                 rclpy.spin_once(self)
-            self.get_logger().info('Receiving /clock msgs now.')
+            self.get_logger().warn('Receiving /clock msgs now.')
 
         # Publisher for the odom topic
         self.odom_publisher = self.create_publisher(Odometry, self.odom_topic, 10)

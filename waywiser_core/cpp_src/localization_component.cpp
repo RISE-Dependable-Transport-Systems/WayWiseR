@@ -83,7 +83,7 @@ void LocalizationComponent::setup_localization()
                   mRtcmClient->getCurrentHost() + ":" +
                   QString::number(mRtcmClient->getCurrentPort()));
               } else {
-                qDebug() << "RtcmClient: not connected";
+                qWarning() << "RtcmClient: not connected";
               }
 
               mGNSSReceiver = mUbloxRover;
@@ -91,7 +91,7 @@ void LocalizationComponent::setup_localization()
           }
         }
         if (!mUbloxRover->isSerialConnected()) {
-          qDebug() <<
+          qWarning() <<
             "Configured GNSS receiver is not available! Simulating GNSS receiver using WayWise.";
           mGnssVariant = RECEIVER_VARIANT::WAYWISE_SIMULATED;
         }

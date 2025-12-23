@@ -51,7 +51,7 @@ public:
       while (rclcpp::ok() && this->get_clock()->now().nanoseconds() == 0) {
         rclcpp::sleep_for(std::chrono::milliseconds(1000));
       }
-      RCLCPP_INFO(this->get_logger(), "Receiving /clock msgs now.");
+      RCLCPP_WARN(this->get_logger(), "Receiving /clock msgs now.");
     }
 
     emergency_stop_state_publisher_timer_ = rclcpp::create_timer(
@@ -98,7 +98,7 @@ private:
     if (emergency_stop_target_state_msg->state == EmergencyStopState::ACTIVE) {
       if (!is_emergency_stop_active()) {
         current_emergency_stop_state_msg.state = EmergencyStopState::ACTIVE;
-        RCLCPP_INFO(
+        RCLCPP_WARN(
           get_logger(), "Emergency stop ACTIVATED by %s.",
           emergency_stop_target_state_msg->sender_id.c_str());
 
@@ -110,7 +110,7 @@ private:
     } else if (emergency_stop_target_state_msg->state == EmergencyStopState::CLEAR) {
       if (is_emergency_stop_active()) {
         current_emergency_stop_state_msg.state = EmergencyStopState::CLEAR;
-        RCLCPP_INFO(
+        RCLCPP_WARN(
           get_logger(), "Emergency stop CLEARED by %s.",
           emergency_stop_target_state_msg->sender_id.c_str());
       }

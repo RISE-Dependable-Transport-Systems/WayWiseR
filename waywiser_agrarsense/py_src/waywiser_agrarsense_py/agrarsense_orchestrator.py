@@ -226,7 +226,7 @@ class AgrarsenseOrchestrator(Node):
             # Set first clock received time after 3 consecutive stable messages
             if self.consecutive_stable_clocks_at_startup >= 3:
                 self.first_clock_received_time = current_sim_time
-                self.get_logger().info(
+                self.get_logger().warn(
                     f'Received first stable clock message at time {current_sim_time}.'
                 )
 
@@ -235,7 +235,7 @@ class AgrarsenseOrchestrator(Node):
             if current_sim_time < self.previous_sim_time:  # Detect clock reset
                 self.first_clock_received_time = None  # Reset first clock time
                 self.consecutive_stable_clocks_at_startup = 0  # Reset counter
-                self.get_logger().info('Detected clock reset!')
+                self.get_logger().warn('Detected clock reset!')
                 return
 
             # Check if we've passed the simulator startup time
@@ -306,7 +306,7 @@ class AgrarsenseOrchestrator(Node):
         if self.sim_clock_timeout_timer is not None:
             self.sim_clock_timeout_timer.cancel()
             self.sim_clock_timeout_timer = None
-            self.get_logger().info('Simulation clock timeout reached. Restarting simulation.')
+            self.get_logger().warn('Simulation clock timeout reached. Restarting simulation.')
 
         self.end_simulation()
 
@@ -380,7 +380,7 @@ class AgrarsenseOrchestrator(Node):
         self.simulator_subprocess = create_subprocess(
             self, start_simulator_command, subprocess_name
         )
-        self.get_logger().info(
+        self.get_logger().warn(
             'Waiting for the first clock message.'
         )  # will wait for the first clock message to spawn objects
         self.update_sim_state(AgrarsenseSimulatorState.INITIALIZING)

@@ -27,7 +27,7 @@ void WaywiserCar::initialize_node(
     while (rclcpp::ok() && this->get_clock()->now().nanoseconds() == 0) {
       rclcpp::sleep_for(std::chrono::milliseconds(1000));
     }
-    RCLCPP_INFO(this->get_logger(), "Receiving /clock msgs now.");
+    RCLCPP_WARN(this->get_logger(), "Receiving /clock msgs now.");
   }
 
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
@@ -187,13 +187,13 @@ void WaywiserCar::setup_parameters()
   mCarInterfaceComponent->setToFSensorsInfo(tof_sensors_info);
 
   std::ostringstream log_stream;
-  log_stream << "CarInterfaceComponent offset parameters:\n";
+  log_stream << "\nCarInterfaceComponent offset parameters:\n";
   // Rear axle to base
   auto vector3_param = get_vector3_param(this, "rear_axle_frame_to_base_frame_offset");
   if (!vector3_param && mUrdfModel) {
     vector3_param = getFramePositionOffset(mUrdfModel, base_frame_, rear_axle_frame_);
   }
-  log_stream << "rear_axle_frame_to_base_frame_offset: " << vector3_param->c_str() << "\n";
+  log_stream << " rear_axle_frame_to_base_frame_offset: " << vector3_param->c_str() << "\n";
   mCarInterfaceComponent->setRearAxleToBaseOffset(vector3_param->to_type<xyz_t>());
 
   // Rear axle to center
@@ -201,7 +201,7 @@ void WaywiserCar::setup_parameters()
   if (!vector3_param && mUrdfModel) {
     vector3_param = getFramePositionOffset(mUrdfModel, chassis_frame_, rear_axle_frame_);
   }
-  log_stream << "rear_axle_frame_to_center_frame_offset: " << vector3_param->c_str() << "\n";
+  log_stream << " rear_axle_frame_to_center_frame_offset: " << vector3_param->c_str() << "\n";
   mCarInterfaceComponent->setRearAxleToCenterOffset(vector3_param->to_type<xyz_t>());
 
   // Rear axle to rear end
@@ -209,7 +209,7 @@ void WaywiserCar::setup_parameters()
   if (!vector3_param && mUrdfModel) {
     vector3_param = getFramePositionOffset(mUrdfModel, rear_end_frame_, rear_axle_frame_);
   }
-  log_stream << "rear_axle_frame_to_rear_end_frame_offset: " << vector3_param->c_str() << "\n";
+  log_stream << " rear_axle_frame_to_rear_end_frame_offset: " << vector3_param->c_str() << "\n";
   mCarInterfaceComponent->setRearAxleToRearEndOffset(vector3_param->to_type<xyz_t>());
 
   // Output log_stream
@@ -616,7 +616,7 @@ void WaywiserCar::odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom_ms
             rear_axle_frame_to_odom_child_frame_msg_tfs.transform.translation.z
           };
           if (transform_warning_logged_) {
-            RCLCPP_INFO(
+            RCLCPP_WARN(
               get_logger(), "Transform from %s to %s is available now.",
               rear_axle_frame_.c_str(), odom_msg->child_frame_id.c_str());
             transform_warning_logged_ = false;
@@ -710,7 +710,7 @@ void WaywiserCar::fused_nav_sat_fix_extended_callback(
             rear_axle_frame_to_nav_sat_frame_msg_tfs.transform.translation.z
           };
           if (transform_warning_logged_) {
-            RCLCPP_INFO(
+            RCLCPP_WARN(
               get_logger(), "Transform from %s to %s is available now.",
               msg->header.frame_id.c_str(), rear_axle_frame_.c_str());
             transform_warning_logged_ = false;

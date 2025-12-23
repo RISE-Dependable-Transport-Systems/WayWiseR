@@ -31,7 +31,7 @@ public:
       while (rclcpp::ok() && this->get_clock()->now().nanoseconds() == 0) {
         rclcpp::sleep_for(std::chrono::milliseconds(1000));
       }
-      RCLCPP_INFO(this->get_logger(), "Receiving /clock msgs now.");
+      RCLCPP_WARN(this->get_logger(), "Receiving /clock msgs now.");
     }
 
     emergency_stop_request_publisher_ = this->create_publisher<EmergencyStopState>(

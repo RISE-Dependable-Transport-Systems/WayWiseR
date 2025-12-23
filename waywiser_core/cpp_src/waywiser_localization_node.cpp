@@ -81,7 +81,7 @@ public:
       "position_fusion_input_timer_rate", 10);
 
     std::ostringstream log_stream;
-    log_stream << "Offset parameters:\n";
+    log_stream << "\nLocalizationComponent offset parameters:\n";
     std::optional<vector3_t> vector3_param;
 
 
@@ -90,7 +90,7 @@ public:
     if (!vector3_param && mUrdfModel) {
       vector3_param = getFramePositionOffset(mUrdfModel, gnss_chip_frame_, gnss_antenna_frame_);
     }
-    log_stream << "gnss_antenna_to_gnss_chip_offset: " << vector3_param->c_str() << "\n";
+    log_stream << " gnss_antenna_to_gnss_chip_offset: " << vector3_param->c_str() << "\n";
     gnss_antenna_to_gnss_chip_offset_ = vector3_param->to_type<xyz_t>();
 
     // GNSS chip orientation
@@ -98,7 +98,7 @@ public:
     if (!vector3_param && mUrdfModel) {
       vector3_param = getFrameRotationOffset(mUrdfModel, gnss_reference_frame_, gnss_chip_frame_);
     }
-    log_stream << "gnss_chip_orientation_offset: " << vector3_param->c_str() << "\n";
+    log_stream << " gnss_chip_orientation_offset: " << vector3_param->c_str() << "\n";
     gnss_chip_orientation_offset_ = vector3_param->to_type<xyz_t>();
 
     // GNSS chip to rear axle
@@ -106,7 +106,7 @@ public:
     if (!vector3_param && mUrdfModel) {
       vector3_param = getFramePositionOffset(mUrdfModel, gnss_reference_frame_, gnss_chip_frame_);
     }
-    log_stream << "gnss_chip_to_reference_point_offset: " << vector3_param->c_str() << "\n";
+    log_stream << " gnss_chip_to_reference_point_offset: " << vector3_param->c_str() << "\n";
     gnss_chip_to_reference_point_offset_ = vector3_param->to_type<xyz_t>();
 
     // Output log_stream
@@ -226,7 +226,7 @@ private:
         );
 
         if (transform_warning_logged) {
-          RCLCPP_INFO(
+          RCLCPP_WARN(
             get_logger(), "Transform from %s to %s is available now.",
             imu_msg->header.frame_id.c_str(), gnss_reference_frame_.c_str());
           transform_warning_logged = false;
@@ -282,7 +282,7 @@ private:
           odom_child_frame_to_gnss_reference_frame_msg_tfs.transform.translation.z
         };
         if (transform_warning_logged_) {
-          RCLCPP_INFO(
+          RCLCPP_WARN(
             get_logger(), "Transform from %s to %s is available now.",
             odom_msg->child_frame_id.c_str(), gnss_reference_frame_.c_str());
           transform_warning_logged_ = false;

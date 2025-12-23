@@ -75,8 +75,7 @@ void CarInterfaceComponent::setup_vehicle_interface()
             carMovementController->setServoController(servoController);
 
             if (mMinBatteryVoltage <= 0.0) {
-              qDebug() <<
-                "WARNING: Low battery protection is not configured!";
+              qWarning() << "Low battery protection is not configured!";
             } else {
               qDebug() << "Low battery protection is enabled with voltage threshold of " <<
                 mMinBatteryVoltage << " V.";
@@ -102,30 +101,19 @@ void CarInterfaceComponent::setup_vehicle_interface()
               });
           } else {
             mVehicleInterfaceType = VehicleInterfaceType::WAYWISE_SIMULATED;
-            qDebug() <<
-              "VESCMotorController is not connected!";
+            qWarning() << "VESCMotorController is not connected!";
           }
         }
 
         if (mVehicleInterfaceType == VehicleInterfaceType::WAYWISE_SIMULATED) {
-          qDebug() << "Simulating vehicle movement using WayWise.";
-          const int pollPeriodMs = 1000 / mVehicleStatePollRate;
-          QObject::connect(
-            &mWaywiseSimulationTimer, &QTimer::timeout,
-            [this, carMovementController, pollPeriodMs]() {
-              carMovementController->simulationStep(pollPeriodMs);
-            });
-          mWaywiseSimulationTimer.start(pollPeriodMs);
-        }
-
-        mMovementController = carMovementController;
+          qWarning() << "Simulating vehicle movement using WayWise.";
       } break;
     case VehicleInterfaceType::EXT_SIMULATED:
       {
         mMovementController.reset(new MovementController(mCarState));
       } break;
     default:
-      qDebug() << "Unknown vehicle interface type is requested!";
+      qWarning() << "Unknown vehicle interface type is requested!";
       break;
   }
 
@@ -148,7 +136,7 @@ void CarInterfaceComponent::setup_vehicle_interface()
           mIMUOrientationUpdater = mVESCMotorController->getIMUOrientationUpdater(mCarState);
           qDebug() << "Vesc IMU is configured.";
         } else {
-          qDebug() <<
+          qWarning() <<
             "vesc IMU is configured, but serial connection is not available! Using waywise simulation instead.";
           mImuVariant = ImuVariant::WAYWISE_SIMULATED;
         }
@@ -164,18 +152,7 @@ void CarInterfaceComponent::setup_vehicle_interface()
 
   if (mImuVariant == ImuVariant::WAYWISE_SIMULATED) {
     mIMUOrientationUpdater.reset(new IMUOrientationUpdater(mCarState));
-
-    QObject::connect(
-      &mWaywiseSimulationTimer, &QTimer::timeout,
-      [&]() {
-        mIMUOrientationUpdater->simulationStep();
-      }
-    );
-    if (mVehicleInterfaceType != VehicleInterfaceType::WAYWISE_SIMULATED) {
-      const int pollPeriodMs = 1000 / mVehicleStatePollRate;
-      mWaywiseSimulationTimer.start(pollPeriodMs);
-    }
-    qDebug() << "Waywise simulated IMU is configured.";
+    qWarning() << "Waywise simulated IMU is configured.";
   }
 
   // ToF Sensors
@@ -200,7 +177,7 @@ void CarInterfaceComponent::activate_emergency_stop(
     mMovementController->setDesiredSpeed(0.0);
     mMovementController->setDesiredSteering(0.0);
     mEmergencyStopState->set_active();
-    qDebug() << QString("Emergency stop ACTIVATED%1.%2")
+    qWarning() << QString("Emergency stop ACTIVATED%1.%2")
       .arg(sender_id.empty() ? "" : " by " + QString::fromStdString(sender_id))
       .arg(reason.empty() ? "" : " Reason: " + QString::fromStdString(reason));
   }
@@ -210,7 +187,7 @@ void CarInterfaceComponent::clear_emergency_stop(const std::string & sender_id)
 {
   if (!mEmergencyStopState->is_clear()) {
     mEmergencyStopState->set_clear();
-    qDebug() << QString("Emergency stop CLEARED%1")
+    qWarning() << QString("Emergency stop CLEARED%1")
       .arg(sender_id.empty() ? "" : " by " + QString::fromStdString(sender_id));
   }
 }

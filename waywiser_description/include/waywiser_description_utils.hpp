@@ -21,10 +21,6 @@ inline QSharedPointer<urdf::Model> getURDFModel(const std::string & urdf_file_)
     }
   }
 
-  if (urdfModel != nullptr) {
-    qDebug() << "URDF model loaded.";
-  }
-
   return urdfModel;
 }
 

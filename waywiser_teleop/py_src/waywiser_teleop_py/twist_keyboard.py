@@ -83,7 +83,7 @@ class TwistKeyboard(Node):
             while rclpy.ok() and self.get_clock().now().nanoseconds == 0:
                 time.sleep(1.0)
                 rclpy.spin_once(self)
-            self.get_logger().info('Receiving /clock msgs now.')
+            self.get_logger().warn('Receiving /clock msgs now.')
 
         # Publishers
         self.twist_publisher = self.create_publisher(Twist, 'cmd_vel', 10)
@@ -552,7 +552,7 @@ class TwistKeyboardUI(QMainWindow):
             wave_data = (wave_data * 32767).astype(np.int16)
 
             # Create a temporary WAV file
-            temp_dir = tempfile.gettempdir()
+            temp_dir = tempfile.mkdtemp()
             self.temp_wav_file = os.path.join(temp_dir, 'twist_keyboard_beep.wav')
 
             # Write WAV file
