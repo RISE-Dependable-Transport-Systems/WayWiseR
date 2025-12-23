@@ -1,11 +1,15 @@
+import os
+
+from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-
 from waywiser_description_py.waywiser_description_utils import get_scaled_urdf_string
-from waywiser_py.waywiser_utils import get_full_file_path
 import yaml
+
+from waywiser_py.waywiser_utils import get_full_file_path
 
 
 def generate_launch_description():
@@ -90,5 +94,24 @@ def waywiser_localization_node_launch(context):
                 # prefix='xterm -e gdb -q -ex run --args',
             )
         )
+        if 'gnss_variant' in node_params_dict:
+            gnss_variant = node_params_dict['gnss_variant']
+            if gnss_variant.lower() == 'external':
+                nodes.append(
+                    IncludeLaunchDescription(
+                        PythonLaunchDescriptionSource(
+                            [
+                                os.path.join(
+                                    get_package_share_directory('waywiser_core'),
+                                    'launch',
+                                    'tfs_to_navsatfixfused.launch.py',
+                                )
+                            ]
+                        ),
+                        launch_arguments={
+                            'config': LaunchConfiguration('localization_config'),
+                        }.items(),
+                    )
+                )
 
     return nodes

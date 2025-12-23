@@ -156,22 +156,6 @@ def generate_launch_description():
         }.items(),
     )
 
-    tfs_to_navsatfixfused = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                os.path.join(
-                    waywiser_core_dir,
-                    'launch',
-                    'tfs_to_navsatfixfused.launch.py',
-                )
-            ]
-        ),
-        launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'config': LaunchConfiguration('vehicle_config'),
-        }.items(),
-    )
-
     twist_safety = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -264,7 +248,6 @@ def generate_launch_description():
     ld.add_action(waywiser_agrarsense_relay)
     ld.add_action(waywiser_car)
     ld.add_action(waywiser_car_localization)
-    ld.add_action(tfs_to_navsatfixfused)
     ld.add_action(twist_safety)
     ld.add_action(teleop_rviz2)
     ld.add_action(yolo)

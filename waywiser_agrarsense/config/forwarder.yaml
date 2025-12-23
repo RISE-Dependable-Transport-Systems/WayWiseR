@@ -66,7 +66,7 @@ waywiser_car_node:
     joint_states_publish_rate: 10
     invert_trailer_joint_state: true
     autopilot_timer_rate: 10
-    enable_mavlink_interface: false
+    enable_mavlink_interface: true
     waywise_control_tower_address: "127.0.0.1"
     waywise_control_tower_port: 14540
     purepursuit_radius: 10.0 # m

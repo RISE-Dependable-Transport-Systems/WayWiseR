@@ -2,9 +2,10 @@ import os
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
+import yaml
 
 
 def generate_launch_description():
@@ -13,6 +14,7 @@ def generate_launch_description():
     waywiser_twist_safety_dir = get_package_share_directory('waywiser_twist_safety')
     waywiser_rviz2_dir = get_package_share_directory('waywiser_rviz2')
     waywiser_teleop_dir = get_package_share_directory('waywiser_teleop')
+    waywiser_slam_dir = get_package_share_directory('waywiser_slam')
 
     # args that can be set from the command line or a default will be used
     use_sim_time_la = DeclareLaunchArgument(
@@ -35,7 +37,9 @@ def generate_launch_description():
     )
     rviz_config_la = DeclareLaunchArgument(
         'rviz_config',
-        default_value=os.path.join(waywiser_rviz2_dir, 'config/odom_reference_frame_rover.rviz'),
+        default_value=os.path.join(
+            waywiser_rviz2_dir, 'config/map_reference_frame_rover_slam.rviz'
+        ),
         description='Full path of rviz display config file or path to their directory',
     )
     teleop_config_la = DeclareLaunchArgument(
@@ -58,6 +62,21 @@ def generate_launch_description():
         default_value='waywiser_car_node',
         description='Name of the vehicle node to control',
     )
+    localization_node_name_la = DeclareLaunchArgument(
+        'localization_node_name',
+        default_value='waywiser_car_localization_node',
+        description='Name of the node to be launched',
+    )
+    lidar_based_slam_la = DeclareLaunchArgument(
+        'lidar_based_slam',
+        default_value='True',
+        description='Use lidar based slam',
+    )
+    slam_config_la = DeclareLaunchArgument(
+        'slam_config',
+        default_value=os.path.join(waywiser_slam_dir, 'config/slam.yaml'),
+        description='Full path to params file for slam toolbox',
+    )
 
     # include launch files
     gazebo = IncludeLaunchDescription(
@@ -76,7 +95,7 @@ def generate_launch_description():
         }.items(),
     )
 
-    rover = IncludeLaunchDescription(
+    waywiser_car_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
                 os.path.join(
@@ -89,6 +108,23 @@ def generate_launch_description():
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'vehicle_config': LaunchConfiguration('vehicle_config'),
+        }.items(),
+    )
+
+    waywiser_car_localization = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(
+                    waywiser_core_dir,
+                    'launch',
+                    'waywiser_localization.launch.py',
+                )
+            ]
+        ),
+        launch_arguments={
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'localization_config': LaunchConfiguration('vehicle_config'),
+            'localization_node_name': LaunchConfiguration('localization_node_name'),
         }.items(),
     )
 
@@ -129,6 +165,9 @@ def generate_launch_description():
         }.items(),
     )
 
+    # create opaque functions to launch nodes using context
+    slam_conditional_launch_action = OpaqueFunction(function=slam_conditional_launch)
+
     # create launch description
     ld = LaunchDescription()
 
@@ -142,11 +181,45 @@ def generate_launch_description():
     ld.add_action(teleop_la)
     ld.add_action(rviz2_la)
     ld.add_action(control_vehicle_node_name_la)
+    ld.add_action(localization_node_name_la)
+    ld.add_action(lidar_based_slam_la)
+    ld.add_action(slam_config_la)
 
     # start nodes
     ld.add_action(gazebo)
     ld.add_action(twist_safety)
     ld.add_action(teleop_rviz2)
-    ld.add_action(rover)
+    ld.add_action(waywiser_car_launch)
+    ld.add_action(waywiser_car_localization)
+    ld.add_action(slam_conditional_launch_action)
 
     return ld
+
+
+def slam_conditional_launch(context):
+    lidar_based_slam = LaunchConfiguration('lidar_based_slam').perform(context)
+    if lidar_based_slam.lower() == 'true':
+        return [
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            get_package_share_directory('waywiser_slam'),
+                            'launch',
+                            'slam.launch.py',
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    'slam_config': LaunchConfiguration('slam_config'),
+                    'use_sim_time': LaunchConfiguration('use_sim_time'),
+                }.items(),
+            )
+        ]
+
+    return []
+
+
+def yaml_to_dict(path_to_yaml):
+    with open(path_to_yaml, 'r', encoding='utf-8') as f:
+        return yaml.load(f, Loader=yaml.SafeLoader)

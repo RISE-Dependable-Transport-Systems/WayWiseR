@@ -10,6 +10,7 @@
     rear_end_frame: rear_end_link
     left_end_frame: left_end_link
     right_end_frame: right_end_link
+    gnss_reference_frame: rear_axle_link
 
     front_steering_joint_names:
       ["left_front_wheel_steering_joint", "right_front_wheel_steering_joint"]
@@ -41,6 +42,8 @@
     autopilot_center_pose_topic: "/rover/autopilot_center_pose"
     emergency_stop_status_topic: "/emergency_stop/current_state"
     emergency_stop_update_topic: "/emergency_stop/target_state"
+    nav_sat_fix_extended_topic: "/rover/sensors/gnss/nav_sat_fix_extended"
+    fused_nav_sat_fix_extended_topic: "/rover/sensors/gnss/fused_nav_sat_fix_extended"
 
 waywiser_car_node:
   ros__parameters:
@@ -55,7 +58,7 @@ waywiser_car_node:
     publish_world_to_odom_tf: false
     vehicle_state_poll_rate: 30 # currently same rate for both odom topic and odom->base_link tf
     use_sdvp_position_fusion: false
-    imu_variant: ""
+    imu_variant: "vesc"
     min_battery_voltage: 13.6
     joint_states_publish_rate: 10
     enable_lidar: false
@@ -71,6 +74,23 @@ waywiser_car_node:
     adaptive_pure_pursuit: true
     end_goal_alignment_type: 1 # Align {0: REAR_AXLE, 1: FRONT_REAR_END, 2: CENTER} with the end goal
     end_goal_alignment_threshold: 0.1 # m
+
+waywiser_car_localization_node:
+  ros__parameters:
+    use_sdvp_position_fusion: false
+    gnss_variant: "external"
+    ext_startup_timeout: 5.0
+
+tfs_to_navsatfixfused_node:
+  ros__parameters:
+    tf_object_frame: "rear_axle_link"
+    gnss_is_fused_on_chip: true
+    gnss_fix_type: 3
+    gnss_horizontal_accuracy: 0.01
+    gnss_vertical_accuracy: 0.01
+    gnss_heading_accuracy: 0.1
+    gnss_last_rtcm_correction_age: 0
+    gnss_num_satellites: 0
 
 emergency_stop_monitor:
   ros__parameters:

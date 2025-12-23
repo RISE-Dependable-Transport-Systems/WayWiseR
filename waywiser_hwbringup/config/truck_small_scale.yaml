@@ -38,7 +38,7 @@
         "semitrailer_rrw_link_joint",
       ]
     truck_trailer_link_joint_name: "truck_trailer_link_joint"
-    has_trailer: false
+    has_trailer: true
     length: 0.505
     width: 0.185
     wheelbase: 0.2866
@@ -56,7 +56,7 @@
 
     urdf_file: "semitruck.urdf.xacro"
     urdf_scale: 0.071429 # 1:14
-    urdf_extra_args: "has_trailer:=false"
+    urdf_extra_args: "has_trailer:=true"
 
     odom_topic: "/truck/odometry"
     vehicle_pose_topic: "/truck/rear_axle_pose"
