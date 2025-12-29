@@ -4,48 +4,25 @@ This guide sets up a development environment with [Visual Studio Code](https://c
 
 ## Prerequisites
 
-Install these VS Code extensions:
+To install the recommended VS Code extensions, run the following command in your terminal:
 
-- [Python](https://marketplace.visualstudio.com/items?itemName=ms-python.python)
-- [Ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)
-- [C++](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools)
-- [Uncrustify](https://marketplace.visualstudio.com/items?itemName=zachflower.uncrustify)
-- [CMake Language Support](https://marketplace.visualstudio.com/items?itemName=josetr.cmake-language-support-vscode)
-- [shell-format](https://marketplace.visualstudio.com/items?itemName=foxundermoon.shell-format)
-- [XML](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-xml)
-- [YAML](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
-
-## Configure Ruff for Python
-
-Create or update `.vscode/ruff.toml` with:
-
-```toml
-# Allow lines to be as long as 99
-line-length = 99
-
-[lint]
-# Select E (PEP8), W (warnings), F (pyflakes), C (complexity), Q (quotes), I (imports)
-select = ["E", "F", "W", "C", "Q", "I"]
-
-[lint.flake8-quotes]
-inline-quotes = "single"
-docstring-quotes = "double"
-
-[format]
-quote-style = "single"
-docstring-code-format = true
-docstring-code-line-length = 99
-
-[lint.isort]
-known-first-party = ["waywiser_core", "waywiser_py", "waywiser_description_py", "waywiser_test_runner", "waywiser_twist_safety", "yaml"]
-known-third-party = ["rclpy", "ament_index_python", "matplotlib", "numpy", "pymap3d", "shapely", "tf_transformations"]
-force-sort-within-sections = true
-order-by-type = false
+```bash
+code --install-extension ms-python.python
+code --install-extension charliermarsh.ruff
+code --install-extension ms-vscode.cpptools
+code --install-extension zachflower.uncrustify
+code --install-extension josetr.cmake-language-support-vscode
+code --install-extension foxundermoon.shell-format
+code --install-extension esbenp.prettier-vscode
 ```
 
 ## Configure Uncrustify for C++
 
-Download [ament_code_style.cfg](https://github.com/ament/ament_lint/blob/humble/ament_uncrustify/ament_uncrustify/configuration/ament_code_style.cfg) to `.vscode` directory.
+Run the following command to download the `ament_code_style.cfg` to your `.vscode` directory:
+
+```bash
+wget https://raw.githubusercontent.com/ament/ament_lint/humble/ament_uncrustify/ament_uncrustify/configuration/ament_code_style.cfg -O .vscode/ament_code_style.cfg
+```
 
 ## Configure VS Code Settings
 
@@ -62,7 +39,6 @@ Create or update `.vscode/settings.json` with:
   },
   "python.analysis.typeCheckingMode": "basic",
   "python.analysis.autoImportCompletions": true,
-  "ruff.configuration": "./.vscode/ruff.toml",
   "ruff.organizeImports": true,
   "editor.formatOnSave": true,
   "[cpp]": {
@@ -77,10 +53,10 @@ Create or update `.vscode/settings.json` with:
     "editor.defaultFormatter": "foxundermoon.shell-format"
   },
   "[xml]": {
-    "editor.defaultFormatter": "redhat.vscode-xml"
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[yaml]": {
-    "editor.defaultFormatter": "redhat.vscode-yaml"
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[jsonc]": {
     "editor.defaultFormatter": "vscode.json-language-features"

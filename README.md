@@ -43,6 +43,12 @@ In general, our development resources are scarce and dedicated to fulfill use ca
 
 ### How to install and build (on Ubuntu 22.04)
 
+Install uv (required):
+
+- [Install uv](https://github.com/astral-sh/uv?tab=readme-ov-file#installation)
+
+  `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
 Install ROS2 (required):
 
 - [Install ROS2 Humble](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html)
@@ -59,35 +65,80 @@ To instead build MAVSDK from source (optional):
 
 Setup workspace and build it (without simulator-related packages):
 
-    sudo apt update && sudo apt install -y libunwind-dev libqt5serialport5-dev git build-essential cmake python3-colcon-common-extensions
+1. **Install system dependencies:**
 
-    export WAYWISER_WS=~/waywiser_ws     #update the environment variable with desired path
-    export WAYWISER_SKIPPED_PACKAGES="waywiser_agrarsense waywiser_carla waywiser_gazebo"
+   ```bash
+   sudo apt update && sudo apt install -y \
+     libunwind-dev \
+     libqt5serialport5-dev \
+     git \
+     build-essential \
+     cmake \
+     python3-colcon-common-extensions
+   ```
 
-    mkdir -p $WAYWISER_WS/src
-    git clone git@github.com:RISE-Dependable-Transport-Systems/WayWiseR.git $WAYWISER_WS/src/WayWiseR
-    cd $WAYWISER_WS/src/WayWiseR
-    git submodule update --init waywiser_core/WayWise
-    cd $WAYWISER_WS
-    python -m venv .venv
-    source .venv/bin/activate
-    export PYTHONPATH=.venv/lib/python3.10/site-packages:$PYTHONPATH
-    pip install -r src/WayWiseR/requirements.txt
-    source /opt/ros/humble/setup.bash
-    rosdep install --from-paths $(colcon list --paths-only | grep -Evw "$(echo "$WAYWISER_SKIPPED_PACKAGES" | tr ' ' '|')") --ignore-src --rosdistro humble -r -y
-    colcon build --symlink-install --packages-skip $WAYWISER_SKIPPED_PACKAGES
+2. **Setup environment variables:**
+
+   ```bash
+   export WAYWISER_WS=~/waywiser_ws  # Update with your desired path
+   # Skip simulator packages for this setup
+   export WAYWISER_SKIPPED_PACKAGES="waywiser_agrarsense waywiser_carla waywiser_gazebo"
+   ```
+
+3. **Clone and initialize workspace:**
+
+   ```bash
+   mkdir -p $WAYWISER_WS/src
+   git clone git@github.com:RISE-Dependable-Transport-Systems/WayWiseR.git $WAYWISER_WS/src/WayWiseR
+
+   cd $WAYWISER_WS/src/WayWiseR
+   git submodule update --init waywiser_core/WayWise
+   ```
+
+4. **Setup Python virtual environment (using uv):**
+
+   ```bash
+   cd $WAYWISER_WS
+   uv venv --clear
+   source .venv/bin/activate
+
+   # Add venv site-packages to PYTHONPATH
+   export PYTHONPATH=.venv/lib/python3.10/site-packages:$PYTHONPATH
+
+   # Install WayWiseR python dependencies
+   uv pip install -e src/WayWiseR
+   ```
+
+5. **Install ROS2 dependencies and build:**
+
+   ```bash
+   source /opt/ros/humble/setup.bash
+
+   # Install dependencies, excluding skipped packages
+   rosdep install --from-paths $(colcon list --paths-only | grep -Evw "$(echo "$WAYWISER_SKIPPED_PACKAGES" | tr ' ' '|')") \
+     --ignore-src --rosdistro $ROS_DISTRO -r -y
+
+   colcon build --symlink-install --packages-skip $WAYWISER_SKIPPED_PACKAGES
+   ```
+
+To persist the environment variables and source the ROS2 overlay automatically in each terminal when activating the virtual environment, run the following command (copy-paste the entire block):
+
+```bash
+cat <<EOT >> $WAYWISER_WS/.venv/bin/activate
+
+# WayWiseR Environment Setup
+source /opt/ros/humble/setup.bash
+export WAYWISER_WS=$WAYWISER_WS
+export WAYWISER_SKIPPED_PACKAGES="$WAYWISER_SKIPPED_PACKAGES"
+export PYTHONPATH=.venv/lib/python3.10/site-packages:\$PYTHONPATH
+
+if [ -f "$WAYWISER_WS/install/setup.bash" ]; then
+source "$WAYWISER_WS/install/setup.bash"
+fi
+EOT
+```
 
 To build simulator-related packages such as waywiser_agrarsense, waywiser_carla, and waywiser_gazebo, follow the instructions in the respective packages.
-
-To persist the environment variables and source the ROS2 overlay automatically in each terminal when activating the virtual environment (using `source .venv/bin/activate`), run the following command:
-
-    echo "source /opt/ros/humble/setup.bash" >> .venv/bin/activate
-    echo "export WAYWISER_WS=$WAYWISER_WS" >> .venv/bin/activate
-    echo "export WAYWISER_SKIPPED_PACKAGES=$WAYWISER_SKIPPED_PACKAGES" >> .venv/bin/activate
-    echo 'export PYTHONPATH=.venv/lib/python3.10/site-packages:$PYTHONPATH' >> .venv/bin/activate
-    echo 'if [ -f "install/setup.bash" ]; then' >> .venv/bin/activate
-    echo ' source "install/setup.bash"' >> .venv/bin/activate
-    echo 'fi' >> .venv/bin/activate
 
 ### Current state
 

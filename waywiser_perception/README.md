@@ -8,7 +8,7 @@
 - Install torch and torchvision following the instructions from https://forums.developer.nvidia.com/t/pytorch-for-jetson/
 - Install pip dependencies:
   ```
-  pip install numpy==1.23 ultralytics opencv-python pycuda
+  uv pip install numpy==1.23 ultralytics opencv-python pycuda
   ```
 
 ### x86_64
@@ -17,13 +17,13 @@
 
   - install cuda toolkit if not already installed (https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#ubuntu).
   - ```
-    pip install pycuda
+    uv pip install pycuda
     ```
 
 - Install pip dependencies:
 
   ```
-  pip install numpy ultralytics opencv-python torch torchvision
+  uv pip install numpy ultralytics opencv-python torch torchvision
   ```
 
 ## Setup
