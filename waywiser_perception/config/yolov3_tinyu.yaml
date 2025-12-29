@@ -1,22 +1,22 @@
 yolo_node:
-    ros__parameters:
-        model_file_path: "~/workspaces/agrarsense_ws/waywiser/resources/yolov3-tinyu.engine"
-        device: "cuda:0" # cuda:x/cpu
-        confidence_threshold: 0.5 # Detection confidence threshold
-        prediction_verbose: False
-        color_image_topic: "/agrarsense/out/sensors/rgb_front"
-        publish_annotated_image: True
-        annotated_color_image_topic: "/agrarsense/out/sensors/rgb_front_annotated_image"
-        camera_base_frame: "forwarder/rgb_front"
+  ros__parameters:
+    model_file_path: "~/workspaces/agrarsense_ws/waywiser/resources/yolov3-tinyu.engine"
+    device: "cuda:0" # cuda:x/cpu
+    confidence_threshold: 0.5 # Detection confidence threshold
+    prediction_verbose: False
+    color_image_topic: "/agrarsense/out/sensors/rgb_front"
+    publish_annotated_image: True
+    annotated_color_image_topic: "/agrarsense/out/sensors/rgb_front_annotated_image"
+    camera_base_frame: "forwarder/rgb_front"
 
-        depth_image_topic: "/agrarsense/out/sensors/depth_front_raw"
-        depth_camerainfo_topic: "/agrarsense/out/sensors/depth_front/camera_info"
-        maximum_object_depth_size: 0.5
+    depth_image_topic: "/agrarsense/out/sensors/depth_front_raw"
+    depth_camerainfo_topic: "/agrarsense/out/sensors/depth_front/camera_info"
+    maximum_object_depth_size: 0.5
 
-        use_tracker: False
-        color_image_topic_as_stream: True
-        tracker_config_filepath: "bytetrack.yaml" # "bytetrack.yaml" or "botsort.yaml"
+    use_tracker: False
+    color_image_topic_as_stream: True
+    tracker_config_filepath: "bytetrack.yaml" # "bytetrack.yaml" or "botsort.yaml"
 
-        publish_bbox_3d_markers: False
-        rviz_3d_visualization_markers_topic: "/sensors/camera/color/bbox_3d_markers"
-        detections_topic: "/sensors/camera/color/yolov3_tinyu_detections"
+    publish_bbox_3d_markers: False
+    rviz_3d_visualization_markers_topic: "/sensors/camera/color/bbox_3d_markers"
+    detections_topic: "/sensors/camera/color/yolov3_tinyu_detections"
