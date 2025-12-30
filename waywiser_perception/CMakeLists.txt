@@ -24,8 +24,29 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
 find_package(rclcpp_components REQUIRED)
 
+find_package(octomap REQUIRED)
+find_package(octomap_msgs REQUIRED)
+
 include_directories(include)
 ament_export_include_directories(include)
+
+add_executable(octomap_node cpp_src/octomap.cpp)
+
+ament_target_dependencies(octomap_node
+  rclcpp
+  sensor_msgs
+  geometry_msgs
+  tf2_ros
+  tf2_sensor_msgs
+  octomap_msgs
+)
+
+target_link_libraries(octomap_node octomap)
+
+install(
+  TARGETS octomap_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
 
 add_library(point_cloud_transformer_core SHARED
   cpp_src/rclcpp_components/point_cloud_transformer_core.cpp
@@ -78,7 +99,6 @@ install(
   py_src/waywiser_perception_py/yolo_node.py
   py_src/waywiser_perception_py/rgbd_to_pointcloud.py
   py_src/waywiser_perception_py/collision_monitor.py
-  py_src/waywiser_perception_py/occlusion_analysis.py
   py_src/waywiser_perception_py/camera_info_publisher.py
   py_src/waywiser_perception_py/rgb_to_grayscale.py
   DESTINATION lib/${PROJECT_NAME}
