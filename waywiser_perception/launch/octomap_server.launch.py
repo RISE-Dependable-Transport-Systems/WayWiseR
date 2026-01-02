@@ -15,7 +15,7 @@ def generate_launch_description():
         default_value=os.path.join(waywiser_perception_dir, 'config/octomap_server.yaml'),
         description='Full path to params file for OctoMap server',
     )
-    # assumes camera_node_name='camera' — override if using a different name
+
     cloud_topic_la = DeclareLaunchArgument(
         'cloud_topic',
         default_value='/sensors/camera/color/points',
