@@ -27,11 +27,13 @@ find_package(rclcpp_components REQUIRED)
 find_package(octomap REQUIRED)
 find_package(octomap_msgs REQUIRED)
 
+find_package(waywiser_twist_safety REQUIRED)  
+find_package(waywiser REQUIRED)
+
 include_directories(include)
 ament_export_include_directories(include)
 
 add_executable(octomap_node cpp_src/octomap.cpp)
-
 ament_target_dependencies(octomap_node
   rclcpp
   sensor_msgs
@@ -40,12 +42,22 @@ ament_target_dependencies(octomap_node
   tf2_sensor_msgs
   octomap_msgs
 )
-
 target_link_libraries(octomap_node octomap)
 
-install(
-  TARGETS octomap_node
-  RUNTIME DESTINATION lib/${PROJECT_NAME}
+add_executable(octomap_occlusions_node cpp_src/octomap_occlusions.cpp)  
+ament_target_dependencies(octomap_occlusions_node  
+  rclcpp  
+  geometry_msgs  
+  tf2_ros   
+  octomap_msgs  
+  waywiser_twist_safety  
+  waywiser  
+)  
+target_link_libraries(octomap_occlusions_node octomap)  
+
+install(  
+  TARGETS octomap_node octomap_occlusions_node  
+  RUNTIME DESTINATION lib/${PROJECT_NAME}  
 )
 
 add_library(point_cloud_transformer_core SHARED

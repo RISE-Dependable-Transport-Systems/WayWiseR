@@ -80,7 +80,7 @@ private:
       // Convert PointCloud2 to OctoMap Pointcloud
       octomap::Pointcloud cloud = toOctoCloud(transformed_cloud);
 
-      // Compute sensor origin in odom frame
+      // Compute sensor origin
       octomap::point3d sensor_origin(
         transform_stamped.transform.translation.x,
         transform_stamped.transform.translation.y,
@@ -156,11 +156,16 @@ private:
   double degrade_timeout_{2.0};
   int degrade_every_n_scans_{5};
 
+  // TF2 components
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;
-  std::unique_ptr<octomap::OcTreeStamped> octree_;      // unique_ptr ensures the OcTree is solely owned by this node
+
+  // ROS components  
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
   rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr octomap_pub_;
+
+  // OcTree storage
+  std::unique_ptr<octomap::OcTreeStamped> octree_;      // unique_ptr ensures the OcTree is solely owned by this node
   std::mutex map_mutex_;    // Mutex to protect octree_ during updates and serialisation
 };
 
