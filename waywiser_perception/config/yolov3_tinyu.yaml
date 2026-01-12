@@ -1,6 +1,6 @@
 yolo_node:
   ros__parameters:
-    model_file_path: "~/workspaces/agrarsense_ws/waywiser/resources/yolov3-tinyu.engine"
+    model_file_path: "~/workspaces/waywiser_ws/resources/yolov3-tinyu.engine"
     device: "cuda:0" # cuda:x/cpu
     confidence_threshold: 0.5 # Detection confidence threshold
     prediction_verbose: False

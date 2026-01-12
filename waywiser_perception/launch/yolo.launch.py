@@ -6,6 +6,7 @@ from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+from waywiser_py.waywiser_utils import RosUtils
 import yaml
 
 
@@ -40,8 +41,12 @@ def generate_launch_description():
 
 
 def yolov8_launch(context):
-    config_data = yaml_to_dict(LaunchConfiguration('yolo_config').perform(context))
-    yolo_parameters = config_data['yolo_node']['ros__parameters']
+    yolo_config = LaunchConfiguration('yolo_config').perform(context)
+    yolo_parameters = RosUtils.get_node_params(yolo_config, 'yolo_node')
+
+    if not yolo_parameters:
+        return []
+
     yolo_parameters['model_file_path'] = os.path.expanduser(yolo_parameters['model_file_path'])
     if yolo_parameters['use_tracker']:
         tracker_config_filepath = os.path.expanduser(yolo_parameters['tracker_config_filepath'])
