@@ -218,10 +218,6 @@
           </friction>
         </surface>
       </collision>
-      <sensor name="imu_sensor" type="imu">
-        <always_on>1</always_on>
-        <update_rate>250</update_rate>
-      </sensor>
     </link>
     <include>
       <uri>model://realsense_d435i_camera/model.sdf</uri>
@@ -230,13 +226,72 @@
         <sensor element_id="camera_link::camera_sensor">
           <topic action="modify">sensors/drone/camera</topic>
           <camera action="modify">
-            <optical_frame_id action="modify">"drone_camera_link"</optical_frame_id>
+            <optical_frame_id action="modify">drone/camera_link</optical_frame_id>
           </camera>
         </sensor>
       </experimental:params>
     </include>
-    <joint name="camera_joint" type="fixed">
+    <joint name="drone/camera_joint" type="fixed">
       <child>realsense_d435i_camera::camera_link</child>
+      <parent>base_link</parent>
+    </joint>
+    <link name="imu_link">
+      <pose>0 0 0.05 0 0 0</pose>
+      <sensor name="imu_link" type="imu">
+        <always_on>1</always_on>
+        <update_rate>50</update_rate>
+        <topic>drone/imu</topic>
+        <ignition_frame_id>drone/imu_link</ignition_frame_id>
+        <pose relative_to='imu_link'>0 0 0 0 0 0</pose>
+      </sensor>
+    </link>
+    <joint name="drone/imu_joint" type="fixed">
+      <child>imu_link</child>
+      <parent>base_link</parent>
+    </joint>
+    <link name="gps_link">
+      <pose>0 0 0.05 0 0 0</pose>
+      <sensor name="gps_link" type="navsat">
+        <always_on>1</always_on>
+        <update_rate>50</update_rate>
+        <visualize>0</visualize>
+        <topic>drone/gps/navsat</topic>
+        <ignition_frame_id>drone/gps_link</ignition_frame_id>
+        <pose relative_to='gps_link'>0 0 0 0 0 0</pose>
+        <navsat>
+          <position_sensing>
+            <horizontal>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>4e-10</stddev>
+              </noise>
+            </horizontal>
+            <vertical>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>4e-4</stddev>
+              </noise>
+            </vertical>
+          </position_sensing>
+          <velocity_sensing>
+            <horizontal>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.1</stddev>
+              </noise>
+            </horizontal>
+            <vertical>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.1</stddev>
+              </noise>
+            </vertical>
+          </velocity_sensing>
+        </navsat>
+      </sensor>
+    </link>
+    <joint name="drone/gps_joint" type="fixed">
+      <child>gps_link</child>
       <parent>base_link</parent>
     </joint>
     <link name="rotor_0">
@@ -296,7 +351,7 @@
         </surface>
       </collision>
     </link>
-    <joint name="rotor_0_joint" type="revolute">
+    <joint name="drone/rotor_0_joint" type="revolute">
       <parent>base_link</parent>
       <child>rotor_0</child>
       <axis>
@@ -369,7 +424,7 @@
         </surface>
       </collision>
     </link>
-    <joint name="rotor_1_joint" type="revolute">
+    <joint name="drone/rotor_1_joint" type="revolute">
       <parent>base_link</parent>
       <child>rotor_1</child>
       <axis>
@@ -442,7 +497,7 @@
         </surface>
       </collision>
     </link>
-    <joint name="rotor_2_joint" type="revolute">
+    <joint name="drone/rotor_2_joint" type="revolute">
       <parent>base_link</parent>
       <child>rotor_2</child>
       <axis>
@@ -515,7 +570,7 @@
         </surface>
       </collision>
     </link>
-    <joint name="rotor_3_joint" type="revolute">
+    <joint name="drone/rotor_3_joint" type="revolute">
       <parent>base_link</parent>
       <child>rotor_3</child>
       <axis>
@@ -535,7 +590,7 @@
     https://github.com/gazebosim/gz-sim/pull/1689 or equivalent -->
     <plugin filename="ignition-gazebo-multicopter-motor-model-system"
       name="ignition::gazebo::systems::MulticopterMotorModel">
-      <jointName>rotor_0_joint</jointName>
+      <jointName>drone/rotor_0_joint</jointName>
       <linkName>rotor_0</linkName>
       <turningDirection>ccw</turningDirection>
       <timeConstantUp>0.0125</timeConstantUp>
@@ -552,7 +607,7 @@
     </plugin>
     <plugin filename="ignition-gazebo-multicopter-motor-model-system"
       name="ignition::gazebo::systems::MulticopterMotorModel">
-      <jointName>rotor_1_joint</jointName>
+      <jointName>drone/rotor_1_joint</jointName>
       <linkName>rotor_1</linkName>
       <turningDirection>ccw</turningDirection>
       <timeConstantUp>0.0125</timeConstantUp>
@@ -569,7 +624,7 @@
     </plugin>
     <plugin filename="ignition-gazebo-multicopter-motor-model-system"
       name="ignition::gazebo::systems::MulticopterMotorModel">
-      <jointName>rotor_2_joint</jointName>
+      <jointName>drone/rotor_2_joint</jointName>
       <linkName>rotor_2</linkName>
       <turningDirection>cw</turningDirection>
       <timeConstantUp>0.0125</timeConstantUp>
@@ -586,7 +641,7 @@
     </plugin>
     <plugin filename="ignition-gazebo-multicopter-motor-model-system"
       name="ignition::gazebo::systems::MulticopterMotorModel">
-      <jointName>rotor_3_joint</jointName>
+      <jointName>drone/rotor_3_joint</jointName>
       <linkName>rotor_3</linkName>
       <turningDirection>cw</turningDirection>
       <timeConstantUp>0.0125</timeConstantUp>
@@ -600,6 +655,29 @@
       <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
       <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
       <motorType>velocity</motorType>
+    </plugin>
+    <plugin filename="libignition-gazebo-joint-state-publisher-system.so"
+      name="ignition::gazebo::systems::JointStatePublisher">
+      <joint_name>drone/rotor_0_joint</joint_name>
+      <joint_name>drone/rotor_1_joint</joint_name>
+      <joint_name>drone/rotor_2_joint</joint_name>
+      <joint_name>drone/rotor_3_joint</joint_name>
+      <joint_name>drone/imu_joint</joint_name>
+      <joint_name>drone/gps_joint</joint_name>
+      <joint_name>drone/camera_joint</joint_name>
+      <topic>/drone/joint_states</topic>
+    </plugin>
+    <plugin
+      filename="ignition-gazebo-pose-publisher-system"
+      name="gz::sim::systems::PosePublisher">
+      <publish_link_pose>false</publish_link_pose>
+      <publish_collision_pose>false</publish_collision_pose>
+      <publish_visual_pose>false</publish_visual_pose>
+      <publish_sensor_pose>false</publish_sensor_pose>
+      <publish_model_pose>true</publish_model_pose>
+      <use_pose_vector_msg>true</use_pose_vector_msg>
+      <publish_nested_model_pose>true</publish_nested_model_pose>
+      <update_frequency>50</update_frequency>
     </plugin>
   </model>
 </sdf>

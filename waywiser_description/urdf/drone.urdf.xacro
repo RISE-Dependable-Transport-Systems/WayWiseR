@@ -1,0 +1,131 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="drone">
+    <xacro:include filename="inertial_macros.xacro" />
+    <xacro:property name="chassis_height" value="0.1" />
+    <material name="black">
+        <color rgba="0 0 0 1" />
+    </material>
+
+    <!-- Robot Base -->
+    <link name="base_link" />
+
+    <link name="chassis_link">
+        <visual name="chassis_link_visual">
+            <origin xyz="0 0 0.025" rpy="0 0 3.141592654" />
+            <geometry>
+                <mesh filename="package://waywiser_description/sdf/drone/meshes/NXP-HGD-CF.dae" />
+            </geometry>
+        </visual>
+        <!-- Motor Bases -->
+        <visual name="5010_motor_base_0">
+            <origin xyz="0.174 0.174 0.032" rpy="0 0 -0.45" />
+            <geometry>
+                <mesh filename="package://waywiser_description/sdf/drone/meshes/5010Base.dae" />
+            </geometry>
+        </visual>
+        <visual name="5010_motor_base_1">
+            <origin xyz="-0.174 0.174 0.032" rpy="0 0 -0.45" />
+            <geometry>
+                <mesh filename="package://waywiser_description/sdf/drone/meshes/5010Base.dae" />
+            </geometry>
+        </visual>
+        <visual name="5010_motor_base_2">
+            <origin xyz="0.174 -0.174 0.032" rpy="0 0 -0.45" />
+            <geometry>
+                <mesh filename="package://waywiser_description/sdf/drone/meshes/5010Base.dae" />
+            </geometry>
+        </visual>
+        <visual name="5010_motor_base_3">
+            <origin xyz="-0.174 -0.174 0.032" rpy="0 0 -0.45" />
+            <geometry>
+                <mesh filename="package://waywiser_description/sdf/drone/meshes/5010Base.dae" />
+            </geometry>
+        </visual>
+    </link>
+
+    <joint name="chassis_joint" type="fixed">
+        <parent link="base_link" />
+        <child link="chassis_link" />
+        <origin xyz="0 0 0" rpy="0 0 0" />
+    </joint>
+
+    <link name="imu_link" />
+    <joint name="imu_joint" type="fixed">
+        <parent link="base_link" />
+        <child link="imu_link" />
+        <origin xyz="0 0 0.05" rpy="0 0 0" />
+    </joint>
+
+    <link name="gps_link" />
+    <joint name="gps_joint" type="fixed">
+        <parent link="base_link" />
+        <child link="gps_link" />
+        <origin xyz="0 0 0.05" rpy="0 0 0" />
+    </joint>
+
+    <link name="camera_link">
+        <visual name="visual">
+            <origin xyz="0 0 0" rpy="0 0 1.570795" />
+            <geometry>
+                <mesh
+                    filename="package://waywiser_description/sdf/realsense_d435i_camera/meshes/realsense.dae">
+                    <submesh>
+                        <name>RealSense</name>
+                        <center>false</center>
+                    </submesh>
+                </mesh>
+            </geometry>
+        </visual>
+    </link>
+
+    <joint name="camera_joint" type="fixed">
+        <parent link="chassis_link" />
+        <child link="camera_link" />
+        <origin xyz="0.153 0 -0.015" rpy="0 0 0" />
+    </joint>
+
+
+    <!-- Rotors -->
+    <xacro:macro name="rotor" params="suffix x y z color direction mesh">
+        <link name="rotor_${suffix}">
+            <xacro:inertial_box mass="0.016" length="0.27" breadth="0.02" height="0.001">
+                <origin xyz="0 0 0" rpy="0 0 0" />
+            </xacro:inertial_box>
+            <visual>
+                <origin xyz="-0.022 -0.146 -0.016" rpy="0 0 0" />
+                <geometry>
+                    <mesh filename="package://waywiser_description/sdf/drone/meshes/${mesh}"
+                        scale="0.846 0.846 0.846" />
+                </geometry>
+            </visual>
+            <visual name="motor_bell">
+                <origin xyz="0 0 -0.032" rpy="0 0 0" />
+                <geometry>
+                    <mesh filename="package://waywiser_description/sdf/drone/meshes/5010Bell.dae" />
+                </geometry>
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="0.279 0.016 0.001" />
+                </geometry>
+            </collision>
+        </link>
+        <joint name="rotor_${suffix}_joint" type="continuous">
+            <parent link="base_link" />
+            <child link="rotor_${suffix}" />
+            <origin xyz="${x} ${y} ${z}" rpy="0 0 0" />
+            <axis xyz="0 0 1" />
+        </joint>
+        <gazebo reference="rotor_${suffix}">
+            <material>Gazebo/DarkGrey</material>
+        </gazebo>
+    </xacro:macro>
+    <xacro:rotor suffix="0" x="0.174" y="-0.174" z="0.06" color="DarkGrey" direction="ccw"
+        mesh="1345_prop_ccw.stl" />
+    <xacro:rotor suffix="1" x="-0.174" y="0.174" z="0.06" color="DarkGrey" direction="ccw"
+        mesh="1345_prop_ccw.stl" />
+    <xacro:rotor suffix="2" x="0.174" y="0.174" z="0.06" color="DarkGrey" direction="cw"
+        mesh="1345_prop_cw.stl" />
+    <xacro:rotor suffix="3" x="-0.174" y="-0.174" z="0.06" color="DarkGrey" direction="cw"
+        mesh="1345_prop_cw.stl" />
+</robot>

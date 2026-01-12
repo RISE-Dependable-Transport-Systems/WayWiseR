@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <link name="gps_link">
+        <visual>
+            <geometry>
+                <cylinder radius="0.02" length="0.05" />
+            </geometry>
+            <material name="black" />
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder radius="0.02" length="0.05" />
+            </geometry>
+        </collision>
+        <xacro:inertial_cylinder mass="0.05" radius="0.02" length="0.05">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+        </xacro:inertial_cylinder>
+    </link>
+
+    <joint name="gps_joint" type="fixed">
+        <parent link="${gps_parent_link}" />
+        <child link="gps_link" />
+        <origin xyz="0 0 0.05" rpy="0 0 0" />
+    </joint>
+
+    <gazebo reference="gps_link">
+        <material>Gazebo/Black</material>
+        <sensor name="gps_sensor" type="navsat">
+            <always_on>1</always_on>
+            <update_rate>10</update_rate>
+            <visualize>0</visualize>
+            <topic>${robot_name}/gps/navsat</topic>
+            <ignition_frame_id>${robot_name}/gps_link</ignition_frame_id>
+            <pose relative_to='${robot_name}/gps_link'>0 0 0 0 0 0</pose>
+            <navsat>
+                <position_sensing>
+                    <horizontal>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>4e-10</stddev>
+                        </noise>
+                    </horizontal>
+                    <vertical>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>4e-4</stddev>
+                        </noise>
+                    </vertical>
+                </position_sensing>
+                <velocity_sensing>
+                    <horizontal>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>0.1</stddev>
+                        </noise>
+                    </horizontal>
+                    <vertical>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>0.1</stddev>
+                        </noise>
+                    </vertical>
+                </velocity_sensing>
+            </navsat>
+        </sensor>
+    </gazebo>
+</robot>

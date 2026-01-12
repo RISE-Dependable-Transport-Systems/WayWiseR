@@ -1,14 +1,15 @@
 #!/bin/bash
 
 # Check if the minimum number of arguments is provided
-if [ "$#" -lt 2 ]; then
-    echo "Usage: $0 <input_xacro_file> <scale_factor> [xacro_args...]"
+if [ "$#" -lt 3 ]; then
+    echo "Usage: $0 <input_xacro_file> <scale_factor> <frame_prefix> [xacro_args...]"
     exit 1
 fi
 
 INPUT_XACRO=$1
 SCALE_FACTOR=$2
-shift 2 # Shift the arguments so that $@ contains only the xacro arguments
+FRAME_PREFIX=$3
+shift 3 # Shift the arguments so that $@ contains only the xacro arguments
 
 # Check if xacro is installed
 if ! command -v xacro &>/dev/null; then
@@ -25,20 +26,35 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Create an XSLT stylesheet to scale the URDF
+# Create an XSLT stylesheet to scale the URDF and apply frame prefix
 XSLT_STYLESHEET=$(mktemp)
 
 cat <<EOF >$XSLT_STYLESHEET
 <?xml version="1.0"?>
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
 
-    <!-- Define the scale factor parameter -->
+    <!-- Define the parameters -->
     <xsl:param name="scale_factor"/>
+    <xsl:param name="frame_prefix"/>
 
     <!-- Identity transform for all elements by default -->
     <xsl:template match="@*|node()">
         <xsl:copy>
             <xsl:apply-templates select="@*|node()"/>
+        </xsl:copy>
+    </xsl:template>
+
+    <!-- Prefix link/name, joint/name, joint/parent/link, joint/child/link, and gazebo/reference -->
+    <xsl:template match="link/@name | joint/@name | joint/parent/@link | joint/child/@link | gazebo/@reference">
+        <xsl:attribute name="{name()}">
+            <xsl:value-of select="concat(\$frame_prefix, .)"/>
+        </xsl:attribute>
+    </xsl:template>
+
+    <!-- Prefix joint names used inside Gazebo plugin tags -->
+    <xsl:template match="left_joint | right_joint | left_steering_joint | right_steering_joint | joint_name">
+        <xsl:copy>
+            <xsl:value-of select="concat(\$frame_prefix, .)"/>
         </xsl:copy>
     </xsl:template>
 
@@ -114,7 +130,7 @@ if ! command -v xsltproc &>/dev/null; then
 fi
 
 # Apply the XSLT stylesheet to the temporary URDF file and output to stdout
-xsltproc --stringparam scale_factor "$SCALE_FACTOR" "$XSLT_STYLESHEET" "$TEMP_URDF"
+xsltproc --stringparam scale_factor "$SCALE_FACTOR" --stringparam frame_prefix "$FRAME_PREFIX" "$XSLT_STYLESHEET" "$TEMP_URDF"
 
 # Check if transformation was successful
 if [ $? -ne 0 ]; then
