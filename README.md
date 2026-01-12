@@ -74,7 +74,8 @@ Setup workspace and build it (without simulator-related packages):
      git \
      build-essential \
      cmake \
-     python3-colcon-common-extensions
+     python3-colcon-common-extensions \
+     python3-pyqt5
    ```
 
 2. **Setup environment variables:**
@@ -103,7 +104,7 @@ Setup workspace and build it (without simulator-related packages):
    source .venv/bin/activate
 
    # Add venv site-packages to PYTHONPATH
-   export PYTHONPATH=.venv/lib/python3.10/site-packages:$PYTHONPATH
+   export PYTHONPATH=$WAYWISER_WS/.venv/lib/python3.10/site-packages:$PYTHONPATH
 
    # Install WayWiseR python dependencies
    uv pip install -e src/WayWiseR
@@ -130,7 +131,7 @@ cat <<EOT >> $WAYWISER_WS/.venv/bin/activate
 source /opt/ros/humble/setup.bash
 export WAYWISER_WS=$WAYWISER_WS
 export WAYWISER_SKIPPED_PACKAGES="$WAYWISER_SKIPPED_PACKAGES"
-export PYTHONPATH=.venv/lib/python3.10/site-packages:\$PYTHONPATH
+export PYTHONPATH=$WAYWISER_WS/.venv/lib/python3.10/site-packages:\$PYTHONPATH
 
 if [ -f "$WAYWISER_WS/install/setup.bash" ]; then
 source "$WAYWISER_WS/install/setup.bash"
@@ -139,6 +140,21 @@ EOT
 ```
 
 To build simulator-related packages such as waywiser_agrarsense, waywiser_carla, and waywiser_gazebo, follow the instructions in the respective packages.
+
+6. **Setup Environment Configuration (.env)**
+
+   WayWiseR uses a `.env` file to manage settings such as ROS 2 Domain ID and FastDDS Discovery Server configurations.
+
+   ```bash
+   cp src/WayWiseR/.env.example src/WayWiseR/.env
+   ```
+
+   **Key Configurations:**
+
+   - `ROS_DOMAIN_ID`: Set your desired ROS 2 domain (default: 0).
+   - `ROS_USE_DISCOVERY_SERVER`: Set to `1` to enable Discovery Server mode, or `0` for standard Multicast discovery.
+
+   The `.env` file is automatically sourced whenever you activate your virtual environment via `source .venv/bin/activate`.
 
 ### Current state
 

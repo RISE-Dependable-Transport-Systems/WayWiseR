@@ -35,7 +35,8 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
-ament_environment_hooks(load_dotenv.bash)
+ament_environment_hooks(00_load_dotenv.bash)
+ament_environment_hooks(discovery/client_setup.bash)
 ament_export_include_directories(include)
 
 if(BUILD_TESTING)

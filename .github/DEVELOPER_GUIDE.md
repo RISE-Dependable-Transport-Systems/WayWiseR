@@ -9,11 +9,12 @@ To install the recommended VS Code extensions, run the following command in your
 ```bash
 code --install-extension ms-python.python
 code --install-extension charliermarsh.ruff
-code --install-extension ms-vscode.cpptools
+code --install-extension llvm-vs-code-extensions.vscode-clangd
 code --install-extension zachflower.uncrustify
 code --install-extension josetr.cmake-language-support-vscode
 code --install-extension foxundermoon.shell-format
 code --install-extension esbenp.prettier-vscode
+code --install-extension DotJoshJohnson.xml
 ```
 
 ## Configure Uncrustify for C++
@@ -21,7 +22,7 @@ code --install-extension esbenp.prettier-vscode
 Run the following command to download the `ament_code_style.cfg` to your `.vscode` directory:
 
 ```bash
-wget https://raw.githubusercontent.com/ament/ament_lint/humble/ament_uncrustify/ament_uncrustify/configuration/ament_code_style.cfg -O .vscode/ament_code_style.cfg
+wget https://raw.githubusercontent.com/ament/ament_lint/humble/ament_uncrustify/ament_uncrustify/configuration/ament_code_style.cfg -O $WAYWISER_WS/src/WayWiseR/.vscode/ament_code_style.cfg
 ```
 
 ## Configure VS Code Settings
@@ -35,7 +36,8 @@ Create or update `.vscode/settings.json` with:
     "editor.codeActionsOnSave": {
       "source.organizeImports": "explicit",
       "source.fixAll": "explicit"
-    }
+    },
+    "editor.formatOnSave": true
   },
   "python.analysis.typeCheckingMode": "basic",
   "python.analysis.autoImportCompletions": true,
@@ -45,22 +47,32 @@ Create or update `.vscode/settings.json` with:
     "editor.defaultFormatter": "zachflower.uncrustify"
   },
   "uncrustify.configPath.linux": ".vscode/ament_code_style.cfg",
-  "C_Cpp.codeAnalysis.clangTidy.enabled": true,
   "[cmake]": {
     "editor.defaultFormatter": "josetr.cmake-language-support-vscode"
   },
+  "cmake.ignoreCMakeListsMissing": true,
+  "cmakeFormat.args": ["--max-pargs-hwrap=6"],
   "[shellscript]": {
     "editor.defaultFormatter": "foxundermoon.shell-format"
   },
   "[xml]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "DotJoshJohnson.xml"
   },
   "[yaml]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[jsonc]": {
-    "editor.defaultFormatter": "vscode.json-language-features"
-  }
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "clangd.arguments": [
+    "--background-index",
+    "--pretty",
+    "--clang-tidy",
+    "--query-driver=/usr/bin/g++",
+    "--header-insertion=never",
+    "--compile-commands-dir=${workspaceFolder}/../../build"
+  ],
+  "C_Cpp.intelliSenseEngine": "disabled"
 }
 ```
 

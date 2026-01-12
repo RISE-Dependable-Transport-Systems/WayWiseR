@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Check if the script is being sourced
+[[ "${BASH_SOURCE[0]}" != "${0}" ]] && is_sourced=true || is_sourced=false
+
 # Function to display usage information
 display_usage() {
     echo "Usage: $(basename "$0") [-h] [-e] [-r] [-su] [-s server_ip] [-c client_ip] [-d domain_id]"
@@ -25,7 +28,7 @@ get_full_file_path() {
             file_path="$PWD/waywiser/discovery/$file_path"
         else
             echo "Error: Unable to find file $file_path"
-            exit 1
+            return 1
         fi
     fi
 
@@ -64,7 +67,7 @@ mkdir -p $tmp_dir
 
 edit_config=false
 remote_client=false
-is_super_client=0
+is_super_client=${ROS_SUPER_CLIENT:-0}
 server_ip=""
 client_ip=""
 domain_id_input=-1
@@ -75,7 +78,7 @@ while getopts "hers:c:d:" opt; do
     case $opt in
     h)
         display_usage
-        exit 0
+        $is_sourced && return 0 || exit 0
         ;;
     e) edit_config=true ;;
     r) remote_client=true ;;
@@ -93,42 +96,94 @@ while getopts "hers:c:d:" opt; do
         else
             echo "Error: Invalid domain_id. It must be an integer >= 0 and < 200." >&2
             display_usage
-            exit 1
+            $is_sourced && return 1 || exit 1
         fi
         ;;
     \?)
         echo "Invalid option: -$OPTARG" >&2
         display_usage
-        exit 1
+        $is_sourced && return 1 || exit 1
         ;;
     :)
         echo "Option -$OPTARG requires an argument." >&2
         display_usage
-        exit 1
+        $is_sourced && return 1 || exit 1
         ;;
     esac
 done
 shift $((OPTIND - 1))
 
-if [ "$is_super_client" -eq 1 ]; then
+# If remote client is not explicitly set, but discovery environment variables are present,
+# then we assume we are running in remote mode.
+# We also check that they are not just empty strings or literal empty quotes.
+if ! $remote_client && [[ -n "$ROS_REMOTE_DISCOVERY_CLIENT_IP" ]] && [[ "$ROS_REMOTE_DISCOVERY_CLIENT_IP" != '""' ]] && [[ "$ROS_REMOTE_DISCOVERY_CLIENT_IP" != "''" ]]; then
+    remote_client=true
+fi
+
+# Detect if discovery server mode should be activated
+# 1. Explicit remote IPs in environment
+# 2. ROS_USE_DISCOVERY_SERVER=1
+use_discovery_server=false
+if $remote_client; then
+    use_discovery_server=true
+elif [[ "$ROS_USE_DISCOVERY_SERVER" == "1" ]]; then
+    use_discovery_server=true
+fi
+
+if [[ "$is_super_client" == "1" ]]; then
     discovery_protocol="SUPER_CLIENT"
 else
     discovery_protocol="CLIENT"
 fi
 
+if [[ "$is_sourced" == "true" ]]; then
+    if $use_discovery_server || $remote_client; then
+        echo "--- Discovery Server Mode Active ---"
+        echo "    Remote: $remote_client"
+        echo "    Local: $use_discovery_server"
+    else
+        # Unset discovery variables to return to standard multicast
+        unset ROS_DISCOVERY_SERVER
+        unset FASTRTPS_DEFAULT_PROFILES_FILE
+        unset RMW_FASTRTPS_USE_QOS_FROM_XML
+        OPTIND=1
+        return 0
+    fi
+fi
+
+# If discovery server is not requested and not sourced, we can show a message or just exit
+if ! $use_discovery_server && ! $remote_client; then
+    echo "Discovery Server mode is disabled. Using standard Multicast."
+    unset ROS_DISCOVERY_SERVER
+    unset FASTRTPS_DEFAULT_PROFILES_FILE
+    unset RMW_FASTRTPS_USE_QOS_FROM_XML
+    OPTIND=1
+    exit 0
+fi
+
 if $remote_client; then
     config_file=$remote_client_config_file
-    config_fullfilepath=$(get_full_file_path $remote_client_config_file)
+    config_fullfilepath=$(get_full_file_path $remote_client_config_file) || ($is_sourced && return 1 || exit 1)
 
     configured_server_ip=$(grep -oP -m 1 '(?<=<address _marker="server">)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(?=</address>)' $config_fullfilepath)
 
     if [ -z "$server_ip" ]; then
-        server_ip=$configured_server_ip
+        if [[ -n "$ROS_REMOTE_DISCOVERY_SERVER_IP" ]] && [[ "$ROS_REMOTE_DISCOVERY_SERVER_IP" != '""' ]] && [[ "$ROS_REMOTE_DISCOVERY_SERVER_IP" != "''" ]]; then
+            server_ip=${ROS_REMOTE_DISCOVERY_SERVER_IP//\"/}
+            server_ip=${server_ip//\'/}
+        else
+            server_ip=$configured_server_ip
+        fi
     fi
 
     configured_client_ip=$(grep -oP -m 1 '(?<=<address _marker="client">)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(?=</address>)' $config_fullfilepath)
     if [ -z "$client_ip" ]; then
-        client_ip=$configured_client_ip
+        if [[ -n "$ROS_REMOTE_DISCOVERY_CLIENT_IP" ]] && [[ "$ROS_REMOTE_DISCOVERY_CLIENT_IP" != '""' ]] && [[ "$ROS_REMOTE_DISCOVERY_CLIENT_IP" != "''" ]]; then
+            client_ip=${ROS_REMOTE_DISCOVERY_CLIENT_IP//\"/}
+            client_ip=${client_ip//\'/}
+        else
+            client_ip=$configured_client_ip
+        fi
     fi
 
     configured_domain_id=$(grep -oP -m 1 '(?<=<domainId>)[0-9]+(?=</domainId>)' $config_fullfilepath)
@@ -167,17 +222,17 @@ if $remote_client; then
             fi
         else
             echo "Error: The system does not have the client ip $client_ip in any of its interfaces."
-            exit 1
+            $is_sourced && return 1 || exit 1
         fi
     else
         echo "Error: Make sure server_ip $server_ip and client_ip $client_ip are valid ip addresses."
-        exit 1
+        $is_sourced && return 1 || exit 1
     fi
 
     export ROS_DISCOVERY_SERVER=";UDPv4:[$server_ip]:11812"
 else
     config_file=$local_client_config_file
-    config_fullfilepath=$(get_full_file_path $local_client_config_file)
+    config_fullfilepath=$(get_full_file_path $local_client_config_file) || ($is_sourced && return 1 || exit 1)
 
     configured_domain_id=$(grep -oP -m 1 '(?<=<domainId>)[0-9]+(?=</domainId>)' $config_fullfilepath)
     if (($domain_id_input < 0)); then
@@ -223,3 +278,6 @@ echo "  ROS_DISCOVERY_SERVER=\"$ROS_DISCOVERY_SERVER\""
 echo "  FASTRTPS_DEFAULT_PROFILES_FILE=\"$FASTRTPS_DEFAULT_PROFILES_FILE\""
 echo "  ROS_DOMAIN_ID=\"$ROS_DOMAIN_ID\""
 echo "  ROS_SUPER_CLIENT=\"$ROS_SUPER_CLIENT\""
+
+# Reset getopts index for next sourcing
+OPTIND=1
