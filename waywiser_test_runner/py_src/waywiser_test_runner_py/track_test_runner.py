@@ -39,12 +39,11 @@ from visualization_msgs.msg import Marker, MarkerArray
 # Local packages
 from waywiser_core.msg import MissionState, PathWithTwists
 from waywiser_py.waywiser_utils import (
-    are_poses_equal,
-    cleanup_subprocesses,
-    create_subprocess,
-    get_full_file_path,
+    FileUtils,
+    GeometryUtils,
+    NotificationUtils,
+    ProcessUtils,
     RELIABLE_TRANSIENT_LOCAL_QOS,
-    send_email,
 )
 from waywiser_test_runner.msg import SetupState, TestState
 from waywiser_twist_safety.msg import EmergencyStopState
@@ -133,7 +132,7 @@ class TrackTestRunner(Node):
                 self.get_parameter('trailer_hitch_frame').get_parameter_value().string_value
             )
 
-        self.test_configurations_json_path = get_full_file_path(
+        self.test_configurations_json_path = FileUtils.get_full_file_path(
             self.get_parameter('test_configurations_json_path').get_parameter_value().string_value,
             os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
         )
@@ -186,7 +185,7 @@ class TrackTestRunner(Node):
         self.autopilot_state_control_topic = (
             self.get_parameter('autopilot_state_control_topic').get_parameter_value().string_value
         )
-        self.preplanned_route_filepath = get_full_file_path(
+        self.preplanned_route_filepath = FileUtils.get_full_file_path(
             self.get_parameter('preplanned_route_filepath').get_parameter_value().string_value
         )
         self.delay_to_stop_test_with_emergency_stop = (
@@ -536,7 +535,7 @@ class TrackTestRunner(Node):
                     self.get_logger().info('Halting test runner.')
                     self.track_test_runner_wall_timer.cancel()
                     if self.notify_via_mail_on_timeout:
-                        send_email(
+                        NotificationUtils.send_email(
                             subject='Waywiser Test Runner Timeout',
                             body=f'Test instance {self.current_config_index + 1}-'
                             f'{self.current_iter_idx + 1} timed out after '
@@ -734,7 +733,7 @@ class TrackTestRunner(Node):
                 vehicle_pose: Union[PoseStamped, None] = self.vehicle_pose
                 if self.has_trailer and self.reverse_test_route.twists[0].linear.x < 0.0:
                     vehicle_pose: Union[PoseStamped, None] = self.trailer_pose
-                if are_poses_equal(
+                if GeometryUtils.are_poses_equal(
                     vehicle_pose,
                     self.staging_area_pose,
                     tol=self.end_goal_alignment_threshold,
@@ -1331,7 +1330,9 @@ class TrackTestRunner(Node):
         command += topics_to_record
 
         subprocess_name = 'ros_bag_recorder'
-        self.subprocesses[subprocess_name] = create_subprocess(self, command, subprocess_name)
+        self.subprocesses[subprocess_name] = ProcessUtils.create_subprocess(
+            self, command, subprocess_name
+        )
 
     def get_current_test_configuration(self):
         return self.test_configurations[self.current_config_index]
@@ -1345,7 +1346,7 @@ class TrackTestRunner(Node):
             f'Ending test with index [{self.current_config_index + 1}-'
             f'{self.current_iter_idx + 1}].'
         )
-        cleanup_subprocesses(self.subprocesses)
+        ProcessUtils.cleanup_subprocesses(self.subprocesses)
 
         self.test_start_wall_time = None
         self.update_test_state(TestState.IDLE)
@@ -1369,7 +1370,7 @@ class TrackTestRunner(Node):
             self.track_test_runner_wall_timer.cancel()
             # self.destroy_node()
             if self.notify_via_mail_on_completion:
-                send_email(
+                NotificationUtils.send_email(
                     subject='Waywiser Test Runner Completion',
                     body='All test cases are completed.',
                 )
@@ -1593,7 +1594,7 @@ class TrackTestRunner(Node):
         """Override to ensure the subprocesses are terminated on shutdown."""
         try:
             print('Shutting down track_test_runner node.')
-            cleanup_subprocesses(self.subprocesses)
+            ProcessUtils.cleanup_subprocesses(self.subprocesses)
         except Exception as e:
             print(f'Error during node destruction: {e}')
         finally:
