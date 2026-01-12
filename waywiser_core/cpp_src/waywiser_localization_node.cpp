@@ -8,7 +8,7 @@
 
 #include "geometry_msgs/msg/vector3.hpp"
 #include "nav_msgs/msg/odometry.hpp"
-#include "rclcpp/rclcpp.hpp"
+#include <rclcpp/rclcpp.hpp>
 #include "sensor_msgs/msg/imu.hpp"
 #include "std_msgs/msg/float32.hpp"
 #include "tf2_ros/buffer.h"
@@ -18,9 +18,8 @@
 #include "qobject_node.hpp"
 #include "localization_component.hpp"
 #include "waywiser_core_utils.hpp"
-#include "waywiser/waywiser_utils.hpp"
-#include "waywiser_description/waywiser_description_utils.hpp"
 
+#include "waywiser/waywiser_utils.hpp"
 #include "waywiser_core/msg/nav_sat_fix_extended.hpp"
 
 using namespace std::placeholders;
@@ -55,36 +54,38 @@ public:
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
     // ROS parameters
+    frame_prefix_ = declare_parameter("frame_prefix", "");
     urdf_file_ = declare_parameter("urdf_file", "");
-    mUrdfModel = getURDFModel(urdf_file_);
-    world_frame_ = this->declare_parameter("world_frame", "map");
-    gnss_reference_frame_ = this->declare_parameter("gnss_reference_frame", "gnss_base_link");
-    gnss_chip_frame_ = declare_parameter("gnss_chip_frame", gnss_reference_frame_);
-    gnss_antenna_frame_ = declare_parameter("gnss_antenna_frame", gnss_reference_frame_);
-    nav_sat_fix_extended_topic_ = this->declare_parameter(
+    mUrdfModel = URDFUtils::getURDFModel(urdf_file_);
+    world_frame_ = declare_parameter("world_frame", "map");
+    std::string raw_gnss_ref = declare_parameter("gnss_reference_frame", "gnss_base_link");
+    gnss_reference_frame_ = RosUtils::joinFrame(frame_prefix_, raw_gnss_ref);
+    gnss_chip_frame_ = RosUtils::joinFrame(
+      frame_prefix_, declare_parameter("gnss_chip_frame", raw_gnss_ref));
+    gnss_antenna_frame_ = RosUtils::joinFrame(
+      frame_prefix_, declare_parameter("gnss_antenna_frame", raw_gnss_ref));
+    nav_sat_fix_extended_topic_ = declare_parameter(
       "nav_sat_fix_extended_topic", "/nav_sat_fix_extended");
-    fused_nav_sat_fix_extended_topic_ = this->declare_parameter(
+    fused_nav_sat_fix_extended_topic_ = declare_parameter(
       "fused_nav_sat_fix_extended_topic", "/fused_nav_sat_fix_extended");
-    rtcm_frequency_topic_ = this->declare_parameter(
-      "rtcm_frequency_topic", "/rtcm_frequency");
-    imu_topic_ = this->declare_parameter("imu_topic", "");
-    odom_topic_ = this->declare_parameter("odom_topic", "");
-    publish_world_to_fused_tf_ = this->declare_parameter("publish_world_to_fused_tf", false);
-    gnss_variant_ = get_receiver_variant_param(this, "gnss_variant");
-    gnss_print_verbose_ = this->declare_parameter("gnss_print_verbose", false);
-    gnss_sensor_fusion_on_chip_ = this->declare_parameter("gnss_sensor_fusion_on_chip", true);
-    gnss_sensor_fusion_imu_autoalign_ = this->declare_parameter(
+    rtcm_frequency_topic_ = declare_parameter("rtcm_frequency_topic", "");
+    imu_topic_ = declare_parameter("imu_topic", "");
+    odom_topic_ = declare_parameter("odom_topic", "");
+    tf_publish_rate_ = declare_parameter("tf_publish_rate", 0);
+    gnss_variant_ = CoreUtils::get_receiver_variant_param(this, "gnss_variant");
+    gnss_print_verbose_ = declare_parameter("gnss_print_verbose", false);
+    gnss_sensor_fusion_on_chip_ = declare_parameter("gnss_sensor_fusion_on_chip", true);
+    gnss_sensor_fusion_imu_autoalign_ = declare_parameter(
       "gnss_sensor_fusion_imu_autoalign", false);
-    gnss_sensor_fusion_force_recalibrate_ = this->declare_parameter(
+    gnss_sensor_fusion_force_recalibrate_ = declare_parameter(
       "gnss_sensor_fusion_force_recalibrate", false);
-    gnss_message_rate_ = this->declare_parameter("gnss_message_rate", 10);
-    gnss_dynamic_model_ = static_cast<DynamicModel>(this->declare_parameter(
+    gnss_message_rate_ = declare_parameter("gnss_message_rate", 10);
+    gnss_dynamic_model_ = static_cast<DynamicModel>(declare_parameter(
         "gnss_dynamic_model", 12));
-    use_sdvp_position_fusion_ = this->declare_parameter("use_sdvp_position_fusion", false);
-    position_fusion_input_timer_rate_ = this->declare_parameter(
+    use_sdvp_position_fusion_ = declare_parameter("use_sdvp_position_fusion", false);
+    position_fusion_input_timer_rate_ = declare_parameter(
       "position_fusion_input_timer_rate", 10);
-    ext_startup_timeout_ = this->declare_parameter(
-      "ext_startup_timeout", 5.0);
+    ext_startup_timeout_ = declare_parameter("ext_startup_timeout", 5.0);
 
     std::ostringstream log_stream;
     log_stream << "\nLocalizationComponent offset parameters:\n";
@@ -92,25 +93,31 @@ public:
 
 
     // GNSS antenna to GNSS chip
-    vector3_param = get_vector3_param(this, "gnss_antenna_to_gnss_chip_offset");
+    vector3_param = RosUtils::get_vector3_param(this, "gnss_antenna_to_gnss_chip_offset");
     if (!vector3_param && mUrdfModel) {
-      vector3_param = getFramePositionOffset(mUrdfModel, gnss_chip_frame_, gnss_antenna_frame_);
+      vector3_param = URDFUtils::getFramePositionOffset(
+        mUrdfModel, gnss_chip_frame_,
+        gnss_antenna_frame_);
     }
     log_stream << " gnss_antenna_to_gnss_chip_offset: " << vector3_param->c_str() << "\n";
     gnss_antenna_to_gnss_chip_offset_ = vector3_param->to_type<xyz_t>();
 
     // GNSS chip orientation
-    vector3_param = get_vector3_param(this, "gnss_chip_orientation_offset");
+    vector3_param = RosUtils::get_vector3_param(this, "gnss_chip_orientation_offset");
     if (!vector3_param && mUrdfModel) {
-      vector3_param = getFrameRotationOffset(mUrdfModel, gnss_reference_frame_, gnss_chip_frame_);
+      vector3_param = URDFUtils::getFrameRotationOffset(
+        mUrdfModel, gnss_reference_frame_,
+        gnss_chip_frame_);
     }
     log_stream << " gnss_chip_orientation_offset: " << vector3_param->c_str() << "\n";
     gnss_chip_orientation_offset_ = vector3_param->to_type<xyz_t>();
 
     // GNSS chip to rear axle
-    vector3_param = get_vector3_param(this, "gnss_chip_to_reference_point_offset");
+    vector3_param = RosUtils::get_vector3_param(this, "gnss_chip_to_reference_point_offset");
     if (!vector3_param && mUrdfModel) {
-      vector3_param = getFramePositionOffset(mUrdfModel, gnss_reference_frame_, gnss_chip_frame_);
+      vector3_param = URDFUtils::getFramePositionOffset(
+        mUrdfModel, gnss_reference_frame_,
+        gnss_chip_frame_);
     }
     log_stream << " gnss_chip_to_reference_point_offset: " << vector3_param->c_str() << "\n";
     gnss_chip_to_reference_point_offset_ = vector3_param->to_type<xyz_t>();
@@ -118,7 +125,7 @@ public:
     // Output log_stream
     RCLCPP_INFO_STREAM(get_logger(), log_stream.str());
 
-    vector3_param = get_vector3_param(this, "enuref");
+    vector3_param = RosUtils::get_vector3_param(this, "enuref");
     if (vector3_param) {
       enuref_ = vector3_param->to_type<llh_t>();
     }
@@ -173,15 +180,14 @@ public:
     }
 
     // Publishers
-    if (publish_world_to_fused_tf_) {
+    if (tf_publish_rate_ > 0) {
       tf_pub_.reset(new tf2_ros::TransformBroadcaster(this));
-      QObject::connect(
-        mObjectState.get(), &ObjectState::positionUpdated,
-        [&](PosType type) {
-          if (type == PosType::fused) {
-            publish_world_to_fused_tf();
-          }
-        }
+      tf_publish_timer_ = rclcpp::create_timer(
+        this->get_node_base_interface(),
+        this->get_node_timers_interface(),
+        this->get_clock(), // uses sim time if enabled
+        std::chrono::milliseconds(1000 / tf_publish_rate_),
+        std::bind(&WaywiserLocalization::publish_world_to_fused_tf, this)
       );
     }
 
@@ -189,7 +195,7 @@ public:
       fused_nav_sat_fix_extended_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
 
     QObject::connect(
-      mLocalizationComponent->getGnssReceiver().get(), &GNSSReceiver::updatedGNSSPositionAndYaw,
+      mLocalizationComponent->getGnssReceiver().get(), &GNSSReceiver::updatedGNSSPositionAndOrientation,
       [&](QSharedPointer<ObjectState> objectState, double distanceMoved,
       GnssFixStatus gnssFixStatus) {
         Q_UNUSED(objectState)
@@ -198,23 +204,24 @@ public:
         publish_fused_nav_sat_fix_extended_data(gnssFixStatus);
       });
 
-    rtcm_frequency_pub_ = this->create_publisher<std_msgs::msg::Float32>(
-      rtcm_frequency_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
+    if (rtcm_frequency_topic_ != "") {
+      rtcm_frequency_pub_ = this->create_publisher<std_msgs::msg::Float32>(
+        rtcm_frequency_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
 
-
-    switch (mLocalizationComponent->getGnssVariant()) {
-      case RECEIVER_VARIANT::UBLX_ZED_F9P:
-      case RECEIVER_VARIANT::UBLX_ZED_F9R:
-        {
-          QObject::connect(
-            mLocalizationComponent->getRtcmClient().get(), &RtcmClient::rtcmData,
-            [&](const QByteArray & data) {
-              Q_UNUSED(data)
-              publish_rtcm_frequency();
-            });
-        } break;
-      default:
-        break;
+      switch (mLocalizationComponent->getGnssVariant()) {
+        case RECEIVER_VARIANT::UBLX_ZED_F9P:
+        case RECEIVER_VARIANT::UBLX_ZED_F9R:
+          {
+            QObject::connect(
+              mLocalizationComponent->getRtcmClient().get(), &RtcmClient::rtcmData,
+              [&](const QByteArray & data) {
+                Q_UNUSED(data)
+                publish_rtcm_frequency();
+              });
+          } break;
+        default:
+          break;
+      }
     }
 
     startup_time_ = this->now();
@@ -226,7 +233,7 @@ private:
 // Callback methods
   void imu_callback(const sensor_msgs::msg::Imu::SharedPtr imu_msg)
   {
-    static tf2::Quaternion imu_frame_to_base_frame_rotation;
+    static tf2::Quaternion q_imu_frame_to_base_frame;
     static bool imu_frame_to_base_frame_tf_available = false;
 
     if (!imu_frame_to_base_frame_tf_available) {
@@ -235,13 +242,9 @@ private:
         geometry_msgs::msg::TransformStamped imu_frame_to_base_frame_tfs =
           tf_buffer_->lookupTransform(
           gnss_reference_frame_, imu_msg->header.frame_id, tf2::TimePointZero);
-
-        imu_frame_to_base_frame_rotation = tf2::Quaternion(
-          imu_frame_to_base_frame_tfs.transform.rotation.x,
-          imu_frame_to_base_frame_tfs.transform.rotation.y,
-          imu_frame_to_base_frame_tfs.transform.rotation.z,
-          imu_frame_to_base_frame_tfs.transform.rotation.w
-        );
+        tf2::fromMsg(
+          imu_frame_to_base_frame_tfs.transform.rotation,
+          q_imu_frame_to_base_frame);
 
         if (transform_warning_logged) {
           RCLCPP_WARN(
@@ -259,6 +262,8 @@ private:
         return;
       }
       imu_frame_to_base_frame_tf_available = true;
+      RCLCPP_INFO(
+        get_logger(), "Processing IMU data from %s topic.", imu_topic_.c_str());
     }
 
     tf2::Quaternion q_imu(
@@ -268,18 +273,21 @@ private:
       imu_msg->orientation.w
     );
 
-    // Apply transform
-    tf2::Quaternion q_base = imu_frame_to_base_frame_rotation * q_imu;
+    // Apply transform: World->Base = World->IMU * IMU->Base
+    // We have World->IMU (q_imu) and Base->IMU (q_imu_frame_to_base_frame)
+    // So World->Base = q_imu * (Base->IMU)^-1
+    tf2::Quaternion q_base = q_imu * q_imu_frame_to_base_frame.inverse();
+    q_base.normalize();
 
     double rollRad, pitchRad, yawRad;
     tf2::Matrix3x3(q_base).getRPY(rollRad, pitchRad, yawRad);
 
     PosPoint imuPosition = mObjectState->getPosition(PosType::IMU);
-    imuPosition.setRoll(rollRad * 180.0 / M_PI);
-    imuPosition.setPitch(pitchRad * 180.0 / M_PI);
-    imuPosition.setYaw(yawRad * 180.0 / M_PI);
+    imuPosition.setRoll(rollRad * RAD2DEG);
+    imuPosition.setPitch(pitchRad * RAD2DEG);
+    imuPosition.setYaw(yawRad * RAD2DEG);
     imuPosition.setTime(
-      QTime::currentTime().addSecs(-QDateTime::currentDateTime().offsetFromUtc()));
+      QTime::currentTime().addSecs(-QDateTime::currentDateTime().offsetFromUtc())); // TODO: Fix time for simulation case
     mObjectState->setPosition(imuPosition);
   }
 
@@ -315,11 +323,12 @@ private:
         return;
       }
       odom_child_frame_to_gnss_reference_frame_tf_available = true;
+      RCLCPP_INFO(get_logger(), "Processing Odom data from %s topic.", odom_topic_.c_str());
     }
 
-    update_pospoint_from_pose(
+    CoreUtils::update_pospoint_from_pose(
       mObjectState, odom_child_frame_to_gnss_reference_frame_offset, odom_msg->pose.pose,
-      PosType::odom);
+      PosType::odom); // TODO: update this to work with 3D
   }
 
   void external_nav_sat_fix_extended_callback(
@@ -350,9 +359,9 @@ private:
         Q_UNUSED(time)
         Q_UNUSED(objectState)
 
-        gnssReceiver->updateGNSSPositionAndYaw(
+        gnssReceiver->updateGNSSPositionAndOrientation(
           {msg->latitude, msg->longitude, msg->altitude},
-          msg->heading, msg->is_fused_on_chip);
+          {msg->roll, msg->pitch, msg->yaw}, msg->is_fused_on_chip); // NED to ENU conversion for yaw is done inside updateGNSSPositionAndOrientation
 
         // GNSS fix status
         GnssFixStatus gnssFixStatus;
@@ -385,18 +394,20 @@ private:
 // Utility methods
   void publish_fused_nav_sat_fix_extended_data(const GnssFixStatus & gnssFixStatus)
   {
-    PosPoint gnssPos = mObjectState->getPosition(PosType::GNSS);
+    PosPoint fusedPos = mObjectState->getPosition(PosType::fused);
 
     // Publish navSatFixExt
     waywiser_core::msg::NavSatFixExtended nav_sat_fix_extended_msg;
     nav_sat_fix_extended_msg.header.stamp = this->now();
     nav_sat_fix_extended_msg.header.frame_id = gnss_reference_frame_;
 
-    llh_t llh = coordinateTransforms::enuToLlh(mObjectState->getEnuRef(), gnssPos.getXYZ());
+    llh_t llh = coordinateTransforms::enuToLlh(mObjectState->getEnuRef(), fusedPos.getXYZ());
     nav_sat_fix_extended_msg.latitude = llh.latitude;   // Latitude in degrees
     nav_sat_fix_extended_msg.longitude = llh.longitude;   // Longitude in degrees
     nav_sat_fix_extended_msg.altitude = llh.height;   // Altitude in meters
-    nav_sat_fix_extended_msg.heading = coordinateTransforms::yawENUtoNED(gnssPos.getYaw());   // degrees
+    nav_sat_fix_extended_msg.roll = fusedPos.getRoll();
+    nav_sat_fix_extended_msg.pitch = -fusedPos.getPitch(); // ENU to NED conversion
+    nav_sat_fix_extended_msg.yaw = coordinateTransforms::yawENUtoNED(fusedPos.getYaw());
 
     nav_sat_fix_extended_msg.is_fused_on_chip = gnssFixStatus.isFusedOnChip;
     nav_sat_fix_extended_msg.fix_type = static_cast<uint8_t>(gnssFixStatus.fixType);
@@ -415,7 +426,12 @@ private:
 
     double x_ = fusedPosition.getX();
     double y_ = fusedPosition.getY();
-    double yawRad_ = fusedPosition.getYaw() * M_PI / 180.0;
+    double z_ = fusedPosition.getHeight();
+    double rollRad_ = fusedPosition.getRoll() * DEG2RAD;
+    double pitchRad_ = fusedPosition.getPitch() * DEG2RAD;
+    double yawRad_ = fusedPosition.getYaw() * DEG2RAD;
+    tf2::Quaternion q_base;
+    q_base.setRPY(rollRad_, pitchRad_, yawRad_);
 
     // -- Prepare Transform
     auto world_to_fused_tfs = geometry_msgs::msg::TransformStamped();
@@ -424,11 +440,11 @@ private:
     world_to_fused_tfs.header.stamp = now();
     world_to_fused_tfs.transform.translation.x = x_;
     world_to_fused_tfs.transform.translation.y = y_;
-    world_to_fused_tfs.transform.translation.z = fusedPosition.getHeight();
-    world_to_fused_tfs.transform.rotation.x = 0.0;
-    world_to_fused_tfs.transform.rotation.y = 0.0;
-    world_to_fused_tfs.transform.rotation.z = sin(yawRad_ / 2.0);
-    world_to_fused_tfs.transform.rotation.w = cos(yawRad_ / 2.0);
+    world_to_fused_tfs.transform.translation.z = z_;
+    world_to_fused_tfs.transform.rotation.x = q_base.x();
+    world_to_fused_tfs.transform.rotation.y = q_base.y();
+    world_to_fused_tfs.transform.rotation.z = q_base.z();
+    world_to_fused_tfs.transform.rotation.w = q_base.w();
 
     // -- Publish Transform
     tf_pub_->sendTransform(world_to_fused_tfs);
@@ -464,7 +480,7 @@ private:
 
   static void qtMessageHandler(QtMsgType type, const QMessageLogContext &, const QString & msg)
   {
-    qtMessageToLogger(node_logger_, type, msg);
+    CoreUtils::qtMessageToLogger(node_logger_, type, msg);
   }
 
 // Parameters
@@ -478,7 +494,8 @@ private:
   std::string rtcm_frequency_topic_;
   std::string imu_topic_;
   std::string odom_topic_;
-  bool publish_world_to_fused_tf_;
+  std::string frame_prefix_;
+  int tf_publish_rate_;
   double ext_startup_timeout_;
 
   RECEIVER_VARIANT gnss_variant_;
@@ -512,6 +529,7 @@ private:
 
 // Timers
   rclcpp::TimerBase::SharedPtr ext_startup_watchdog_timer_;
+  rclcpp::TimerBase::SharedPtr tf_publish_timer_;
 
 // WayWise & WayWiseR components
   QSharedPointer<ObjectState> mObjectState;

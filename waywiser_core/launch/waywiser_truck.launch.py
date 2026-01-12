@@ -4,7 +4,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 from waywiser_description_py.waywiser_description_utils import get_robot_state_publisher_node
-from waywiser_py.waywiser_utils import get_full_file_path
+from waywiser_py.waywiser_utils import FileUtils
 import yaml
 
 
@@ -43,11 +43,14 @@ def generate_launch_description():
 
 def waywiser_truck_node_launch(context):
     nodes = []
-    vehicle_config = get_full_file_path(LaunchConfiguration('vehicle_config').perform(context))
+    vehicle_config = FileUtils.get_full_file_path(
+        LaunchConfiguration('vehicle_config').perform(context)
+    )
     if vehicle_config == '':
         print('vehicle_config is empty! Skipping launching waywiser_truck_node.')
         return nodes
 
+    frame_prefix = LaunchConfiguration('frame_prefix').perform(context)
     use_sim_time_raw = LaunchConfiguration('use_sim_time').perform(context)
     use_sim_time = use_sim_time_raw.lower() in ['true', '1', 'yes']
     with open(vehicle_config, 'r', encoding='utf-8') as f:
@@ -57,7 +60,7 @@ def waywiser_truck_node_launch(context):
 
         if 'urdf_file' in node_params_dict:
             robot_state_publisher_node = get_robot_state_publisher_node(
-                node_params_dict, use_sim_time
+                node_params_dict, use_sim_time, frame_prefix
             )
             if robot_state_publisher_node is not None:
                 nodes.append(robot_state_publisher_node)

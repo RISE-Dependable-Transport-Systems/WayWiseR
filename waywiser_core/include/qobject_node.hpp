@@ -2,7 +2,7 @@
 
 #include <QObject>
 
-#include "rclcpp/rclcpp.hpp"
+#include <rclcpp/rclcpp.hpp>
 
 class QObjectNode : public QObject, public rclcpp::Node
 {

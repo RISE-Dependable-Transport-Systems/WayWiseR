@@ -1,22 +1,14 @@
 #ifndef CAR_AUTOPILOT_COMPONENT_HPP_
 #define CAR_AUTOPILOT_COMPONENT_HPP_
 
-#include <memory>
 #include <string>
 #include <QObject>
 #include <QString>
 
 #include "WayWise/autopilot/purepursuitwaypointfollower.h"
-#include "WayWise/autopilot/waypointfollower.h"
 #include "WayWise/communication/mavsdkvehicleserver.h"
-#include "WayWise/communication/parameterserver.h"
-#include "WayWise/core/coordinatetransforms.h"
-#include "WayWise/logger/logger.h"
 #include "WayWise/vehicles/carstate.h"
-#include "WayWise/vehicles/controller/carmovementcontroller.h"
 #include "WayWise/autopilot/followpoint.h"
-
-#include "mavsdk/mavsdk.h"
 
 #include "qobject_node.hpp"
 #include "waywiser_core_utils.hpp"

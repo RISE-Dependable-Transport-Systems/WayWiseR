@@ -73,7 +73,7 @@ void CarAutopilotComponent::processMissionStateMachine()
                 if (mWaypointFollower->getCurrentRoute().size() > 0) {
                   mWaypointList = mWaypointFollower->getCurrentRoute();
                   updateMissionState(
-                    convertToMissionState(
+                    CoreUtils::convertToMissionState(
                       mWaypointFollower->getCurrentState().stmState));
                 } else {
                   updateMissionState(MissionState::WaitingForRoute);
@@ -94,7 +94,7 @@ void CarAutopilotComponent::processMissionStateMachine()
               } else if (mWaypointFollower->getCurrentRoute().size() > 0) {
                 mWaypointList = mWaypointFollower->getCurrentRoute();
                 updateMissionState(
-                  convertToMissionState(
+                  CoreUtils::convertToMissionState(
                     mWaypointFollower->getCurrentState().stmState));
               }
             } break;
@@ -134,10 +134,10 @@ void CarAutopilotComponent::processMissionStateMachine()
                 // Synchronize mission state with waypoint follower state
                 WayPointFollowerSTMstates wayPointFollowerSTMstate =
                   mWaypointFollower->getCurrentState().stmState;
-                if (convertToWayPointFollowerSTMstates(currentMissionState) !=
+                if (CoreUtils::convertToWayPointFollowerSTMstates(currentMissionState) !=
                   wayPointFollowerSTMstate)
                 {
-                  updateMissionState(convertToMissionState(wayPointFollowerSTMstate));
+                  updateMissionState(CoreUtils::convertToMissionState(wayPointFollowerSTMstate));
 
                   if (currentMissionState == MissionState::Idle && mWaypointFollower->isActive()) {
                     stopWaypointFollower();
@@ -242,7 +242,7 @@ void CarAutopilotComponent::updateWaypointFollowerRoute(QList<PosPoint> & waypoi
 void CarAutopilotComponent::updateMissionState(MissionState state)
 {
   currentMissionState = state;
-  qDebug() << "MissionState: " << missionStateToString(currentMissionState).c_str();
+  qDebug() << "MissionState: " << CoreUtils::missionStateToString(currentMissionState).c_str();
   emit updatedMissionState(currentMissionState);
 }
 

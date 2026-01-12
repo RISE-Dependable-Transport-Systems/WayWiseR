@@ -1,8 +1,7 @@
 #ifndef WAYWISER_CAR_NODE_CORE_HPP_
 #define WAYWISER_CAR_NODE_CORE_HPP_
 
-#include <chrono>
-#include <functional>
+#include <urdf/model.h>
 #include <memory>
 #include <string>
 #include <QObject>
@@ -12,7 +11,7 @@
 #include "geometry_msgs/msg/vector3.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/logger.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "std_msgs/msg/bool.hpp"
@@ -28,19 +27,17 @@
 #include "tf2_ros/transform_broadcaster.h"
 #include "visualization_msgs/msg/marker_array.hpp"
 
+#include "qobject_node.hpp"
+#include "car_autopilot_component.hpp"
+#include "car_interface_component.hpp"
+#include "waywiser_core_utils.hpp"
+
 #include "waywiser_core/msg/battery_state.hpp"
 #include "waywiser_core/msg/car_control_command.hpp"
 #include "waywiser_core/msg/mission_state.hpp"
 #include "waywiser_core/msg/nav_sat_fix_extended.hpp"
 #include "waywiser_core/msg/path_with_twists.hpp"
 #include "waywiser_twist_safety/msg/emergency_stop_state.hpp"
-
-#include "qobject_node.hpp"
-#include "car_autopilot_component.hpp"
-#include "car_interface_component.hpp"
-#include "waywiser_core_utils.hpp"
-#include "waywiser/waywiser_utils.hpp"
-#include "waywiser_description/waywiser_description_utils.hpp"
 
 using namespace std::placeholders;
 
@@ -112,14 +109,17 @@ protected:
   std::string left_end_frame_;
   std::string right_end_frame_;
   std::string imu_frame_;
+  std::string frame_prefix_;
 
   std::string battery_state_topic_;
   std::string odom_topic_;
   std::string fused_nav_sat_fix_extended_topic_;
   std::string vehicle_pose_topic_;
   std::string emergency_stop_update_topic_;
-  std::string car_control_command_topic_;
+  std::string vehicle_control_command_topic_;
   std::string imu_topic_;
+  std::string autopilot_vel_topic_;
+  std::string joint_states_topic_;
 
   std::string mission_status_topic_;
   std::string vehicle_alignment_reference_point_topic_;
@@ -163,6 +163,7 @@ protected:
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr autopilot_marker_pub_;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_out_pub_;
 
   // Subscribers
   rclcpp::Subscription<waywiser_core::msg::NavSatFixExtended>::SharedPtr

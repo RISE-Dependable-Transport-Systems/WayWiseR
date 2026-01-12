@@ -1,6 +1,8 @@
 #include "waywiser_car_node_core.hpp"
 #include "moc_waywiser_car_node_core.cpp"
 
+#include "waywiser/waywiser_utils.hpp"
+
 rclcpp::Logger WaywiserCar::node_logger_ = rclcpp::get_logger("waywiser_car_node");
 
 void WaywiserCar::initialize_node()
@@ -71,8 +73,10 @@ void WaywiserCar::initialize_node(
 void WaywiserCar::setup_parameters()
 {
   // ROS parameters
+  frame_prefix_ = declare_parameter("frame_prefix", "");
   urdf_file_ = declare_parameter("urdf_file", "");
-  mUrdfModel = getURDFModel(urdf_file_);
+  mUrdfModel = URDFUtils::getURDFModel(urdf_file_);
+  world_frame_ = declare_parameter("world_frame", "map");
 
   front_steering_joint_names_ = declare_parameter<std::vector<std::string>>(
     "front_steering_joint_names",
@@ -87,16 +91,33 @@ void WaywiserCar::setup_parameters()
     std::vector<std::string>{"left_rear_wheel_joint", "right_rear_wheel_joint"}
   );
 
-  odom_frame_ = declare_parameter("odom_frame", "odom");
-  base_frame_ = declare_parameter("base_frame", "base_link");
-  world_frame_ = declare_parameter("world_frame", "map");
-  rear_axle_frame_ = declare_parameter("rear_axle_frame", base_frame_);
-  chassis_frame_ = declare_parameter("chassis_frame", base_frame_);
-  front_end_frame_ = declare_parameter("front_end_frame", base_frame_);
-  rear_end_frame_ = declare_parameter("rear_end_frame", base_frame_);
-  left_end_frame_ = declare_parameter("left_end_frame", base_frame_);
-  right_end_frame_ = declare_parameter("right_end_frame", base_frame_);
-  imu_frame_ = declare_parameter("imu_frame", base_frame_);
+  for (auto & name : front_steering_joint_names_) {
+    name = RosUtils::joinFrame(frame_prefix_, name);
+  }
+  for (auto & name : front_wheel_joint_names_) {
+    name = RosUtils::joinFrame(frame_prefix_, name);
+  }
+  for (auto & name : rear_wheel_joint_names_) {
+    name = RosUtils::joinFrame(frame_prefix_, name);
+  }
+
+  odom_frame_ = RosUtils::joinFrame(frame_prefix_, declare_parameter("odom_frame", "odom"));
+  base_frame_ = RosUtils::joinFrame(frame_prefix_, declare_parameter("base_frame", "base_link"));
+  rear_axle_frame_ =
+    RosUtils::joinFrame(frame_prefix_, declare_parameter("rear_axle_frame", "base_link"));
+  chassis_frame_ = RosUtils::joinFrame(
+    frame_prefix_, declare_parameter(
+      "chassis_frame",
+      "base_link"));
+  front_end_frame_ =
+    RosUtils::joinFrame(frame_prefix_, declare_parameter("front_end_frame", "base_link"));
+  rear_end_frame_ =
+    RosUtils::joinFrame(frame_prefix_, declare_parameter("rear_end_frame", "base_link"));
+  left_end_frame_ =
+    RosUtils::joinFrame(frame_prefix_, declare_parameter("left_end_frame", "base_link"));
+  right_end_frame_ =
+    RosUtils::joinFrame(frame_prefix_, declare_parameter("right_end_frame", "base_link"));
+  imu_frame_ = RosUtils::joinFrame(frame_prefix_, declare_parameter("imu_frame", "base_link"));
 
   battery_state_topic_ = declare_parameter("battery_state_topic", "/battery_state");
   odom_topic_ = declare_parameter("odom_topic", "/odom");
@@ -105,9 +126,15 @@ void WaywiserCar::setup_parameters()
   vehicle_pose_topic_ = declare_parameter("vehicle_pose_topic", "/car_pose");
   emergency_stop_update_topic_ =
     declare_parameter("emergency_stop_update_topic", "/emergency_stop/target_state");
-  car_control_command_topic_ = declare_parameter(
-    "car_control_command_topic",
+  vehicle_control_command_topic_ = declare_parameter(
+    "vehicle_control_command_topic",
     "/waywiser_control_cmd");
+  autopilot_vel_topic_ = declare_parameter(
+    "autopilot_vel_topic",
+    "/waywiser_autopilot_vel");
+  joint_states_topic_ = declare_parameter(
+    "joint_states_topic",
+    "/waywiser_joint_states");
 
   mission_status_topic_ = declare_parameter("mission_status_topic", "/mission_status");
   vehicle_alignment_reference_point_topic_ = declare_parameter(
@@ -162,13 +189,15 @@ void WaywiserCar::setup_parameters()
     mCarInterfaceComponent->getSpeedToRPMFactor();
 
   mCarInterfaceComponent->setImuVariant(
-    get_imu_variant_param(this, "imu_variant"));
+    CoreUtils::get_imu_variant_param(this, "imu_variant"));
   mCarInterfaceComponent->setVehicleInterfaceType(
-    get_vehicle_interface_type_param(this, "vehicle_interface_type"));
+    CoreUtils::get_vehicle_interface_type_param(this, "vehicle_interface_type"));
   mCarInterfaceComponent->setSpeedControlType(
-    get_speed_control_type_param(this, "speed_control_type"));
+    CoreUtils::get_speed_control_type_param(this, "speed_control_type"));
 
-  auto pid_speed_controller_gains_opt = get_vector3_param(this, "pid_speed_controller_gains");
+  auto pid_speed_controller_gains_opt = RosUtils::get_vector3_param(
+    this,
+    "pid_speed_controller_gains");
   if (pid_speed_controller_gains_opt) {
     mCarInterfaceComponent->setPIDSpeedControllerGains(
       pid_speed_controller_gains_opt->x, pid_speed_controller_gains_opt->y,
@@ -194,25 +223,31 @@ void WaywiserCar::setup_parameters()
   std::ostringstream log_stream;
   log_stream << "\nCarInterfaceComponent offset parameters:\n";
   // Rear axle to base
-  auto vector3_param = get_vector3_param(this, "rear_axle_frame_to_base_frame_offset");
+  auto vector3_param = RosUtils::get_vector3_param(this, "rear_axle_frame_to_base_frame_offset");
   if (!vector3_param && mUrdfModel) {
-    vector3_param = getFramePositionOffset(mUrdfModel, base_frame_, rear_axle_frame_);
+    vector3_param = URDFUtils::getFramePositionOffset(
+      mUrdfModel, base_frame_,
+      rear_axle_frame_);
   }
   log_stream << " rear_axle_frame_to_base_frame_offset: " << vector3_param->c_str() << "\n";
   mCarInterfaceComponent->setRearAxleToBaseOffset(vector3_param->to_type<xyz_t>());
 
   // Rear axle to center
-  vector3_param = get_vector3_param(this, "rear_axle_frame_to_center_frame_offset");
+  vector3_param = RosUtils::get_vector3_param(this, "rear_axle_frame_to_center_frame_offset");
   if (!vector3_param && mUrdfModel) {
-    vector3_param = getFramePositionOffset(mUrdfModel, chassis_frame_, rear_axle_frame_);
+    vector3_param = URDFUtils::getFramePositionOffset(
+      mUrdfModel, chassis_frame_,
+      rear_axle_frame_);
   }
   log_stream << " rear_axle_frame_to_center_frame_offset: " << vector3_param->c_str() << "\n";
   mCarInterfaceComponent->setRearAxleToCenterOffset(vector3_param->to_type<xyz_t>());
 
   // Rear axle to rear end
-  vector3_param = get_vector3_param(this, "rear_axle_frame_to_rear_end_frame_offset");
+  vector3_param = RosUtils::get_vector3_param(this, "rear_axle_frame_to_rear_end_frame_offset");
   if (!vector3_param && mUrdfModel) {
-    vector3_param = getFramePositionOffset(mUrdfModel, rear_end_frame_, rear_axle_frame_);
+    vector3_param = URDFUtils::getFramePositionOffset(
+      mUrdfModel, rear_end_frame_,
+      rear_axle_frame_);
   }
   log_stream << " rear_axle_frame_to_rear_end_frame_offset: " << vector3_param->c_str() << "\n";
   mCarInterfaceComponent->setRearAxleToRearEndOffset(vector3_param->to_type<xyz_t>());
@@ -220,7 +255,7 @@ void WaywiserCar::setup_parameters()
   // Output log_stream
   RCLCPP_INFO_STREAM(get_logger(), log_stream.str());
 
-  vector3_param = get_vector3_param(this, "enuref");
+  vector3_param = RosUtils::get_vector3_param(this, "enuref");
   if (vector3_param) {
     enuref_ = vector3_param->to_type<llh_t>();
   }
@@ -327,7 +362,8 @@ void WaywiserCar::setup_publishers()
   emergency_stop_update_pub_ = create_publisher<waywiser_twist_safety::msg::EmergencyStopState>(
     emergency_stop_update_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
   car_control_command_pub_ = create_publisher<waywiser_core::msg::CarControlCommand>(
-    car_control_command_topic_, 10);
+    vehicle_control_command_topic_, 10);
+  cmd_vel_out_pub_ = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel_out", 10);
   for (const auto & tof_sensor_name : tof_sensor_names_) {
     tof_pubs_[tof_sensor_name] =
       create_publisher<std_msgs::msg::Float32>(tof_sensor_topics_[tof_sensor_name], 10);
@@ -343,8 +379,7 @@ void WaywiserCar::setup_publishers()
   if (enable_autopilot_component_) {
     if (!waypoint_follower_bypass_mux_) {
       autopilot_twist_pub_ = create_publisher<geometry_msgs::msg::Twist>(
-        "waywiser_autopilot_vel",
-        10);
+        autopilot_vel_topic_, 10);
     }
     mission_status_pub_ =
       create_publisher<waywiser_core::msg::MissionState>(
@@ -402,7 +437,7 @@ void WaywiserCar::setup_publishers()
   }
 
   if (enable_visualization_msgs_ && joint_states_publish_rate_ > 0) {
-    joint_state_pub_ = create_publisher<sensor_msgs::msg::JointState>("waywiser_joint_states", 10);
+    joint_state_pub_ = create_publisher<sensor_msgs::msg::JointState>(joint_states_topic_, 10);
   }
 }
 
@@ -425,7 +460,7 @@ void WaywiserCar::setup_subscribers()
       &WaywiserCar::fused_nav_sat_fix_extended_callback, this, _1));
 
   twist_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
-    "/cmd_vel", 10, std::bind(&WaywiserCar::twist_callback, this, _1));
+    "/cmd_vel_in", 10, std::bind(&WaywiserCar::twist_callback, this, _1));
 
   emergency_stop_status_sub_ =
     this->create_subscription<waywiser_twist_safety::msg::EmergencyStopState>(
@@ -545,7 +580,10 @@ void WaywiserCar::node_management_timer_callback()
         world_pose_stamped.pose.position.y = currentVehiclePosition.getY();
         world_pose_stamped.pose.position.z = currentVehiclePosition.getHeight();
         tf2::Quaternion orientation;
-        orientation.setRPY(0.0, 0.0, currentVehiclePosition.getYaw() * M_PI / 180.0);
+        orientation.setRPY(
+          currentVehiclePosition.getRoll() * DEG2RAD,
+          currentVehiclePosition.getPitch() * DEG2RAD,
+          currentVehiclePosition.getYaw() * DEG2RAD);
         world_pose_stamped.pose.orientation = tf2::toMsg(orientation);
         autopilot_center_pose_pub_->publish(world_pose_stamped);
 
@@ -610,7 +648,7 @@ void WaywiserCar::odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom_ms
       } else if (odom_msg->child_frame_id == rear_end_frame_) {
         rear_axle_frame_to_odom_child_frame_offset = mCarState->getRearAxleToRearEndOffset();
       } else if (mUrdfModel) {
-        rear_axle_frame_to_odom_child_frame_offset = getFramePositionOffset(
+        rear_axle_frame_to_odom_child_frame_offset = URDFUtils::getFramePositionOffset(
           mUrdfModel, odom_msg->child_frame_id, rear_axle_frame_).to_type<xyz_t>();
       } else {
         static bool transform_warning_logged_ = false;
@@ -644,7 +682,7 @@ void WaywiserCar::odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom_ms
     }
   }
 
-  update_pospoint_from_pose(
+  CoreUtils::update_pospoint_from_pose(
     mCarState, rear_axle_frame_to_odom_child_frame_offset, odom_msg->pose.pose, PosType::odom);
 
   geometry_msgs::msg::Twist current_twist = odom_msg->twist.twist;
@@ -654,7 +692,7 @@ void WaywiserCar::odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom_ms
   static float min_linear_speed = mCarInterfaceComponent->getErpmMin() /
     mCarInterfaceComponent->getSpeedToRPMFactor();
   double steering = 0.0;
-  if (fabs(mCarState->getSpeed()) >= min_linear_speed) {
+  if (fabs(mCarState->getSpeed()) > 1e-6 && fabs(mCarState->getSpeed()) >= fabs(min_linear_speed)) {
     // NOTE / TODO: WayWise has a sign error here (curvature in wrong direction)
     float steering_curvature = -(current_twist.angular.z / mCarState->getSpeed());    // ω = v/r => 1/r = ω/v
     steering = atan(mCarState->getAxisDistance() * steering_curvature) /
@@ -704,7 +742,7 @@ void WaywiserCar::fused_nav_sat_fix_extended_callback(
       } else if (msg->header.frame_id == rear_end_frame_) {
         nav_sat_frame_to_rear_axle_frame_offset = mCarState->getRearAxleToRearEndOffset();
       } else if (mUrdfModel) {
-        nav_sat_frame_to_rear_axle_frame_offset = getFramePositionOffset(
+        nav_sat_frame_to_rear_axle_frame_offset = URDFUtils::getFramePositionOffset(
           mUrdfModel, msg->header.frame_id, rear_axle_frame_).to_type<xyz_t>();
       } else {
         static bool transform_warning_logged_ = false;
@@ -738,15 +776,16 @@ void WaywiserCar::fused_nav_sat_fix_extended_callback(
   }
 
   xyz_t xyz = coordinateTransforms::llhToEnu(
-    mCarState->getEnuRef(),
-    {msg->latitude, msg->longitude, msg->altitude});
+    mCarState->getEnuRef(), {msg->latitude, msg->longitude, msg->altitude});
   PosPoint posPoint = mCarState->getPosition(PosType::fused);
   posPoint.setXYZ(xyz);
   posPoint.updateWithOffsetAndYawRotation(
     -nav_sat_frame_to_rear_axle_frame_offset,
-    coordinateTransforms::yawNEDtoENU(msg->heading) * M_PI / 180.0);
+    coordinateTransforms::yawNEDtoENU(msg->yaw) * DEG2RAD);
+  posPoint.setRoll(msg->roll * DEG2RAD);
+  posPoint.setPitch(-msg->pitch * DEG2RAD); // negative due to NED to ENU conversion
   posPoint.setTime(
-    QTime::currentTime().addSecs(-QDateTime::currentDateTime().offsetFromUtc()));
+    QTime::currentTime().addSecs(-QDateTime::currentDateTime().offsetFromUtc())); // TODO: update this to work with simulation time
   mCarState->setPosition(posPoint);
 
   GnssFixStatus gnssFixStatus;
@@ -767,7 +806,11 @@ void WaywiserCar::publish_odom()
 
   double x_ = odom_position.getX();
   double y_ = odom_position.getY();
-  double yawRad_ = odom_position.getYaw() * M_PI / 180.0;
+  double rollRad_ = odom_position.getRoll() * DEG2RAD;
+  double pitchRad_ = odom_position.getPitch() * DEG2RAD;
+  double yawRad_ = odom_position.getYaw() * DEG2RAD;
+  tf2::Quaternion q_odom;
+  q_odom.setRPY(rollRad_, pitchRad_, yawRad_);
   static double previousYawRad_ = yawRad_;
 
   // -- Prepare odom msg
@@ -779,10 +822,7 @@ void WaywiserCar::publish_odom()
   // Position in the coordinate frame given by header.frame_id
   odom_msg.pose.pose.position.x = x_;
   odom_msg.pose.pose.position.y = y_;
-  odom_msg.pose.pose.orientation.x = 0.0;
-  odom_msg.pose.pose.orientation.y = 0.0;
-  odom_msg.pose.pose.orientation.z = sin(yawRad_ / 2.0);
-  odom_msg.pose.pose.orientation.w = cos(yawRad_ / 2.0);
+  odom_msg.pose.pose.orientation = tf2::toMsg(q_odom);
 
   // Velocity in the coordinate frame given by child_frame_id
   odom_msg.twist.twist.linear.x = mCarState->getSpeed();
@@ -801,7 +841,12 @@ void WaywiserCar::publish_tfs()
 
   double x_ = odom_position.getX();
   double y_ = odom_position.getY();
-  double yawRad_ = odom_position.getYaw() * M_PI / 180.0;
+  double z_ = odom_position.getHeight();
+  double rollRad_ = odom_position.getRoll() * DEG2RAD;
+  double pitchRad_ = odom_position.getPitch() * DEG2RAD;
+  double yawRad_ = odom_position.getYaw() * DEG2RAD;
+  tf2::Quaternion q_odom_to_base_link;
+  q_odom_to_base_link.setRPY(rollRad_, pitchRad_, yawRad_);
 
   if (rear_axle_frame_ != base_frame_) {
     PosPoint odom_to_base_link_position = mCarState->posInVehicleFrameToPosPointENU(
@@ -809,17 +854,15 @@ void WaywiserCar::publish_tfs()
 
     x_ = odom_to_base_link_position.getX();
     y_ = odom_to_base_link_position.getY();
+    z_ = odom_to_base_link_position.getHeight();
   }
 
   // -- Prepare Transform
   auto odom_to_base_link_msg_tf = geometry_msgs::msg::Transform();
   odom_to_base_link_msg_tf.translation.x = x_;
   odom_to_base_link_msg_tf.translation.y = y_;
-  odom_to_base_link_msg_tf.translation.z = 0.0;
-  odom_to_base_link_msg_tf.rotation.x = 0.0;
-  odom_to_base_link_msg_tf.rotation.y = 0.0;
-  odom_to_base_link_msg_tf.rotation.z = sin(yawRad_ / 2.0);
-  odom_to_base_link_msg_tf.rotation.w = cos(yawRad_ / 2.0);
+  odom_to_base_link_msg_tf.translation.z = z_;
+  odom_to_base_link_msg_tf.rotation = tf2::toMsg(q_odom_to_base_link);
 
   if (publish_odom_to_baselink_tf_) {
     auto odom_to_base_link_msg_tfs = geometry_msgs::msg::TransformStamped();
@@ -849,11 +892,12 @@ void WaywiserCar::publish_tfs()
     map_to_base_link_msg_tf.translation.x = world_to_base_link_position.getX();
     map_to_base_link_msg_tf.translation.y = world_to_base_link_position.getY();
     map_to_base_link_msg_tf.translation.z = world_to_base_link_position.getHeight();
-    double worldYawRad_ = world_to_base_link_position.getYaw() * M_PI / 180.0;
-    map_to_base_link_msg_tf.rotation.x = 0.0;
-    map_to_base_link_msg_tf.rotation.y = 0.0;
-    map_to_base_link_msg_tf.rotation.z = sin(worldYawRad_ / 2.0);
-    map_to_base_link_msg_tf.rotation.w = cos(worldYawRad_ / 2.0);
+    double worldRollRad_ = world_to_base_link_position.getRoll() * DEG2RAD;
+    double worldPitchRad_ = world_to_base_link_position.getPitch() * DEG2RAD;
+    double worldYawRad_ = world_to_base_link_position.getYaw() * DEG2RAD;
+    tf2::Quaternion q_map_to_base_link;
+    q_map_to_base_link.setRPY(worldRollRad_, worldPitchRad_, worldYawRad_);
+    map_to_base_link_msg_tf.rotation = tf2::toMsg(q_map_to_base_link);
     tf2::fromMsg(map_to_base_link_msg_tf, map_to_base_link_tf2_tf);
 
     tf2::toMsg(
@@ -873,7 +917,9 @@ void WaywiserCar::publish_world_pose()
   world_pose_stamped.pose.position.y = currentPosition.getY();
   world_pose_stamped.pose.position.z = currentPosition.getHeight();
   tf2::Quaternion orientation;
-  orientation.setRPY(0.0, 0.0, currentPosition.getYaw() * M_PI / 180.0);
+  orientation.setRPY(
+    currentPosition.getRoll() * DEG2RAD,
+    currentPosition.getPitch() * DEG2RAD, currentPosition.getYaw() * DEG2RAD);
   world_pose_stamped.pose.orientation = tf2::toMsg(orientation);
   world_pose_stamped.header.frame_id = world_frame_;
   world_pose_stamped.header.stamp = this->get_clock()->now();
@@ -909,9 +955,12 @@ void WaywiserCar::publish_route_markers()
 
     marker.pose.position.x = waypoint.getX();
     marker.pose.position.y = waypoint.getY();
-    marker.pose.position.z = 0.0;
+    marker.pose.position.z = waypoint.getHeight();
     tf2::Quaternion orientation;
-    orientation.setRPY(0.0, 0.0, waypoint.getYaw() * M_PI / 180.0);
+    orientation.setRPY(
+      waypoint.getRoll() * DEG2RAD,
+      waypoint.getPitch() * DEG2RAD,
+      waypoint.getYaw() * DEG2RAD);
     marker.pose.orientation = tf2::toMsg(orientation);
 
     auto marker_radius = mCarState->getWidth() / 5.0;
@@ -1042,12 +1091,13 @@ void WaywiserCar::publish_imu_data()
   sensor_msgs::msg::Imu imu_msg;
   imu_msg.header.stamp = this->now();
   imu_msg.header.frame_id = imu_frame_;
-
-  double yawRad = mCarState->getPosition(PosType::IMU).getYaw() * M_PI / 180.0;
-  imu_msg.orientation.x = 0.0;
-  imu_msg.orientation.y = 0.0;
-  imu_msg.orientation.z = sin(yawRad / 2.0);
-  imu_msg.orientation.w = cos(yawRad / 2.0);
+  auto imu_position = mCarState->getPosition(PosType::IMU);
+  double rollRad = imu_position.getRoll() * DEG2RAD;
+  double pitchRad = imu_position.getPitch() * DEG2RAD;
+  double yawRad = imu_position.getYaw() * DEG2RAD;
+  tf2::Quaternion q_imu;
+  q_imu.setRPY(rollRad, pitchRad, yawRad);
+  imu_msg.orientation = tf2::toMsg(q_imu);
 
   imu_pub_->publish(imu_msg);
 }
@@ -1064,6 +1114,14 @@ void WaywiserCar::process_twist_msg(const geometry_msgs::msg::Twist::SharedPtr t
     mCarInterfaceComponent->updateControlCommand(twist_msg->linear.x, twist_msg->angular.z, dt);
     mCarInterfaceComponent->executeControlCommand();
     car_control_command_pub_->publish(mCarInterfaceComponent->getCarControlCommand().to_msg());
+
+    geometry_msgs::msg::Twist cmd_vel_out_msg;
+    cmd_vel_out_msg.linear.x = mCarInterfaceComponent->getCarControlCommand().throttle *
+      max_target_speed;
+    cmd_vel_out_msg.angular.z = tan(
+      -mCarInterfaceComponent->getCarControlCommand().steering * mCarState->getMaxSteeringAngle()) /
+      mCarState->getAxisDistance() * cmd_vel_out_msg.linear.x;
+    cmd_vel_out_pub_->publish(cmd_vel_out_msg);
   }
 }
 
@@ -1125,5 +1183,5 @@ double WaywiserCar::update_joint_states_msg(
 
 void WaywiserCar::qtMessageHandler(QtMsgType type, const QMessageLogContext &, const QString & msg)
 {
-  qtMessageToLogger(node_logger_, type, msg);
+  CoreUtils::qtMessageToLogger(node_logger_, type, msg);
 }

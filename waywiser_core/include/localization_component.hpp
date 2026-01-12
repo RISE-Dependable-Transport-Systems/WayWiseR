@@ -1,23 +1,18 @@
 #ifndef LOCALIZATION_COMPONENT_HPP_
 #define LOCALIZATION_COMPONENT_HPP_
 
-#include <memory>
-#include <string>
 #include <QObject>
 #include <QString>
-#include <tuple>
 #include <QSerialPortInfo>
 
 #include "WayWise/core/coordinatetransforms.h"
-#include "WayWise/logger/logger.h"
 #include "WayWise/sensors/fusion/sdvpvehiclepositionfuser.h"
 #include "WayWise/sensors/gnss/gnssreceiver.h"
 #include "WayWise/sensors/gnss/rtcmclient.h"
-#include "WayWise/sensors/gnss/ubloxrover.h"
+#include "WayWise/sensors/gnss/ublox.h"
 #include "WayWise/vehicles/objectstate.h"
 
 #include "qobject_node.hpp"
-#include "waywiser_core_utils.hpp"
 
 
 class LocalizationComponent : public QObject
@@ -65,6 +60,7 @@ public:
   QSharedPointer<RtcmClient> getRtcmClient() const {return mRtcmClient;}
 
 signals:
+  void gnssPositionAndOrientationUpdated(PosPoint gnssPos, PosPoint imuPos);
 
 public slots:
 
@@ -93,6 +89,7 @@ protected:
   QObjectNode * mParentQObjectNode;
   rclcpp::TimerBase::SharedPtr mPositionFusionInputTimer = nullptr;
   std::vector<QMetaObject::Connection> mQMetaObjectConnections;
+  bool mImuDataAvailable = false;
 };
 
 #endif  // LOCALIZATION_COMPONENT_HPP_

@@ -1,18 +1,14 @@
 #ifndef CAR_INTERFACE_COMPONENT_HPP_
 #define CAR_INTERFACE_COMPONENT_HPP_
 
-#include <memory>
 #include <string>
 #include <QObject>
 #include <QString>
 #include <tuple>
 
 #include "WayWise/core/coordinatetransforms.h"
-#include "WayWise/logger/logger.h"
-#include "WayWise/sensors/imu/bno055orientationupdater.h"
 #include "WayWise/sensors/imu/imuorientationupdater.h"
 #include "WayWise/sensors/tof/tofsensor.h"
-#include "WayWise/sensors/tof/vl53l0xtofsensor.h"
 #include "WayWise/vehicles/carstate.h"
 #include "WayWise/vehicles/controller/carmovementcontroller.h"
 #include "WayWise/vehicles/controller/vescmotorcontroller.h"

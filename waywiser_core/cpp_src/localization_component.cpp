@@ -1,6 +1,8 @@
 #include "localization_component.hpp"
 #include "moc_localization_component.cpp"
 
+#include "WayWise/sensors/gnss/ubloxrover.h"
+
 LocalizationComponent::LocalizationComponent(
   QObjectNode * parentQObjectNode, const QSharedPointer<ObjectState> & objectState)
 : QObject(parentQObjectNode)
@@ -40,6 +42,7 @@ void LocalizationComponent::reset()
     QObject::disconnect(connection);
   }
   mQMetaObjectConnections.clear();
+  mImuDataAvailable = false;
 }
 
 void LocalizationComponent::setup_localization()
@@ -143,7 +146,7 @@ void LocalizationComponent::setup_localization()
 
     mQMetaObjectConnections.emplace_back(
       QObject::connect(
-        mGNSSReceiver.get(), &GNSSReceiver::updatedGNSSPositionAndYaw,
+        mGNSSReceiver.get(), &GNSSReceiver::updatedGNSSPositionAndOrientation,
         mSDVPVehiclePositionFuser.get(),
         &SDVPVehiclePositionFuser::correctPositionAndYawGNSS));
 
@@ -174,14 +177,31 @@ void LocalizationComponent::setup_localization()
         }
     ));
   } else {
+    QObject::connect(
+      mGNSSReceiver.get(), &GNSSReceiver::updatedGNSSPositionAndOrientation,
+      [&](QSharedPointer<ObjectState> objectState, double distanceMoved,
+      GnssFixStatus gnssFixStatus) {
+        Q_UNUSED(distanceMoved)
+
+        PosPoint fusedPos = objectState->getPosition(PosType::fused);
+        PosPoint gnssPos = objectState->getPosition(PosType::GNSS);
+        fusedPos.setXYZ(gnssPos.getXYZ());
+        fusedPos.setTime(gnssPos.getTime());
+        if (gnssFixStatus.isFusedOnChip) {
+          fusedPos.setRPY(gnssPos.getRPY());
+        } else if (mImuDataAvailable) {
+          fusedPos.setRPY(objectState->getPosition(PosType::IMU).getRPY());
+        }
+        objectState->setPosition(fusedPos);
+      }
+    );
+
     mQMetaObjectConnections.emplace_back(
       QObject::connect(
         mObjectState.get(), &ObjectState::positionUpdated,
         [&](PosType type) {
-          if (type == PosType::GNSS) {
-            PosPoint fusedPos = mObjectState->getPosition(type);
-            fusedPos.setType(PosType::fused);
-            mObjectState->setPosition(fusedPos);
+          if (type == PosType::IMU && !mImuDataAvailable) {
+            mImuDataAvailable = true;
           }
         }
     ));

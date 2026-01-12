@@ -1,6 +1,8 @@
 #include "car_interface_component.hpp"
 #include "moc_car_interface_component.cpp"
 
+#include "WayWise/sensors/tof/vl53l0xtofsensor.h"
+
 CarInterfaceComponent::CarInterfaceComponent(
   QObjectNode * parentQObjectNode, const QSharedPointer<CarState> & carState,
   bool autoActuateMotorAndServo)
@@ -219,7 +221,7 @@ void CarInterfaceComponent::updateControlCommand(
 
     desired_linear_speed = std::clamp(desired_linear_speed, -max_linear_speed, max_linear_speed);
     desired_linear_speed = fabs(desired_linear_speed) >=
-      min_linear_speed ? desired_linear_speed : 0.0;
+      fabs(min_linear_speed) ? desired_linear_speed : 0.0;
 
     switch (mSpeedControlType) {
       case SpeedControlType::OPEN_LOOP_ERPM_CONTROL:

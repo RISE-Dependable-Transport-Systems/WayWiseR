@@ -1,10 +1,7 @@
 #ifndef WAYWISER_TRUCK_NODE_CORE_HPP_
 #define WAYWISER_TRUCK_NODE_CORE_HPP_
 
-#include <map>
-
 #include "WayWise/vehicles/truckstate.h"
-#include "WayWise/vehicles/trailerstate.h"
 
 #include "truck_autopilot_component.hpp"
 #include "truck_interface_component.hpp"

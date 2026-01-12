@@ -6,6 +6,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_C_STANDARD 23)
 
@@ -129,6 +130,7 @@ set(WAYWISE_TRUCK_SOURCES
 add_executable(
   waywiser_localization_node
   cpp_src/waywiser_localization_node.cpp
+  cpp_src/waywiser_core_utils.cpp
   cpp_src/localization_component.cpp
   cpp_src/qobject_node.cpp
   ${COMMON_WAYWISE_SOURCES}
@@ -139,6 +141,7 @@ add_executable(
   waywiser_car_node
   cpp_src/waywiser_car_node.cpp
   cpp_src/waywiser_car_node_core.cpp
+  cpp_src/waywiser_core_utils.cpp
   cpp_src/car_autopilot_component.cpp
   cpp_src/car_interface_component.cpp
   cpp_src/qobject_node.cpp
@@ -153,6 +156,7 @@ add_executable(
   cpp_src/waywiser_truck_node.cpp
   cpp_src/waywiser_truck_node_core.cpp
   cpp_src/waywiser_car_node_core.cpp
+  cpp_src/waywiser_core_utils.cpp
   cpp_src/truck_autopilot_component.cpp
   cpp_src/truck_interface_component.cpp
   cpp_src/car_autopilot_component.cpp
@@ -165,8 +169,10 @@ add_executable(
   ${COMMON_WAYWISE_AP_SOURCES}
 )
 
-add_executable(tfs_to_navsatfixfused_node
-  cpp_src/tfs_to_navsatfixfused_node.cpp
+add_executable(navsatfix_extended_wrapper_node
+  cpp_src/navsatfix_extended_wrapper_node.cpp
+  cpp_src/waywiser_core_utils.cpp
+  ${COMMON_WAYWISE_SOURCES}
 )
 
 set(LOCALIZATION_LIBRARIES
@@ -191,7 +197,7 @@ set(TRUCK_LIBRARIES
   ${CAR_LIBRARIES}
 )
 
-set(TFS_TO_NAVSATFIXFUSED_LIBRARIES
+set(NAVSATFIX_EXTENDED_WRAPPER_LIBRARIES
   Qt5::Core
   ${cpp_typesupport_target}
 )
@@ -199,7 +205,20 @@ set(TFS_TO_NAVSATFIXFUSED_LIBRARIES
 target_link_libraries(waywiser_localization_node ${LOCALIZATION_LIBRARIES})
 target_link_libraries(waywiser_car_node ${CAR_LIBRARIES})
 target_link_libraries(waywiser_truck_node ${TRUCK_LIBRARIES})
-target_link_libraries(tfs_to_navsatfixfused_node ${TFS_TO_NAVSATFIXFUSED_LIBRARIES})
+target_link_libraries(navsatfix_extended_wrapper_node ${NAVSATFIX_EXTENDED_WRAPPER_LIBRARIES})
+
+function(add_qt_includes target)
+  target_include_directories(${target} SYSTEM PRIVATE
+    ${Qt5Core_INCLUDE_DIRS}
+    ${Qt5SerialPort_INCLUDE_DIRS}
+    ${Qt5Network_INCLUDE_DIRS}
+  )
+endfunction()
+
+add_qt_includes(waywiser_localization_node)
+add_qt_includes(waywiser_car_node)
+add_qt_includes(waywiser_truck_node)
+add_qt_includes(navsatfix_extended_wrapper_node)
 
 set(LOCALIZATION_DEPENDENCIES
   geometry_msgs
@@ -233,11 +252,13 @@ set(TRUCK_DEPENDENCIES
   ${CAR_DEPENDENCIES}
 )
 
-set(TFS_TO_NAVSATFIXFUSED_DEPENDENCIES
+set(NAVSATFIX_EXTENDED_WRAPPER_DEPENDENCIES
   rclcpp
+  sensor_msgs
   tf2
   tf2_ros
   tf2_geometry_msgs
+  urdf
   waywiser
   waywiser_twist_safety
 )
@@ -245,7 +266,7 @@ set(TFS_TO_NAVSATFIXFUSED_DEPENDENCIES
 ament_target_dependencies(waywiser_localization_node ${LOCALIZATION_DEPENDENCIES})
 ament_target_dependencies(waywiser_car_node ${CAR_DEPENDENCIES})
 ament_target_dependencies(waywiser_truck_node ${TRUCK_DEPENDENCIES})
-ament_target_dependencies(tfs_to_navsatfixfused_node ${TFS_TO_NAVSATFIXFUSED_DEPENDENCIES})
+ament_target_dependencies(navsatfix_extended_wrapper_node ${NAVSATFIX_EXTENDED_WRAPPER_DEPENDENCIES})
 
 install(
   DIRECTORY launch
@@ -255,12 +276,12 @@ install(
 install(TARGETS waywiser_localization_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS waywiser_car_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS waywiser_truck_node DESTINATION lib/${PROJECT_NAME})
-install(TARGETS tfs_to_navsatfixfused_node DESTINATION lib/${PROJECT_NAME}
+install(TARGETS navsatfix_extended_wrapper_node DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
 
-ament_export_dependencies(rosidl_default_runtime)
+ament_export_dependencies(rosidl_default_runtime urdf)
 ament_export_include_directories(include)
 
 ament_package()

@@ -1,6 +1,8 @@
 #include "truck_interface_component.hpp"
 #include "moc_truck_interface_component.cpp"
 
+#include "WayWise/sensors/angle/as5600updater.h"
+
 TruckInterfaceComponent::TruckInterfaceComponent(
   QObjectNode * parentQObjectNode, const QSharedPointer<TruckState> truckState, bool hasTrailer,
   bool autoActuateMotorAndServo)

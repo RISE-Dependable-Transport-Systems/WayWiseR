@@ -11,7 +11,9 @@ std_msgs/Header header
 float64 latitude
 float64 longitude
 float64 altitude
-float32 heading
+float32 roll
+float32 pitch
+float32 yaw
 
 float32 horizontal_accuracy
 float32 vertical_accuracy
