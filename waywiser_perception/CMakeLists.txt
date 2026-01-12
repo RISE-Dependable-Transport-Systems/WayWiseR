@@ -21,6 +21,7 @@ find_package(geometry_msgs REQUIRED)
 
 find_package(rclcpp REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
 find_package(rclcpp_components REQUIRED)
 
@@ -49,6 +50,7 @@ ament_target_dependencies(octomap_occlusions_node
   rclcpp  
   geometry_msgs  
   tf2_ros   
+  tf2_geometry_msgs 
   octomap_msgs  
   waywiser_twist_safety  
   waywiser  
