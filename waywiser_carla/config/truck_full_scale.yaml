@@ -162,10 +162,9 @@ waywiser_truck_localization_node:
     use_sdvp_position_fusion: false
     gnss_variant: "external"
 
-tfs_to_navsatfixfused_node:
+navsatfix_extended_wrapper_node:
   ros__parameters:
     tf_object_frame: "truck"
-    gnss_is_fused_on_chip: true
     gnss_fix_type: 3
     gnss_horizontal_accuracy: 0.01
     gnss_vertical_accuracy: 0.01

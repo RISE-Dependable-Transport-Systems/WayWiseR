@@ -6,6 +6,10 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_C_STANDARD 23)
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -37,13 +41,14 @@ ament_target_dependencies(emulated_angle_sensor
 
 # Add the EmulatedRangeSensor executable
 add_executable(emulated_range_sensor_array cpp_src/emulated_range_sensor_array.cpp)
+target_include_directories(emulated_range_sensor_array PUBLIC ${OpenCV_INCLUDE_DIRS})
 ament_target_dependencies(emulated_range_sensor_array
   rclcpp
   sensor_msgs
   std_msgs
   cv_bridge
-  OpenCV
 )
+target_link_libraries(emulated_range_sensor_array ${OpenCV_LIBRARIES})
 
 # Install targets
 install(

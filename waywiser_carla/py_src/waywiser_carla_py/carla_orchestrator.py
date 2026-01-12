@@ -16,12 +16,11 @@ from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 import tf_transformations
 
 from waywiser_py.waywiser_utils import (
-    cleanup_subprocesses,
-    create_subprocess,
-    get_full_file_path,
+    FileUtils,
+    ProcessUtils,
     RELIABLE_TRANSIENT_LOCAL_QOS,
-    terminate_subprocess,
 )
+
 from waywiser_test_runner.msg import SetupState
 
 WEATHER_PRESETS = {
@@ -81,7 +80,7 @@ class CarlaOrchestrator(Node):
             #     .string_value
             # )
 
-        self.carla_script_path = get_full_file_path(
+        self.carla_script_path = FileUtils.get_full_file_path(
             self.get_parameter('carla_script_path').get_parameter_value().string_value
         )
         self.ego_vehicle_role_name = (
@@ -107,7 +106,7 @@ class CarlaOrchestrator(Node):
         self.objects_json_path = (
             self.get_parameter('objects_json_path').get_parameter_value().string_value
         )
-        self.objects_json_path = get_full_file_path(
+        self.objects_json_path = FileUtils.get_full_file_path(
             self.objects_json_path,
             os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
         )
@@ -275,7 +274,7 @@ class CarlaOrchestrator(Node):
         ):
             self.simulation_config = json.loads(msg.data)
             if 'objects_json_path' in self.simulation_config:
-                self.simulation_config['objects_json_path'] = get_full_file_path(
+                self.simulation_config['objects_json_path'] = FileUtils.get_full_file_path(
                     self.simulation_config['objects_json_path'],
                     os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
                 )
@@ -304,7 +303,7 @@ class CarlaOrchestrator(Node):
         objects_json_path = self.objects_json_path
         if 'objects_json_path' in self.simulation_config:
             objects_json_path = self.simulation_config['objects_json_path']
-        objects_json_path = get_full_file_path(
+        objects_json_path = FileUtils.get_full_file_path(
             objects_json_path, os.path.join(get_package_share_directory(PACKAGE_NAME), 'config')
         )
         if objects_json_path == '':
@@ -347,7 +346,7 @@ class CarlaOrchestrator(Node):
                 start_simulator_command.append('-norelativemousemode')
 
             subprocess_name = 'simulator'
-            self.simulator_subprocess = create_subprocess(
+            self.simulator_subprocess = ProcessUtils.create_subprocess(
                 self, start_simulator_command, subprocess_name
             )
             time.sleep(self.sim_startup_time)
@@ -377,7 +376,9 @@ class CarlaOrchestrator(Node):
             command.extend(['-p', f'{param}:={value}'])
 
         subprocess_name = 'carla_ros_bridge'
-        self.subprocesses[subprocess_name] = create_subprocess(self, command, subprocess_name)
+        self.subprocesses[subprocess_name] = ProcessUtils.create_subprocess(
+            self, command, subprocess_name
+        )
 
     def spawn_objects(self, spawn_objects_config, timeout=10):
         """Start the carla_spawn_objects node."""
@@ -398,7 +399,7 @@ class CarlaOrchestrator(Node):
             command.extend(['-p', f'{param}:={value}'])
 
         subprocess_name = 'carla_spawn_objects'
-        self.subprocesses[subprocess_name] = create_subprocess(
+        self.subprocesses[subprocess_name] = ProcessUtils.create_subprocess(
             self,
             ['unbuffer'] + command,
             subprocess_name,
@@ -474,12 +475,14 @@ class CarlaOrchestrator(Node):
         ]
 
         subprocess_name = 'carla_set_initial_pose'
-        self.subprocesses[subprocess_name] = create_subprocess(self, command, subprocess_name)
+        self.subprocesses[subprocess_name] = ProcessUtils.create_subprocess(
+            self, command, subprocess_name
+        )
 
     def end_current_simulation(self):
-        cleanup_subprocesses(self.subprocesses)
+        ProcessUtils.cleanup_subprocesses(self.subprocesses)
         if self.reset_carla_after_exec and self.simulator_subprocess is not None:
-            terminate_subprocess(self.simulator_subprocess)
+            ProcessUtils.terminate_subprocess(self.simulator_subprocess)
 
     def publish_static_tfs(self):
         for static_tf_publisher_info in self.static_tf_publishers:
@@ -509,8 +512,8 @@ class CarlaOrchestrator(Node):
         """Override to ensure the subprocesses are terminated on shutdown."""
         try:
             print('Shutting down carla_orchestrator node.')
-            cleanup_subprocesses(self.subprocesses)
-            terminate_subprocess(self.simulator_subprocess)
+            ProcessUtils.cleanup_subprocesses(self.subprocesses)
+            ProcessUtils.terminate_subprocess(self.simulator_subprocess)
         except Exception as e:
             print(f'Error during node destruction: {e}')
         finally:
