@@ -20,13 +20,13 @@ public:
     OctomapOcclusionsNode() : Node("octomap_occlusions_node"), tf_buffer_(this->get_clock()), tf_listener_(tf_buffer_) 
     { 
         // Declare parameters with default values
-        this->declare_parameter<std::string>("map_frame", "odom"); 
+        this->declare_parameter<std::string>("map_frame", "odom");
+        this->declare_parameter<std::string>("octomap_topic", "octomap_full");  
         this->declare_parameter<double>("tf_timeout_sec", 0.5); 
         this->declare_parameter<double>("volume_threshold", 0.1); 
-        this->declare_parameter<std::string>("octomap_topic", "octomap_full"); 
         this->declare_parameter<double>("max_range", 5.0); 
-        this->declare_parameter<double>("camera_fov", 70.0);    // Luxonis OAK-D Pro W (vertical FoV)
-        this->declare_parameter<double>("sensor_height_above_ground", 0.055); // [m] (height formula in depth_camera.xacro: chassis_height/2 + 0.015, where chassis_height is set to 0.08m in rover_core.xacro)
+        this->declare_parameter<double>("camera_fov", 70.0);
+        this->declare_parameter<double>("sensor_height_above_ground", 0.055);
 
         // Retrieve parameters  
         this->get_parameter("map_frame", map_frame_);
@@ -92,10 +92,6 @@ private:
                 unknown_volume = calculateOccludedVolume(transform_stamped);  
             }   // lock released
 
-            RCLCPP_INFO(this->get_logger(),   
-                "Occluded volume: %.4f m³ (threshold: %.2f m³)",   
-                unknown_volume, volume_threshold_);  
-
             if(unknown_volume > volume_threshold_) {
                 emergency_stop_msg_.stamp = this->get_clock()->now();  
                 emergency_stop_msg_.reason = "Unknown volume " + std::to_string(unknown_volume) +   
@@ -138,7 +134,7 @@ private:
         tf2::Vector3 forward_vector(0, 0, 1);  
 
         // Rotate forward vector by quaternion to get the camera's actual orientation in map frame
-        tf2::Vector3 transformed_forward = q * forward_vector;  
+        tf2::Vector3 transformed_forward = tf2::quatRotate(q, forward_vector); 
 
         // Type convert back to octomap::point3d  
         const octomap::point3d forward_direction(  
@@ -181,9 +177,9 @@ private:
         
     // Safe initialisers for cached values (before parameters are loaded)
     std::string map_frame_ {"odom"};
+    std::string octomap_topic_ {"/octomap_full"};
     double tf_timeout_sec_ {0.5};
     double volume_threshold_ {0.1};
-    std::string octomap_topic_ {"/octomap_full"};
     double max_range_{5.0};
     double camera_fov_{70.0};
     double sensor_height_above_ground_{0.055};

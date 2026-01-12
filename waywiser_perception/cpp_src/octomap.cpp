@@ -23,11 +23,10 @@ public:
     this->declare_parameter<std::string>("map_frame", "odom");
     this->declare_parameter<std::string>("cloud_topic", "sensors/camera/color/points");
     this->declare_parameter<double>("tf_timeout_sec", 0.5);
-    // OctoMap specific parameters
-    this->declare_parameter<double>("resolution", 0.10);                // resolution in meters per voxel (OctoMap default is 0.05m)
-    this->declare_parameter<double>("max_range", 5.0);                  // maximum ray casting range in meters
-    this->declare_parameter<bool>("enable_degrade", true);              // enable degrading of outdated nodes for dynamic environments
-    this->declare_parameter<double>("degrade_timeout", 2.0);            // timeout in seconds
+    this->declare_parameter<double>("resolution", 0.10);
+    this->declare_parameter<double>("max_range", 5.0);
+    this->declare_parameter<bool>("enable_degrade", true);
+    this->declare_parameter<double>("degrade_timeout", 2.0);
     this->declare_parameter<int>("degrade_every_n_scans", 5);
 
     // Retrieve parameters
@@ -149,12 +148,12 @@ private:
   std::string map_frame_ {"odom"};
   std::string cloud_topic_ {"/sensors/camera/color/points"};
   double tf_timeout_sec_ {0.5};
-  uint32_t scan_count_{0};
   double resolution_{0.10};
   double max_range_{5.0};
   bool enable_degrade_{true};
   double degrade_timeout_{2.0};
   int degrade_every_n_scans_{5};
+  uint32_t scan_count_{0};
 
   // TF2 components
   tf2_ros::Buffer tf_buffer_;

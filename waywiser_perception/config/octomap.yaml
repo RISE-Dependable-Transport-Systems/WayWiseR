@@ -1,0 +1,26 @@
+octomap_node:  
+  ros__parameters:  
+    # Frame and topic configuration  
+    map_frame: "odom"  
+    cloud_topic: "sensors/camera/color/points"  
+    tf_timeout_sec: 0.5  
+      
+    # OctoMap parameters  
+    resolution: 0.10          # resolution in meters per voxel (default: 0.05m)
+    max_range: 5.0            # maximum ray casting range in meters  
+    enable_degrade: true      # enable degrading of outdated nodes for dynamic environments
+    degrade_timeout: 2.0      # timeout in seconds for degradation  
+    degrade_every_n_scans: 5  # perform degradation every N scans
+
+octomap_occlusions_node:  
+  ros__parameters:  
+    # Frame and topic configuration  
+    map_frame: "odom"  
+    octomap_topic: "octomap_full"
+    tf_timeout_sec: 0.5    
+      
+    # Occlusion detection parameters  
+    volume_threshold: 0.1  
+    max_range: 5.0  
+    camera_fov: 70.0  # Luxonis OAK-D Pro W FoV (vertical)
+    sensor_height_above_ground: 0.055 # [m]
