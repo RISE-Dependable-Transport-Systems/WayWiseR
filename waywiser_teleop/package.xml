@@ -30,6 +30,7 @@
   <depend>twist_mux</depend>
   <depend>rclpy</depend>
   <depend>waywiser_twist_safety</depend>
+  <depend>waywiser_core</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
