@@ -17,10 +17,9 @@ from rosgraph_msgs.msg import Clock as ClockMsg
 from std_msgs.msg import String
 
 from waywiser_py.waywiser_utils import (
-    create_subprocess,
-    get_full_file_path,
+    FileUtils,
+    ProcessUtils,
     RELIABLE_TRANSIENT_LOCAL_QOS,
-    terminate_subprocess,
 )
 from waywiser_test_runner.msg import SetupState
 
@@ -81,7 +80,7 @@ class AgrarsenseOrchestrator(Node):
                 self.get_parameter(f'spawn_point.{object_id}').get_parameter_value().string_value
             )
 
-        self.agrarsense_script_path = get_full_file_path(
+        self.agrarsense_script_path = FileUtils.get_full_file_path(
             self.get_parameter('agrarsense_script_path').get_parameter_value().string_value
         )
         self.ego_vehicle_role_name = (
@@ -109,7 +108,7 @@ class AgrarsenseOrchestrator(Node):
         )
 
         self.agrarsense_ros_bridge_params = {
-            'script_path': get_full_file_path(
+            'script_path': FileUtils.get_full_file_path(
                 self.get_parameter('agrarsense_ros_bridge.script_path')
                 .get_parameter_value()
                 .string_value,
@@ -144,7 +143,7 @@ class AgrarsenseOrchestrator(Node):
         self.weather_json_path = (
             self.get_parameter('weather_json_path').get_parameter_value().string_value
         )
-        self.weather_json_path = get_full_file_path(
+        self.weather_json_path = FileUtils.get_full_file_path(
             self.weather_json_path,
             os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
         )
@@ -292,7 +291,7 @@ class AgrarsenseOrchestrator(Node):
             and self.simulator_subprocess is not None
             or self.sim_state == AgrarsenseSimulatorState.INITIALIZING
         ):
-            terminate_subprocess(self.simulator_subprocess)
+            ProcessUtils.terminate_subprocess(self.simulator_subprocess)
             self.simulator_subprocess = None
             self.sim_state = AgrarsenseSimulatorState.UNKNOWN
         elif self.sim_state in [
@@ -325,9 +324,11 @@ class AgrarsenseOrchestrator(Node):
         ):
             self.simulation_config_to_process = json.loads(msg.data)
             if 'objects_json_path' in self.simulation_config_to_process:
-                self.simulation_config_to_process['objects_json_path'] = get_full_file_path(
-                    self.simulation_config_to_process['objects_json_path'],
-                    os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
+                self.simulation_config_to_process['objects_json_path'] = (
+                    FileUtils.get_full_file_path(
+                        self.simulation_config_to_process['objects_json_path'],
+                        os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
+                    )
                 )
             self.get_logger().info(
                 f'Processing setup request: {self.simulation_config_to_process}'
@@ -357,7 +358,7 @@ class AgrarsenseOrchestrator(Node):
         command.append(f'{self.agrarsense_ros_bridge_params["docker_container_name"]}')
 
         subprocess_name = 'agrarsense_ros_bridge'
-        self.ros_bridge_subprocess = create_subprocess(self, command, subprocess_name)
+        self.ros_bridge_subprocess = ProcessUtils.create_subprocess(self, command, subprocess_name)
         time.sleep(5.0)  # Wait for the bridge to start
 
     def initialize_simulation(self):
@@ -377,7 +378,7 @@ class AgrarsenseOrchestrator(Node):
             start_simulator_command.append(f'--quality-level={self.quality_level}')
 
         subprocess_name = 'simulator'
-        self.simulator_subprocess = create_subprocess(
+        self.simulator_subprocess = ProcessUtils.create_subprocess(
             self, start_simulator_command, subprocess_name
         )
         self.get_logger().warn(
@@ -425,7 +426,7 @@ class AgrarsenseOrchestrator(Node):
         weather_json_path = self.weather_json_path
         if 'weather_json_path' in self.simulation_config_to_process:
             weather_json_path = self.simulation_config_to_process['weather_json_path']
-            weather_json_path = get_full_file_path(
+            weather_json_path = FileUtils.get_full_file_path(
                 weather_json_path,
                 os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
             )
@@ -437,7 +438,7 @@ class AgrarsenseOrchestrator(Node):
         objects_json_path = self.objects_json_path
         if 'objects_json_path' in self.simulation_config_to_process:
             objects_json_path = self.simulation_config_to_process['objects_json_path']
-        objects_json_path = get_full_file_path(
+        objects_json_path = FileUtils.get_full_file_path(
             objects_json_path, os.path.join(get_package_share_directory(PACKAGE_NAME), 'config')
         )
         if objects_json_path == '':
@@ -527,8 +528,8 @@ class AgrarsenseOrchestrator(Node):
         docker_container_name = self.agrarsense_ros_bridge_params['docker_container_name']
         try:
             print('Shutting down carla_orchestrator node.')
-            terminate_subprocess(self.simulator_subprocess)
-            terminate_subprocess(self.ros_bridge_subprocess)
+            ProcessUtils.terminate_subprocess(self.simulator_subprocess)
+            ProcessUtils.terminate_subprocess(self.ros_bridge_subprocess)
 
             subprocess.run(['docker', 'rm', '-f', docker_container_name], check=True)
             print(f'Docker container {docker_container_name} removed.')
