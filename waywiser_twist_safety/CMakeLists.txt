@@ -10,6 +10,10 @@ if(POLICY CMP0148)
   cmake_policy(SET CMP0148 OLD)
 endif()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_C_STANDARD 23)
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)

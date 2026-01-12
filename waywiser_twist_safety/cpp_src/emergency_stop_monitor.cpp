@@ -1,10 +1,11 @@
-#include <chrono>
 #include <memory>
 
+#include <rclcpp/rclcpp.hpp>
+
 #include "geometry_msgs/msg/twist.hpp"
-#include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/bool.hpp"
+
 #include "waywiser/waywiser_utils.hpp"
 
 #include "waywiser_twist_safety/msg/emergency_stop_state.hpp"
@@ -23,6 +24,10 @@ public:
     current_emergency_stop_state_msg.sender_id = "emergency_stop_monitor";
 
     start_with_emergency_stop_ = this->declare_parameter("start_with_emergency_stop", true);
+    emergency_stop_status_topic_ = this->declare_parameter(
+      "emergency_stop_status_topic", "/emergency_stop/status");
+    emergency_stop_update_topic_ = this->declare_parameter(
+      "emergency_stop_update_topic", "/emergency_stop/target_state");
 
     if (start_with_emergency_stop_) {
       current_emergency_stop_state_msg.state = EmergencyStopState::ACTIVE;
@@ -33,11 +38,11 @@ public:
     }
 
     emergency_stop_target_state_subscriber_ = this->create_subscription<EmergencyStopState>(
-      "/emergency_stop/target_state", QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS,
+      emergency_stop_update_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS,
       std::bind(&EmergencyStopMonitor::emergency_stop_target_state_callback, this, _1));
 
     emergency_stop_current_state_publisher_ = this->create_publisher<EmergencyStopState>(
-      "/emergency_stop/current_state", 10);
+      emergency_stop_status_topic_, 10);
 
     emergency_stop_state_publish_rate_ = this->declare_parameter(
       "emergency_stop_state_publish_rate", 10);
@@ -73,8 +78,8 @@ public:
     );
 
     twist_subscriber_ = this->create_subscription<geometry_msgs::msg::Twist>(
-      "/cmd_vel_in", 10, std::bind(&EmergencyStopMonitor::twist_callback, this, _1));
-    twist_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel_out", 10);
+      "cmd_vel_in", 10, std::bind(&EmergencyStopMonitor::twist_callback, this, _1));
+    twist_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("cmd_vel_out", 10);
 
     RCLCPP_INFO(
       get_logger(),
@@ -177,6 +182,9 @@ private:
 
     twist_watchdog_timer_->cancel();
   }
+
+  std::string emergency_stop_status_topic_;
+  std::string emergency_stop_update_topic_;
 
   rclcpp::Subscription<EmergencyStopState>::SharedPtr emergency_stop_target_state_subscriber_;
   rclcpp::Publisher<EmergencyStopState>::SharedPtr emergency_stop_current_state_publisher_;
