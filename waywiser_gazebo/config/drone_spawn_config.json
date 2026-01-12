@@ -1,0 +1,22 @@
+{
+    "sdf_models": [
+        {
+            "name": "standing_actor_2",
+            "path": "./src/WayWiseR/waywiser_description/sdf/actor_stand/model.sdf",
+            "bridge_config": "",
+            "pose": "4.0 -3.0 0 0 0 3.14159"
+        },
+        {
+            "path": "./src/WayWiseR/waywiser_description/sdf/drone/model.sdf",
+            "bridge_config": "./src/WayWiseR/waywiser_gazebo/config/drone_gazebo_bridges.yaml",
+            "pose": "8.0 -2.0 3.0 0 0.35 3.14159"
+        }
+    ],
+    "static_transforms": [
+        {
+            "frame_id": "drone",
+            "child_frame_id": "drone/base_link",
+            "pose": "0 0 0 0 0 0"
+        }
+    ]
+}

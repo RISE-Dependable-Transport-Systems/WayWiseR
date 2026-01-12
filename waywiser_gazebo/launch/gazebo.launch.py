@@ -26,34 +26,16 @@ def generate_launch_description():
     )
     gazebo_bridge_la = DeclareLaunchArgument(
         'gazebo_bridge',
-        default_value=os.path.join(gazebo_dir, 'config/ros_gazebo_bridges.yaml'),
+        default_value=os.path.join(gazebo_dir, 'config/default_gazebo_bridges.yaml'),
         description='Full path to gazebo bridge file',
     )
     use_sim_time_la = DeclareLaunchArgument(
         'use_sim_time', default_value='True', description='Use simulation/Gazebo clock'
     )
-    frame_prefix_la = DeclareLaunchArgument(
-        'frame_prefix',
-        default_value='/',
-        description='Prefix to publish robot transforms in',
-    )
     ign_gazebo_resource_paths_la = DeclareLaunchArgument(
         'ign_gazebo_resource_paths',
         default_value='',
         description='Paths to additional model resources as a list',
-    )
-
-    # start nodes and use args to set parameters
-    spawn_robot = Node(
-        package='ros_gz_sim',
-        executable='create',
-        arguments=['-topic', 'robot_description'],
-        parameters=[
-            {
-                'use_sim_time': LaunchConfiguration('use_sim_time'),
-            }
-        ],
-        output='screen',
     )
 
     # gazebo bridge
@@ -90,15 +72,11 @@ def generate_launch_description():
 
     # declare launch args
     ld.add_action(use_sim_time_la)
-    ld.add_action(frame_prefix_la)
     ld.add_action(gazebo_la)
     ld.add_action(gazebo_bridge_la)
 
     # run gazebo launch file
     ld.add_action(gazebo)
-
-    # spawn robot in gazebo
-    ld.add_action(spawn_robot)
 
     # setup gazebo bridge
     ld.add_action(ros_gz_bridge_node)
