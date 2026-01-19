@@ -51,11 +51,29 @@ std::string RosUtils::joinFrame(
   const std::string & frame_prefix,
   const std::string & frame_name)
 {
-  if (frame_prefix.empty() || frame_name.empty()) {
+  if (frame_name.empty()) {
     return frame_name;
   }
-  if (frame_prefix.back() == '/' || frame_name.front() == '/') {
-    return frame_prefix + frame_name;
+
+  std::string name = frame_name;
+  std::string prefix = frame_prefix;
+
+  // Remove leading '/' from frame name
+  while (!name.empty() && name.front() == '/') {
+    name.erase(0, 1);
   }
-  return frame_prefix + "/" + frame_name;
+
+  // Remove leading and trailing '/' from prefix
+  while (!prefix.empty() && prefix.front() == '/') {
+    prefix.erase(0, 1);
+  }
+  while (!prefix.empty() && prefix.back() == '/') {
+    prefix.pop_back();
+  }
+
+  if (prefix.empty()) {
+    return name;
+  }
+
+  return prefix + "/" + name;
 }

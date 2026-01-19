@@ -287,7 +287,7 @@ class RosUtils:
         if not yaml_file or not os.path.exists(yaml_file):
             return {}
 
-        with open(yaml_file, 'r') as f:
+        with open(yaml_file, 'r', encoding='utf-8') as f:
             data = yaml.safe_load(f)
 
         if not data:
@@ -338,3 +338,47 @@ class RosUtils:
 
         # Top-level namespace (parent of node namespace)
         return '/' + parts[1]
+
+    @staticmethod
+    def prefix_topic_with_namespace(topic: str, namespace: str) -> str:
+        """
+        Prefix a topic with a given namespace.
+
+        Examples
+        --------
+          topic: /cmd_vel, namespace: /robot  -> /robot/cmd_vel
+          topic: cmd_vel, namespace: robot    -> /robot/cmd_vel
+          topic: /odom, namespace: /          -> /odom
+          topic: odom, namespace: /robot      -> /robot/odom
+        """
+        # Normalize topic
+        if not topic.startswith('/'):
+            topic = '/' + topic
+
+        # Normalize namespace
+        if not namespace or namespace == '/':
+            return topic
+
+        if not namespace.startswith('/'):
+            namespace = '/' + namespace
+        namespace = namespace.rstrip('/')
+
+        return namespace + topic
+
+    @staticmethod
+    def join_frame(frame_prefix: str, frame_name: str) -> str:
+        """
+        Join a frame prefix and frame name.
+
+        Examples
+        --------
+          frame_prefix: /robot, frame_name: cmd_vel  -> robot/cmd_vel
+          frame_prefix: robot, frame_name: cmd_vel   -> robot/cmd_vel
+          frame_prefix: /, frame_name: cmd_vel       -> cmd_vel
+          frame_prefix: robot, frame_name: /cmd_vel  -> robot/cmd_vel
+        """
+        result = RosUtils.prefix_topic_with_namespace(frame_name, frame_prefix)
+        if result.startswith('/'):
+            result = result[1:]
+
+        return result
