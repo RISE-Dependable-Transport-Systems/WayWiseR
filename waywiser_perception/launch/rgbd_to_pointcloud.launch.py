@@ -8,31 +8,25 @@ import yaml
 
 def generate_launch_description():
     # args that can be set from the command line or a default will be used
-    namespace_la = DeclareLaunchArgument(
-        'namespace',
-        default_value='/sensors',
-        description='namespace for all components',
-    )
-
     rgb_topic_la = DeclareLaunchArgument(
         'rgb_topic',
         default_value='camera',
-        description='RGB camera image topic (excluding namespace)',
+        description='RGB camera image topic',
     )
     depth_topic_la = DeclareLaunchArgument(
         'depth_topic',
         default_value='camera',
-        description='Depth camera image topic (excluding namespace)',
+        description='Depth camera image topic',
     )
     rgb_camera_info_topic_la = DeclareLaunchArgument(
         'rgb_camera_info_topic',
         default_value='camera_info',
-        description='RGB camera info topic (excluding namespace)',
+        description='RGB camera info topic',
     )
     pointcloud_topic_la = DeclareLaunchArgument(
         'pointcloud_topic',
         default_value='points',
-        description='Pointcloud topic (excluding namespace)',
+        description='Pointcloud topic',
     )
     max_depth_meters_la = DeclareLaunchArgument(
         'max_depth_meters',
@@ -53,13 +47,10 @@ def generate_launch_description():
         'log_level', default_value='warn', description='Log level'
     )
 
-    container_la = DeclareLaunchArgument(
-        name='container',
-        default_value='',
-        description=(
-            'Name of an existing node container to load launched nodes into. '
-            'If unset, a new container will be created.'
-        ),
+    node_name_la = DeclareLaunchArgument(
+        'node_name',
+        default_value='rgbd_to_pointcloud',
+        description='Name of the node',
     )
 
     # use context to start nodes
@@ -69,7 +60,6 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # declare launch arg
-    ld.add_action(namespace_la)
     ld.add_action(rgb_topic_la)
     ld.add_action(depth_topic_la)
     ld.add_action(rgb_camera_info_topic_la)
@@ -78,7 +68,7 @@ def generate_launch_description():
     ld.add_action(optical_to_ros_transform_la)
     ld.add_action(use_sim_time_la)
     ld.add_action(log_level_la)
-    ld.add_action(container_la)
+    ld.add_action(node_name_la)
 
     # start nodes
     ld.add_action(rgbd_to_pointcloud_launch_action)
@@ -91,13 +81,12 @@ def rgbd_to_pointcloud_launch(context):
     depth_topic = LaunchConfiguration('depth_topic').perform(context)
     rgb_camera_info_topic = LaunchConfiguration('rgb_camera_info_topic').perform(context)
     pointcloud_topic = LaunchConfiguration('pointcloud_topic').perform(context)
-    namespace = LaunchConfiguration('namespace').perform(context)
+    node_name = LaunchConfiguration('node_name').perform(context)
 
     rgbd_to_pointcloud_node = Node(
         package='waywiser_perception',
         executable='rgbd_to_pointcloud.py',
-        name=depth_topic + '_pointcloud',
-        namespace=namespace,
+        name=node_name,
         parameters=[
             {
                 'use_sim_time': LaunchConfiguration('use_sim_time'),

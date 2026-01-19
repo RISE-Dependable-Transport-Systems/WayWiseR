@@ -6,7 +6,7 @@ import math
 from geometry_msgs.msg import TransformStamped
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import CameraInfo
+from sensor_msgs.msg import CameraInfo, Image
 from tf2_ros import StaticTransformBroadcaster
 from tf_transformations import quaternion_from_euler, quaternion_multiply
 
@@ -37,6 +37,8 @@ class CameraInfoPublisher(Node):
         self.declare_parameter('base_frame', 'base_link')
         self.declare_parameter('topic_name', 'camera_info')
         self.declare_parameter('spawn_point', '')
+        self.declare_parameter('in_topic', '')
+        self.declare_parameter('out_topic', 'camera')
 
         # Get camera parameters
         self.width = self.get_parameter('width').get_parameter_value().integer_value
@@ -46,6 +48,8 @@ class CameraInfoPublisher(Node):
         self.base_frame = self.get_parameter('base_frame').get_parameter_value().string_value
         self.topic_name = self.get_parameter('topic_name').get_parameter_value().string_value
         self.spawn_point = self.get_parameter('spawn_point').get_parameter_value().string_value
+        self.in_topic = self.get_parameter('in_topic').get_parameter_value().string_value
+        self.out_topic = self.get_parameter('out_topic').get_parameter_value().string_value
 
         # Calculate focal length in pixels
         f_x = f_y = self.width / (2 * math.tan(math.radians(self.fov) / 2))
@@ -126,6 +130,12 @@ class CameraInfoPublisher(Node):
         self.publisher = self.create_publisher(CameraInfo, self.topic_name, 10)
         self.timer = self.create_timer(1.0, self.publish_camera_info)
 
+        if self.in_topic != '':
+            self.in_subscription = self.create_subscription(
+                Image, self.in_topic, self.in_callback, 10
+            )
+            self.out_publisher = self.create_publisher(Image, self.out_topic, 10)
+
     def publish_static_transform(self, x, y, z, qx, qy, qz, qw):
         static_broadcaster = StaticTransformBroadcaster(self)
 
@@ -153,6 +163,10 @@ class CameraInfoPublisher(Node):
         # Update the timestamp and publish
         self.camera_info_msg.header.stamp = self.get_clock().now().to_msg()
         self.publisher.publish(self.camera_info_msg)
+
+    def in_callback(self, msg):
+        msg.header.frame_id = self.camera_frame
+        self.out_publisher.publish(msg)
 
 
 def main(args=None):

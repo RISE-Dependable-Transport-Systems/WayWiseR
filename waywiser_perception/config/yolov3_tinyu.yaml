@@ -17,6 +17,6 @@ yolo_node:
     color_image_topic_as_stream: True
     tracker_config_filepath: "bytetrack.yaml" # "bytetrack.yaml" or "botsort.yaml"
 
-    publish_bbox_3d_markers: False
+    publish_bbox_3d_markers: False # markers cannot be published without using a tracker
     rviz_3d_visualization_markers_topic: "/sensors/camera/color/bbox_3d_markers"
     detections_topic: "/sensors/camera/color/yolov3_tinyu_detections"
