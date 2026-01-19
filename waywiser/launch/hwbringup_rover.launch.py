@@ -2,14 +2,18 @@ import os
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import (
+    DeclareLaunchArgument,
+    GroupAction,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+)
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
-import yaml
+from launch_ros.actions import Node, PushRosNamespace, SetRemap
 
-from waywiser_py.waywiser_utils import get_full_file_path
+from waywiser_py.waywiser_utils import FileUtils, RosUtils
 
 
 def generate_launch_description():
@@ -30,13 +34,8 @@ def generate_launch_description():
         default_value=os.path.join(waywiser_hwbringup_dir, 'config/lidar.yaml'),
         description='Full path to params file of lidar',
     )
-    frame_prefix_la = DeclareLaunchArgument(
-        'frame_prefix',
-        default_value='/',
-        description='Prefix to publish robot transforms in',
-    )
-    enable_collision_monitor_la = DeclareLaunchArgument(
-        'enable_collision_monitor',
+    enable_nav2_collision_monitor_la = DeclareLaunchArgument(
+        'enable_nav2_collision_monitor',
         default_value='False',
         description='Use Nav2 collision monitoring',
     )
@@ -61,7 +60,7 @@ def generate_launch_description():
         description='Launch rviz2',
     )
     control_vehicle_node_name_la = DeclareLaunchArgument(
-        'control_vehicle_node',
+        'control_vehicle_node_name',
         default_value='waywiser_car_node',
         description='Name of the vehicle node to control',
     )
@@ -80,54 +79,133 @@ def generate_launch_description():
         default_value=os.path.join(waywiser_slam_dir, 'config/slam.yaml'),
         description='Full path to params file for slam toolbox',
     )
+    rover_name_la = DeclareLaunchArgument(
+        'rover_name',
+        default_value='rover',
+        description='Name of the rover, used as ROS namespace and prefix for robot frames',
+    )
+
+    rover_name = LaunchConfiguration('rover_name')
+    frame_prefix = [rover_name, '/']
 
     # include launch files
-    waywiser_car_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                os.path.join(
-                    waywiser_core_dir,
-                    'launch',
-                    'waywiser_car.launch.py',
-                )
-            ]
-        ),
-        launch_arguments={
-            'vehicle_config': LaunchConfiguration('vehicle_config'),
-            'frame_prefix': LaunchConfiguration('frame_prefix'),
-        }.items(),
+    waywiser_car_launch = GroupAction(
+        actions=[
+            PushRosNamespace(rover_name),
+            SetRemap(src='/tf', dst='/tf'),
+            SetRemap(src='/tf_static', dst='/tf_static'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            waywiser_core_dir,
+                            'launch',
+                            'waywiser_car.launch.py',
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    'vehicle_config': LaunchConfiguration('vehicle_config'),
+                    'frame_prefix': frame_prefix,
+                }.items(),
+            ),
+        ]
     )
 
-    localization_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                os.path.join(
-                    get_package_share_directory('waywiser_core'),
-                    'launch',
-                    'waywiser_localization.launch.py',
-                )
-            ]
-        ),
-        launch_arguments={
-            'localization_config': LaunchConfiguration('vehicle_config'),
-            'localization_node_name': LaunchConfiguration('localization_node_name'),
-        }.items(),
+    rover_navsatfix_extended_wrapper = GroupAction(
+        actions=[
+            PushRosNamespace(rover_name),
+            SetRemap(src='/tf', dst='/tf'),
+            SetRemap(src='/tf_static', dst='/tf_static'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            get_package_share_directory('waywiser_core'),
+                            'launch',
+                            'navsatfix_extended_wrapper.launch.py',
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    'config': LaunchConfiguration('vehicle_config'),
+                    'frame_prefix': frame_prefix,
+                }.items(),
+            ),
+        ]
     )
 
-    twist_safety = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                os.path.join(
-                    waywiser_twist_safety_dir,
-                    'launch',
-                    'twist_safety.launch.py',
-                )
-            ]
-        ),
-        launch_arguments={
-            'enable_collision_monitor': LaunchConfiguration('enable_collision_monitor'),
-            'twist_safety_config': LaunchConfiguration('vehicle_config'),
-        }.items(),
+    rover_localization = GroupAction(
+        actions=[
+            PushRosNamespace(rover_name),
+            SetRemap(src='/tf', dst='/tf'),
+            SetRemap(src='/tf_static', dst='/tf_static'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            waywiser_core_dir,
+                            'launch',
+                            'waywiser_localization.launch.py',
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    'localization_config': LaunchConfiguration('vehicle_config'),
+                    'localization_node_name': LaunchConfiguration('localization_node_name'),
+                    'frame_prefix': frame_prefix,
+                }.items(),
+            ),
+        ]
+    )
+
+    rover_twist_safety = GroupAction(
+        actions=[
+            PushRosNamespace(rover_name),
+            SetRemap(src='/tf', dst='/tf'),
+            SetRemap(src='/tf_static', dst='/tf_static'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            waywiser_twist_safety_dir,
+                            'launch',
+                            'twist_safety.launch.py',
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    'enable_nav2_collision_monitor': LaunchConfiguration(
+                        'enable_nav2_collision_monitor'
+                    ),
+                    'twist_safety_config': LaunchConfiguration('vehicle_config'),
+                }.items(),
+            ),
+        ]
+    )
+
+    rover_lidar_based_slam = GroupAction(
+        actions=[
+            PushRosNamespace(rover_name),
+            SetRemap(src='/tf', dst='/tf'),
+            SetRemap(src='/tf_static', dst='/tf_static'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            waywiser_slam_dir,
+                            'launch',
+                            'slam.launch.py',
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    'slam_config': LaunchConfiguration('slam_config'),
+                    'frame_prefix': frame_prefix,
+                }.items(),
+                condition=IfCondition(LaunchConfiguration('lidar_based_slam')),
+            ),
+        ]
     )
 
     teleop_rviz2 = IncludeLaunchDescription(
@@ -145,14 +223,17 @@ def generate_launch_description():
             'teleop_config': LaunchConfiguration('teleop_config'),
             'teleop': LaunchConfiguration('teleop'),
             'rviz2': LaunchConfiguration('rviz2'),
-            'control_vehicle_node': LaunchConfiguration('control_vehicle_node'),
+            'control_vehicle_node_fqn': [
+                rover_name,
+                '/',
+                LaunchConfiguration('control_vehicle_node_name'),
+            ],
         }.items(),
     )
 
     # create opaque functions to launch nodes using context
     lidar_conditional_launch_action = OpaqueFunction(function=lidar_conditional_launch)
     camera_conditional_launch_action = OpaqueFunction(function=camera_conditional_launch)
-    slam_conditional_launch_action = OpaqueFunction(function=slam_conditional_launch)
 
     # create launch description
     ld = LaunchDescription()
@@ -160,8 +241,8 @@ def generate_launch_description():
     # declare launch args
     ld.add_action(vehicle_config_la)
     ld.add_action(lidar_config_la)
-    ld.add_action(frame_prefix_la)
-    ld.add_action(enable_collision_monitor_la)
+    ld.add_action(rover_name_la)
+    ld.add_action(enable_nav2_collision_monitor_la)
     ld.add_action(rviz_config_la)
     ld.add_action(teleop_config_la)
     ld.add_action(teleop_la)
@@ -173,36 +254,56 @@ def generate_launch_description():
 
     # start nodes
     ld.add_action(waywiser_car_launch)
-    ld.add_action(localization_launch)
-    ld.add_action(twist_safety)
+    ld.add_action(rover_localization)
+    ld.add_action(rover_twist_safety)
     ld.add_action(teleop_rviz2)
     ld.add_action(lidar_conditional_launch_action)
     ld.add_action(camera_conditional_launch_action)
-    ld.add_action(slam_conditional_launch_action)
+    ld.add_action(rover_lidar_based_slam)
+    ld.add_action(rover_navsatfix_extended_wrapper)
 
     return ld
 
 
 def lidar_conditional_launch(context):
     enable_lidar = False
-    vehicle_config = get_full_file_path(LaunchConfiguration('vehicle_config').perform(context))
+    vehicle_config = FileUtils.get_full_file_path(
+        LaunchConfiguration('vehicle_config').perform(context)
+    )
     if vehicle_config == '':
         return []
 
-    with open(vehicle_config, 'r', encoding='utf-8') as f:
-        config_data = yaml.safe_load(f)
-        waywise_car_node_params_dict = config_data['waywiser_car_node']['ros__parameters']
-        if 'enable_lidar' in waywise_car_node_params_dict:
-            enable_lidar = waywise_car_node_params_dict['enable_lidar']
+    control_vehicle_node_name = LaunchConfiguration('control_vehicle_node_name').perform(context)
+    rover_name = LaunchConfiguration('rover_name').perform(context)
+    frame_prefix = rover_name + '/'
+
+    waywise_car_node_params_dict = RosUtils.get_node_params(
+        vehicle_config, control_vehicle_node_name
+    )
+
+    if 'enable_lidar' in waywise_car_node_params_dict:
+        enable_lidar = waywise_car_node_params_dict['enable_lidar']
+
+    lidar_config = FileUtils.get_full_file_path(
+        LaunchConfiguration('lidar_config').perform(context)
+    )
+    if lidar_config == '':
+        return []
+
+    lidar_params_dict = RosUtils.get_node_params(lidar_config, 'rplidar_node')
+    lidar_params_dict['frame_id'] = RosUtils.join_frame(
+        frame_prefix, lidar_params_dict['frame_id']
+    )
 
     lidar_node = Node(
         package='rplidar_ros',
         executable='rplidar_node',
         name='rplidar_node',
-        parameters=[LaunchConfiguration('lidar_config')],
+        namespace=rover_name,
+        parameters=[lidar_params_dict],
         output='screen',
         condition=IfCondition(str(enable_lidar)),
-        remappings=[('/scan', '/scan_lidar')],
+        remappings=[('/scan', rover_name + '/scan_lidar')],
     )
 
     return [lidar_node]
@@ -210,15 +311,22 @@ def lidar_conditional_launch(context):
 
 def camera_conditional_launch(context):
     enable_camera = False
-    vehicle_config = get_full_file_path(LaunchConfiguration('vehicle_config').perform(context))
+    vehicle_config = FileUtils.get_full_file_path(
+        LaunchConfiguration('vehicle_config').perform(context)
+    )
     if vehicle_config == '':
         return []
 
-    with open(vehicle_config, 'r', encoding='utf-8') as f:
-        config_data = yaml.safe_load(f)
-        waywise_car_node_params_dict = config_data['waywiser_car_node']['ros__parameters']
-        if 'enable_camera' in waywise_car_node_params_dict:
-            enable_camera = waywise_car_node_params_dict['enable_camera']
+    control_vehicle_node_name = LaunchConfiguration('control_vehicle_node_name').perform(context)
+    rover_name = LaunchConfiguration('rover_name').perform(context)
+    frame_prefix = rover_name + '/'  # TODO: use frame_prefix in camera launch
+
+    waywise_car_node_params_dict = RosUtils.get_node_params(
+        vehicle_config, control_vehicle_node_name
+    )
+
+    if 'enable_camera' in waywise_car_node_params_dict:
+        enable_camera = waywise_car_node_params_dict['enable_camera']
 
     camera_launch_acton = []
     if enable_camera:
@@ -233,35 +341,10 @@ def camera_conditional_launch(context):
                         )
                     ]
                 ),
-            )
-        ]
-
-    return camera_launch_acton
-
-
-def slam_conditional_launch(context):
-    lidar_based_slam = LaunchConfiguration('lidar_based_slam').perform(context)
-    if lidar_based_slam.lower() == 'true':
-        return [
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    [
-                        os.path.join(
-                            get_package_share_directory('waywiser_slam'),
-                            'launch',
-                            'slam.launch.py',
-                        )
-                    ]
-                ),
                 launch_arguments={
-                    'slam_config': LaunchConfiguration('slam_config'),
+                    'namespace': rover_name + '/sensors',
                 }.items(),
             )
         ]
 
-    return []
-
-
-def yaml_to_dict(path_to_yaml):
-    with open(path_to_yaml, 'r', encoding='utf-8') as f:
-        return yaml.load(f, Loader=yaml.SafeLoader)
+    return camera_launch_acton
