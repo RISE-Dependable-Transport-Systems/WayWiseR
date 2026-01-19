@@ -263,14 +263,12 @@ class TwistKeyboard(Node):
         self.destroy_client(client)
 
     def _prefix_with_vehicle_namespace(self, topic):
-        if self.vehicle_namespace:
-            topic = f'/{self.vehicle_namespace}/{topic}'
-            topic = topic.replace('//', '/')
-        return topic
+        return RosUtils.prefix_topic_with_namespace(topic, self.vehicle_namespace)
 
     def _create_subscribers(self):
         """Create or recreate subscribers based on topic names."""
         if self.odom_topic:
+            self.get_logger().info(f'Creating subscriber for odom topic {self.odom_topic}')
             if self.odom_subscriber:
                 self.destroy_subscription(self.odom_subscriber)
             self.odom_subscriber = self.create_subscription(
@@ -327,9 +325,7 @@ class TwistKeyboard(Node):
         if self.mux_output_topic:
             if self.mux_publisher:
                 self.destroy_publisher(self.mux_publisher)
-            mux_output_topic_with_ns = self.mux_output_topic
-            if self.vehicle_namespace != '':
-                mux_output_topic_with_ns = f'{self.vehicle_namespace}/{mux_output_topic_with_ns}'
+            mux_output_topic_with_ns = self._prefix_with_vehicle_namespace(self.mux_output_topic)
             self.mux_publisher = self.create_publisher(Twist, mux_output_topic_with_ns, 10)
 
     def odom_callback(self, msg):
