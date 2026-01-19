@@ -58,23 +58,28 @@
     urdf_scale: 0.071429 # 1:14
     urdf_extra_args: "has_trailer:=true"
 
-    odom_topic: "/truck/odometry"
-    vehicle_pose_topic: "/truck/rear_axle_pose"
+    odom_topic: "odometry"
+    vehicle_pose_topic: "rear_axle_pose"
     trailer_pose_topic: "/semitrailer/rear_axle_pose"
-    angle_sensor_topic: "/truck/sensors/trailer_angle"
-    rtcm_frequency_topic: "/truck/sensors/gnss/rtcm_frequency"
-    nav_pvt_pose_topic: "/truck/sensors/gnss/nav_pvt_pose"
-    battery_state_topic: "/truck/sensors/battery_state"
-    mission_status_topic: "/truck/mission_status"
-    autopilot_state_control_topic: "/truck/autopilot_state_control"
-    vehicle_alignment_reference_point_topic: "/truck/vehicle_alignment_reference_point"
-    autopilot_center_pose_topic: "/truck/autopilot_center_pose"
-    emergency_stop_status_topic: "/emergency_stop/current_state"
-    emergency_stop_update_topic: "/emergency_stop/target_state"
-    fused_nav_sat_fix_extended_topic: "/truck/sensors/gnss/fused_nav_sat_fix_extended"
-    imu_topic: "/truck/sensors/imu"
+    angle_sensor_topic: "sensors/trailer_angle"
+    rtcm_frequency_topic: "sensors/gnss/rtcm_frequency"
+    nav_pvt_pose_topic: "sensors/gnss/nav_pvt_pose"
+    battery_state_topic: "sensors/battery_state"
+    mission_status_topic: "mission_status"
+    autopilot_state_control_topic: "autopilot_state_control"
+    vehicle_alignment_reference_point_topic: "vehicle_alignment_reference_point"
+    autopilot_center_pose_topic: "autopilot_center_pose"
+    emergency_stop_status_topic: "emergency_stop/current_state"
+    emergency_stop_update_topic: "emergency_stop/target_state"
+    fused_nav_sat_fix_extended_topic: "sensors/gnss/fused_nav_sat_fix_extended"
+    imu_topic: "sensors/imu"
 
     urm14_sensor_array_config: urm14_sensor_array.yaml
+
+    vehicle_control_command_topic: "waywiser_control_cmd"
+    autopilot_vel_topic: "waywiser_autopilot_vel"
+    joint_states_topic: "waywiser_joint_states"
+    gnss_chip_orientation_offset: [0, 0, 0.0]
 
 waywiser_truck_node:
   ros__parameters:
@@ -91,17 +96,18 @@ waywiser_truck_node:
     # tof_sensors: [tof_trailer_rear, tof_trailer_right, tof_trailer_left]
     # tof_trailer_rear:
     #   i2c_addr: 0x29
-    #   topic: "/truck/sensors/tof/trailer_rear"
+    #   topic: "sensors/tof/trailer_rear"
     # tof_trailer_right:
     #   i2c_addr: 0x30
-    #   topic: "/truck/sensors/tof/trailer_right"
+    #   topic: "sensors/tof/trailer_right"
     # tof_trailer_left:
     #   i2c_addr: 0x31
-    #   topic: "/truck/sensors/tof/trailer_left"
+    #   topic: "sensors/tof/trailer_left"
     min_battery_voltage: 13.6
     angle_sensor_offset: 94.043
     joint_states_publish_rate: 10
     invert_trailer_joint_state: true
+    invert_steering_joint_state: true
 
     #autopilot component
     autopilot_timer_rate: 10
@@ -120,7 +126,7 @@ waywiser_truck_node:
 waywiser_truck_localization_node:
   ros__parameters:
     use_sdvp_position_fusion: false
-    publish_world_to_fused_tf: false
+    tf_publish_rate: 0
     gnss_variant: "UBLOX_ZED_F9R" # "UBLOX_ZED_F9P" or "UBLOX_ZED_F9R"
     gnss_print_verbose: true
     gnss_sensor_fusion_on_chip: true

@@ -33,17 +33,23 @@
     urdf_file: "rover.urdf.xacro"
     urdf_scale: 1.0 # 1:1
 
-    odom_topic: "/rover/odometry"
-    vehicle_pose_topic: "/rover/rear_axle_pose"
-    battery_state_topic: "/rover/sensors/battery_state"
-    mission_status_topic: "/rover/mission_status"
-    autopilot_state_control_topic: "/rover/autopilot_state_control"
-    vehicle_alignment_reference_point_topic: "/rover/vehicle_alignment_reference_point"
-    autopilot_center_pose_topic: "/rover/autopilot_center_pose"
-    emergency_stop_status_topic: "/emergency_stop/current_state"
-    emergency_stop_update_topic: "/emergency_stop/target_state"
-    nav_sat_fix_extended_topic: "/rover/sensors/gnss/nav_sat_fix_extended"
-    fused_nav_sat_fix_extended_topic: "/rover/sensors/gnss/fused_nav_sat_fix_extended"
+    odom_topic: "odometry"
+    vehicle_pose_topic: "rear_axle_pose"
+    battery_state_topic: "sensors/battery_state"
+    mission_status_topic: "mission_status"
+    autopilot_state_control_topic: "autopilot_state_control"
+    vehicle_alignment_reference_point_topic: "vehicle_alignment_reference_point"
+    autopilot_center_pose_topic: "autopilot_center_pose"
+    emergency_stop_status_topic: "emergency_stop/current_state"
+    emergency_stop_update_topic: "emergency_stop/target_state"
+    nav_sat_fix_extended_topic: "sensors/gnss/nav_sat_fix_extended"
+    fused_nav_sat_fix_extended_topic: "sensors/gnss/fused_nav_sat_fix_extended"
+    vehicle_control_command_topic: "waywiser_control_cmd"
+    autopilot_vel_topic: "waywiser_autopilot_vel"
+    joint_states_topic: "waywiser_joint_states"
+    rtcm_frequency_topic: "rtcm_frequency"
+    imu_topic: "sensors/imu/raw"
+    gnss_chip_orientation_offset: [0, 0, 0.0]
 
 waywiser_car_node:
   ros__parameters:
@@ -55,9 +61,8 @@ waywiser_car_node:
     # TODO: limit erpm also based on current
     # current_max: 30.0
     publish_odom_to_baselink_tf: true
-    publish_world_to_odom_tf: false
+    publish_world_to_odom_tf: true
     vehicle_state_poll_rate: 30 # currently same rate for both odom topic and odom->base_link tf
-    use_sdvp_position_fusion: false
     imu_variant: "vesc"
     min_battery_voltage: 13.6
     joint_states_publish_rate: 10
@@ -81,10 +86,10 @@ waywiser_car_localization_node:
     gnss_variant: "external"
     ext_startup_timeout: 5.0
 
-tfs_to_navsatfixfused_node:
+navsatfix_extended_wrapper_node:
   ros__parameters:
+    conversion_mode: "tf"
     tf_object_frame: "rear_axle_link"
-    gnss_is_fused_on_chip: true
     gnss_fix_type: 3
     gnss_horizontal_accuracy: 0.01
     gnss_vertical_accuracy: 0.01
