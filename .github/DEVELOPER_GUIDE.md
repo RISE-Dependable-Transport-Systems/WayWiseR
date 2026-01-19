@@ -12,7 +12,7 @@ code --install-extension charliermarsh.ruff
 code --install-extension llvm-vs-code-extensions.vscode-clangd
 code --install-extension zachflower.uncrustify
 code --install-extension josetr.cmake-language-support-vscode
-code --install-extension foxundermoon.shell-format
+code --install-extension shakram02.bash-beautify
 code --install-extension esbenp.prettier-vscode
 code --install-extension DotJoshJohnson.xml
 ```
@@ -53,7 +53,7 @@ Create or update `.vscode/settings.json` with:
   "cmake.ignoreCMakeListsMissing": true,
   "cmakeFormat.args": ["--max-pargs-hwrap=6"],
   "[shellscript]": {
-    "editor.defaultFormatter": "foxundermoon.shell-format"
+    "editor.defaultFormatter": "shakram02.bash-beautify"
   },
   "[xml]": {
     "editor.defaultFormatter": "DotJoshJohnson.xml"

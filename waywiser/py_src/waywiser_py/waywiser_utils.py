@@ -346,10 +346,9 @@ class RosUtils:
 
         Examples
         --------
-          topic: /cmd_vel, namespace: /robot  -> /robot/cmd_vel
-          topic: cmd_vel, namespace: robot    -> /robot/cmd_vel
           topic: /odom, namespace: /          -> /odom
           topic: odom, namespace: /robot      -> /robot/odom
+
         """
         # Normalize topic
         if not topic.startswith('/'):
@@ -372,10 +371,10 @@ class RosUtils:
 
         Examples
         --------
-          frame_prefix: /robot, frame_name: cmd_vel  -> robot/cmd_vel
           frame_prefix: robot, frame_name: cmd_vel   -> robot/cmd_vel
           frame_prefix: /, frame_name: cmd_vel       -> cmd_vel
           frame_prefix: robot, frame_name: /cmd_vel  -> robot/cmd_vel
+
         """
         result = RosUtils.prefix_topic_with_namespace(frame_name, frame_prefix)
         if result.startswith('/'):

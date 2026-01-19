@@ -319,7 +319,7 @@ def camera_conditional_launch(context):
 
     control_vehicle_node_name = LaunchConfiguration('control_vehicle_node_name').perform(context)
     rover_name = LaunchConfiguration('rover_name').perform(context)
-    frame_prefix = rover_name + '/'  # TODO: use frame_prefix in camera launch
+    # frame_prefix = rover_name + '/'  # TODO: use frame_prefix in camera launch
 
     waywise_car_node_params_dict = RosUtils.get_node_params(
         vehicle_config, control_vehicle_node_name

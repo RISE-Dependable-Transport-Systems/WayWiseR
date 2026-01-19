@@ -224,9 +224,9 @@ def urm14_ultrasonic_array_launch(context):
 
     if 'urm14_sensor_array_config' in node_params_dict:
         vehicle_name = LaunchConfiguration('vehicle_name').perform(context)
-        frame_prefix = (
-            vehicle_name + '/'
-        )  # TODO: use frame_prefix in urm14_ultrasonic_array launch
+        # frame_prefix = (
+        #     vehicle_name + '/'
+        # )  # TODO: use frame_prefix in urm14_ultrasonic_array launch
 
         urm14_sensor_array_config = FileUtils.get_full_file_path(
             node_params_dict['urm14_sensor_array_config'],
