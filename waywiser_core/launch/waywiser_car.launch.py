@@ -76,7 +76,7 @@ def waywiser_car_node_launch(context):
 
     if 'urdf_file' in node_params_dict:
         robot_state_publisher_node = get_robot_state_publisher_node(
-            node_params_dict, use_sim_time, frame_prefix
+            context, node_params_dict, use_sim_time, frame_prefix
         )
         if robot_state_publisher_node is not None:
             nodes.append(robot_state_publisher_node)

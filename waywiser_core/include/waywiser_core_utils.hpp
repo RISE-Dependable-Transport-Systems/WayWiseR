@@ -124,20 +124,21 @@ public:
 
   static vector3_t getFramePosition(
     QSharedPointer<urdf::Model> urdfModel,
-    const std::string & link_name);
+    const std::string & link_name,
+    const bool logWarning = true);
 
   static vector3_t getFramePositionOffset(
     QSharedPointer<urdf::Model> urdfModel, const std::string & frame_A,
-    const std::string & frame_B);
+    const std::string & frame_B, const bool logWarning = true);
 
   static urdf::Rotation getFrameRotation(
     QSharedPointer<urdf::Model> urdfModel,
-    const std::string & link_name);
+    const std::string & link_name, const bool logWarning = true);
 
   static vector3_t getFrameRotationOffset(
     QSharedPointer<urdf::Model> urdfModel,
     const std::string & frame_A,
-    const std::string & frame_B);
+    const std::string & frame_B, const bool logWarning = true);
 };
 
 

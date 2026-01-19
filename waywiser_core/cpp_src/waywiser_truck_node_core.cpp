@@ -35,17 +35,30 @@ void WaywiserTruck::setup_parameters()
       "trailer_wheel_joint_names",
       std::vector<std::string>{"semitrailer_rlw_link_joint", "semitrailer_rrw_link_joint"}
     );
-    truck_trailer_link_joint_name_ = declare_parameter<std::string>(
-      "truck_trailer_link_joint_name", "truck_trailer_link_joint"
-    );
 
-    hitch_frame_ = declare_parameter("hitch_frame", base_frame_);
-    trailer_base_frame_ = declare_parameter("trailer_base_frame", "trailer");
-    trailer_rear_axle_frame_ = this->declare_parameter(
-      "trailer_rear_axle_frame", trailer_base_frame_);
-    trailer_center_frame_ = this->declare_parameter("trailer_center_frame", trailer_base_frame_);
-    trailer_rear_end_frame_ = this->declare_parameter("trailer_rear_end_frame", "");
-    trailer_hitch_frame_ = this->declare_parameter("trailer_hitch_frame", "");
+    for (auto & name : trailer_wheel_joint_names_) {
+      name = RosUtils::joinFrame(frame_prefix_, name);
+    }
+
+    truck_trailer_link_joint_name_ = RosUtils::joinFrame(
+      frame_prefix_,
+      declare_parameter<std::string>(
+        "truck_trailer_link_joint_name", "truck_trailer_link_joint"
+    ));
+
+    hitch_frame_ =
+      RosUtils::joinFrame(frame_prefix_, declare_parameter("hitch_frame", base_frame_));
+    trailer_base_frame_ =
+      RosUtils::joinFrame(frame_prefix_, declare_parameter("trailer_base_frame", "trailer"));
+    trailer_rear_axle_frame_ = RosUtils::joinFrame(
+      frame_prefix_, this->declare_parameter(
+        "trailer_rear_axle_frame", trailer_base_frame_));
+    trailer_center_frame_ = RosUtils::joinFrame(
+      frame_prefix_, this->declare_parameter("trailer_center_frame", trailer_base_frame_));
+    trailer_rear_end_frame_ =
+      RosUtils::joinFrame(frame_prefix_, this->declare_parameter("trailer_rear_end_frame", ""));
+    trailer_hitch_frame_ =
+      RosUtils::joinFrame(frame_prefix_, this->declare_parameter("trailer_hitch_frame", ""));
 
     angle_sensor_topic_ = this->declare_parameter("angle_sensor_topic", "/sensors/angle");
     trailer_pose_topic_ = declare_parameter("trailer_pose_topic", "/trailer_pose");
@@ -211,7 +224,7 @@ void WaywiserTruck::publish_tfs()
   WaywiserCar::publish_tfs();
 
   if (has_trailer_) {
-    if (publish_odom_to_baselink_tf_) {
+    if (false && publish_odom_to_baselink_tf_) {
       PosPoint odom_to_trailer_base_link_position =
         mTruckState->getTrailingVehicle()->posInVehicleFrameToPosPointENU(
         mTruckInterfaceComponent->getTrailerRearAxleToTrailerBaseOffset(), PosType::odom);

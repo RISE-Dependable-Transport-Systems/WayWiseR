@@ -75,7 +75,7 @@ def waywiser_localization_node_launch(context):
             urdf_extra_args = node_params_dict['urdf_extra_args']
 
         urdf_file_string = get_scaled_urdf_string(
-            node_params_dict['urdf_file'], urdf_scale, urdf_extra_args, frame_prefix
+            context, node_params_dict['urdf_file'], urdf_scale, urdf_extra_args, frame_prefix
         )
         if urdf_file_string is not None:
             node_params_dict['urdf_file'] = urdf_file_string

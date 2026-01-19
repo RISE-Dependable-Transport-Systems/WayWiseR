@@ -212,13 +212,19 @@ QSharedPointer<urdf::Model> URDFUtils::getURDFModel(const std::string & urdf_fil
 
 vector3_t URDFUtils::getFramePosition(
   QSharedPointer<urdf::Model> urdfModel,
-  const std::string & link_name)
+  const std::string & link_name, const bool logWarning)
 {
+  std::string normalized_link_name = link_name;
+  if (!normalized_link_name.empty() && normalized_link_name.front() == '/') {
+    normalized_link_name.erase(0, 1);
+  }
+
   urdf::Vector3 position(0, 0, 0);
-  urdf::LinkConstSharedPtr link = urdfModel->getLink(link_name);
+  urdf::LinkConstSharedPtr link = urdfModel->getLink(normalized_link_name);
   if (!link) {
-    if (urdfModel->getRoot()->name != link_name) {
-      qWarning() << "Link not found:" << QString::fromStdString(link_name) << " in model:" <<
+    if (urdfModel->getRoot()->name != normalized_link_name && logWarning) {
+      qWarning() << "Link not found:" << QString::fromStdString(normalized_link_name) <<
+        " in model:" <<
         QString::fromStdString(urdfModel->getName());
     }
   } else {
@@ -233,19 +239,25 @@ vector3_t URDFUtils::getFramePosition(
 
 vector3_t URDFUtils::getFramePositionOffset(
   QSharedPointer<urdf::Model> urdfModel, const std::string & frame_A,
-  const std::string & frame_B)
+  const std::string & frame_B, const bool logWarning)
 {
-  return getFramePosition(urdfModel, frame_A) - getFramePosition(urdfModel, frame_B);
+  return getFramePosition(urdfModel, frame_A, logWarning) -
+         getFramePosition(urdfModel, frame_B, logWarning);
 }
 
 urdf::Rotation URDFUtils::getFrameRotation(
   QSharedPointer<urdf::Model> urdfModel,
-  const std::string & link_name)
+  const std::string & link_name, const bool logWarning)
 {
+  std::string normalized_link_name = link_name;
+  if (!normalized_link_name.empty() && normalized_link_name.front() == '/') {
+    normalized_link_name.erase(0, 1);
+  }
+
   urdf::Rotation rotation(0, 0, 0, 1);  // identity quaternion
-  urdf::LinkConstSharedPtr link = urdfModel->getLink(link_name);
-  if (!link) {
-    qWarning() << "Link not found:" << QString::fromStdString(link_name);
+  urdf::LinkConstSharedPtr link = urdfModel->getLink(normalized_link_name);
+  if (!link && logWarning) {
+    qWarning() << "Link not found:" << QString::fromStdString(normalized_link_name);
   } else {
     while (link && link->parent_joint) {
       const urdf::Pose & joint_pose = link->parent_joint->parent_to_joint_origin_transform;
@@ -259,10 +271,10 @@ urdf::Rotation URDFUtils::getFrameRotation(
 vector3_t URDFUtils::getFrameRotationOffset(
   QSharedPointer<urdf::Model> urdfModel,
   const std::string & frame_A,
-  const std::string & frame_B)
+  const std::string & frame_B, const bool logWarning)
 {
-  urdf::Rotation rot_A = getFrameRotation(urdfModel, frame_A);
-  urdf::Rotation rot_B = getFrameRotation(urdfModel, frame_B);
+  urdf::Rotation rot_A = getFrameRotation(urdfModel, frame_A, logWarning);
+  urdf::Rotation rot_B = getFrameRotation(urdfModel, frame_B, logWarning);
 
   urdf::Rotation rot_offset = rot_B.GetInverse() * rot_A;
 

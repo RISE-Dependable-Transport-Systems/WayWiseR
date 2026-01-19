@@ -649,7 +649,7 @@ void WaywiserCar::odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom_ms
         rear_axle_frame_to_odom_child_frame_offset = mCarState->getRearAxleToRearEndOffset();
       } else if (mUrdfModel) {
         rear_axle_frame_to_odom_child_frame_offset = URDFUtils::getFramePositionOffset(
-          mUrdfModel, odom_msg->child_frame_id, rear_axle_frame_).to_type<xyz_t>();
+          mUrdfModel, odom_msg->child_frame_id, rear_axle_frame_, false).to_type<xyz_t>();
       } else {
         static bool transform_warning_logged_ = false;
         try {
@@ -743,7 +743,7 @@ void WaywiserCar::fused_nav_sat_fix_extended_callback(
         nav_sat_frame_to_rear_axle_frame_offset = mCarState->getRearAxleToRearEndOffset();
       } else if (mUrdfModel) {
         nav_sat_frame_to_rear_axle_frame_offset = URDFUtils::getFramePositionOffset(
-          mUrdfModel, msg->header.frame_id, rear_axle_frame_).to_type<xyz_t>();
+          mUrdfModel, msg->header.frame_id, rear_axle_frame_, false).to_type<xyz_t>();
       } else {
         static bool transform_warning_logged_ = false;
         try {
