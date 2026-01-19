@@ -1,29 +1,140 @@
-# WayWiseR ﹘ [WayWise](https://github.com/RISE-Dependable-Transport-Systems/WayWise) ❤️ [ROS2](https://docs.ros.org/)
+# WayWiseR
 
 ![Workflow build result](https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/actions/workflows/build.yaml/badge.svg) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/RISE-Dependable-Transport-Systems/WayWiseR)
 
-WayWise**R** is the integration of WayWise, the rapid prototyping library for connected, autonomous vehicles developed at the RISE Dependable Transport Systems group, with ROS2.
-Both WayWise and WayWiseR are focused on our research projects.
-Broadly speaking, there are two main use cases:
+**WayWiseR** is a [ROS2](https://docs.ros.org/)-based rapid prototyping platform designed for **Connected and Automated Vehicle (CAV)** validation research. Extending the low-level functionalities provided by the [WayWise](https://github.com/RISE-Dependable-Transport-Systems/WayWise) library with standardized ROS2 interfaces, WayWiseR enables systematic scenario-based validation across both simulated and physical environments.
 
-1. **Accelerating bringup of ROS2-powered vehicles.**
-   In this case, the main functionality of the vehicle is implemented using ROS2 packages and nodes, e.g., [Nav2](https://github.com/ros-planning/navigation2) or any other package you like.
-   WayWise is used for the low-level functionality like talking to motor controller, servo, IMU and GNSS (optional) to publish Odom messages and subscribe to Twist messages through WayWiseR.
-   The main purpose of WayWiseR here is to make it easy to bringup ROS2-powered vehicles using Waywise.
-   <img width="1465" alt="Use Case 1" src="https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/assets/2404625/468456d0-2130-4602-a803-2553a65fd220">
+WayWiseR is divided into modular ROS2 packages:
 
-2. **Extended functionality for WayWise-powered vehicles.**
-   In this case, the main functionality is implemented using WayWise (e.g., route following using pure pursuit, control and planning using [ControlTower](https://github.com/RISE-Dependable-Transport-Systems/ControlTower)).
-   ROS2 adds additional functionality like localization using [SLAM Toolbox](https://github.com/SteveMacenski/slam_toolbox) or advanced simulations in combination with, e.g., [Gazebo](https://gazebosim.org).
-   Compared to use case 1, directions of Odom and Twist messages would tentatively reverse: WayWise would publish Twist messages through WayWiseR to control the simulated vehicle and subscribe to Odom messages.
-   <img width="1895" alt="Use Case 2" src="https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/assets/2404625/543b7e36-41ea-4ade-ad8f-f54034e85162">
+| Package                                      | Description                                                       |
+| :------------------------------------------- | :---------------------------------------------------------------- |
+| `waywiser`                                   | Meta-package, FastDDS discovery and global utils.                 |
+| `waywiser_core`                              | ROS2 wrappers for the core WayWise functionalities.              |
+| `waywiser_description`                       | Vehicle and sensor descriptions (URDF/Xacro).                     |
+| `waywiser_hwbringup`                         | Configuration and launch files for physical hardware.             |
+| `waywiser_perception`                        | Image processing and computer vision.                             |
+| `waywiser_nav2`                              | Dynamic path planning via Nav2.                                   |
+| `waywiser_rviz2`                             | RViz2 configuration and launch files.                             |
+| `waywiser_slam`                              | SLAM Toolbox configuration and launch files.                      |
+| `waywiser_teleop`                            | Multi-source teleoperation and arbitration.                       |
+| `waywiser_test_runner`                       | ROS2 based Test orchestration.                                    |
+| `waywiser_twist_safety`                      | Onboard safety features such as command arbitration, E-Stop, etc. |
+| `waywiser_gazebo` / `_carla` / `_agrarsense` | Simulation-specific integration and environments.                 |
 
-In both cases, WayWiseR provides an abstraction layer between WayWise and ROS2, as well as launch files and configuration to quickly get you started.
-A typical project might start out in simulation using ROS2 and Gazebo. Then, WayWiseR is used to bring it to a real vehicle (1. use case).
-Alternatively, a project could start out with a ROS2-supported sensor that you want to gather data with (say a LiDAR). Then, WayWise could be used to make the sensor mobile with exact positioning and waypoint following (2. use case).
-Considering the modularity of ROS2 and WayWise, a project could also do something entirely different that does not clearly fit into one of the use cases. 😊
+---
 
-Current maintainers are: (firstname.lastname@ri.se):
+## Installation & Build (Ubuntu 22.04)
+
+1. **Prerequisites:**
+   - Install [uv](https://github.com/astral-sh/uv?tab=readme-ov-file#installation) for Python package management:
+
+     ```bash
+     curl -LsSf https://astral.sh/uv/install.sh | sh
+     ```
+
+   - Install ROS2 Humble following the [official guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html).
+
+   - Install the latest MAVSDK 2.x version (3.x is not yet supported) by downloading the latest deb package from [prebuilt releases](https://github.com/mavlink/MAVSDK/releases) and running:
+
+     ```bash
+     sudo dpkg -i libmavsdk-dev*.deb
+     ```
+
+     Alternatively, MAVSDK can be built from source by using the scripts [here](https://github.com/RISE-Dependable-Transport-Systems/WayWise/tree/main/tools/build_MAVSDK).
+
+   - Install system dependencies:
+
+     ```bash
+     sudo apt update && sudo apt install -y \
+         libunwind-dev \
+         libqt5serialport5-dev \
+         git \
+         build-essential \
+         cmake \
+         python3-colcon-common-extensions \
+         python3-pyqt5
+     ```
+
+2. **Initialize the workspace:**
+
+   ```bash
+   export WAYWISER_WS=~/waywiser_ws # Update with your desired path
+   mkdir -p $WAYWISER_WS/src
+   git clone git@github.com:RISE-Dependable-Transport-Systems/WayWiseR.git $WAYWISER_WS/src/WayWiseR
+   cd $WAYWISER_WS/src/WayWiseR
+   git submodule update --init waywiser_core/WayWise
+   ```
+
+3. **Setup Python virtual environment:**
+
+   ```bash
+   cd $WAYWISER_WS
+   uv venv --clear && source .venv/bin/activate
+   export PYTHONPATH=$WAYWISER_WS/.venv/lib/python3.10/site-packages:$PYTHONPATH
+   uv pip install -e src/WayWiseR
+   ```
+
+4. **Build the workspace:**
+
+   ```bash
+   source /opt/ros/humble/setup.bash
+   # Skip simulator packages for now:
+   export WAYWISER_SKIPPED_PACKAGES="waywiser_agrarsense waywiser_carla waywiser_gazebo"
+   rosdep install --from-paths $(colcon list --paths-only | grep -Evw "$(echo "$WAYWISER_SKIPPED_PACKAGES" | tr ' ' '|')") --ignore-src --rosdistro $ROS_DISTRO -r -y
+   colcon build --symlink-install --packages-skip $WAYWISER_SKIPPED_PACKAGES
+   ```
+
+   >💡 **Tip**: To persist environment variables, append the setup block to your `.venv/bin/activate` by running the following command in your terminal:
+   >
+   > ```bash
+   > cat <<EOT >> $WAYWISER_WS/.venv/bin/activate
+   > # WayWiseR Environment Setup
+   > source /opt/ros/humble/setup.bash
+   > export WAYWISER_WS=$WAYWISER_WS
+   > export WAYWISER_SKIPPED_PACKAGES="$WAYWISER_SKIPPED_PACKAGES"
+   > export PYTHONPATH=$WAYWISER_WS/.venv/lib/python3.10/site-packages:\$PYTHONPATH
+   >
+   > if [ -f "$WAYWISER_WS/install/setup.bash" ]; then
+   > source "$WAYWISER_WS/install/setup.bash"
+   > fi
+   > EOT
+   > ```
+
+   To build simulator-related packages such as waywiser_agrarsense, waywiser_carla, and waywiser_gazebo, follow the instructions in the respective packages.
+
+5. **Environment Configuration (.env):**
+
+   WayWiseR uses a `.env` file to manage settings such as ROS2 Domain ID and FastDDS Discovery Server configurations.
+
+   ```bash
+   cp src/WayWiseR/.env.example src/WayWiseR/.env
+   ```
+
+   Update the configurations in the `.env` file as needed. The `.env` file is automatically sourced whenever the virtual environment is activated via `source .venv/bin/activate`.
+
+---
+
+## Developer Guide
+
+For detailed developer setup configuration, refer to the [Developer Guide](.github/DEVELOPER_GUIDE.md).
+
+---
+
+## Demos
+
+### Autonomous reverse docking of a semi-truck (1:14 scaled) prototype
+
+https://github.com/user-attachments/assets/10458e63-c195-4a39-ae8a-7fcdc91dceaf
+
+### Safety-critical human detection and emergency braking in forestry simulations
+
+https://github.com/user-attachments/assets/b987e2b1-8aab-4627-a7d1-eda75a33960e
+
+---
+
+## Maintainers
+
+Current maintainers are: (firstname.middlename.lastname@ri.se):
 
 - Ramana Reddy Avula
 - Aria Mirzai
@@ -35,166 +146,25 @@ Previous maintainers:
 - Marvin Damschen
 - Rickard Häll
 
-## How to use it and what to expect
+---
 
-This ROS2 package is meant to be cloned into a ROS2 workspace.
-We do not do releases (for the time being) and do not promise a stable API but stick to standard ROS messages wherever possible.
-In general, our development resources are scarce and dedicated to fulfill use cases of research projects we are part of. We do our best to avoid it, but things will break from time to time.
+## Citation
 
-### How to install and build (on Ubuntu 22.04)
+If you use WayWiseR in your research, please cite:
 
-Install uv (required):
-
-- [Install uv](https://github.com/astral-sh/uv?tab=readme-ov-file#installation)
-
-  `curl -LsSf https://astral.sh/uv/install.sh | sh`
-
-Install ROS2 (required):
-
-- [Install ROS2 Humble](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html)
-
-Install MAVSDK latest 2.x version (required, version 3.x is not supported):
-
-- [Download MAVSDK pre-built releses](https://github.com/mavlink/MAVSDK/releases)
-
-  `sudo dpkg -i libmavsdk-dev*.deb`
-
-To instead build MAVSDK from source (optional):
-
-- [Scripts can be found in the WayWise repository](https://github.com/RISE-Dependable-Transport-Systems/WayWise/tree/main/tools/build_MAVSDK)
-
-Setup workspace and build it (without simulator-related packages):
-
-1. **Install system dependencies:**
-
-   ```bash
-   sudo apt update && sudo apt install -y \
-     libunwind-dev \
-     libqt5serialport5-dev \
-     git \
-     build-essential \
-     cmake \
-     python3-colcon-common-extensions \
-     python3-pyqt5
-   ```
-
-2. **Setup environment variables:**
-
-   ```bash
-   export WAYWISER_WS=~/waywiser_ws  # Update with your desired path
-   # Skip simulator packages for this setup
-   export WAYWISER_SKIPPED_PACKAGES="waywiser_agrarsense waywiser_carla waywiser_gazebo"
-   ```
-
-3. **Clone and initialize workspace:**
-
-   ```bash
-   mkdir -p $WAYWISER_WS/src
-   git clone git@github.com:RISE-Dependable-Transport-Systems/WayWiseR.git $WAYWISER_WS/src/WayWiseR
-
-   cd $WAYWISER_WS/src/WayWiseR
-   git submodule update --init waywiser_core/WayWise
-   ```
-
-4. **Setup Python virtual environment (using uv):**
-
-   ```bash
-   cd $WAYWISER_WS
-   uv venv --clear
-   source .venv/bin/activate
-
-   # Add venv site-packages to PYTHONPATH
-   export PYTHONPATH=$WAYWISER_WS/.venv/lib/python3.10/site-packages:$PYTHONPATH
-
-   # Install WayWiseR python dependencies
-   uv pip install -e src/WayWiseR
-   ```
-
-5. **Install ROS2 dependencies and build:**
-
-   ```bash
-   source /opt/ros/humble/setup.bash
-
-   # Install dependencies, excluding skipped packages
-   rosdep install --from-paths $(colcon list --paths-only | grep -Evw "$(echo "$WAYWISER_SKIPPED_PACKAGES" | tr ' ' '|')") \
-     --ignore-src --rosdistro $ROS_DISTRO -r -y
-
-   colcon build --symlink-install --packages-skip $WAYWISER_SKIPPED_PACKAGES
-   ```
-
-To persist the environment variables and source the ROS2 overlay automatically in each terminal when activating the virtual environment, run the following command (copy-paste the entire block):
-
-```bash
-cat <<EOT >> $WAYWISER_WS/.venv/bin/activate
-
-# WayWiseR Environment Setup
-source /opt/ros/humble/setup.bash
-export WAYWISER_WS=$WAYWISER_WS
-export WAYWISER_SKIPPED_PACKAGES="$WAYWISER_SKIPPED_PACKAGES"
-export PYTHONPATH=$WAYWISER_WS/.venv/lib/python3.10/site-packages:\$PYTHONPATH
-
-if [ -f "$WAYWISER_WS/install/setup.bash" ]; then
-source "$WAYWISER_WS/install/setup.bash"
-fi
-EOT
+```bibtex
+@inproceedings{avula2025waywiser,
+  title     = {WayWiseR: A Rapid Prototyping Platform for Validating Connected and Automated Vehicles},
+  author    = {Avula, Ramana Reddy and Damschen, Marvin and Mirzai, Aria and Lundgren, Karl and Farooqui, Ashfaq and Thorsen, Anders},
+  booktitle = {Proceedings of the 13th International Conference on Control, Mechatronics and Automation (ICCMA)},
+  year      = {2025},
+  address   = {Paris, France},
+  publisher = {IEEE},
+}
 ```
 
-To build simulator-related packages such as waywiser_agrarsense, waywiser_carla, and waywiser_gazebo, follow the instructions in the respective packages.
-
-6. **Setup Environment Configuration (.env)**
-
-   WayWiseR uses a `.env` file to manage settings such as ROS 2 Domain ID and FastDDS Discovery Server configurations.
-
-   ```bash
-   cp src/WayWiseR/.env.example src/WayWiseR/.env
-   ```
-
-   **Key Configurations:**
-
-   - `ROS_DOMAIN_ID`: Set your desired ROS 2 domain (default: 0).
-   - `ROS_USE_DISCOVERY_SERVER`: Set to `1` to enable Discovery Server mode, or `0` for standard Multicast discovery.
-
-   The `.env` file is automatically sourced whenever you activate your virtual environment via `source .venv/bin/activate`.
-
-### Current state
-
-The current state presents the core platform that our research projects [AGRARSENSE](https://www.ri.se/en/what-we-do/projects/agrarsense) and [SUNRISE](https://www.ri.se/en/what-we-do/projects/safety-assurance-framework-for-connected-automated-mobility-systems) have used throughout 2024–2025 to investigate safety-critical situational awareness in the forestry and road vehicle contexts, respectively.
-
-## Organization
-
-WayWiseR is divided into several ROS2 packages. Make sure to have a look into the respecitve package.xml files.
-
-- **waywiser**: A meta package that depends on all packages below to be able to refer to WayWiseR as a whole. It contains configuration files to optionally setup fastdds discovery server.
-- **waywiser_agrarsense**: Everything related to simulation using [Agrarsense simulator](https://agrarsense.frostbit.fi/index.html#md_Docs_getting_started).
-- **waywiser_carla**: Everything related to simulation using [Carla](https://carla.org/).
-- **waywiser_core**: Wraps [WayWise](https://github.com/RISE-Dependable-Transport-Systems/WayWise) into ROS2 nodes.
-- **waywiser_description**: Contains vehicle descriptions in the form of [xacro](https://docs.ros.org/en/humble/Tutorials/Intermediate/URDF/Using-Xacro-to-Clean-Up-a-URDF-File.html) files. Currently a single vehicle is available that corresponds to a [Traxxas](https://traxxas.com/) Slash incl. camera, depth camera, LiDAR and IMU.
-- **waywiser_gazebo**: Everything related to simulation using [Gazebo](https://gazebosim.org).
-- **waywiser_hwbringup**: Configuration and launch files to get real (not simulated) vehicles running.
-- **waywiser_nav2**: Package that provides dynamic path planning using [Nav2](https://navigation.ros.org/).
-- **waywiser_perception**: Provides image-processing and computer vision functionalities using [YOLOv8](https://docs.ultralytics.com/).
-- **waywiser_rviz2**: Configuration and launch files for RViz2.
-- **waywiser_slam**: Configuration and launch files for [SLAM Toolbox](https://github.com/SteveMacenski/slam_toolbox).
-- **waywiser_teleop**: Configuration and launch files for teleop packages (handling keyboard or gamepad input) and a node to arbitrate between them.
-- **waywiser_test_runner**: Package that orchestrates tests.
-- **waywiser_twist_safety**: Contains configuration and launch files to manage twist commands to vehicle from different sources. It also includes a composable node for emergency stop monitoring.
-
-## Examples
-
-Use case 1 ﹘ Nav2 on top of WayWise:
-
-https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/assets/2404625/99751b42-a983-4826-a795-4b80ddd2bc28
-
-Use case 2 ﹘ WayWise autopilot driving in Gazebo:
-
-https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/assets/2404625/c936d089-d462-4c81-a0ff-e2c9cdb1e4ab
-
-## Developer Guide
-
-For detailed developer setup configuration, refer to the [Developer Guide](.github/DEVELOPER_GUIDE.md).
-
-## Funded by
+## Funding
 
 <img src="https://user-images.githubusercontent.com/2404625/202213271-a4006999-49d5-4e61-9f3d-867a469238d1.png" width="120" height="81" align="left" alt="EU logo" />
-This project has received funding from the European Union’s Horizon Europe research and innovation programme under grant agreement nº 101095835 and nº 101069573. The results reflect only the authors' view and the Agency is not responsible
+This project has received funding from the European Union’s Horizon Europe research and innovation programme under grant agreements 101095835 and 101069573. The results reflect only the authors' view, and the Agency is not responsible
 for any use that may be made of the information it contains.
