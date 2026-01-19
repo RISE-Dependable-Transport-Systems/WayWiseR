@@ -30,9 +30,9 @@
       <always_on>1</always_on>
       <update_rate>30</update_rate>
       <visualize>0</visualize>
-      <topic>${robot_name}/imu</topic>
-      <ignition_frame_id>${robot_name}/imu_link</ignition_frame_id>
-      <pose relative_to='${robot_name}/imu_link'>0 0 0 0 0 0</pose>
+      <topic>${frame_prefix}imu</topic>
+      <ignition_frame_id>${frame_prefix}imu_link</ignition_frame_id>
+      <pose relative_to='${frame_prefix}imu_link'>0 0 0 0 0 0</pose>
     </sensor>
   </gazebo>
 </robot>

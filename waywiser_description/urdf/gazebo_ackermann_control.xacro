@@ -1,9 +1,7 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
   <gazebo>
-    <plugin
-      filename="ignition-gazebo-ackermann-steering-system"
-      name="ignition::gazebo::systems::AckermannSteering">
+    <plugin filename="ignition-gazebo-ackermann-steering-system" name="ignition::gazebo::systems::AckermannSteering">
 
       <!-- Wheel Information -->
       <left_joint>left_front_wheel_joint</left_joint>
@@ -26,20 +24,19 @@
       <max_acceleration>5</max_acceleration>
 
       <!-- Input -->
-      <topic>${robot_name}/cmd_vel</topic>
+      <topic>${frame_prefix}cmd_vel</topic>
 
       <!-- Output -->
       <odom_publish_frequency>50</odom_publish_frequency>
       <tf_topic>/tf</tf_topic>
-      <odom_topic>${robot_name}/odom</odom_topic>
-      <frame_id>${robot_name}/odom</frame_id>
-      <child_frame_id>${robot_name}/base_link</child_frame_id>
+      <odom_topic>${frame_prefix}odom</odom_topic>
+      <frame_id>${frame_prefix}odom</frame_id>
+      <child_frame_id>${frame_prefix}base_link</child_frame_id>
     </plugin>
   </gazebo>
 
   <gazebo>
-    <plugin filename="libignition-gazebo-joint-state-publisher-system.so"
-      name="ignition::gazebo::systems::JointStatePublisher">
+    <plugin filename="libignition-gazebo-joint-state-publisher-system.so" name="ignition::gazebo::systems::JointStatePublisher">
       <joint_name>left_front_wheel_joint</joint_name>
       <joint_name>left_rear_wheel_joint</joint_name>
       <joint_name>right_front_wheel_joint</joint_name>
@@ -48,9 +45,7 @@
       <joint_name>right_front_wheel_steering_joint</joint_name>
       <topic>/joint_states</topic>
     </plugin>
-    <plugin
-      filename="ignition-gazebo-pose-publisher-system"
-      name="gz::sim::systems::PosePublisher">
+    <plugin filename="ignition-gazebo-pose-publisher-system" name="gz::sim::systems::PosePublisher">
       <publish_link_pose>false</publish_link_pose>
       <publish_collision_pose>false</publish_collision_pose>
       <publish_visual_pose>false</publish_visual_pose>

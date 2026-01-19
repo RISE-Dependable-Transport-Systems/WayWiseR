@@ -20,7 +20,7 @@ fi
 
 # Process the input XACRO with xacro, passing any additional arguments
 TEMP_URDF=$(mktemp)
-xacro "$INPUT_XACRO" "$@" >"$TEMP_URDF"
+xacro "$INPUT_XACRO" frame_prefix:="$FRAME_PREFIX" "$@" >"$TEMP_URDF"
 if [ $? -ne 0 ]; then
     rm "$TEMP_URDF"
     exit 1
@@ -103,7 +103,7 @@ cat <<EOF >$XSLT_STYLESHEET
     <xsl:template name="scale-space-separated">
         <xsl:param name="value"/>
         <xsl:param name="delimiter" select="' '"/>
-        
+
         <xsl:choose>
             <xsl:when test="contains(\$value, \$delimiter)">
                 <xsl:value-of select="number(substring-before(\$value, \$delimiter)) * number(\$scale_factor)"/>

@@ -22,8 +22,7 @@
         <cylinder radius="${lidar_radius}" length="${lidar_length}" />
       </geometry>
     </collision>
-    <xacro:inertial_cylinder mass="${lidar_mass}" length="${lidar_length}"
-      radius="${lidar_radius}">
+    <xacro:inertial_cylinder mass="${lidar_mass}" length="${lidar_length}" radius="${lidar_radius}">
       <origin xyz="0 0 0" rpy="0 0 0" />
     </xacro:inertial_cylinder>
   </link>
@@ -40,8 +39,7 @@
         <box size="${lidar_support_length} ${lidar_support_breadth} ${lidar_support_height}" />
       </geometry>
     </collision>
-    <xacro:inertial_box mass="${lidar_mass}" length="${lidar_support_length}"
-      breadth="${lidar_support_breadth}" height="${lidar_support_height}">
+    <xacro:inertial_box mass="${lidar_mass}" length="${lidar_support_length}" breadth="${lidar_support_breadth}" height="${lidar_support_height}">
       <origin xyz="0 0 0" rpy="0 0 0" />
     </xacro:inertial_box>
   </link>
@@ -61,9 +59,9 @@
   <gazebo reference="lidar_link">
     <material>Gazebo/Black</material>
     <sensor name='lidar_link' type='gpu_lidar'>
-      <topic>${robot_name}/scan_lidar</topic>
-      <ignition_frame_id>${robot_name}/lidar_link</ignition_frame_id>
-      <pose relative_to="${robot_name}/lidar_link">0 0 0 0 0 0</pose>
+      <topic>${frame_prefix}scan_lidar</topic>
+      <ignition_frame_id>${frame_prefix}lidar_link</ignition_frame_id>
+      <pose relative_to="${frame_prefix}lidar_link">0 0 0 0 0 0</pose>
       <always_on>1</always_on>
       <visualize>0</visualize>
       <update_rate>10</update_rate>
