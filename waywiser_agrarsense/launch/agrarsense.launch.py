@@ -17,7 +17,9 @@ def generate_launch_description():
     # args that can be set from the command line or a default will be used
     sim_config_la = DeclareLaunchArgument(
         'sim_config',
-        default_value=os.path.join(waywiser_agrarsense_dir, 'config/agrarsense.yaml'),
+        default_value=os.path.join(
+            waywiser_agrarsense_dir, 'config/agrarsense_orchestrator_playground.yaml'
+        ),
         description='Full path to params file of simulator',
     )
 

@@ -9,6 +9,8 @@ from rclpy.node import Node
 from tf2_ros import TransformBroadcaster
 from tf_transformations import euler_from_quaternion, quaternion_from_euler
 
+from waywiser_py.waywiser_utils import RosUtils
+
 
 class VehicleTFPublisher(Node):
     """ROS2 node that publishes vehicle odometry and transforms."""
@@ -28,11 +30,17 @@ class VehicleTFPublisher(Node):
         # Get parameters
         self.role_name = self.get_parameter('role_name').get_parameter_value().string_value
         self.world_frame = self.get_parameter('world_frame').get_parameter_value().string_value
-        self.odom_frame = self.get_parameter('odom_frame').get_parameter_value().string_value
-        self.base_link_frame = (
-            self.get_parameter('base_link_frame').get_parameter_value().string_value
+        self.odom_frame = RosUtils.join_frame(
+            self.role_name, self.get_parameter('odom_frame').get_parameter_value().string_value
         )
-        self.odom_topic = self.get_parameter('odom_topic').get_parameter_value().string_value
+        self.get_logger().info(f'Odom frame set to: {self.odom_frame}')
+        self.base_link_frame = RosUtils.join_frame(
+            self.role_name,
+            self.get_parameter('base_link_frame').get_parameter_value().string_value,
+        )
+        self.odom_topic = RosUtils.prefix_topic_with_namespace(
+            self.get_parameter('odom_topic').get_parameter_value().string_value, self.role_name
+        )
         self.publish_rate = self.get_parameter('publish_rate').get_parameter_value().double_value
         self.yaw_offset = self.get_parameter('yaw_offset').get_parameter_value().double_value
 

@@ -45,6 +45,6 @@ agrarsense_orchestrator_node:
         world_frame: "map"
         odom_frame: "odom"
         base_link_frame: "base_link"
-        odom_topic: "/forwarder/odometry"
+        odom_topic: "odometry"
         publish_rate: 10.0
         yaw_offset: 0.0

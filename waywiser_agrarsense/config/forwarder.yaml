@@ -32,22 +32,28 @@
     urdf_file: "forwarder.urdf"
     urdf_scale: 1.0 # 1:1
 
-    odom_topic: "/forwarder/odometry"
-    vehicle_pose_topic: "/forwarder/rear_axle_pose"
-    rtcm_frequency_topic: "/forwarder/sensors/gnss/rtcm_frequency"
-    nav_pvt_pose_topic: "/forwarder/sensors/gnss/nav_pvt_pose"
-    battery_state_topic: "/forwarder/sensors/battery_state"
-    mission_status_topic: "/forwarder/mission_status"
-    autopilot_state_control_topic: "/forwarder/autopilot_state_control"
-    vehicle_alignment_reference_point_topic: "/forwarder/vehicle_alignment_reference_point"
-    autopilot_center_pose_topic: "/forwarder/autopilot_center_pose"
-    emergency_stop_status_topic: "/emergency_stop/current_state"
-    emergency_stop_update_topic: "/emergency_stop/target_state"
-    nav_sat_fix_extended_topic: "/forwarder/sensors/gnss/nav_sat_fix_extended"
-    fused_nav_sat_fix_extended_topic: "/forwarder/sensors/gnss/fused_nav_sat_fix_extended"
+    odom_topic: "odometry"
+    vehicle_pose_topic: "rear_axle_pose"
+    rtcm_frequency_topic: "sensors/gnss/rtcm_frequency"
+    nav_pvt_pose_topic: "sensors/gnss/nav_pvt_pose"
+    battery_state_topic: "sensors/battery_state"
+    mission_status_topic: "mission_status"
+    autopilot_state_control_topic: "autopilot_state_control"
+    vehicle_alignment_reference_point_topic: "vehicle_alignment_reference_point"
+    autopilot_center_pose_topic: "autopilot_center_pose"
+    emergency_stop_status_topic: "emergency_stop/current_state"
+    emergency_stop_update_topic: "emergency_stop/target_state"
+    nav_sat_fix_extended_topic: "sensors/gnss/nav_sat_fix_extended"
+    fused_nav_sat_fix_extended_topic: "sensors/gnss/fused_nav_sat_fix_extended"
 
     gnss_reference_frame: "base_link"
     gnss_message_rate: 10 # Hz
+
+    vehicle_control_command_topic: "waywiser_control_cmd"
+    autopilot_vel_topic: "waywiser_autopilot_vel"
+    joint_states_topic: "waywiser_joint_states"
+    imu_topic: "sensors/imu/raw"
+    gnss_chip_orientation_offset: [0.0, 0.0, 0.0]
 
 waywiser_car_node:
   ros__parameters:
@@ -84,11 +90,13 @@ waywiser_car_localization_node:
   ros__parameters:
     use_sdvp_position_fusion: false
     gnss_variant: "external"
+    ext_startup_timeout: 20.0
 
-tfs_to_navsatfixfused_node:
+navsatfix_extended_wrapper_node:
   ros__parameters:
+    conversion_mode: "tf"
     tf_object_frame: "forwarder"
-    gnss_is_fused_on_chip: true
+    frame_id_override: "base_link"
     gnss_fix_type: 3
     gnss_horizontal_accuracy: 0.01
     gnss_vertical_accuracy: 0.01
@@ -122,10 +130,10 @@ onboard_twist_mux:
         timeout: 0.5
         priority: 50
 
-collision_monitor:
+nav2_collision_monitor:
   ros__parameters:
     cmd_vel_in_topic: "onboard_mux_vel"
-    cmd_vel_out_topic: "collision_monitor_vel"
+    cmd_vel_out_topic: "nav2_collision_monitor_vel"
     transform_tolerance: 0.5
     source_timeout: 5.0
     base_shift_correction: True
@@ -138,10 +146,42 @@ collision_monitor:
       slowdown_ratio: 0.5
       visualize: True
       radius: 20.0
-      polygon_pub_topic: "/agrarsense/out/vehicles/forwarder/polygon_slowdown"
+      polygon_pub_topic: "polygon_slowdown"
     observation_sources: ["pointcloud_front"]
     pointcloud_front:
       type: "pointcloud"
-      topic: "/forwarder/depth_front/color/points"
+      topic: "sensors/depth_front/color/points"
       min_height: 0.1
       max_height: 0.5
+
+waywiser_collision_monitor_node:
+  ros__parameters:
+    detections_topic: "sensors/rgb_front/yolov3_tinyu_detections"
+    distance_threshold: 3.0 # [m]
+    emergency_stop_status_topic: "emergency_stop/current_state"
+    emergency_stop_update_topic: "emergency_stop/target_state"
+    class_ids_to_stop: ["0"] # "0"=Person for YOLO, "15"=Person for MobileNet
+    reference_frame: forwarder/rgb_front
+
+yolo_node:
+  ros__parameters:
+    model_file_path: "~/workspaces/waywiser_ws/resources/yolov3-tinyu.engine"
+    device: "cuda:0" # cuda:x/cpu
+    confidence_threshold: 0.5 # Detection confidence threshold
+    prediction_verbose: False
+    color_image_topic: "sensors/rgb_front/image_rect"
+    publish_annotated_image: True
+    annotated_color_image_topic: "sensors/rgb_front/yolov3_tinyu_annotated_image"
+    camera_base_frame: "forwarder/rgb_front"
+
+    depth_image_topic: "sensors/depth_front/image_rect"
+    depth_camerainfo_topic: "sensors/depth_front/camera_info"
+    maximum_object_depth_size: 0.5
+
+    use_tracker: False
+    color_image_topic_as_stream: True
+    tracker_config_filepath: "bytetrack.yaml" # "bytetrack.yaml" or "botsort.yaml"
+
+    publish_bbox_3d_markers: False # markers cannot be published without using a tracker
+    rviz_3d_visualization_markers_topic: ""
+    detections_topic: "sensors/rgb_front/yolov3_tinyu_detections"

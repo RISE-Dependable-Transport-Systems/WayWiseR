@@ -13,7 +13,9 @@ def generate_launch_description():
     # args that can be set from the command line or a default will be used
     config_la = DeclareLaunchArgument(
         'config',
-        default_value=os.path.join(waywiser_agrarsense_dir, 'config/agrarsense_orchestrator.yaml'),
+        default_value=os.path.join(
+            waywiser_agrarsense_dir, 'config/agrarsense_orchestrator_playground.yaml'
+        ),
         description='Full path to params file for agrarsense orchestrator',
     )
     ego_vehicle_role_name_la = DeclareLaunchArgument(
