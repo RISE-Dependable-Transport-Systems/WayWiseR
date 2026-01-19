@@ -75,24 +75,29 @@
     urdf_scale: 1.0 # 1:1
     urdf_extra_args: "has_trailer:=true"
 
-    odom_topic: "/truck/odometry"
-    vehicle_pose_topic: "/truck/rear_axle_pose"
-    trailer_pose_topic: "/semitrailer/rear_axle_pose"
-    angle_sensor_topic: "/truck/sensors/trailer_angle"
-    rtcm_frequency_topic: "/truck/sensors/gnss/rtcm_frequency"
-    nav_pvt_pose_topic: "/truck/sensors/gnss/nav_pvt_pose"
-    battery_state_topic: "/truck/sensors/battery_state"
-    mission_status_topic: "/truck/mission_status"
-    autopilot_state_control_topic: "/truck/autopilot_state_control"
-    vehicle_alignment_reference_point_topic: "/truck/vehicle_alignment_reference_point"
-    autopilot_center_pose_topic: "/truck/autopilot_center_pose"
-    emergency_stop_status_topic: "/emergency_stop/current_state"
-    emergency_stop_update_topic: "/emergency_stop/target_state"
-    nav_sat_fix_extended_topic: "/truck/sensors/gnss/nav_sat_fix_extended"
-    fused_nav_sat_fix_extended_topic: "/truck/sensors/gnss/fused_nav_sat_fix_extended"
+    odom_topic: "odometry"
+    vehicle_pose_topic: "rear_axle_pose"
+    trailer_pose_topic: "semitrailer/rear_axle_pose"
+    angle_sensor_topic: "sensors/trailer_angle"
+    rtcm_frequency_topic: "sensors/gnss/rtcm_frequency"
+    nav_pvt_pose_topic: "sensors/gnss/nav_pvt_pose"
+    battery_state_topic: "sensors/battery_state"
+    mission_status_topic: "mission_status"
+    autopilot_state_control_topic: "autopilot_state_control"
+    vehicle_alignment_reference_point_topic: "vehicle_alignment_reference_point"
+    autopilot_center_pose_topic: "autopilot_center_pose"
+    emergency_stop_status_topic: "emergency_stop/current_state"
+    emergency_stop_update_topic: "emergency_stop/target_state"
+    nav_sat_fix_extended_topic: "sensors/gnss/nav_sat_fix_extended"
+    fused_nav_sat_fix_extended_topic: "sensors/gnss/fused_nav_sat_fix_extended"
 
     gnss_reference_frame: "truck"
     gnss_message_rate: 30 # Hz
+
+    vehicle_control_command_topic: "waywiser_control_cmd"
+    autopilot_vel_topic: "waywiser_autopilot_vel"
+    joint_states_topic: "waywiser_joint_states"
+    imu_topic: "sensors/imu/raw"
 
 emulated_angle_sensor_node:
   ros__parameters:
@@ -101,7 +106,7 @@ emulated_angle_sensor_node:
     angle_offset: 0.0
     publish_rate: 50
     invert_angle: false
-    angle_sensor_topic: "/truck/sensors/trailer_angle"
+    angle_sensor_topic: "sensors/trailer_angle"
 
 emulated_range_sensor_array_node:
   ros__parameters:
@@ -110,7 +115,7 @@ emulated_range_sensor_array_node:
     semitrailer_left_range_sensor:
       frame_id: semitrailer_left_ultrasonic_link
       depth_topic: "/carla/semitrailer/left_ultrasonic/image"
-      range_topic: "/truck/sensors/ultrasonic/trailer_left"
+      range_topic: "sensors/ultrasonic/trailer_left"
       min_range: 0.1
       max_range: 10.0
       field_of_view: 30.0
@@ -118,7 +123,7 @@ emulated_range_sensor_array_node:
     semitrailer_rear_range_sensor:
       frame_id: semitrailer_rear_ultrasonic_link
       depth_topic: "/carla/semitrailer/rear_ultrasonic/image"
-      range_topic: "/truck/sensors/ultrasonic/trailer_rear"
+      range_topic: "sensors/ultrasonic/trailer_rear"
       min_range: 0.1
       max_range: 10.0
       field_of_view: 30.0
@@ -136,7 +141,7 @@ waywiser_truck_node:
     # TODO: limit erpm also based on current
     # current_max: 30.0
     waypoint_follower_bypass_mux: false
-    publish_odom_to_baselink_tf: false
+    publish_odom_to_baselink_tf: true
     publish_world_to_odom_tf: true
     vehicle_state_poll_rate: 50 # currently same rate for both odom topic and odom->base_link tf
     min_battery_voltage: 13.6
@@ -156,6 +161,7 @@ waywiser_truck_node:
     min_approach_speed: 1.39 # m/s
     yaw_accuracy_threshold_for_mission: 1.0 # degrees
     position_accuracy_threshold_for_mission: 0.7 # m
+    invert_steering_joint_state: true
 
 waywiser_truck_localization_node:
   ros__parameters:
@@ -164,7 +170,9 @@ waywiser_truck_localization_node:
 
 navsatfix_extended_wrapper_node:
   ros__parameters:
+    conversion_mode: "tf"
     tf_object_frame: "truck"
+    frame_id_override: "truck_base_link"
     gnss_fix_type: 3
     gnss_horizontal_accuracy: 0.01
     gnss_vertical_accuracy: 0.01
@@ -172,7 +180,7 @@ navsatfix_extended_wrapper_node:
     gnss_last_rtcm_correction_age: 0
     gnss_num_satellites: 0
 
-waywiser_to_carla_control_node:
+waywiser_carla_relay_node:
   ros__parameters:
     steering_gain: 0.857142857
 
@@ -197,27 +205,3 @@ onboard_twist_mux:
         topic: nav2_vel
         timeout: 0.5
         priority: 50
-
-collision_monitor:
-  ros__parameters:
-    cmd_vel_in_topic: "onboard_mux_vel"
-    cmd_vel_out_topic: "collision_monitor_vel"
-    transform_tolerance: 0.5
-    source_timeout: 5.0
-    base_shift_correction: True
-    stop_pub_timeout: 2.0
-    polygons: ["PolygonSlow"]
-    PolygonSlow:
-      type: "circle"
-      action_type: "slowdown"
-      max_points: 3
-      slowdown_ratio: 0.5
-      visualize: True
-      radius: 20.0
-      polygon_pub_topic: "/carla/truck/polygon_slowdown"
-    observation_sources: ["pointcloud_front"]
-    pointcloud_front:
-      type: "pointcloud"
-      topic: "/carla/truck/depth_front/color/points"
-      min_height: 0.1
-      max_height: 0.5

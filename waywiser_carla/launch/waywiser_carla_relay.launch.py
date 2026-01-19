@@ -6,7 +6,7 @@ from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-import yaml
+from waywiser_py.waywiser_utils import FileUtils, RosUtils
 
 
 def generate_launch_description():
@@ -27,25 +27,11 @@ def generate_launch_description():
         description='Full path to params file of vehicle',
     )
 
-    # start nodes and use args to set parameters
-    waywiser_to_carla_control_node = Node(
-        package='waywiser_carla',
-        executable='waywiser_to_carla_control.py',
-        name='waywiser_to_carla_control_node',
-        parameters=[
-            {
-                'use_sim_time': LaunchConfiguration('use_sim_time'),
-                'ego_vehicle_role_name': LaunchConfiguration('ego_vehicle_role_name'),
-            },
-            LaunchConfiguration('vehicle_config'),
-        ],
-        arguments=['--ros-args', '--log-level', 'info'],
-        output='screen',
-        emulate_tty=True,
-    )
-
     # create opaque functions to launch nodes using context
     carla_odom_relay_la = OpaqueFunction(function=carla_odom_relay_launch)
+    waywiser_to_carla_control_launch_action = OpaqueFunction(
+        function=waywiser_to_carla_control_launch
+    )
 
     # create launch description
     ld = LaunchDescription()
@@ -56,8 +42,8 @@ def generate_launch_description():
     ld.add_action(vehicle_config_la)
 
     # start nodes
-    ld.add_action(waywiser_to_carla_control_node)
     ld.add_action(carla_odom_relay_la)
+    ld.add_action(waywiser_to_carla_control_launch_action)
 
     return ld
 
@@ -66,24 +52,52 @@ def carla_odom_relay_launch(context):
     ego_vehicle_role_name = LaunchConfiguration('ego_vehicle_role_name').perform(context)
     input_topic = '/carla/' + ego_vehicle_role_name + '/odometry'
 
-    with open(LaunchConfiguration('vehicle_config').perform(context), 'r', encoding='utf-8') as f:
-        config_data = yaml.safe_load(f)
-        node_params = config_data['/**']['ros__parameters']
+    vehicle_config = FileUtils.get_full_file_path(
+        LaunchConfiguration('vehicle_config').perform(context)
+    )
+    general_params_dict = RosUtils.get_node_params(vehicle_config, '')
+    if 'odom_topic' in general_params_dict:
+        output_topic = general_params_dict['odom_topic']
 
-        if 'odom_topic' in node_params:
-            output_topic = node_params['odom_topic']
-
-            relay_node = Node(
-                package='topic_tools',
-                executable='relay',
-                name=ego_vehicle_role_name + '_odom_relay',
-                output='screen',
-                emulate_tty=True,
-                parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
-                arguments=[input_topic, output_topic],
-            )
-        else:
-            # raise error
-            raise ValueError('odom_topic not found in vehicle_config')
+        relay_node = Node(
+            package='topic_tools',
+            executable='relay',
+            name='odom_relay',
+            output='screen',
+            emulate_tty=True,
+            parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
+            arguments=[input_topic, output_topic],
+        )
+    else:
+        # raise error
+        raise ValueError('odom_topic not found in vehicle_config')
 
     return [relay_node]
+
+
+def waywiser_to_carla_control_launch(context):
+    nodes = []
+    vehicle_config = FileUtils.get_full_file_path(
+        LaunchConfiguration('vehicle_config').perform(context)
+    )
+    node_params_dict = RosUtils.get_node_params(vehicle_config, 'waywiser_to_carla_control_node')
+
+    nodes.append(
+        Node(
+            package='waywiser_carla',
+            executable='waywiser_to_carla_control.py',
+            name='waywiser_to_carla_control_node',
+            parameters=[
+                node_params_dict,
+                {
+                    'use_sim_time': LaunchConfiguration('use_sim_time'),
+                    'ego_vehicle_role_name': LaunchConfiguration('ego_vehicle_role_name'),
+                },
+            ],
+            arguments=['--ros-args', '--log-level', 'info'],
+            output='screen',
+            emulate_tty=True,
+        )
+    )
+
+    return nodes

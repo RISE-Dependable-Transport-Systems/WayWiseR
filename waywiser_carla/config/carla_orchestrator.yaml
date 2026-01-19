@@ -29,4 +29,4 @@ carla_orchestrator_node:
       semitrailer: "-36.7,18.5,1.5,0,0,180"
     object_pose_topics:
       truck: "/truck/rear_axle_pose"
-      semitrailer: "/semitrailer/rear_axle_pose"
+      semitrailer: "/truck/semitrailer/rear_axle_pose"
