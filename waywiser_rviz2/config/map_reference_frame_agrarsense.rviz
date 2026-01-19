@@ -4,9 +4,9 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /TF1/Frames1
-      Splitter Ratio: 0.5
-    Tree Height: 357
+        - /TF1/Tree1
+      Splitter Ratio: 0.7558823823928833
+    Tree Height: 480
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -24,7 +24,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: Depth points
   - Class: slam_toolbox::SlamToolboxPlugin
     Name: SlamToolboxPlugin
 Visualization Manager:
@@ -46,7 +46,7 @@ Visualization Manager:
         Z: -0.20000000298023224
       Plane: XY
       Plane Cell Count: 300
-      Reference Frame: map
+      Reference Frame: forwarder/odom
       Value: true
     - Alpha: 1
       Class: rviz_default_plugins/RobotModel
@@ -58,7 +58,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /robot_description
+        Value: /forwarder/robot_description
       Enabled: true
       Links:
         All Links Enabled: true
@@ -66,81 +66,81 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        base_link:
+        forwarder/base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        crane_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        fl1_wheel_link:
+        forwarder/crane_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        fl2_wheel_link:
+        forwarder/fl1_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        fr1_wheel_link:
+        forwarder/fl2_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        fr2_wheel_link:
+        forwarder/fr1_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        front_axle_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        front_chassis_link:
+        forwarder/fr2_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        front_end_link:
+        forwarder/front_axle_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        hitch_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        rear_axle_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        rear_chassis_link:
+        forwarder/front_chassis_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rear_end_link:
+        forwarder/front_end_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        rl1_wheel_link:
+        forwarder/hitch_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        forwarder/rear_axle_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        forwarder/rear_chassis_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rl2_wheel_link:
+        forwarder/rear_end_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        forwarder/rl1_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rr1_wheel_link:
+        forwarder/rl2_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rr2_wheel_link:
+        forwarder/rr1_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        forwarder/rr2_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -158,50 +158,52 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        base_link:
+        forwarder:
           Value: true
-        crane_link:
+        forwarder/base_link:
           Value: false
-        fl1_wheel_link:
-          Value: false
-        fl2_wheel_link:
+        forwarder/crane_link:
           Value: false
         forwarder/depth_front:
+          Value: false
+        forwarder/fl1_wheel_link:
+          Value: false
+        forwarder/fl2_wheel_link:
+          Value: false
+        forwarder/fr1_wheel_link:
+          Value: false
+        forwarder/fr2_wheel_link:
+          Value: false
+        forwarder/front_axle_link:
+          Value: false
+        forwarder/front_chassis_link:
+          Value: false
+        forwarder/front_end_link:
+          Value: false
+        forwarder/hitch_link:
+          Value: false
+        forwarder/odom:
+          Value: true
+        forwarder/rear_axle_link:
+          Value: false
+        forwarder/rear_chassis_link:
+          Value: false
+        forwarder/rear_end_link:
           Value: false
         forwarder/rgb_ext_pov:
           Value: false
         forwarder/rgb_front:
           Value: false
-        fr1_wheel_link:
+        forwarder/rl1_wheel_link:
           Value: false
-        fr2_wheel_link:
+        forwarder/rl2_wheel_link:
           Value: false
-        front_axle_link:
+        forwarder/rr1_wheel_link:
           Value: false
-        front_chassis_link:
-          Value: false
-        front_end_link:
-          Value: true
-        hitch_link:
+        forwarder/rr2_wheel_link:
           Value: false
         map:
-          Value: false
-        odom:
           Value: true
-        rear_axle_link:
-          Value: false
-        rear_chassis_link:
-          Value: false
-        rear_end_link:
-          Value: true
-        rl1_wheel_link:
-          Value: false
-        rl2_wheel_link:
-          Value: false
-        rr1_wheel_link:
-          Value: false
-        rr2_wheel_link:
-          Value: false
       Marker Scale: 10
       Name: TF
       Show Arrows: false
@@ -209,40 +211,42 @@ Visualization Manager:
       Show Names: true
       Tree:
         map:
-          odom:
-            base_link:
+          forwarder:
+            {}
+          forwarder/odom:
+            forwarder/base_link:
               forwarder/depth_front:
                 {}
+              forwarder/rear_end_link:
+                forwarder/rear_chassis_link:
+                  forwarder/crane_link:
+                    {}
+                  forwarder/hitch_link:
+                    forwarder/front_chassis_link:
+                      forwarder/front_axle_link:
+                        forwarder/fl1_wheel_link:
+                          {}
+                        forwarder/fl2_wheel_link:
+                          {}
+                        forwarder/fr1_wheel_link:
+                          {}
+                        forwarder/fr2_wheel_link:
+                          {}
+                      forwarder/front_end_link:
+                        {}
+                  forwarder/rear_axle_link:
+                    forwarder/rl1_wheel_link:
+                      {}
+                    forwarder/rl2_wheel_link:
+                      {}
+                    forwarder/rr1_wheel_link:
+                      {}
+                    forwarder/rr2_wheel_link:
+                      {}
               forwarder/rgb_ext_pov:
                 {}
               forwarder/rgb_front:
                 {}
-              rear_end_link:
-                rear_chassis_link:
-                  crane_link:
-                    {}
-                  hitch_link:
-                    front_chassis_link:
-                      front_axle_link:
-                        fl1_wheel_link:
-                          {}
-                        fl2_wheel_link:
-                          {}
-                        fr1_wheel_link:
-                          {}
-                        fr2_wheel_link:
-                          {}
-                      front_end_link:
-                        {}
-                  rear_axle_link:
-                    rl1_wheel_link:
-                      {}
-                    rl2_wheel_link:
-                      {}
-                    rr1_wheel_link:
-                      {}
-                    rr2_wheel_link:
-                      {}
       Update Interval: 0
       Value: true
     - Class: rviz_default_plugins/Image
@@ -257,7 +261,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /agrarsense/out/sensors/rgb_front
+        Value: /forwarder/sensors/rgb_front/image_rect
       Value: true
     - Class: rviz_default_plugins/Image
       Enabled: true
@@ -271,7 +275,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /agrarsense/out/sensors/depth_front
+        Value: /forwarder/sensors/depth_front/image_rect
       Value: true
     - Class: rviz_default_plugins/Image
       Enabled: true
@@ -285,7 +289,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /agrarsense/out/sensors/rgb_ext_pov
+        Value: /forwarder/sensors/rgb_ext_pov/image_rect
       Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
@@ -317,23 +321,10 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /agrarsense/out/sensors/depth_front/color/points
+        Value: /forwarder/sensors/depth_front/color/points
       Use Fixed Frame: true
       Use rainbow: false
       Value: true
-    - Alpha: 1
-      Class: rviz_default_plugins/Polygon
-      Color: 165; 29; 45
-      Enabled: false
-      Name: Polygon stop
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /agrarsense/out/vehicles/forwarder/polygon_stop
-      Value: false
     - Alpha: 1
       Class: rviz_default_plugins/Polygon
       Color: 249; 240; 107
@@ -345,7 +336,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /agrarsense/out/vehicles/forwarder/polygon_slowdown
+        Value: /forwarder/polygon_slowdown
       Value: true
     - Class: rviz_default_plugins/Image
       Enabled: true
@@ -359,44 +350,12 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /agrarsense/out/sensors/rgb_front_annotated_image
-      Value: true
-    - Class: rviz_default_plugins/MarkerArray
-      Enabled: true
-      Name: Object detection 3D-markers
-      Namespaces:
-        {}
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /agrarsense/out/sensors/depthcamera_front/bbox_3d_markers
-      Value: true
-    - Alpha: 1
-      Axes Length: 2
-      Axes Radius: 0.5
-      Class: rviz_default_plugins/Pose
-      Color: 255; 25; 0
-      Enabled: true
-      Head Length: 0.30000001192092896
-      Head Radius: 0.10000000149011612
-      Name: Pose
-      Shaft Length: 1
-      Shaft Radius: 0.05000000074505806
-      Shape: Axes
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /agrarsense/out/sensors/forwarder/pose
+        Value: /forwarder/sensors/rgb_front/yolov3_tinyu_annotated_image
       Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: map
+    Fixed Frame: forwarder/odom
     Frame Rate: 10
   Name: root
   Tools:
@@ -438,21 +397,26 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: 0
-      Class: rviz_default_plugins/TopDownOrtho
+      Class: rviz_default_plugins/Orbit
+      Distance: 33.872230529785156
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
+      Focal Point:
+        X: 4.952905178070068
+        Y: -2.016780138015747
+        Z: 8.921300888061523
+      Focal Shape Fixed Size: true
+      Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 24.4928035736084
+      Pitch: 0.5097967982292175
       Target Frame: base_link
-      Value: TopDownOrtho (rviz_default_plugins)
-      X: -1.8568049669265747
-      Y: 0.5101549625396729
+      Value: Orbit (rviz_default_plugins)
+      Yaw: 3.1185879707336426
     Saved: ~
 Window Geometry:
   Depth front:
@@ -464,7 +428,7 @@ Window Geometry:
   Hide Right Dock: false
   Object detection image:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd0000000400000000000001e8000002defc020000000efb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003e000001a3000000ca00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000220053006c0061006d0054006f006f006c0062006f00780050006c007500670069006e0000000353000001cc0000019100fffffffb00000020004f0062006a00650063007400200064006500740065006300740069006f006e000000024c0000016b0000000000000000fb0000000a0049006d006100670065000000025e000000d90000000000000000fb0000000a0049006d0061006700650100000276000000c10000000000000000fb0000002c004f0062006a00650063007400200064006500740065006300740069006f006e00200069006d00610067006501000001e7000001350000002800fffffffb0000000a0049006d00610067006500000001af000000ae00000000000000000000000100000105000002defc0200000006fb00000012005200470042002000660072006f006e0074010000003e000000910000002800fffffffb0000001600440065007000740068002000660072006f006e007401000000d50000008d0000002800fffffffb00000020005200470042002000650078007400650072006e0061006c00200050004f005601000001680000008c0000002800fffffffb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a0056006900650077007301000001fa00000122000000a600fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007440000003afc0100000002fb0000000800540069006d00650100000000000007440000028e00fffffffb0000000800540069006d006501000000000000045000000000000000000000044b000002de00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd000000040000000000000156000002defc020000000efb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003e0000021e000000ca00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000220053006c0061006d0054006f006f006c0062006f00780050006c007500670069006e0000000353000001cc0000019100fffffffb00000020004f0062006a00650063007400200064006500740065006300740069006f006e000000024c0000016b0000000000000000fb0000000a0049006d006100670065000000025e000000d90000000000000000fb0000000a0049006d0061006700650100000276000000c10000000000000000fb0000002c004f0062006a00650063007400200064006500740065006300740069006f006e00200069006d0061006700650100000262000000ba0000002800fffffffb0000000a0049006d00610067006500000001af000000ae00000000000000000000000100000105000002defc0200000006fb00000012005200470042002000660072006f006e0074010000003e000000ad0000002800fffffffb0000001600440065007000740068002000660072006f006e007401000000f1000000b20000002800fffffffb00000020005200470042002000650078007400650072006e0061006c00200050004f005601000001a9000000b10000002800fffffffb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a005600690065007700730100000260000000bc000000a600fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007440000003afc0100000002fb0000000800540069006d00650100000000000007440000028e00fffffffb0000000800540069006d00650100000000000004500000000000000000000004dd000002de00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   RGB external POV:
     collapsed: false
   RGB front:
@@ -480,5 +444,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1860
-  X: 52
-  Y: 27
+  X: 518
+  Y: 267
