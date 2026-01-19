@@ -25,9 +25,9 @@ public:
 
     start_with_emergency_stop_ = this->declare_parameter("start_with_emergency_stop", true);
     emergency_stop_status_topic_ = this->declare_parameter(
-      "emergency_stop_status_topic", "/emergency_stop/status");
+      "emergency_stop_status_topic", "emergency_stop/status");
     emergency_stop_update_topic_ = this->declare_parameter(
-      "emergency_stop_update_topic", "/emergency_stop/target_state");
+      "emergency_stop_update_topic", "emergency_stop/target_state");
 
     if (start_with_emergency_stop_) {
       current_emergency_stop_state_msg.state = EmergencyStopState::ACTIVE;
