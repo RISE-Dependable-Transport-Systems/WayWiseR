@@ -15,6 +15,7 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <build_depend>waywiser</build_depend>
+  <exec_depend>waywiser</exec_depend>
 
   <depend>topic_tools</depend>
   <depend>rclcpp</depend>
@@ -29,7 +30,6 @@
   <depend>cv_bridge</depend>
   <depend>carla_msgs</depend>
   <depend>tf_transformations</depend>
-  <depend>waywiser</depend>
   <exec_depend>carla_ros_bridge</exec_depend>
   <exec_depend>carla_spawn_objects</exec_depend>
 

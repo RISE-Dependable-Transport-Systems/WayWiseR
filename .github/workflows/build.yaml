@@ -15,6 +15,11 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
       - name: Fix expired ROS 2 GPG key
         run: |
           sudo rm -f /usr/share/keyrings/ros-archive-keyring.gpg
@@ -23,12 +28,21 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | \
             sudo tee /etc/apt/sources.list.d/ros2.list
           sudo apt update
+
       - name: Setup ROS 2
         uses: ros-tooling/setup-ros@0.7.1
         with:
           required-ros-distributions: humble
-      - name: Install dependencies
-        run: sudo apt update && sudo apt install -y libunwind-dev libqt5serialport5-dev
+
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            libunwind-dev \
+            libqt5serialport5-dev \
+            python3-pyqt5 \
+            build-essential \
+            cmake
 
       - name: Install MAVSDK
         run: wget https://github.com/mavlink/MAVSDK/releases/download/v2.2.0/libmavsdk-dev_2.2.0_ubuntu22.04_amd64.deb && sudo dpkg --install libmavsdk-*.deb
