@@ -85,3 +85,28 @@ cd $WAYWISER_WS
 colcon test --base-paths src/WayWiseR/ --packages-skip $WAYWISER_SKIPPED_PACKAGES
 colcon test-result --verbose
 ```
+
+## Local CI Pipeline (Docker & act)
+
+To verify changes in an environment identical to the GitHub Actions runner, you can run the CI pipeline locally using [Docker](https://docs.docker.com/engine/install/) and [act](https://nektosact.com/).
+
+### Installation
+
+1. **Docker**: Install [Docker Engine](https://docs.docker.com/engine/install/) for your platform.
+2. **act**: Install the [`act`](https://nektosact.com/) CLI (e.g., `curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo sh`).
+
+### Running the Pipeline
+
+Before running the pipeline for the first time or after changing the CI environment, build the custom CI image locally:
+
+```bash
+# Build the CI image
+docker build -t ghcr.io/rise-dependable-transport-systems/waywiser/ci-image:humble -f .github/workflows/Dockerfile.ci .
+```
+
+Then, run the build and test job using `act`. The `--pull=false` flag ensures `act` uses your local image:
+
+```bash
+# Run the CI pipeline locally
+act -j build-and-test --pull=false -P ubuntu-22.04=ghcr.io/rise-dependable-transport-systems/waywiser/ci-image:humble
+```

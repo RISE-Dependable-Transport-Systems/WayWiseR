@@ -13,48 +13,13 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-22.04
-    container: osrf/ros:humble-desktop
+    container: ghcr.io/rise-dependable-transport-systems/waywiser/ci-image:humble
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Install supplemental dependencies
-        run: |
-          apt update && apt install -y curl wget
-          curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-          apt install -y \
-            nodejs \
-            libunwind-dev \
-            libqt5serialport5-dev \
-            python3-pyqt5 \
-            ccache \
-            python3-colcon-lcov-result \
-            python3-colcon-coveragepy-result
-
-      - name: Cache MAVSDK
-        id: cache-mavsdk
-        uses: actions/cache@v4
-        with:
-          path: libmavsdk-dev_2.2.0_ubuntu22.04_amd64.deb
-          key: ${{ runner.os }}-mavsdk-2.2.0
-
-      - name: Download MAVSDK
-        if: steps.cache-mavsdk.outputs.cache-hit != 'true'
-        run: wget https://github.com/mavlink/MAVSDK/releases/download/v2.2.0/libmavsdk-dev_2.2.0_ubuntu22.04_amd64.deb
-
-      - name: Install MAVSDK
-        run: dpkg --install libmavsdk-*.deb
-
-      - name: Cache rosdep
-        uses: actions/cache@v4
-        with:
-          path: ~/.ros/rosdep
-          key: ${{ runner.os }}-rosdep-${{ hashFiles('**/package.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-rosdep-
 
       - name: Generate repos file with carla-ros-bridge
         run: |
@@ -69,10 +34,10 @@ jobs:
       - name: Cache ccache
         uses: actions/cache@v4
         with:
-          path: ~/.ccache
-          key: ${{ runner.os }}-ccache-${{ hashFiles('**/package.xml') }}
+          path: /root/.ccache
+          key: ${{ runner.os }}-ccache-humble-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-ccache-
+            ${{ runner.os }}-ccache-humble-
 
       - name: Run Tests
         uses: ros-tooling/action-ros-ci@v0.3
