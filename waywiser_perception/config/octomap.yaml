@@ -15,13 +15,15 @@ octomap_node:
 octomap_occlusions_node:  
   ros__parameters:  
     # Frame and topic configuration  
-    map_frame: "odom"  
     octomap_topic: "octomap_full"
     frame_id: 'camera_link'
     tf_timeout_sec: 0.5    
-      
-    # Occlusion detection parameters  
+    
+    # Occlusion detection parameters TODO update
     volume_threshold: 1.2  
-    max_range: 5.0  
-    camera_fov: 70.0  # Luxonis OAK-D Pro W FoV (vertical)
-    sensor_height_above_ground: 0.055 # [m]
+    horizontal_fov: 127.0
+    vertical_fov: 79.5
+    min_range: 0.4
+    max_range: 5.0
+    # sensor_height_above_ground: 0.055 # [m]
+    
