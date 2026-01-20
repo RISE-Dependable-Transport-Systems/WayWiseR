@@ -14,6 +14,7 @@
   <url type="website">https://carla.readthedocs.io/en/latest/</url>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>waywiser</build_depend>
 
   <depend>topic_tools</depend>
   <depend>rclcpp</depend>
