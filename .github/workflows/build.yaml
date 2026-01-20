@@ -13,6 +13,7 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-22.04
+    container: osrf/ros:humble-desktop
 
     steps:
       - name: Checkout
@@ -20,32 +21,40 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Fix expired ROS 2 GPG key
+      - name: Install supplemental dependencies
         run: |
-          sudo rm -f /usr/share/keyrings/ros-archive-keyring.gpg
-          sudo curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | \
-            gpg --dearmor -o /usr/share/keyrings/ros-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | \
-            sudo tee /etc/apt/sources.list.d/ros2.list
-          sudo apt update
-
-      - name: Setup ROS 2
-        uses: ros-tooling/setup-ros@0.7.1
-        with:
-          required-ros-distributions: humble
-
-      - name: Install system dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y \
+          apt update && apt install -y curl wget
+          curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+          apt install -y \
+            nodejs \
             libunwind-dev \
             libqt5serialport5-dev \
             python3-pyqt5 \
-            build-essential \
-            cmake
+            ccache \
+            python3-colcon-lcov-result \
+            python3-colcon-coveragepy-result
+
+      - name: Cache MAVSDK
+        id: cache-mavsdk
+        uses: actions/cache@v4
+        with:
+          path: libmavsdk-dev_2.2.0_ubuntu22.04_amd64.deb
+          key: ${{ runner.os }}-mavsdk-2.2.0
+
+      - name: Download MAVSDK
+        if: steps.cache-mavsdk.outputs.cache-hit != 'true'
+        run: wget https://github.com/mavlink/MAVSDK/releases/download/v2.2.0/libmavsdk-dev_2.2.0_ubuntu22.04_amd64.deb
 
       - name: Install MAVSDK
-        run: wget https://github.com/mavlink/MAVSDK/releases/download/v2.2.0/libmavsdk-dev_2.2.0_ubuntu22.04_amd64.deb && sudo dpkg --install libmavsdk-*.deb
+        run: dpkg --install libmavsdk-*.deb
+
+      - name: Cache rosdep
+        uses: actions/cache@v4
+        with:
+          path: ~/.ros/rosdep
+          key: ${{ runner.os }}-rosdep-${{ hashFiles('**/package.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-rosdep-
 
       - name: Generate repos file with carla-ros-bridge
         run: |
@@ -57,9 +66,18 @@ jobs:
               version: v0.9.15-humble-dev
           EOF
 
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-ccache-${{ hashFiles('**/package.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
+
       - name: Run Tests
-        uses: ros-tooling/action-ros-ci@0.3.5
+        uses: ros-tooling/action-ros-ci@v0.3
         with:
           package-name: waywiser waywiser_agrarsense waywiser_carla waywiser_core waywiser_description waywiser_gazebo waywiser_hwbringup waywiser_nav2 waywiser_perception waywiser_rviz2 waywiser_slam waywiser_teleop waywiser_test_runner waywiser_twist_safety
           target-ros2-distro: humble
           vcs-repo-file-url: /tmp/deps.repos
+          extra-cmake-args: -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
