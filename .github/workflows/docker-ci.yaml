@@ -2,9 +2,8 @@ name: Build and Push CI Image
 
 on:
     push:
-        paths:
-            - ".github/workflows/Dockerfile.ci"
-            - ".github/workflows/docker-ci.yaml"
+        branches:
+            - humble
     workflow_dispatch:
 
 jobs:
