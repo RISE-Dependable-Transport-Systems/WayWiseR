@@ -19,11 +19,13 @@ octomap_occlusions_node:
     frame_id: 'camera_link'
     tf_timeout_sec: 0.5    
     
-    # Occlusion detection parameters TODO update
+    # Occlusion detection parameters
     volume_threshold: 1.2  
+    horizontal_steps: 20  # Adjust for density vs performance (20x15 = 300 rays)
+    vertical_steps: 15
+
+    # Frustum parameters
     horizontal_fov: 127.0
     vertical_fov: 79.5
     min_range: 0.4
     max_range: 5.0
-    # sensor_height_above_ground: 0.055 # [m]
-    
