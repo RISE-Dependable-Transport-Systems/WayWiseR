@@ -23,7 +23,7 @@
   <depend>nav2_common</depend>
   <depend>image_proc</depend>
   <depend>depth_image_proc</depend>
-
+  <depend>octomap_msgs</depend>
   <depend>rclcpp</depend>
   <depend>tf2_ros</depend>
   <depend>tf2_sensor_msgs</depend>
