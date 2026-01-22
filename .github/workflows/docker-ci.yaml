@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - humble
+    paths:
+      - ".github/workflows/Dockerfile.ci"
+      - ".github/workflows/docker-ci.yaml"
+      - "**/package.xml"
   workflow_dispatch:
 
 jobs:
@@ -28,16 +32,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
+      # Only ONE tag: humble
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/rise-dependable-transport-systems/waywiser/ci-image
           tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=humble,enable=true
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/humble' }}
-            type=sha
+            type=raw,value=humble
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
