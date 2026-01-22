@@ -8,8 +8,8 @@ WayWiseR is divided into modular ROS2 packages:
 
 | Package                                      | Description                                                       |
 | :------------------------------------------- | :---------------------------------------------------------------- |
-| `waywiser`                                   | Meta-package, FastDDS discovery and global utils.                 |
-| `waywiser_core`                              | ROS2 wrappers for the core WayWise functionalities.              |
+| `waywiser`                                   | FastDDS discovery configuration and global utils.                 |
+| `waywiser_core`                              | ROS2 wrappers for the core WayWise functionalities.               |
 | `waywiser_description`                       | Vehicle and sensor descriptions (URDF/Xacro).                     |
 | `waywiser_hwbringup`                         | Configuration and launch files for physical hardware.             |
 | `waywiser_perception`                        | Image processing and computer vision.                             |
@@ -17,7 +17,7 @@ WayWiseR is divided into modular ROS2 packages:
 | `waywiser_rviz2`                             | RViz2 configuration and launch files.                             |
 | `waywiser_slam`                              | SLAM Toolbox configuration and launch files.                      |
 | `waywiser_teleop`                            | Multi-source teleoperation and arbitration.                       |
-| `waywiser_test_runner`                       | ROS2 based Test orchestration.                                    |
+| `waywiser_test_runner`                       | Test orchestration for both simulators and hardware.              |
 | `waywiser_twist_safety`                      | Onboard safety features such as command arbitration, E-Stop, etc. |
 | `waywiser_gazebo` / `_carla` / `_agrarsense` | Simulation-specific integration and environments.                 |
 
@@ -84,7 +84,7 @@ WayWiseR is divided into modular ROS2 packages:
    colcon build --symlink-install --packages-skip $WAYWISER_SKIPPED_PACKAGES
    ```
 
-   >💡 **Tip**: To persist environment variables, append the setup block to your `.venv/bin/activate` by running the following command in your terminal:
+   > 💡 **Tip**: To persist environment variables, append the setup block to your `.venv/bin/activate` by running the following command in your terminal:
    >
    > ```bash
    > cat <<EOT >> $WAYWISER_WS/.venv/bin/activate
@@ -95,7 +95,7 @@ WayWiseR is divided into modular ROS2 packages:
    > export PYTHONPATH=$WAYWISER_WS/.venv/lib/python3.10/site-packages:\$PYTHONPATH
    >
    > if [ -f "$WAYWISER_WS/install/setup.bash" ]; then
-   > source "$WAYWISER_WS/install/setup.bash"
+   >   source "$WAYWISER_WS/install/setup.bash"
    > fi
    > EOT
    > ```
@@ -110,7 +110,7 @@ WayWiseR is divided into modular ROS2 packages:
    cp src/WayWiseR/.env.example src/WayWiseR/.env
    ```
 
-   Update the configurations in the `.env` file as needed. The `.env` file is automatically sourced whenever the virtual environment is activated via `source .venv/bin/activate`.
+   Update the configurations in the `.env` file as needed. The `.env` file is automatically sourced whenever the virtual environment is activated via `source $WAYWISER_WS/.venv/bin/activate`.
 
 ---
 

@@ -88,12 +88,12 @@ colcon test-result --verbose
 
 ## Local CI Pipeline (Docker & act)
 
-To verify changes in an environment identical to the GitHub Actions runner, you can run the CI pipeline locally using [Docker](https://docs.docker.com/engine/install/) and [act](https://nektosact.com/).
+To verify changes in an environment identical to the GitHub Actions runner, you can run the CI pipeline locally using [Docker](https://docs.docker.com/engine) and [act](https://nektosact.com/).
 
 ### Installation
 
-1. **Docker**: Install [Docker Engine](https://docs.docker.com/engine/install/) for your platform.
-2. **act**: Install the [`act`](https://nektosact.com/) CLI (e.g., `curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo sh`).
+1. **Docker**: Install `Docker engine` for your platform by following the [official guide](https://docs.docker.com/engine/install/).
+2. **act**: Install `act` CLI by following the [official guide](https://nektosact.com/installation/).
 
 ### Running the Pipeline
 
