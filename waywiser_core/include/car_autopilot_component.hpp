@@ -1,24 +1,16 @@
 #ifndef CAR_AUTOPILOT_COMPONENT_HPP_
 #define CAR_AUTOPILOT_COMPONENT_HPP_
 
-#include <memory>
 #include <string>
 #include <QObject>
 #include <QString>
 
 #include "WayWise/autopilot/purepursuitwaypointfollower.h"
-#include "WayWise/autopilot/waypointfollower.h"
 #include "WayWise/communication/mavsdkvehicleserver.h"
-#include "WayWise/communication/parameterserver.h"
-#include "WayWise/core/coordinatetransforms.h"
-#include "WayWise/logger/logger.h"
 #include "WayWise/vehicles/carstate.h"
-#include "WayWise/vehicles/controller/carmovementcontroller.h"
 #include "WayWise/autopilot/followpoint.h"
-#include "WayWise/sensors/gnss/gnssreceiver.h"
 
-#include "mavsdk/mavsdk.h"
-
+#include "qobject_node.hpp"
 #include "waywiser_core_utils.hpp"
 
 class CarAutopilotComponent : public QObject
@@ -27,13 +19,11 @@ class CarAutopilotComponent : public QObject
 
 public:
   // Constructor and destructor
-  CarAutopilotComponent(QObject * parent, const QSharedPointer<CarState> carState)
-  : QObject(parent), mCarState(carState) {}
+  CarAutopilotComponent(QObjectNode * parentQObjectNode, const QSharedPointer<CarState> carState)
+  : QObject(parentQObjectNode), mCarState(carState), mParentQObjectNode(parentQObjectNode) {}
   virtual ~CarAutopilotComponent() {}
 
-  virtual void setupAutopilot(
-    QSharedPointer<GNSSReceiver> gNSSReceiver,
-    QSharedPointer<EmergencyStopState> emergencyStopState);
+  virtual void setupAutopilot(QSharedPointer<EmergencyStopState> emergencyStopState);
   void reset();
 
   // Setters
@@ -51,6 +41,7 @@ public:
   void setYawAccuracyThresholdForMission(float value) {mYawAccuracyThresholdForMission = value;}
   void setAdaptiveApproachSpeedEnabled(bool adaptive) {mAdaptiveApproachSpeedEnabled = adaptive;}
   void setMinApproachSpeed(float minApproachSpeed) {mMinApproachSpeed = minApproachSpeed;}
+  void setGnssFixStatus(GnssFixStatus gnssFixStatus) {mGnssFixStatus = gnssFixStatus;}
 
   // Getters
   int getAutopilotTimerRate() const {return mAutopilotTimerRate;}
@@ -88,7 +79,7 @@ public:
 
 signals:
   void updatedMissionState(MissionState state);
-  void gnssFixAccuracyAssertionFailed();
+  void gnssFixAccuracyAssertionFailed(GnssFixStatus gnssFixStatus);
 
 protected:
   virtual void updateMissionState(MissionState state);
@@ -110,7 +101,6 @@ protected:
 
   // WayWise components
   QSharedPointer<CarState> mCarState;
-  QSharedPointer<GNSSReceiver> mGNSSReceiver;
   QSharedPointer<EmergencyStopState> mEmergencyStopState;
 
   QSharedPointer<MovementController> mAutopilotMovementController;
@@ -119,8 +109,10 @@ protected:
   QSharedPointer<FollowPoint> mFollowPoint;
 
   // Internal variables
+  QObjectNode * mParentQObjectNode;
   QList<PosPoint> mWaypointList;
   MissionState currentMissionState = MissionState::WaitingForVehicleInit;
+  GnssFixStatus mGnssFixStatus;
 };
 
 #endif  // CAR_AUTOPILOT_COMPONENT_HPP_

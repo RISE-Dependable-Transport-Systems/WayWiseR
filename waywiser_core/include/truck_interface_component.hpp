@@ -3,7 +3,7 @@
 
 #include "WayWise/vehicles/truckstate.h"
 #include "WayWise/vehicles/trailerstate.h"
-#include "WayWise/sensors/angle/as5600updater.h"
+#include "WayWise/sensors/angle/anglesensorupdater.h"
 
 #include "car_interface_component.hpp"
 
@@ -14,7 +14,7 @@ class TruckInterfaceComponent : public CarInterfaceComponent
 public:
   // Constructor and destructor
   TruckInterfaceComponent(
-    QObject * parent, const QSharedPointer<TruckState> truckState, bool hasTrailer,
+    QObjectNode * parentQObjectNode, const QSharedPointer<TruckState> truckState, bool hasTrailer,
     bool autoActuateMotorAndServo = true);
   virtual ~TruckInterfaceComponent();
   virtual void reset() override;

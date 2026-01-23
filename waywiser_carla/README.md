@@ -1,54 +1,58 @@
 ## Carla setup
 
-- Clone the carla-ros-bridge repo (fork from [ros-bridge](https://github.com/carla-simulator/ros-bridge)):
+> [!IMPORTANT]
+> Before proceeding, ensure you have followed the steps in the **[How to install and build](../README.md#how-to-install-and-build-on-ubuntu-2204)** section of the main README.
 
-  ```
-  export CARLA_ROS_BRIDGE_WS=~/carla_ros_bridge_ws     #update the environment variable with desired path
-  mkdir -p $CARLA_ROS_BRIDGE_WS/src
-  git clone --recurse-submodules git@github.com:RISE-Dependable-Transport-Systems/carla-ros-bridge.git $CARLA_ROS_BRIDGE_WS/src/carla-ros-bridge
-  ```
+1. **Clone carla-ros-bridge** (fork from [ros-bridge](https://github.com/carla-simulator/ros-bridge)):
 
-- Add CARLA_ROS_BRIDGE_WS environment variable to .bashrc to persist the variable when a new terminal is opened:
+   ```bash
+   export CARLA_ROS_BRIDGE_WS=~/carla_ros_bridge_ws     # Update with desired path
+   mkdir -p $CARLA_ROS_BRIDGE_WS/src
+   git clone --recurse-submodules git@github.com:RISE-Dependable-Transport-Systems/carla-ros-bridge.git $CARLA_ROS_BRIDGE_WS/src/carla-ros-bridge
+   ```
 
-  ```
-  echo "export CARLA_ROS_BRIDGE_WS=$CARLA_ROS_BRIDGE_WS" >> .venv/bin/activate
-  ```
+2. **Install carla-ros-bridge dependencies:**
 
-- Install carla-ros-bridge specific dependencies from the root directory of the workspace:
-  ```
-  cd $CARLA_ROS_BRIDGE_WS
-  rosdep install -i --from-path src/carla-ros-bridge --rosdistro humble -r -y
-  pip install -r src/carla-ros-bridge/requirements.txt
-  ```
-- Build carla-ros-bridge:
-  ```
-  colcon build --symlink-install --base-paths $CARLA_ROS_BRIDGE_WS/src/carla-ros-bridge
-  ```
-- Source carla-ros-bridge from the waywiser workspace before building waywiser_carla:
-  ```
-  source $CARLA_ROS_BRIDGE_WS/install/local_setup.bash
-  ```
-- Install waywiser_carla dependencies using rosdep:
+   ```bash
+   source $WAYWISER_WS/.venv/bin/activate
+   cd $CARLA_ROS_BRIDGE_WS
+   rosdep install -i --from-path src/carla-ros-bridge --rosdistro $ROS_DISTRO -r -y
+   uv pip install -r src/carla-ros-bridge/requirements.txt
+   ```
 
-  ```
-  cd $WAYWISER_WS
-  rosdep install --from-paths $(colcon list --paths-only | grep "waywiser_carla") --ignore-src --rosdistro humble -r -y
-  ```
+3. **Build carla-ros-bridge:**
 
-- Build waywiser_carla package:
-  ```
-  colcon build --symlink-install --packages-select waywiser_carla
-  ```
-- Source the overlay:
-  ```
-  source install/local_setup.bash
-  ```
+   ```bash
+   colcon build --symlink-install --base-paths $CARLA_ROS_BRIDGE_WS/src/carla-ros-bridge
+   ```
 
-Note: Both CARLA_ROS_BRIDGE_WS and WAYWISER_WS overlays need to be sourced in every new terminal:
+4. **Install waywiser_carla dependencies:**
 
-```
-cd $WAYWISER_WS
-source $CARLA_ROS_BRIDGE_WS/install/local_setup.bash && source install/local_setup.bash
+   ```bash
+   # Source the bridge workspace first
+   source $CARLA_ROS_BRIDGE_WS/install/setup.bash
+
+   cd $WAYWISER_WS
+   rosdep install --from-paths $(colcon list --paths-only | grep "waywiser_carla") --ignore-src --rosdistro $ROS_DISTRO -r -y
+   ```
+
+5. **Build waywiser_carla:**
+
+   ```bash
+   colcon build --symlink-install --packages-up-to waywiser_carla
+   ```
+
+To persist the environment variables and source CARLA_ROS_BRIDGE_WS automatically when activating the virtual environment, run the following command (copy-paste the entire block):
+
+```bash
+cat <<EOT >> $WAYWISER_WS/.venv/bin/activate
+
+# Carla ROS Bridge Setup
+export CARLA_ROS_BRIDGE_WS=$CARLA_ROS_BRIDGE_WS
+if [ -f "$CARLA_ROS_BRIDGE_WS/install/setup.bash" ]; then
+source "$CARLA_ROS_BRIDGE_WS/install/setup.bash"
+fi
+EOT
 ```
 
 ## Examples
@@ -61,4 +65,4 @@ source $CARLA_ROS_BRIDGE_WS/install/local_setup.bash && source install/local_set
 
 The carla_osm_tile_server node implements a TCP/IP based server that generates map tiles from CARLA simulator data and serves them in a format similar to OpenStreetMap (OSM) tile servers, making WayWiseR compatible with OSM-based mapping applications like [ControlTower](https://github.com/RISE-Dependable-Transport-Systems/ControlTower). When the node is run for the first time, it connects to CARLA via ros-bridge and renders a 2D top-view image of the CARLA world, including roads and lane markings from opendrive data. The high-resolution map image is saved locally and is used to generate map tiles on demand.
 
-https://github.com/user-attachments/assets/edb4115a-6099-4ebc-97ff-f9e2919c92bc
+<https://github.com/user-attachments/assets/edb4115a-6099-4ebc-97ff-f9e2919c92bc>

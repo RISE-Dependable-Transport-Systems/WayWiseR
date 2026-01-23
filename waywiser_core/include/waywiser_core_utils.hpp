@@ -1,16 +1,26 @@
 #ifndef WAYWISER_CORE_UTILS_HPP_
 #define WAYWISER_CORE_UTILS_HPP_
 
-#include <optional>
 #include <QDebug>
-#include <limits>
+#include <QSharedPointer>
+#include <QTime>
+#include <QDateTime>
+#include <cstdint>
+#include <string>
 
-#include "boost/algorithm/string.hpp"
-#include "rclcpp/rclcpp.hpp"
+#include <boost/algorithm/string.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <urdf/model.h>
 
-#include "geometry_msgs/msg/twist.hpp"
+#include "tf2/utils.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
+#include "waywiser/waywiser_utils.hpp"
 #include "WayWise/autopilot/purepursuitwaypointfollower.h"
+#include "WayWise/sensors/gnss/gnssreceiver.h"
+#include "WayWise/vehicles/objectstate.h"
+#include "WayWise/core/pospoint.h"
+#include "WayWise/core/coordinatetransforms.h"
 
 #include "waywiser_core/msg/mission_state.hpp"
 #include "waywiser_core/msg/car_control_command.hpp"
@@ -18,7 +28,7 @@
 
 
 enum class VehicleInterfaceType {WAYWISE_SIMULATED, EXT_SIMULATED, VESC};
-enum class ImuVariant {UNKNOWN, BNO055, VESC};
+enum class ImuVariant {UNKNOWN, BNO055, VESC, WAYWISE_SIMULATED};
 enum class SpeedControlType {OPEN_LOOP_ERPM_CONTROL, CLOSED_LOOP_PID_SPEED_CONTROL};
 
 struct CarControlCommand
@@ -27,14 +37,7 @@ struct CarControlCommand
   float brake = 0.0;
   float steering = 0.0;
 
-  waywiser_core::msg::CarControlCommand to_msg() const
-  {
-    waywiser_core::msg::CarControlCommand car_control_command_msg;
-    car_control_command_msg.throttle = throttle;
-    car_control_command_msg.brake = brake;
-    car_control_command_msg.steering = steering;
-    return car_control_command_msg;
-  }
+  waywiser_core::msg::CarControlCommand to_msg() const;
 };
 
 class PIDController
@@ -43,19 +46,9 @@ public:
   PIDController(double kp, double ki, double kd)
   : kp_(kp), ki_(ki), kd_(kd), prev_error_(0.0), integral_(0.0) {}
 
-  double compute(double error, double dt)
-  {
-    integral_ += error * dt;
-    double derivative = (error - prev_error_) / dt;
-    prev_error_ = error;
-    return kp_ * error + ki_ * integral_ + kd_ * derivative;
-  }
+  double compute(double error, double dt);
 
-  void reset()
-  {
-    prev_error_ = 0.0;
-    integral_ = 0.0;
-  }
+  void reset();
 
 private:
   double kp_, ki_, kd_;
@@ -92,129 +85,61 @@ private:
   int8_t state = waywiser_twist_safety::msg::EmergencyStopState::UNKNOWN;
 };
 
-inline std::string missionStateToString(MissionState state)
+class CoreUtils
 {
-  switch (state) {
-    case MissionState::Idle:
-      return "Idle";
-    case MissionState::WaitingForRoute:
-      return "Waiting For Route";
-    case MissionState::WaitingForVehicleInit:
-      return "Waiting For Vehicle Init";
-    case MissionState::WaitingForEmergencyStopClear:
-      return "Waiting For Emergency Stop Clear";
-    case MissionState::WaitingForGnssAccuracy:
-      return "Waiting For GNSS Accuracy";
-    case MissionState::FollowRouteInit:
-      return "Follow Route Init";
-    case MissionState::FollowRouteGotoBegin:
-      return "Follow Route Goto Begin";
-    case MissionState::FollowRouteFollowing:
-      return "Follow Route Following";
-    case MissionState::FollowRouteApproachingEndGoal:
-      return "Follow Route Approaching End Goal";
-    case MissionState::FollowRouteFinished:
-      return "Follow Route Finished";
-    default:
-      return "Unknown MissionState";
-  }
-}
+public:
+  static void update_pospoint_from_pose(
+    QSharedPointer<ObjectState> objectState,
+    const xyz_t pose_frame_to_reference_frame_offset,
+    const geometry_msgs::msg::Pose pose,
+    const PosType posType);
 
-inline MissionState convertToMissionState(WayPointFollowerSTMstates state)
+  static std::string missionStateToString(MissionState state);
+
+  static MissionState convertToMissionState(WayPointFollowerSTMstates state);
+
+  static WayPointFollowerSTMstates convertToWayPointFollowerSTMstates(MissionState state);
+
+  static ImuVariant get_imu_variant_param(
+    rclcpp::Node * node,
+    const std::string & param_name);
+
+  static VehicleInterfaceType get_vehicle_interface_type_param(
+    rclcpp::Node * node, const std::string & param_name);
+
+  static RECEIVER_VARIANT get_receiver_variant_param(
+    rclcpp::Node * node, const std::string & param_name);
+
+  static SpeedControlType get_speed_control_type_param(
+    rclcpp::Node * node, const std::string & param_name);
+
+  static void qtMessageToLogger(
+    const rclcpp::Logger & logger, QtMsgType type, const QString & msg);
+};
+
+class URDFUtils
 {
-  switch (state) {
-    case WayPointFollowerSTMstates::NONE:
-      return MissionState::Idle;
-    case WayPointFollowerSTMstates::FOLLOW_ROUTE_INIT:
-      return MissionState::FollowRouteInit;
-    case WayPointFollowerSTMstates::FOLLOW_ROUTE_GOTO_BEGIN:
-      return MissionState::FollowRouteGotoBegin;
-    case WayPointFollowerSTMstates::FOLLOW_ROUTE_FOLLOWING:
-      return MissionState::FollowRouteFollowing;
-    case WayPointFollowerSTMstates::FOLLOW_ROUTE_APPROACHING_END_GOAL:
-      return MissionState::FollowRouteApproachingEndGoal;
-    case WayPointFollowerSTMstates::FOLLOW_ROUTE_FINISHED:
-      return MissionState::FollowRouteFinished;
-    default:
-      // Handle unknown conversion:
-      return MissionState::Idle;
-  }
-}
+public:
+  static QSharedPointer<urdf::Model> getURDFModel(const std::string & urdf_file_);
 
-inline WayPointFollowerSTMstates convertToWayPointFollowerSTMstates(MissionState state)
-{
-  switch (state) {
-    case MissionState::Idle:
-      return WayPointFollowerSTMstates::NONE;
-    case MissionState::FollowRouteInit:
-      return WayPointFollowerSTMstates::FOLLOW_ROUTE_INIT;
-    case MissionState::FollowRouteGotoBegin:
-      return WayPointFollowerSTMstates::FOLLOW_ROUTE_GOTO_BEGIN;
-    case MissionState::FollowRouteFollowing:
-      return WayPointFollowerSTMstates::FOLLOW_ROUTE_FOLLOWING;
-    case MissionState::FollowRouteApproachingEndGoal:
-      return WayPointFollowerSTMstates::FOLLOW_ROUTE_APPROACHING_END_GOAL;
-    case MissionState::FollowRouteFinished:
-      return WayPointFollowerSTMstates::FOLLOW_ROUTE_FINISHED;
-    default:
-      // Handle unknown conversion:
-      return WayPointFollowerSTMstates::NONE;
-  }
-}
+  static vector3_t getFramePosition(
+    QSharedPointer<urdf::Model> urdfModel,
+    const std::string & link_name,
+    const bool logWarning = true);
 
-inline ImuVariant get_imu_variant_param(rclcpp::Node * node, const std::string & param_name)
-{
-  auto str = node->declare_parameter(param_name, "");
-  boost::to_lower(str);
+  static vector3_t getFramePositionOffset(
+    QSharedPointer<urdf::Model> urdfModel, const std::string & frame_A,
+    const std::string & frame_B, const bool logWarning = true);
 
-  if (str == "vesc") {
-    return ImuVariant::VESC;
-  } else if (str == "bno055") {
-    return ImuVariant::BNO055;
-  }
-  return ImuVariant::UNKNOWN;
-}
+  static urdf::Rotation getFrameRotation(
+    QSharedPointer<urdf::Model> urdfModel,
+    const std::string & link_name, const bool logWarning = true);
 
-inline VehicleInterfaceType get_vehicle_interface_type_param(
-  rclcpp::Node * node, const std::string & param_name)
-{
-  auto str = node->declare_parameter(param_name, "");
-  boost::to_lower(str);
+  static vector3_t getFrameRotationOffset(
+    QSharedPointer<urdf::Model> urdfModel,
+    const std::string & frame_A,
+    const std::string & frame_B, const bool logWarning = true);
+};
 
-  if (str == "waywise_simulated") {
-    return VehicleInterfaceType::WAYWISE_SIMULATED;
-  } else if (str == "ext_simulated") {
-    return VehicleInterfaceType::EXT_SIMULATED;
-  }
-  return VehicleInterfaceType::VESC;
-}
-
-inline RECEIVER_VARIANT get_receiver_variant_param(
-  rclcpp::Node * node, const std::string & param_name)
-{
-  auto str = node->declare_parameter(param_name, "");
-  boost::to_lower(str);
-
-  if (str == "ublox_zed_f9p") {
-    return RECEIVER_VARIANT::UBLX_ZED_F9P;
-  } else if (str == "ublox_zed_f9r") {
-    return RECEIVER_VARIANT::UBLX_ZED_F9R;
-  } else if (str == "external") {
-    return RECEIVER_VARIANT::EXTERNAL;
-  }
-  return RECEIVER_VARIANT::WAYWISE_SIMULATED;
-}
-
-inline SpeedControlType get_speed_control_type_param(
-  rclcpp::Node * node, const std::string & param_name)
-{
-  auto str = node->declare_parameter(param_name, "");
-  boost::to_lower(str);
-
-  if (str == "closed_loop_pid_speed_control") {
-    return SpeedControlType::CLOSED_LOOP_PID_SPEED_CONTROL;
-  }
-  return SpeedControlType::OPEN_LOOP_ERPM_CONTROL;
-}
 
 #endif  // WAYWISER_CORE_UTILS_HPP_

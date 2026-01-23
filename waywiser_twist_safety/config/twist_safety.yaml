@@ -20,14 +20,14 @@ onboard_twist_mux:
         timeout: 0.5
         priority: 50
 
-collision_monitor:
+nav2_collision_monitor:
   # Adapted from the config file:
   # https://github.com/ros-planning/navigation2/blob/humble/nav2_collision_monitor/params/collision_monitor_params.yaml
   ros__parameters:
     base_frame_id: "base_link"
     odom_frame_id: "odom"
     cmd_vel_in_topic: "onboard_mux_vel"
-    cmd_vel_out_topic: "collision_monitor_vel"
+    cmd_vel_out_topic: "nav2_collision_monitor_vel"
     transform_tolerance: 0.5
     source_timeout: 5.0
     base_shift_correction: True

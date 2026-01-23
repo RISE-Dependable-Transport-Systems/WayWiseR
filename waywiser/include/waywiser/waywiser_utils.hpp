@@ -1,26 +1,25 @@
 #ifndef WAYWISER_UTILS_HPP_
 #define WAYWISER_UTILS_HPP_
 
-#include "rclcpp/rclcpp.hpp"
+#include <cmath>
+#include <cstdio>
+#include <optional>
+#include <string>
+#include <vector>
+
+#include <rclcpp/rclcpp.hpp>
+
+constexpr double RAD2DEG = 180.0 / M_PI;
+constexpr double DEG2RAD = M_PI / 180.0;
 
 namespace QOS_PROFILES
 {
 
 // Reliable + Transient Local QoS (e.g., for latched topics)
-const rclcpp::QoS RELIABLE_TRANSIENT_LOCAL_QOS = rclcpp::QoS(
-  rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_default)
-)
-  .reliable()
-  .transient_local()
-  .keep_last(1);
+extern const rclcpp::QoS RELIABLE_TRANSIENT_LOCAL_QOS;
 
 // Reliable + Volatile QoS (e.g., normal pub/sub)
-const rclcpp::QoS RELIABLE_VOLATILE_QOS = rclcpp::QoS(
-  rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_default)
-)
-  .reliable()
-  .durability_volatile()
-  .keep_last(1);
+extern const rclcpp::QoS RELIABLE_VOLATILE_QOS;
 
 }  // namespace QOS_PROFILES
 
@@ -79,29 +78,20 @@ struct vector3_t
     return {-x, -y, -z};
   }
 
-  std::string to_string() const
-  {
-    char buf[128];
-    std::snprintf(buf, sizeof(buf), "[%.4f, %.4f, %.4f]", x, y, z);
-    return std::string(buf);
-  }
+  std::string to_string() const;
 
-  const char * c_str() const
-  {
-    static thread_local std::string buffer;
-    buffer = to_string();
-    return buffer.c_str();
-  }
+  const char * c_str() const;
 };
 
-inline std::optional<vector3_t> get_vector3_param(
-  rclcpp::Node * node, const std::string & param_name,
-  const std::vector<double> & default_value = {0.0})
+class RosUtils
 {
-  auto vec = node->declare_parameter(param_name, default_value);
-  if (vec.size() != 3) {
-    return std::nullopt;
-  }
-  return vector3_t{vec[0], vec[1], vec[2]};
-}
+public:
+  static std::optional<vector3_t> get_vector3_param(
+    rclcpp::Node * node, const std::string & param_name,
+    const std::vector<double> & default_value = {0.0, 0.0, 0.0});
+
+  static std::string joinFrame(
+    const std::string & frame_prefix,
+    const std::string & frame_name);
+};
 #endif  // WAYWISER_UTILS_HPP_

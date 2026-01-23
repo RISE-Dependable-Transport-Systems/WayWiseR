@@ -8,9 +8,7 @@ import threading
 
 import carla
 import numpy as np
-from PIL import Image
-from PIL import ImageDraw
-from PIL import ImageFont
+from PIL import Image, ImageDraw, ImageFont
 from PIL.PngImagePlugin import PngInfo
 import rclpy
 from rclpy.node import Node

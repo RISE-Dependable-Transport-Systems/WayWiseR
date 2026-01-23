@@ -1,24 +1,16 @@
 #include "car_interface_component.hpp"
 #include "moc_car_interface_component.cpp"
 
+#include "WayWise/sensors/tof/vl53l0xtofsensor.h"
+
 CarInterfaceComponent::CarInterfaceComponent(
-  QObject * parent, const QSharedPointer<CarState> & carState, bool autoActuateMotorAndServo)
-: QObject(parent)
+  QObjectNode * parentQObjectNode, const QSharedPointer<CarState> & carState,
+  bool autoActuateMotorAndServo)
+: QObject(parentQObjectNode)
 {
+  mParentQObjectNode = parentQObjectNode;
   mCarState = carState;
   mAutoActuateMotorAndServo = autoActuateMotorAndServo;
-}
-
-CarInterfaceComponent::~CarInterfaceComponent()
-{
-  if (mGNSSReceiver && (mGNSSReceiver->getReceiverVariant() == RECEIVER_VARIANT::UBLX_ZED_F9P ||
-    mGNSSReceiver->getReceiverVariant() == RECEIVER_VARIANT::UBLX_ZED_F9R))
-  {
-    QSharedPointer<UbloxRover> mUbloxRover = qSharedPointerDynamicCast<UbloxRover>(mGNSSReceiver);
-    if (mUbloxRover) {
-      mUbloxRover->aboutToShutdown();
-    }
-  }
 }
 
 void CarInterfaceComponent::reset()
@@ -31,17 +23,10 @@ void CarInterfaceComponent::reset()
   mCarControlCommand.brake = 1.0;
   mCarControlCommand.steering = 0.0;
 
-  mExternalFusedPositionBackupConnections.clear();
   mEmergencyStopState->set_clear();
 
   mCarState->setVelocity({0.0, 0.0, 0.0});
   mCarState->setSteering(0.0);
-
-  auto initial_yaw_offset = getGnssChipOrientationOffset().z;
-  auto pospoint = PosPoint();
-  pospoint.setYaw(initial_yaw_offset);
-  pospoint.setType(PosType::odom);
-  mCarState->setPosition(pospoint);
 }
 
 void CarInterfaceComponent::setup_vehicle_interface()
@@ -56,16 +41,13 @@ void CarInterfaceComponent::setup_vehicle_interface()
   mEmergencyStopState.reset(new EmergencyStopState());
 
   // --- Movement control setup ---
+  mCarMovementController.reset(new CarMovementController(mCarState, mAutoActuateMotorAndServo));
+
   switch (mVehicleInterfaceType) {
     case VehicleInterfaceType::VESC:
     case VehicleInterfaceType::WAYWISE_SIMULATED:
       {
-        QSharedPointer<CarMovementController> carMovementController =
-          QSharedPointer<CarMovementController>(
-          new CarMovementController(
-            mCarState,
-            mAutoActuateMotorAndServo));
-        carMovementController->setSpeedToRPMFactor(mSpeedToRPMFactor);
+        mCarMovementController->setSpeedToRPMFactor(mSpeedToRPMFactor);
 
         // setup and connect VESC, simulate movements if unable to connect
         if (mVehicleInterfaceType == VehicleInterfaceType::VESC) {
@@ -80,7 +62,7 @@ void CarInterfaceComponent::setup_vehicle_interface()
           }
 
           if (mVESCMotorController->isSerialConnected()) {
-            carMovementController->setMotorController(mVESCMotorController);
+            mCarMovementController->setMotorController(mVESCMotorController);
             // convert Hz to ms and set VESC polling rate
             mVESCMotorController->setPollValuesPeriod(1000 / mVehicleStatePollRate);
 
@@ -89,11 +71,10 @@ void CarInterfaceComponent::setup_vehicle_interface()
             servoController->setInvertOutput(mInvertServoOutput);
             servoController->setServoCenter(mServoOffset);
             servoController->setServoRange(mServoRange);
-            carMovementController->setServoController(servoController);
+            mCarMovementController->setServoController(servoController);
 
             if (mMinBatteryVoltage <= 0.0) {
-              qDebug() <<
-                "WARNING: Low battery protection is not configured!";
+              qWarning() << "Low battery protection is not configured!";
             } else {
               qDebug() << "Low battery protection is enabled with voltage threshold of " <<
                 mMinBatteryVoltage << " V.";
@@ -119,30 +100,20 @@ void CarInterfaceComponent::setup_vehicle_interface()
               });
           } else {
             mVehicleInterfaceType = VehicleInterfaceType::WAYWISE_SIMULATED;
-            qDebug() <<
-              "VESCMotorController is not connected!";
+            qWarning() << "VESCMotorController is not connected!";
           }
         }
 
         if (mVehicleInterfaceType == VehicleInterfaceType::WAYWISE_SIMULATED) {
-          qDebug() << "Simulating vehicle movement using WayWise.";
-          const int pollPeriodMs = 1000 / mVehicleStatePollRate;
-          QObject::connect(
-            &mWaywiseSimulationTimer, &QTimer::timeout,
-            [this, carMovementController, pollPeriodMs]() {
-              carMovementController->simulationStep(pollPeriodMs);
-            });
-          mWaywiseSimulationTimer.start(pollPeriodMs);
+          qWarning() << "Simulating vehicle movement using WayWise.";
         }
-
-        mMovementController = carMovementController;
       } break;
     case VehicleInterfaceType::EXT_SIMULATED:
       {
-        mMovementController.reset(new MovementController(mCarState));
+        // pass
       } break;
     default:
-      qDebug() << "Unknown vehicle interface type is requested!";
+      qWarning() << "Unknown vehicle interface type is requested!";
       break;
   }
 
@@ -157,172 +128,31 @@ void CarInterfaceComponent::setup_vehicle_interface()
       break;
   }
 
-  // --- Positioning setup ---
-  // GNSS (with fused IMU when using u-blox F9R)
-  switch (mGnssReceiverVariant) {
-    case RECEIVER_VARIANT::UBLX_ZED_F9P:
-    case RECEIVER_VARIANT::UBLX_ZED_F9R:
+  // IMU
+  switch (mImuVariant) {
+    case ImuVariant::VESC:
       {
-        QSharedPointer<UbloxRover> mUbloxRover = QSharedPointer<UbloxRover>::create(mCarState);
-        foreach(const QSerialPortInfo & portInfo, QSerialPortInfo::availablePorts()) {
-          // qDebug()<<portInfo.manufacturer();
-          if (portInfo.manufacturer().toLower().replace("-", "").contains("ublox")) {
-            mUbloxRover->setReceiverVariant(mGnssReceiverVariant);
-
-            if (mGnssReceiverVariant == RECEIVER_VARIANT::UBLX_ZED_F9R) {
-              mUbloxRover->setDynamicModel(mGnssDynamicModel);
-              mUbloxRover->setPrintVerbose(mGnssPrintVerbose);
-              mUbloxRover->setESFAlgAutoMntAlgOn(mGnssSensorFusionImuAutoalign);
-              mUbloxRover->setForceRecalibrateSensors(mGnssSensorFusionForceRecalibrate);
-              mUbloxRover->setGNSSMeasurementRate(mGnssMeasurementRate);
-              mUbloxRover->setNavPrioMessageRate(mGnssPriorityMessageRate);
-              mUbloxRover->setSpeedDataInputRate(mPositionFusionInputTimerRate);
-            }
-
-            if (mUbloxRover->connectSerial(portInfo)) {
-              qDebug() << "UbloxRover connected to:" << portInfo.systemLocation();
-
-              mUbloxRover->setAntennaToChipOffset(
-                mGnssAntennaToGnssChipOffset.x,
-                mGnssAntennaToGnssChipOffset.y,
-                mGnssAntennaToGnssChipOffset.z);
-              mUbloxRover->setChipToRearAxleOffset(
-                mGnssChipToRearAxleOffset.x,
-                mGnssChipToRearAxleOffset.y,
-                mGnssChipToRearAxleOffset.z);
-              mUbloxRover->setChipOrientationOffset(
-                mGnssChipOrientationOffset.x,
-                mGnssChipOrientationOffset.y,
-                mGnssChipOrientationOffset.z);
-
-              if (mUseSdvpPositionFusion) {
-                QObject::connect(
-                  mUbloxRover.get(), &UbloxRover::updatedGNSSPositionAndYaw,
-                  mSDVPVehiclePositionFuser.get(),
-                  &SDVPVehiclePositionFuser::correctPositionAndYawGNSS);
-              } else {
-                QObject::connect(
-                  mUbloxRover.get(), &UbloxRover::txNavPvt,
-                  [&](const ubx_nav_pvt & ubxPvt) {
-                    Q_UNUSED(ubxPvt)
-
-                    PosPoint currentPosition = mCarState->getPosition(PosType::GNSS);
-                    currentPosition.setType(PosType::fused);
-                    mCarState->setPosition(currentPosition);
-                  });
-              }
-
-              // -- NTRIP/TCP client setup for feeding RTCM data into GNSS receiver
-              mRtcmClient.reset(new RtcmClient(this));
-              QObject::connect(
-                mUbloxRover.get(), &UbloxRover::gotNmeaGga,
-                mRtcmClient.get(), &RtcmClient::forwardNmeaGgaToServer);
-              QObject::connect(
-                mRtcmClient.get(), &RtcmClient::rtcmData,
-                mUbloxRover.get(), &UbloxRover::writeRtcmToUblox);
-              if (mRtcmClient->connectWithInfoFromFile("./rtcmServerInfo.txt")) {
-                qDebug() << "RtcmClient: connected to" << QString(
-                  mRtcmClient->getCurrentHost() + ":" +
-                  QString::number(mRtcmClient->getCurrentPort()));
-              } else {
-                qDebug() << "RtcmClient: not connected";
-              }
-
-              mGNSSReceiver = mUbloxRover;
-              mGNSSReceiver->setEnuRef(mEnuReference);
-
-              if (mGNSSReceiver->getReceiverVariant() == RECEIVER_VARIANT::UBLX_ZED_F9R) {
-                connect(
-                  &mPositionFusionInputTimer, &QTimer::timeout,
-                  mGNSSReceiver.get(), &GNSSReceiver::readVehicleSpeedForPositionFusion);
-                mPositionFusionInputTimer.start(1000 / mPositionFusionInputTimerRate);
-              }
-            }
-          }
-        }
-        if (mGNSSReceiver == nullptr) {
-          qDebug() <<
-            "Configured GNSS receiver is not available! Simulating GNSS receiver using WayWise.";
-          mGnssReceiverVariant = RECEIVER_VARIANT::WAYWISE_SIMULATED;
+        if (mVESCMotorController && mVESCMotorController->isSerialConnected()) {
+          mIMUOrientationUpdater = mVESCMotorController->getIMUOrientationUpdater(mCarState);
+          qDebug() << "Vesc IMU is configured.";
+        } else {
+          qWarning() <<
+            "vesc IMU is configured, but serial connection is not available! Using waywise simulation instead.";
+          mImuVariant = ImuVariant::WAYWISE_SIMULATED;
         }
       } break;
-    case RECEIVER_VARIANT::EXTERNAL:
+    case ImuVariant::BNO055:
       {
-        mGNSSReceiver.reset(new GNSSReceiver(mCarState));
-        mGNSSReceiver->setReceiverVariant(RECEIVER_VARIANT::EXTERNAL);
-        mGNSSReceiver->setEnuRef(mEnuReference);
-
-        QObject::connect(
-          parent(), SIGNAL(externalFusedPositionTimeout()), this,
-          SLOT(on_external_fused_position_timeout()));
-
-        QObject::connect(
-          parent(), SIGNAL(updatedFusedPositionExternally(PosPoint)), this,
-          SLOT(on_updated_fused_position_externally(PosPoint)));
+        mIMUOrientationUpdater.reset(new IMUOrientationUpdater(mCarState));
+        qDebug() << "BNO055 IMU is configured.";
       } break;
     default:
       break;
   }
 
-  if (mGnssReceiverVariant == RECEIVER_VARIANT::WAYWISE_SIMULATED) {
-    mGNSSReceiver.reset(new GNSSReceiver(mCarState));
-    mGNSSReceiver->setReceiverVariant(RECEIVER_VARIANT::WAYWISE_SIMULATED);
-    mGNSSReceiver->setReceiverState(RECEIVER_STATE::READY);
-    mGNSSReceiver->setEnuRef(mEnuReference);
-    mGNSSReceiver->setGnssFixAccuracy({0.0, 0.0, 0.0}); // TODO: estimate accuracy
-
-    QObject::connect(
-      mMovementController.get(), &MovementController::updatedOdomPositionAndYaw,
-      [&](QSharedPointer<VehicleState> vehicleState, double distanceDriven) {
-        Q_UNUSED(distanceDriven)
-
-        update_fused_position(vehicleState->getPosition(PosType::odom));
-      });
-
-    QObject::connect(
-      parent(), SIGNAL(updatedOdomPositionExternally(PosPoint)), this,
-      SLOT(update_fused_position(PosPoint)));
-  }
-
-  // Position Fuser
-  if (mUseSdvpPositionFusion) {
-    mSDVPVehiclePositionFuser.reset(new SDVPVehiclePositionFuser(this));
-
-    // IMU
-    switch (mImuVariant) {
-      case ImuVariant::VESC:
-        {
-          if (mVESCMotorController->isSerialConnected()) {
-            mIMUOrientationUpdater = mVESCMotorController->getIMUOrientationUpdater(mCarState);
-            QObject::connect(
-              mIMUOrientationUpdater.get(), &IMUOrientationUpdater::updatedIMUOrientation,
-              mSDVPVehiclePositionFuser.get(),
-              &SDVPVehiclePositionFuser::correctPositionAndYawIMU);
-            qDebug() << "Using vesc IMU for position fusion.";
-          } else {
-            qDebug() <<
-              "vesc IMU is configured for position fusion but VESCMotorController is not connected.";
-          }
-        } break;
-      case ImuVariant::BNO055:
-        {
-          mIMUOrientationUpdater.reset(new BNO055OrientationUpdater(mCarState, "/dev/i2c-1"));
-          QObject::connect(
-            mIMUOrientationUpdater.get(), &IMUOrientationUpdater::updatedIMUOrientation,
-            mSDVPVehiclePositionFuser.get(),
-            &SDVPVehiclePositionFuser::correctPositionAndYawIMU);
-          qDebug() << "Using bno055 IMU for position fusion.";
-        } break;
-      default:
-        qDebug() << "Unknown IMU variant is requested for position fusion!";
-        break;
-    }
-
-    // Odometry
-    QObject::connect(
-      mMovementController.get(), &MovementController::updatedOdomPositionAndYaw,
-      mSDVPVehiclePositionFuser.get(),
-      &SDVPVehiclePositionFuser::correctPositionAndYawOdom);
+  if (mImuVariant == ImuVariant::WAYWISE_SIMULATED) {
+    mIMUOrientationUpdater.reset(new IMUOrientationUpdater(mCarState));
+    qWarning() << "Waywise simulated IMU is configured.";
   }
 
   // ToF Sensors
@@ -337,61 +167,19 @@ void CarInterfaceComponent::setup_vehicle_interface()
       });
     mToFSensors[tof_sensor_name] = tof_sensor;
   }
-}
 
-void CarInterfaceComponent::on_updated_fused_position_externally(PosPoint position)
-{
-  Q_UNUSED(position)
-
-  mGNSSReceiver->setReceiverState(RECEIVER_STATE::READY);
-  mGNSSReceiver->setGnssFixAccuracy({0.0, 0.0, 0.0});       // TODO: estimate accuracy
-
-  switch (mGNSSReceiver->getReceiverVariant()) {
-    case RECEIVER_VARIANT::WAYWISE_SIMULATED:
-      {
-        qDebug() << "Receiving external position updates.";
-        mGNSSReceiver->setReceiverVariant(RECEIVER_VARIANT::EXTERNAL);
-        for (const auto & conn : mExternalFusedPositionBackupConnections) {
-          QObject::disconnect(conn);
-        }
-        mExternalFusedPositionBackupConnections.clear();
-      } break;
-    default:
-      break;
+  // WayWise simulation timer
+  if (mVehicleInterfaceType == VehicleInterfaceType::WAYWISE_SIMULATED ||
+    mImuVariant == ImuVariant::WAYWISE_SIMULATED)
+  {
+    mWaywiseSimulationTimer = rclcpp::create_timer(
+      mParentQObjectNode->get_node_base_interface(),
+      mParentQObjectNode->get_node_timers_interface(),
+      mParentQObjectNode->get_clock(), // uses sim time if enabled
+      std::chrono::milliseconds(1000 / mVehicleStatePollRate),
+      std::bind(&CarInterfaceComponent::waywise_simulation_timer_callback, this)
+    );
   }
-}
-
-void CarInterfaceComponent::on_external_fused_position_timeout()
-{
-  qDebug() <<
-    "External position update timed out. Switching to waywise simulated position updater.";
-  mGNSSReceiver->setReceiverVariant(RECEIVER_VARIANT::WAYWISE_SIMULATED);
-  mGNSSReceiver->setReceiverState(RECEIVER_STATE::READY);
-  mGNSSReceiver->setGnssFixAccuracy({0.0, 0.0, 0.0});           // TODO: estimate accuracy
-  if (!mExternalFusedPositionBackupConnections.isEmpty()) {
-    for (const auto & conn : mExternalFusedPositionBackupConnections) {
-      QObject::disconnect(conn);
-    }
-    mExternalFusedPositionBackupConnections.clear();
-  }
-  mExternalFusedPositionBackupConnections.append(
-    QObject::connect(
-      mMovementController.get(), &MovementController::updatedOdomPositionAndYaw,
-      [&](QSharedPointer<VehicleState> vehicleState, double distanceDriven) {
-        Q_UNUSED(distanceDriven)
-
-        update_fused_position(vehicleState->getPosition(PosType::odom));
-      }));
-  mExternalFusedPositionBackupConnections.append(
-    QObject::connect(
-      parent(), SIGNAL(updatedOdomPositionExternally(PosPoint)), this,
-      SLOT(update_fused_position(PosPoint))));
-}
-
-void CarInterfaceComponent::update_fused_position(PosPoint position)
-{
-  position.setType(PosType::fused);
-  mCarState->setPosition(position);
 }
 
 void CarInterfaceComponent::activate_emergency_stop(
@@ -399,10 +187,10 @@ void CarInterfaceComponent::activate_emergency_stop(
   const std::string & reason)
 {
   if (!mEmergencyStopState->is_active()) {
-    mMovementController->setDesiredSpeed(0.0);
-    mMovementController->setDesiredSteering(0.0);
+    mCarMovementController->setDesiredSpeed(0.0);
+    mCarMovementController->setDesiredSteering(0.0);
     mEmergencyStopState->set_active();
-    qDebug() << QString("Emergency stop ACTIVATED%1.%2")
+    qWarning() << QString("Emergency stop ACTIVATED%1.%2")
       .arg(sender_id.empty() ? "" : " by " + QString::fromStdString(sender_id))
       .arg(reason.empty() ? "" : " Reason: " + QString::fromStdString(reason));
   }
@@ -412,15 +200,14 @@ void CarInterfaceComponent::clear_emergency_stop(const std::string & sender_id)
 {
   if (!mEmergencyStopState->is_clear()) {
     mEmergencyStopState->set_clear();
-    qDebug() << QString("Emergency stop CLEARED%1")
+    qWarning() << QString("Emergency stop CLEARED%1")
       .arg(sender_id.empty() ? "" : " by " + QString::fromStdString(sender_id));
   }
 }
 
-void CarInterfaceComponent::updateControlCommand(const geometry_msgs::msg::Twist & twist, double dt)
+void CarInterfaceComponent::updateControlCommand(
+  double desired_linear_speed, double desired_angular_speed, double dt)
 {
-  float desired_speed = 0.0;
-
   if (mEmergencyStopState->is_active()) {
     mCarControlCommand.throttle = 0.0;
     mCarControlCommand.brake = 1.0;
@@ -432,25 +219,26 @@ void CarInterfaceComponent::updateControlCommand(const geometry_msgs::msg::Twist
     static double max_linear_speed = mErpmMax / mSpeedToRPMFactor;
     static double min_linear_speed = mErpmMin / mSpeedToRPMFactor;
 
-    desired_speed = std::clamp(twist.linear.x, -max_linear_speed, max_linear_speed);
-    desired_speed = fabs(desired_speed) >= min_linear_speed ? desired_speed : 0.0;
+    desired_linear_speed = std::clamp(desired_linear_speed, -max_linear_speed, max_linear_speed);
+    desired_linear_speed = fabs(desired_linear_speed) >=
+      fabs(min_linear_speed) ? desired_linear_speed : 0.0;
 
     switch (mSpeedControlType) {
       case SpeedControlType::OPEN_LOOP_ERPM_CONTROL:
         {
-          mCarControlCommand.throttle = desired_speed / max_linear_speed;
+          mCarControlCommand.throttle = desired_linear_speed / max_linear_speed;
           mCarControlCommand.brake = 0.0;
         } break;
       case SpeedControlType::CLOSED_LOOP_PID_SPEED_CONTROL:
         {
-          if (fabs(desired_speed) > 0.0) {
-            double speed_error = desired_speed - mCarState->getSpeed();
+          if (fabs(desired_linear_speed) > 0.0) {
+            double speed_error = desired_linear_speed - mCarState->getSpeed();
             auto speed_control_signal = std::clamp(
               mPIDSpeedController->compute(speed_error, dt), -1.0, 1.0);
             // qDebug() << "Speed control signal: " << speed_control_signal << ", current speed: " <<
-            // mCarState->getSpeed() << ", desired speed: " << desired_speed << ", speed error: " <<
+            // mCarState->getSpeed() << ", desired speed: " << desired_linear_speed << ", speed error: " <<
             // speed_error;
-            if (desired_speed * speed_control_signal > 0.0) {
+            if (desired_linear_speed * speed_control_signal > 0.0) {
               mCarControlCommand.throttle = speed_control_signal;
               mCarControlCommand.brake = 0.0;
             } else {
@@ -469,21 +257,20 @@ void CarInterfaceComponent::updateControlCommand(const geometry_msgs::msg::Twist
     }
 
     float steering_curvature = 0.0; // 1/r = ω/v
-    if (fabs(desired_speed) > 0.0) {
-      steering_curvature = twist.angular.z / desired_speed;
+    if (fabs(desired_linear_speed) > 0.0) {
+      steering_curvature = desired_angular_speed / desired_linear_speed;
     } else {
-      steering_curvature = twist.angular.z / min_linear_speed;
+      steering_curvature = desired_angular_speed / min_linear_speed;
     }
 
     // NOTE / TODO: WayWise has a sign error here (curvature in wrong direction)
     mCarControlCommand.steering = std::clamp(
       -atan(mCarState->getAxisDistance() * steering_curvature) / mCarState->getMaxSteeringAngle(),
-      -1.0,
-      1.0);
+      -1.0, 1.0);
   }
 
-  mMovementController->setDesiredSpeed(desired_speed);
-  mMovementController->setDesiredSteering(mCarControlCommand.steering);
+  mCarMovementController->setDesiredSpeed(desired_linear_speed);
+  mCarMovementController->setDesiredSteering(mCarControlCommand.steering);
 }
 
 void CarInterfaceComponent::executeControlCommand()
@@ -493,6 +280,18 @@ void CarInterfaceComponent::executeControlCommand()
     motorErpm = std::clamp(mCarControlCommand.throttle * mErpmMax, -mErpmMax, mErpmMax);
     motorErpm = fabs(motorErpm) >= mErpmMin ? motorErpm : 0.0;
   }
-  mMovementController->actuateDriveMotor(motorErpm);
-  mMovementController->actuateSteeringServo(mCarControlCommand.steering);
+  mCarMovementController->actuateDriveMotor(motorErpm);
+  mCarMovementController->actuateSteeringServo(mCarControlCommand.steering);
+}
+
+void CarInterfaceComponent::waywise_simulation_timer_callback()
+{
+  static int pollPeriodMs = 1000 / mVehicleStatePollRate;
+  if (mVehicleInterfaceType == VehicleInterfaceType::WAYWISE_SIMULATED) {
+    mCarMovementController->simulationStep(pollPeriodMs);
+  }
+
+  if (mImuVariant == ImuVariant::WAYWISE_SIMULATED) {
+    mIMUOrientationUpdater->simulationStep();
+  }
 }

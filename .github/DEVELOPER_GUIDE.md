@@ -4,48 +4,26 @@ This guide sets up a development environment with [Visual Studio Code](https://c
 
 ## Prerequisites
 
-Install these VS Code extensions:
+To install the recommended VS Code extensions, run the following command in your terminal:
 
-- [Python](https://marketplace.visualstudio.com/items?itemName=ms-python.python)
-- [Ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)
-- [C++](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools)
-- [Uncrustify](https://marketplace.visualstudio.com/items?itemName=zachflower.uncrustify)
-- [CMake Language Support](https://marketplace.visualstudio.com/items?itemName=josetr.cmake-language-support-vscode)
-- [shell-format](https://marketplace.visualstudio.com/items?itemName=foxundermoon.shell-format)
-- [XML](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-xml)
-- [YAML](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
-
-## Configure Ruff for Python
-
-Create or update `.vscode/ruff.toml` with:
-
-```toml
-# Allow lines to be as long as 99
-line-length = 99
-
-[lint]
-# Select E (PEP8), W (warnings), F (pyflakes), C (complexity), Q (quotes), I (imports)
-select = ["E", "F", "W", "C", "Q", "I"]
-
-[lint.flake8-quotes]
-inline-quotes = "single"
-docstring-quotes = "double"
-
-[format]
-quote-style = "single"
-docstring-code-format = true
-docstring-code-line-length = 99
-
-[lint.isort]
-known-first-party = ["waywiser_core", "waywiser_py", "waywiser_test_runner", "waywiser_twist_safety"]
-known-third-party = ["rclpy", "ament_index_python", "matplotlib", "numpy", "pymap3d", "shapely", "tf_transformations"]
-force-sort-within-sections = true
-order-by-type = false
+```bash
+code --install-extension ms-python.python
+code --install-extension charliermarsh.ruff
+code --install-extension llvm-vs-code-extensions.vscode-clangd
+code --install-extension zachflower.uncrustify
+code --install-extension josetr.cmake-language-support-vscode
+code --install-extension shakram02.bash-beautify
+code --install-extension esbenp.prettier-vscode
+code --install-extension DotJoshJohnson.xml
 ```
 
 ## Configure Uncrustify for C++
 
-Download [ament_code_style.cfg](https://github.com/ament/ament_lint/blob/humble/ament_uncrustify/ament_uncrustify/configuration/ament_code_style.cfg) to `.vscode` directory.
+Run the following command to download the `ament_code_style.cfg` to your `.vscode` directory:
+
+```bash
+wget https://raw.githubusercontent.com/ament/ament_lint/humble/ament_uncrustify/ament_uncrustify/configuration/ament_code_style.cfg -O $WAYWISER_WS/src/WayWiseR/.vscode/ament_code_style.cfg
+```
 
 ## Configure VS Code Settings
 
@@ -58,33 +36,43 @@ Create or update `.vscode/settings.json` with:
     "editor.codeActionsOnSave": {
       "source.organizeImports": "explicit",
       "source.fixAll": "explicit"
-    }
+    },
+    "editor.formatOnSave": true
   },
   "python.analysis.typeCheckingMode": "basic",
   "python.analysis.autoImportCompletions": true,
-  "ruff.configuration": "./.vscode/ruff.toml",
   "ruff.organizeImports": true,
   "editor.formatOnSave": true,
   "[cpp]": {
     "editor.defaultFormatter": "zachflower.uncrustify"
   },
   "uncrustify.configPath.linux": ".vscode/ament_code_style.cfg",
-  "C_Cpp.codeAnalysis.clangTidy.enabled": true,
   "[cmake]": {
     "editor.defaultFormatter": "josetr.cmake-language-support-vscode"
   },
+  "cmake.ignoreCMakeListsMissing": true,
+  "cmakeFormat.args": ["--max-pargs-hwrap=6"],
   "[shellscript]": {
-    "editor.defaultFormatter": "foxundermoon.shell-format"
+    "editor.defaultFormatter": "shakram02.bash-beautify"
   },
   "[xml]": {
-    "editor.defaultFormatter": "redhat.vscode-xml"
+    "editor.defaultFormatter": "DotJoshJohnson.xml"
   },
   "[yaml]": {
-    "editor.defaultFormatter": "redhat.vscode-yaml"
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[jsonc]": {
-    "editor.defaultFormatter": "vscode.json-language-features"
-  }
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "clangd.arguments": [
+    "--background-index",
+    "--pretty",
+    "--clang-tidy",
+    "--query-driver=/usr/bin/g++",
+    "--header-insertion=never",
+    "--compile-commands-dir=${workspaceFolder}/../../build"
+  ],
+  "C_Cpp.intelliSenseEngine": "disabled"
 }
 ```
 
@@ -96,4 +84,29 @@ To run tests, build the workspace and then do:
 cd $WAYWISER_WS
 colcon test --base-paths src/WayWiseR/ --packages-skip $WAYWISER_SKIPPED_PACKAGES
 colcon test-result --verbose
+```
+
+## Local CI Pipeline (Docker & act)
+
+To verify changes in an environment identical to the GitHub Actions runner, you can run the CI pipeline locally using [Docker](https://docs.docker.com/engine) and [act](https://nektosact.com/).
+
+### Installation
+
+1. **Docker**: Install `Docker engine` for your platform by following the [official guide](https://docs.docker.com/engine/install/).
+2. **act**: Install `act` CLI by following the [official guide](https://nektosact.com/installation/).
+
+### Running the Pipeline
+
+Before running the pipeline for the first time or after changing the CI environment, build the custom CI image locally:
+
+```bash
+# Build the CI image
+docker build -t ghcr.io/rise-dependable-transport-systems/waywiser/ci-image:humble -f .github/workflows/Dockerfile.ci .
+```
+
+Then, run the build and test job using `act`. The `--pull=false` flag ensures `act` uses your local image:
+
+```bash
+# Run the CI pipeline locally
+act -j build-and-test --pull=false -P ubuntu-22.04=ghcr.io/rise-dependable-transport-systems/waywiser/ci-image:humble
 ```

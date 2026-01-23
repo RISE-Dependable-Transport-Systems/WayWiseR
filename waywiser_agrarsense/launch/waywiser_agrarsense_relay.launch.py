@@ -3,11 +3,17 @@ import os
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import (
+    DeclareLaunchArgument,
+    GroupAction,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
-import yaml
+from launch_ros.actions import Node, PushRosNamespace, SetRemap
+
+from waywiser_py.waywiser_utils import FileUtils, RosUtils
 
 
 def generate_launch_description():
@@ -18,21 +24,12 @@ def generate_launch_description():
     use_sim_time_la = DeclareLaunchArgument(
         'use_sim_time', default_value='True', description='Use simulation clock'
     )
-    ego_vehicle_role_name_la = DeclareLaunchArgument(
-        'ego_vehicle_role_name',
-        default_value='truck',
-        description='Name of the ego vehicle',
-    )
     sim_config_la = DeclareLaunchArgument(
         'sim_config',
-        default_value=os.path.join(waywiser_agrarsense_dir, 'config/agrarsense_orchestrator.yaml'),
+        default_value=os.path.join(
+            waywiser_agrarsense_dir, 'config/agrarsense_orchestrator_playground.yaml'
+        ),
         description='Full path to params file of simulator',
-    )
-
-    vehicle_config_la = DeclareLaunchArgument(
-        'vehicle_config',
-        default_value=os.path.join(waywiser_agrarsense_dir, 'config/forwarder.yaml'),
-        description='Full path to params file of vehicle',
     )
 
     convert_rgb_to_grayscale_depth_la = DeclareLaunchArgument(
@@ -41,55 +38,38 @@ def generate_launch_description():
         description='Whether to convert rgb depth image to grayscale depth',
     )
 
-    # Node configuration for waywiser_twist_transform
-    waywiser_to_agrarsense_control = Node(
-        package='waywiser_agrarsense',
-        executable='waywiser_to_agrarsense_control.py',
-        name='waywiser_to_agrarsense_control',
-        parameters=[
-            {
-                'use_sim_time': LaunchConfiguration('use_sim_time'),
-                'ego_vehicle_role_name': LaunchConfiguration('ego_vehicle_role_name'),
-            },
-            LaunchConfiguration('vehicle_config'),
-        ],
-        arguments=['--ros-args', '--log-level', 'info'],
-        output='screen',
-        emulate_tty=True,
-    )
-
+    # Define OpaqueFunction actions to launch nodes with context
     vehicle_tf_publishers_launch_action = OpaqueFunction(function=vehicle_tf_publishers_launch)
     camera_publishers_launch_action = OpaqueFunction(function=camera_publishers_launch)
+    rgbd_to_pointcloud_launch_action = OpaqueFunction(function=rgbd_to_pointcloud_launch)
 
     # Create launch description
     ld = LaunchDescription()
 
     # Add declared launch arguments
     ld.add_action(use_sim_time_la)
-    ld.add_action(ego_vehicle_role_name_la)
     ld.add_action(sim_config_la)
-    ld.add_action(vehicle_config_la)
     ld.add_action(convert_rgb_to_grayscale_depth_la)
 
-    ld.add_action(waywiser_to_agrarsense_control)
     ld.add_action(vehicle_tf_publishers_launch_action)
     ld.add_action(camera_publishers_launch_action)
+    ld.add_action(rgbd_to_pointcloud_launch_action)
 
     return ld
 
 
 def vehicle_tf_publishers_launch(context):
     nodes = []
-    config_data = yaml_to_dict(LaunchConfiguration('sim_config').perform(context))
-    sim_parameters = config_data['agrarsense_orchestrator_node']['ros__parameters']
+    sim_config = FileUtils.get_full_file_path(LaunchConfiguration('sim_config').perform(context))
+    node_params_dict = RosUtils.get_node_params(sim_config, 'agrarsense_orchestrator_node')
 
     vehicle_ids = []
-    if 'vehicle_ids' in sim_parameters:
-        vehicle_ids = sim_parameters['vehicle_ids']
+    if 'vehicle_ids' in node_params_dict:
+        vehicle_ids = node_params_dict['vehicle_ids']
 
     vehicle_tf_publisher_params = {}
-    if 'vehicle_tf_publisher' in sim_parameters:
-        vehicle_tf_publisher_params = sim_parameters['vehicle_tf_publisher']
+    if 'vehicle_tf_publisher' in node_params_dict:
+        vehicle_tf_publisher_params = node_params_dict['vehicle_tf_publisher']
 
     for vehicle_id in vehicle_ids:
         if vehicle_id in vehicle_tf_publisher_params:
@@ -99,7 +79,8 @@ def vehicle_tf_publishers_launch(context):
                 Node(
                     package='waywiser_agrarsense',
                     executable='vehicle_tf_publisher.py',
-                    name=f'{vehicle_id}_tf_publisher',
+                    namespace=vehicle_id,
+                    name='tf_publisher',
                     output='screen',
                     emulate_tty=True,
                     parameters=[
@@ -116,10 +97,10 @@ def vehicle_tf_publishers_launch(context):
 
 def camera_publishers_launch(context):
     nodes = []
-    config_data = yaml_to_dict(LaunchConfiguration('sim_config').perform(context))
-    sim_parameters = config_data['agrarsense_orchestrator_node']['ros__parameters']
+    sim_config = FileUtils.get_full_file_path(LaunchConfiguration('sim_config').perform(context))
+    node_params_dict = RosUtils.get_node_params(sim_config, 'agrarsense_orchestrator_node')
 
-    spawn_objects_json_file = os.path.expanduser(sim_parameters['objects_json_path'])
+    spawn_objects_json_file = os.path.expanduser(node_params_dict['objects_json_path'])
     # If the path is relative, prepend the package's config directory
     if spawn_objects_json_file and not spawn_objects_json_file.startswith('/'):
         spawn_objects_json_file = os.path.join(
@@ -132,7 +113,7 @@ def camera_publishers_launch(context):
         context
     )
 
-    with open(spawn_objects_json_file, 'r') as f:
+    with open(spawn_objects_json_file, 'r', encoding='utf-8') as f:
         data = json.load(f)
         for obj in data['objects']:
             if obj['type'] == 'vehicle':
@@ -140,64 +121,50 @@ def camera_publishers_launch(context):
                 if 'sensors' in obj:
                     sensors = obj['sensors']
                     for sensor in sensors:
-                        if sensor['model'] == 'RGBCamera':
-                            parameters = sensor['parameters']
+                        if sensor['model'] == 'RGBCamera' or sensor['model'] == 'DepthCamera':
+                            if sensor['model'] == 'RGBCamera':
+                                parameters = sensor['parameters']
+                                parameters['out_topic'] = f'sensors/{sensor["id"]}/image_rect'
+                            else:
+                                parameters = sensor['parameters']['cameraParameters']
+                                parameters['out_topic'] = f'sensors/{sensor["id"]}/image_rect'
+
+                            parameters['fov'] = parameters.pop('fOV')
+                            parameters['camera_frame'] = RosUtils.join_frame(
+                                role_name, sensor['id']
+                            )
+                            parameters['base_frame'] = RosUtils.join_frame(role_name, 'base_link')
+                            parameters['topic_name'] = f'sensors/{sensor["id"]}/camera_info'
+                            parameters['spawn_point'] = json.dumps(sensor['spawnPoint'])
+                            if not (
+                                sensor['model'] == 'DepthCamera' and convert_rgb_to_grayscale_depth
+                            ):
+                                parameters['in_topic'] = f'/agrarsense/out/sensors/{sensor["id"]}'
+
                             nodes.append(
                                 Node(
                                     package='waywiser_perception',
                                     executable='camera_info_publisher.py',
-                                    name=f'{role_name}_{sensor["id"]}_camera_info_publisher',
+                                    namespace=role_name,
+                                    name=f'{sensor["id"]}_camera_info_publisher',
                                     output='screen',
                                     emulate_tty=True,
                                     parameters=[
+                                        parameters,
                                         {
                                             'use_sim_time': LaunchConfiguration('use_sim_time'),
-                                            'width': parameters['width'],
-                                            'height': parameters['height'],
-                                            'fov': parameters['fOV'],
-                                            'camera_frame': f'{role_name}/{sensor["id"]}',
-                                            'base_frame': 'base_link',
-                                            'topic_name': (
-                                                f'/agrarsense/out/sensors/{sensor["id"]}'
-                                                f'/camera_info'
-                                            ),
-                                            'spawn_point': json.dumps(sensor['spawnPoint']),
-                                        }
+                                        },
                                     ],
                                 )
                             )
-                        if sensor['model'] == 'DepthCamera':
-                            parameters = sensor['parameters']['cameraParameters']
-                            nodes.append(
-                                Node(
-                                    package='waywiser_perception',
-                                    executable='camera_info_publisher.py',
-                                    name=f'{role_name}_{sensor["id"]}_camera_info_publisher',
-                                    output='screen',
-                                    emulate_tty=True,
-                                    parameters=[
-                                        {
-                                            'use_sim_time': LaunchConfiguration('use_sim_time'),
-                                            'width': parameters['width'],
-                                            'height': parameters['height'],
-                                            'fov': parameters['fOV'],
-                                            'camera_frame': f'{role_name}/{sensor["id"]}',
-                                            'base_frame': 'base_link',
-                                            'topic_name': (
-                                                f'/agrarsense/out/sensors/{sensor["id"]}/'
-                                                'camera_info'
-                                            ),
-                                            'spawn_point': json.dumps(sensor['spawnPoint']),
-                                        }
-                                    ],
-                                )
-                            )
-                            if convert_rgb_to_grayscale_depth:
+
+                            if sensor['model'] == 'DepthCamera' and convert_rgb_to_grayscale_depth:
                                 nodes.append(
                                     Node(
                                         package='waywiser_perception',
                                         executable='rgb_to_grayscale.py',
-                                        name=f'{role_name}_{sensor["id"]}_rgb_to_grayscale',
+                                        namespace=role_name,
+                                        name=f'{sensor["id"]}_rgb_to_grayscale',
                                         output='screen',
                                         emulate_tty=True,
                                         parameters=[
@@ -206,12 +173,14 @@ def camera_publishers_launch(context):
                                                     'use_sim_time'
                                                 ),
                                                 'far_plane': 1000.0,
-                                                'frame_id_override': f'{role_name}/{sensor["id"]}',
-                                                'rgb_topic': (
+                                                'frame_id_override': RosUtils.join_frame(
+                                                    role_name, sensor['id']
+                                                ),
+                                                'depth_in_topic': (
                                                     f'/agrarsense/out/sensors/{sensor["id"]}'
                                                 ),
-                                                'depth_topic': (
-                                                    f'/agrarsense/out/sensors/{sensor["id"]}'
+                                                'depth_out_topic': (
+                                                    f'sensors/{sensor["id"]}/image_rect'
                                                 ),
                                             }
                                         ],
@@ -224,42 +193,46 @@ def camera_publishers_launch(context):
 def rgbd_to_pointcloud_launch(context):
     waywiser_perception_dir = get_package_share_directory('waywiser_perception')
     nodes = []
-    with open(LaunchConfiguration('sim_config').perform(context)) as f:
-        config_data = yaml.safe_load(f)
-        node_params = config_data['/**']['ros__parameters']
-        rgbd_to_pointcloud_sources = node_params['rgbd_to_pointcloud_sources']
-        for rgbd_to_pointcloud_source in rgbd_to_pointcloud_sources:
-            rgbd_to_pointcloud_source_params = node_params[rgbd_to_pointcloud_source]
-            namespace = '/agrarsense/out/sensors'
+    sim_config = FileUtils.get_full_file_path(LaunchConfiguration('sim_config').perform(context))
+    node_params_dict = RosUtils.get_node_params(sim_config, 'agrarsense_orchestrator_node')
+    rgbd_to_pointcloud_sources = node_params_dict['rgbd_to_pointcloud_sources']
+    for rgbd_to_pointcloud_source in rgbd_to_pointcloud_sources:
+        rgbd_to_pointcloud_source_params = node_params_dict[rgbd_to_pointcloud_source]
+        namespace = f'/{rgbd_to_pointcloud_source_params.get("attached_to", "agrarsense")}/sensors'
 
-            nodes.append(
-                IncludeLaunchDescription(
-                    PythonLaunchDescriptionSource(
-                        [
-                            os.path.join(
-                                waywiser_perception_dir,
-                                'launch',
-                                'rgbd_to_pointcloud.launch.py',
-                            )
-                        ]
+        nodes.append(
+            GroupAction(
+                actions=[
+                    PushRosNamespace(namespace),
+                    SetRemap(src='/tf', dst='/tf'),
+                    SetRemap(src='/tf_static', dst='/tf_static'),
+                    IncludeLaunchDescription(
+                        PythonLaunchDescriptionSource(
+                            [
+                                os.path.join(
+                                    waywiser_perception_dir,
+                                    'launch',
+                                    'rgbd_to_pointcloud.launch.py',
+                                )
+                            ]
+                        ),
+                        launch_arguments={
+                            'use_sim_time': LaunchConfiguration('use_sim_time'),
+                            'node_name': rgbd_to_pointcloud_source_params['depth_camera']
+                            + '_pc_publisher',
+                            'rgb_topic': rgbd_to_pointcloud_source_params['rgb_camera']
+                            + '/image_rect',
+                            'depth_topic': rgbd_to_pointcloud_source_params['depth_camera']
+                            + '/image_rect',
+                            'rgb_camera_info_topic': rgbd_to_pointcloud_source_params['rgb_camera']
+                            + '/camera_info',
+                            'pointcloud_topic': rgbd_to_pointcloud_source_params['depth_camera']
+                            + '/color/points',
+                            'optical_to_ros_transform': 'False',
+                        }.items(),
                     ),
-                    launch_arguments={
-                        'use_sim_time': LaunchConfiguration('use_sim_time'),
-                        'namespace': namespace,
-                        'rgb_topic': rgbd_to_pointcloud_source_params['rgb_camera'],
-                        'depth_topic': rgbd_to_pointcloud_source_params['depth_camera'] + '_raw',
-                        'rgb_camera_info_topic': rgbd_to_pointcloud_source_params['rgb_camera']
-                        + '/camera_info',
-                        'pointcloud_topic': rgbd_to_pointcloud_source_params['depth_camera']
-                        + '/color/points',
-                        'optical_to_ros_transform': 'False',
-                    }.items(),
-                )
+                ]
             )
+        )
 
     return nodes
-
-
-def yaml_to_dict(path_to_yaml):
-    with open(path_to_yaml, 'r') as f:
-        return yaml.load(f, Loader=yaml.SafeLoader)

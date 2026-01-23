@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*
-'''!
+"""!
   @file  DFRobot_CH432T.py
   @brief  Define infrastructure of DFRobot_CH432T class
   @details  ch432t Raspberry Pi SPI to modbus expansion board driver
@@ -9,18 +9,16 @@
   @version  V1.0
   @date  2021-12-14
   @url  https://github.com/DFRobot/DFRobot_CH432T
-'''
+"""
+from ctypes import *
+import logging
 import sys
+from threading import Lock
 import time
 
+from serial.serialutil import *
 import spidev
 
-import logging
-from ctypes import *
-
-from threading import Lock
-
-from serial.serialutil import *
 # from serial.serialutil import SerialBase, SerialException, to_bytes, \
 #     portNotOpenError, writeTimeoutError, Timeout
 
@@ -28,7 +26,7 @@ logger = logging.getLogger()
 # logger.setLevel(logging.INFO)   # Display all print information
 logger.setLevel(logging.WARNING)   # If you don’t want to display too many prints, only print errors, please use this option
 ph = logging.StreamHandler()
-formatter = logging.Formatter("%(asctime)s - [%(filename)s %(funcName)s]:%(lineno)d - %(levelname)s: %(message)s")
+formatter = logging.Formatter('%(asctime)s - [%(filename)s %(funcName)s]:%(lineno)d - %(levelname)s: %(message)s')
 ph.setFormatter(formatter)
 logger.addHandler(ph)
 
@@ -225,13 +223,13 @@ CH432T_REG_SHIFT = 2
 
 
 class DFRobot_CH432T(SerialBase, object):
-  '''!
+  """!
     @brief Define DFRobot_CH432T basic class
     @details Drive ch432t Raspberry Pi SPI to modbus expansion board
-  '''
+  """
 
   class INT_config_reg(Structure):
-    '''
+    """
       @brief Interrupt enable register, including enhancing function control bit and serial port interrupt enabling
       @note Register struct:
       @n -------------------------------------------------------------------------------------
@@ -247,7 +245,7 @@ class DFRobot_CH432T(SerialBase, object):
       ie_lines: when the bit is 1, allow receiving line status interrupt
       ie_thre: when the bit is 1, allow transmitting holding register empty interrupt
       ie_recv: when the bit is 1, allow receiving data interrupt
-    '''
+    """
     _pack_ = 1
     _fields_ = [('reset', c_ubyte, 1),
           ('low_power',c_ubyte, 1),
@@ -258,9 +256,9 @@ class DFRobot_CH432T(SerialBase, object):
           ('ie_thre', c_ubyte, 1),
           ('ie_recv', c_ubyte, 1)]
     def __init__(self):
-      '''!
+      """!
         @brief sensor_status structure init
-      '''
+      """
       self.reset = 0
       self.low_power = 0
       self.slp_ck2x = 0
@@ -270,24 +268,24 @@ class DFRobot_CH432T(SerialBase, object):
       self.ie_recv = 0
 
     def set_list(self, data):
-      '''!
+      """!
         @brief Assign the struct
         @param data The assigned uint8_t data
-      '''
+      """
       buf = (c_ubyte * len(data))()
       for i in range(len(data)):
         buf[i] = data[i]
       memmove(addressof(self), addressof(buf), len(data))
 
     def get_list(self):
-      '''!
+      """!
         @brief Get the struct value
         @return Return the struct value, list type
-      '''
+      """
       return list(bytearray(string_at( addressof(self), sizeof(self) )))
 
   class INT_status_reg(Structure):
-    '''
+    """
       @brief Interrupt identity register, used to analyze and process the interrupt source
       @note Register struct:
       @n -----------------------------------------------------------------------------------
@@ -309,38 +307,38 @@ class DFRobot_CH432T(SerialBase, object):
           Interrupt source: transmit holding register empty, re-enable interrupt when IETHRE changes from 0 to 1; method to clear interrupt: read IIR or write THR;
         0000: priority: 4;  interrupt type: MODEM input changes; 
           Interrupt source: △CTS、△DSR、△RI、△DCD; method to clear interrupt: read MSR;
-    '''
+    """
     _pack_ = 1
     _fields_ = [
                 ('int_type', c_ubyte, 4),
                 ('reserved', c_ubyte, 2),
                 ('fifo_ENS', c_ubyte, 2)]
     def __init__(self):
-      '''!
+      """!
         @brief sensor_status structure init
-      '''
+      """
       self.fifo_ENS = 0
       self.int_type = 1
 
     def set_list(self, data):
-      '''!
+      """!
         @brief Assign the struct
         @param data The assigned uint8_t data
-      '''
+      """
       buf = (c_ubyte * len(data))()
       for i in range(len(data)):
         buf[i] = data[i]
       memmove(addressof(self), addressof(buf), len(data))
 
     def get_list(self):
-      '''!
+      """!
         @brief Obtain the struct value
         @return Return the struct value, list type
-      '''
+      """
       return list(bytearray(string_at( addressof(self), sizeof(self) )))
 
   class fifo_config_reg(Structure):
-    '''
+    """
       @brief FIFO buffer FIFO control register, enable and reset FIFO
       @note Register struct:
       @n -------------------------------------------------------------------------------------
@@ -357,7 +355,7 @@ class DFRobot_CH432T(SerialBase, object):
       r_fifo_rst: when this bit is set to 1, clear the receiving data in FIFO (RSR is not included), this bit will reset automatically without software
       fifo_EN: when the bit is 1, enable FIFO, when the bit reset, disable FIFO,
            It switches to 16C450 compatible mode after disabling FIFO, equivalent to a FIFO with only one byte.
-    '''
+    """
     _pack_ = 1
     _fields_ = [('fifo_EN', c_ubyte, 1),
                 ('r_fifo_rst', c_ubyte, 1),
@@ -365,33 +363,33 @@ class DFRobot_CH432T(SerialBase, object):
                 ('reserved', c_ubyte, 3),
                 ('recv_TG', c_ubyte, 2)]
     def __init__(self):
-      '''!
+      """!
         @brief sensor_status structure init
-      '''
+      """
       self.recv_TG = 0
       self.t_fifo_rst = 0
       self.t_fifo_rst = 0
       self.fifo_EN = 0
 
     def set_list(self, data):
-      '''!
+      """!
         @brief Assign the struct
         @param data The assigned uint8_t data
-      '''
+      """
       buf = (c_ubyte * len(data))()
       for i in range(len(data)):
         buf[i] = data[i]
       memmove(addressof(self), addressof(buf), len(data))
 
     def get_list(self):
-      '''!
+      """!
         @brief Obtain the struct value
         @return Return the struct value, list type
-      '''
+      """
       return list(bytearray(string_at( addressof(self), sizeof(self) )))
 
   class lines_config_reg(Structure):
-    '''
+    """
       @brief Line control register, used to control the format of serial communication
       @note Register struct:
       @n -------------------------------------------------------------------------------------
@@ -413,7 +411,7 @@ class DFRobot_CH432T(SerialBase, object):
            01: 6 data bits, 
            10: 7 data bits, 
            11: 8 data bits.
-    '''
+    """
     _pack_ = 1
     _fields_ = [('word_size', c_ubyte, 2),
                 ('stop_bit', c_ubyte, 1),
@@ -422,9 +420,9 @@ class DFRobot_CH432T(SerialBase, object):
                 ('break_EN', c_ubyte, 1),
                 ('DLAB', c_ubyte, 1)]
     def __init__(self):
-      '''!
+      """!
         @brief sensor_status structure init
-      '''
+      """
       self.DLAB = 0
       self.break_EN = 0
       self.parity_mode = 0
@@ -433,24 +431,24 @@ class DFRobot_CH432T(SerialBase, object):
       self.word_size = 0
 
     def set_list(self, data):
-      '''!
+      """!
         @brief Assign the struct
         @param data The assigned uint8_t data
-      '''
+      """
       buf = (c_ubyte * len(data))()
       for i in range(len(data)):
         buf[i] = data[i]
       memmove(addressof(self), addressof(buf), len(data))
 
     def get_list(self):
-      '''!
+      """!
         @brief Obtain the struct value
         @return Return the struct value, list type
-      '''
+      """
       return list(bytearray(string_at( addressof(self), sizeof(self) )))
 
   class modem_config_reg(Structure):
-    '''
+    """
       @brief MODEM control register, control MODEM output
       @note Register struct:
       @n -------------------------------------------------------------------------------------
@@ -464,7 +462,7 @@ class DFRobot_CH432T(SerialBase, object):
       out1: this bit is user-definable MODEM control bit and is not connected to the actual output pin.
       RTS: when the bit is set to 1, RTS pin output is valid (active low), otherwise it's invalid.
       DTR: when the bit is set to 1, DTR pin output is valid (active low), otherwise it's invalid.
-    '''
+    """
     _pack_ = 1
     _fields_ = [('DTR', c_ubyte, 1),
                 ('RTS', c_ubyte, 1),
@@ -474,9 +472,9 @@ class DFRobot_CH432T(SerialBase, object):
                 ('AFE', c_ubyte, 1),
                 ('reserved', c_ubyte, 2)]
     def __init__(self):
-      '''!
+      """!
         @brief sensor_status structure init
-      '''
+      """
       self.AFE = 0
       self.loop = 0
       self.out2 = 0
@@ -485,24 +483,24 @@ class DFRobot_CH432T(SerialBase, object):
       self.DTR = 0
 
     def set_list(self, data):
-      '''!
+      """!
         @brief Assign the struct
         @param data The assigned uint8_t data
-      '''
+      """
       buf = (c_ubyte * len(data))()
       for i in range(len(data)):
         buf[i] = data[i]
       memmove(addressof(self), addressof(buf), len(data))
 
     def get_list(self):
-      '''!
+      """!
         @brief Obtain the struct value
         @return Return the struct value, list type
-      '''
+      """
       return list(bytearray(string_at( addressof(self), sizeof(self) )))
 
   class lines_status_reg(Structure):
-    '''
+    """
       @brief Line status register, used to analyze serial port status by query.
       @note Register struct:
       @n -----------------------------------------------------------------------------------------------
@@ -518,7 +516,7 @@ class DFRobot_CH432T(SerialBase, object):
       parity_err: set to 1, indicates parity check error of the data read from the received FIFO occurred.
       fifo_over: set to 1, indicates the received FIFO buffer overflow
       data_ready: set to 1, indicates there is data received from the FIFO, after reading all the data in FIFO, the bit will automatically reset.
-    '''
+    """
     _pack_ = 1
     _fields_ = [('data_ready', c_ubyte, 1),
                 ('fifo_over', c_ubyte, 1),
@@ -529,9 +527,9 @@ class DFRobot_CH432T(SerialBase, object):
                 ('t_empty', c_ubyte, 1),
                 ('r_fifo_err', c_ubyte, 1)]
     def __init__(self):
-      '''!
+      """!
         @brief sensor_status structure init
-      '''
+      """
       self.r_fifo_err = 0
       self.t_empty = 1
       self.THR_EN = 1
@@ -542,24 +540,24 @@ class DFRobot_CH432T(SerialBase, object):
       self.data_ready = 0
 
     def set_list(self, data):
-      '''!
+      """!
         @brief Assign the struct
         @param data The assigned uint8_t data
-      '''
+      """
       buf = (c_ubyte * len(data))()
       for i in range(len(data)):
         buf[i] = data[i]
       memmove(addressof(self), addressof(buf), len(data))
 
     def get_list(self):
-      '''!
+      """!
         @brief Obtain the struct value
         @return Return the struct value, list type
-      '''
+      """
       return list(bytearray(string_at( addressof(self), sizeof(self) )))
 
   class modem_status_reg(Structure):
-    '''
+    """
       @brief MODEM Status register, for querying MODEM status
       @note Register struct:
       @n -------------------------------------------------------------------------------------
@@ -575,7 +573,7 @@ class DFRobot_CH432T(SerialBase, object):
       RI_change: That the bit is set to 1 indicates that pin RI input status has changed.
       DSR_change: That the bit is set to 1 indicates that pin DSR input status has changed.
       CTS_change: That the bit is set to 1 indicates that pin CTS input status has changed.
-    '''
+    """
     _pack_ = 1
     _fields_ = [('CTS_change', c_ubyte, 1),
                 ('DSR_change', c_ubyte, 1),
@@ -586,9 +584,9 @@ class DFRobot_CH432T(SerialBase, object):
                 ('RI', c_ubyte, 1),
                 ('DCD', c_ubyte, 1)]
     def __init__(self):
-      '''!
+      """!
         @brief sensor_status structure init
-      '''
+      """
       self.DCD = 0
       self.RI = 0
       self.DSR = 0
@@ -599,23 +597,23 @@ class DFRobot_CH432T(SerialBase, object):
       self.CTS_change = 0
 
     def set_list(self, data):
-      '''!
+      """!
         @brief Assign the struct
         @param data The assigned uint8_t data
-      '''
+      """
       buf = (c_ubyte * len(data))()
       for i in range(len(data)):
         buf[i] = data[i]
       memmove(addressof(self), addressof(buf), len(data))
 
     def get_list(self):
-      '''!
+      """!
         @brief Obtain the struct value
         @return Return the struct value, list type
-      '''
+      """
       return list(bytearray(string_at( addressof(self), sizeof(self) )))
 
-  def __init__(self, port="CH432T_PORT_1", baudrate=115200, bytesize=8, parity='N', stopbits=1):
+  def __init__(self, port='CH432T_PORT_1', baudrate=115200, bytesize=8, parity='N', stopbits=1):
     '''!
       @brief Module init
       @param port serial number, "CH432T_PORT_1" or "CH432T_PORT_2"
@@ -624,40 +622,40 @@ class DFRobot_CH432T(SerialBase, object):
       @param parity check bit
       @param stopbits stop bit
     '''
-    if port not in ["CH432T_PORT_1", "CH432T_PORT_2"]:
+    if port not in ['CH432T_PORT_1', 'CH432T_PORT_2']:
         raise SerialException("Invalid PORT, please select 'CH432T_PORT_1' or 'CH432T_PORT_2'")
     self.portnum = int(port[-1]) - 1
-    logger.info("self.portnum = %d", self.portnum)
+    logger.info('self.portnum = %d', self.portnum)
     self._spi = spidev.SpiDev()
     self._spi.open(0, 0)   # default to use spidev0.0
     self._spi.max_speed_hz = 1000000   # SPI communication frequency is default to be 1 MHz
     super(DFRobot_CH432T, self).__init__(port, baudrate, bytesize, parity, stopbits)
 
   def close(self):
-    '''!
+    """!
       @brief Close the serial port and the internal reference clock of it, so as to make the serial port enter low-power status
-    '''
+    """
     self.set_low_power_mode(CH432T_LOW_POWER_MODE)   # close the internal reference clock of the serial port
     self.is_open = False
 
   def open(self):
-    '''!
+    """!
       @brief Initialize port
       @note Exceptions will be thrown when a hardware communication or config error occurs
-    '''
+    """
     # Read the value of CH432T_IIR_REG and CH432T_LSR_REG register of port0 and port1
     iir = self._read_reg(CH432T_IIR_REG, 1)[0]
-    logger.info( "CH432T_IIR_REG = %#x", iir)
+    logger.info( 'CH432T_IIR_REG = %#x', iir)
     lsr = self._read_reg(CH432T_LSR_REG, 1)[0]
-    logger.info( "CH432T_LSR_REG = %#x", lsr)
+    logger.info( 'CH432T_LSR_REG = %#x', lsr)
 
     # Test user register of port0 and port1
     self._write_reg(CH432T_SCR_REG, 0x66)
     scr = self._read_reg(CH432T_SCR_REG, 1)[0]
-    logger.info( "CH432T_SCR_REG = %#x", scr)
+    logger.info( 'CH432T_SCR_REG = %#x', scr)
     if 0x66 != scr:
-      raise SerialException("Failed to open port! Check whether the expansion board \
-                              is properly connected and whether spidev0.0 is occupied.")
+      raise SerialException('Failed to open port! Check whether the expansion board \
+                              is properly connected and whether spidev0.0 is occupied.')
 
     self.orig_attr = [0, 0]   # cflag and baudrate
     try:
@@ -668,10 +666,10 @@ class DFRobot_CH432T(SerialBase, object):
       self.is_open = True
 
   def _reconfigure_port(self, force_update=False):
-    '''!
+    """!
       @brief Configure serial port
       @note Exceptions will be thrown when config error occurs
-    '''
+    """
 
     # setup char len
     cflag = 0
@@ -708,7 +706,7 @@ class DFRobot_CH432T(SerialBase, object):
     else:
       raise ValueError('Invalid parity: {!r}'.format(self._parity))
 
-    logger.info("cflag = %d", cflag)
+    logger.info('cflag = %d', cflag)
     if force_update or [cflag, self._baudrate] != self.orig_attr:
       self.orig_attr = [cflag, self._baudrate]
       # Now, initialize the UART
@@ -732,20 +730,20 @@ class DFRobot_CH432T(SerialBase, object):
       # self.set_sleep_mode(CH432T_STANDARD_MODE)
 
   def set_low_power_mode(self, mode):
-    '''!
+    """!
       @brief Close the internal reference clock of the serial port to make it enter low power status
       @param mode :
       @n     CH432T_LOW_POWER_MODE: LOW POWER mode
       @n     CH432T_STANDARD_MODE: STANDARD mode
-    '''
+    """
     self._reg_bit_update(CH432T_IER_REG, CH432T_IER_LOWPOWER_BIT, mode)
 
   def set_baudrate(self, baud):
-    '''!
+    """!
       @brief Set baud rate
       @param baud baud rate range: 2~2764800
       @note It is recommended to use general communication baud rate to reduce communication errors such as: 9600, 19200, 115200, etc.
-    '''
+    """
     # CK2X=0, internal 1/12 frequency division
     prescaler = 0
     clock_rate = CH432T_CLOCK_FREQUENCY / 12
@@ -762,7 +760,7 @@ class DFRobot_CH432T(SerialBase, object):
 
     # Save raw value of LCR register
     lcr = self._read_reg(CH432T_LCR_REG, 1)[0]
-    logger.info("lcr = %#x", lcr)
+    logger.info('lcr = %#x', lcr)
     # Open the LCR divisors for configuration
     self._write_reg(CH432T_LCR_REG, CH432T_LCR_CONF_MODE_A)
     time.sleep(0.002)
@@ -778,19 +776,19 @@ class DFRobot_CH432T(SerialBase, object):
     self._write_reg(CH432T_LCR_REG, lcr)
 
   def reset_output_buffer(self):
-    '''!
+    """!
       @brief Clear the transmitting data in FIFO (TSR is not included)
-    '''
+    """
     self._reg_bit_update(CH432T_FCR_REG, CH432T_FCR_TXRESET_BIT, CH432T_FCR_TXRESET_BIT)
 
   def reset_input_buffer(self):
-    '''!
+    """!
       @brief Clear the receiving data in FIFO (RSR is not included)
-    '''
+    """
     self._reg_bit_update(CH432T_FCR_REG, CH432T_FCR_RXRESET_BIT, CH432T_FCR_RXRESET_BIT)
 
   def get_INT_status(self, INT_status):
-    '''!
+    """!
       @brief Interrupt identity register, used to analyze and process the interrupt source
       @param INT_status
       @n       fifo_ENS: This bit is for FIFO enabling status, 1: FIFO enabled
@@ -807,11 +805,11 @@ class DFRobot_CH432T(SerialBase, object):
       @n           Interrupt source: transmit holding register empty, re-enable interrupt when IETHRE changes from 0 to 1; method to clear interrupt: read IIR or write THR;
       @n         0000: priority:  4; interrupt type: MODEM input changes; 
       @n           Interrupt source: △CTS, △DSR, △RI, △DCD; method to clear interrupt: read MSR;
-    '''
+    """
     INT_status.set_list(self._read_reg(CH432T_IIR_REG, 1))
 
   def get_lines_status(self, lines_status):
-    '''!
+    """!
       @brief Line status register, used to analyze serial port status by query
       @param lines_status :
       @n       r_fifo_err: set to 1, indicates there is at least one parity_err, frame_err, or break_INT error in the received FIFO.
@@ -822,11 +820,11 @@ class DFRobot_CH432T(SerialBase, object):
       @n       parity_err: set to 1, indicates parity check error of data read from the received FIFO occurred.
       @n       fifo_over: set to 1, indicates the received FIFO buffer overflow
       @n       data_ready: set to 1, indicates there is data received from the FIFO, after reading all the data in FIFO, the bit will automatically reset.
-    '''
+    """
     lines_status.set_list(self._read_reg(CH432T_LSR_REG, 1))
 
   def get_modem_status(self, modem_status):
-    '''!
+    """!
       @brief MODEM status register, for querying MODEM status
       @param modem_status :
       @n       DCD: This bit is bit flip of pin DCD, 1 indicates pin DCD is active (active low).
@@ -837,22 +835,22 @@ class DFRobot_CH432T(SerialBase, object):
       @n       RI_change: That the bit is set to 1 indicates that pin RI input status has changed.
       @n       DSR_change: That the bit is set to 1 indicates that pin DSR input status has changed.
       @n       CTS_change: That the bit is set to 1 indicates that pin CTS input status has changed.
-    '''
+    """
     modem_status.set_list(self._read_reg(CH432T_MSR_REG, 1))
 
   def read(self, size):
-    '''!
+    """!
       @brief Read serial data
       @param size Read length of serial data
       @return The read serial data
-    '''
+    """
     return self.ch432t_port_irq(size)
 
   def write(self, data):
-    '''!
+    """!
       @brief Write serial data
       @param data The data to be written into serial port
-    '''
+    """
     if not self.is_open:
       raise portNotOpenError
     if sys.version_info >= (3,0):
@@ -862,11 +860,11 @@ class DFRobot_CH432T(SerialBase, object):
     self._write_reg(CH432T_THR_REG, d)
 
   def ch432t_port_irq(self, size):
-    '''!
+    """!
       @brief Interrupt port handler function
       @param size Read length of serial data
       @return The read serial data
-    '''
+    """
     timeout = Timeout(self._timeout)
     int_status = self.INT_status_reg()
     lines_status = self.lines_status_reg()
@@ -881,7 +879,7 @@ class DFRobot_CH432T(SerialBase, object):
         # Line status register, used to analyze serial port status by query
         lines_status.set_list([0])
         self.get_lines_status(lines_status)
-        logger.info("Unknown LSR interrupt state")
+        logger.info('Unknown LSR interrupt state')
         if lines_status.r_fifo_err:
           # logger.info("lines_status.r_fifo_err")
           # logger.info("lines_status.r_fifo_err(CH432T_RBR_REG)---%#x", self._read_reg(CH432T_RBR_REG, 1)[0])
@@ -903,7 +901,7 @@ class DFRobot_CH432T(SerialBase, object):
       elif CH432T_IIR_MSI_SRC == int_status.int_type:
         # MODEM output change interrupt, priority: 4
         self.get_modem_status(CH432T_MSR_REG)
-        logger.info("msr---%#x", self._read_reg(CH432T_MSR_REG, 1)[0])
+        logger.info('msr---%#x', self._read_reg(CH432T_MSR_REG, 1)[0])
         # pass
       else:
         # logger.info("Unknown interrupt state")
@@ -913,11 +911,11 @@ class DFRobot_CH432T(SerialBase, object):
         return None
 
   def ch432t_handle_rx(self, size):
-    '''!
+    """!
       @brief Receive interrupt handler function
       @param size Read length of serial data
       @return The read serial data
-    '''
+    """
     buf = []
     timeout = Timeout(self._timeout)
     lines_status = self.lines_status_reg()
@@ -938,12 +936,12 @@ class DFRobot_CH432T(SerialBase, object):
         return None
 
   def _reg_bit_update(self, reg, mask, value):
-    '''!
+    """!
       @brief Update register specified bit
       @param reg register address
       @param mask mask, used to specify bit
       @param value written data
-    '''
+    """
     temp = self._read_reg(reg, 1)[0]
     temp &= ~mask
     temp |= value & mask
@@ -951,26 +949,26 @@ class DFRobot_CH432T(SerialBase, object):
     self._write_reg(reg, temp)
 
   def _write_reg(self, reg, data):
-    '''!
+    """!
       @brief writes data to a register
       @param reg register address
       @param data written data
-    '''
+    """
     with ch432t_spi_lock:
       if isinstance(data, int):
         data = [data]
       reg_addr = [0x02 | ( (reg + self.portnum * 0x08) << CH432T_REG_SHIFT )]
-      logger.info("portnum = %d, reg = %d, reg_addr = %#x, data = %#x" % (self.portnum, reg , reg_addr[0], data[0]))
+      logger.info('portnum = %d, reg = %d, reg_addr = %#x, data = %#x' % (self.portnum, reg , reg_addr[0], data[0]))
       data.insert(0, reg_addr[0])
       self._spi.xfer2(data)
       time.sleep(0.001)
   def _read_reg(self, reg, length):
-    '''!
+    """!
       @brief read the data from the register
       @param reg register address
       @param length read data length
       @return read data list
-    '''
+    """
     with ch432t_spi_lock:
       reg_addr = [0xFD & ( (reg + self.portnum * 0x08) << CH432T_REG_SHIFT )]
       temp = reg_addr[0]
@@ -984,106 +982,106 @@ class DFRobot_CH432T(SerialBase, object):
       return reg_addr
 
   def cancel_read(self):
-    '''!
+    """!
       @brief Except for the serial port and chip problem, SPI communication is likely to be fine
-    '''
+    """
     if not self.is_open:
       raise portNotOpenError
 
   def cancel_write(self):
-    '''!
+    """!
       @brief Except for the serial port and chip problem, SPI communication is likely to be fine
-    '''
+    """
     if not self.is_open:
       raise portNotOpenError
 
   def flush(self):
-    '''!
+    """!
       @brief Except for the serial port and chip problem, SPI communication is likely to be fine
-    '''
+    """
     if not self.is_open:
       raise portNotOpenError
 
   @property
   def out_waiting(self):
-    '''!
+    """!
       @brief Except for the serial port and chip problem, SPI communication is likely to be fine
-    '''
+    """
     return 0
 
   @property
   def in_waiting(self):
-    '''!
+    """!
       @brief Except for the serial port and chip problem, SPI communication is likely to be fine
-    '''
+    """
     return 0
 
 
   def _reset_port(self):
-    '''!
+    """!
       @brief Soft reset the port
-    '''
+    """
     self._reg_bit_update(CH432T_IER_REG, CH432T_IER_RESET_BIT, CH432T_IER_RESET_BIT)
 
   def set_sleep_mode(self, mode):
-    '''!
+    """!
       @brief Close the clock oscillator to make serial port 0 and 1 enter sleep mode
       @param mode :
       @n     CH432T_SLEEP_MODE: SLEEP mode
       @n     CH432T_STANDARD_MODE: STANDARD mode
-    '''
+    """
     self._reg_bit_update((CH432T_IER_REG - self.portnum * 0x08), CH432T_IER_SLEEP_BIT, mode)
 
   def enable_ie_modem(self, mode):
-    '''!
+    """!
       @brief Allow modem to input status change interrupt
       @param mode :
       @n       True: enable the interrupt
       @n       False: disable the interrupt
-    '''
+    """
     if mode:
       self._reg_bit_update(CH432T_IER_REG, CH432T_IER_MSI_BIT, CH432T_IER_MSI_BIT)
     else:
       self._reg_bit_update(CH432T_IER_REG, CH432T_IER_MSI_BIT, 0)
 
   def enable_ie_lines(self, mode):
-    '''!
+    """!
       @brief Allow receiving line status interrupt
       @param mode :
       @n       True: enable the interrupt
       @n       False: disable the interrupt
-    '''
+    """
     if mode:
       self._reg_bit_update(CH432T_IER_REG, CH432T_IER_RLSI_BIT, CH432T_IER_RLSI_BIT)
     else:
       self._reg_bit_update(CH432T_IER_REG, CH432T_IER_RLSI_BIT, 0)
 
   def enable_ie_thre(self, mode):
-    '''!
+    """!
       @brief Allow transmitting holding register empty interrupt
       @param mode :
       @n       True: enable the interrupt
       @n       False: disable the interrupt
-    '''
+    """
     if mode:
       self._reg_bit_update(CH432T_IER_REG, CH432T_IER_THRI_BIT, CH432T_IER_THRI_BIT)
     else:
       self._reg_bit_update(CH432T_IER_REG, CH432T_IER_THRI_BIT, 0)
 
   def enable_ie_recv(self, mode):
-    '''!
+    """!
       @brief Allow receiving data interrupt
       @param mode :
       @n       True: enable the interrupt
       @n       False: disable the interrupt
-    '''
+    """
     if mode:
       self._reg_bit_update(CH432T_IER_REG, CH432T_IER_RDI_BIT, CH432T_IER_RDI_BIT)
     else:
       self._reg_bit_update(CH432T_IER_REG, CH432T_IER_RDI_BIT, 0)
 
   def set_fifo_recv_TG_mode(self, mode):
-    '''!
+    """!
       @brief Set the interrupt for receiving FIFO and the trigger point of hardware flow control
       @n     If it’s set to be 1 byte, i.e., the interrupt for receiving data occur when 1 byte is received and pin RTS is automatically disabled when enabling the hardware flow control.
       @param mode :
@@ -1091,155 +1089,155 @@ class DFRobot_CH432T(SerialBase, object):
       @n       CH432T_FCR_RECVTG_LEN_4: for 4 bytes;
       @n       CH432T_FCR_RECVTG_LEN_8: for 8 bytes;
       @n       CH432T_FCR_RECVTG_LEN_14: for 14 bytes
-    '''
+    """
     self._reg_bit_update(CH432T_FCR_REG, CH432T_FCR_RXLVL_BIT, mode)
 
   def enable_fifo(self, mode):
-    '''!
+    """!
       @brief Enable fifo
       @param mode :
       @n       True: enable FIFO
       @n       False: disable FIFO (it switches to 16C450 compatible mode after disabling FIFO, equivalent to a FIFO with only one byte)
-    '''
+    """
     if mode:
       self._reg_bit_update(CH432T_FCR_REG, CH432T_FCR_FIFO_BIT, CH432T_FCR_FIFO_BIT)
     else:
       self._reg_bit_update(CH432T_FCR_REG, CH432T_FCR_FIFO_BIT, 0)
 
   def enable_DLAB(self, mode):
-    '''!
+    """!
       @brief Enable divisor latch access
       @param mode :
       @n       True: access DLL and DLM
       @n       False: access RBR/THR/IER
-    '''
+    """
     if mode:
       self._reg_bit_update(CH432T_LCR_REG, CH432T_LCR_DLAB_BIT, CH432T_LCR_CONF_MODE_A)
     else:
       self._reg_bit_update(CH432T_LCR_REG, CH432T_LCR_DLAB_BIT, 0)
 
   def enable_break(self, mode):
-    '''!
+    """!
       @brief BREAK line interval is forced to occur
       @param mode :
       @n       True: enable forcing to generate BREAK line interval
       @n       False: disable forcing to generate BREAK line interval
-    '''
+    """
     if mode:
       self._reg_bit_update(CH432T_LCR_REG, CH432T_LCR_TXBREAK_BIT, CH432T_LCR_TXBREAK_BIT)
     else:
       self._reg_bit_update(CH432T_LCR_REG, CH432T_LCR_TXBREAK_BIT, 0)
 
   def set_parity_mode(self, mode):
-    '''!
+    """!
       @brief Set the format of parity check bit when PAREN is 1 (parity check bit)
       @param mode :
       @n       CH432T_CHECKBIT_ODD: odd parity check, 
       @n       CH432T_CHECKBIT_EVEN: even parity check, 
       @n       CH432T_CHECKBIT_MARK: mark bit (MARK, set to 1), 
       @n       CH432T_CHECKBIT_SPACE: space bit (SPACE, reset).
-    '''
+    """
     self._reg_bit_update(CH432T_LCR_REG, CH432T_LCR_PARITY_MODE_BIT, mode)
 
   def enable_parity_bit(self, mode):
-    '''!
+    """!
       @brief Allow to generate parity check bit when transmitting and check that bit when receiving
       @param mode :
       @n       True: Allow to generate parity check bit when transmitting and check that bit when receiving
       @n       False: no parity check bit
-    '''
+    """
     if mode:
       self._reg_bit_update(CH432T_LCR_REG, CH432T_LCR_PARITY_EN_BIT, CH432T_LCR_PARITY_EN_BIT)
     else:
       self._reg_bit_update(CH432T_LCR_REG, CH432T_LCR_PARITY_EN_BIT, 0)
 
   def set_stop_bit_mode(self, mode):
-    '''!
+    """!
       @brief Set stop bit number
       @param mode :
       @n     CH432T_STOPBIT_1: 1 stop bit
       @n     CH432T_STOPBIT_2: 1-1.5 stop bits if word length is 5, 2 stop bits otherwise
-    '''
+    """
     self._reg_bit_update(CH432T_LCR_REG, CH432T_LCR_STOPLEN_BIT, mode)
 
   def set_word_size_mode(self, mode):
-    '''!
+    """!
       @brief Set word length
       @param mode :
       @n       CH432T_LCR_WORD_LEN_5: 5 data bit, 
       @n       CH432T_LCR_WORD_LEN_6: 6 data bit, 
       @n       CH432T_LCR_WORD_LEN_7: 7 data bit, 
       @n       CH432T_LCR_WORD_LEN_8: 8 data bit.
-    '''
+    """
     self._reg_bit_update(CH432T_LCR_REG, CH432T_LCR_PARITY_MODE_BIT, mode)
 
   def enable_MCR_AFE(self, mode):
-    '''!
+    """!
       @brief Allow CTS & RTS hardware automatic flow control
       @param mode :
       @n       True: enable CTS & RTS hardware automatic flow control
       @n       False: disable CTS & RTS hardware automatic flow control
-    '''
+    """
     if mode:
       self._reg_bit_update(CH432T_MCR_REG, CH432T_MCR_AFE, CH432T_MCR_AFE)
     else:
       self._reg_bit_update(CH432T_MCR_REG, CH432T_MCR_AFE, 0)
 
   def enable_MCR_loop(self, mode):
-    '''!
+    """!
       @brief enable test mode for internal loop
       @param mode :
       @n       True: enable test mode for internal loop
       @n       False: disable test mode for internal loop
-    '''
+    """
     if mode:
       self._reg_bit_update(CH432T_MCR_REG, CH432T_MCR_LOOP_BIT, CH432T_MCR_LOOP_BIT)
     else:
       self._reg_bit_update(CH432T_MCR_REG, CH432T_MCR_LOOP_BIT, 0)
 
   def enable_MCR_out2(self, mode):
-    '''!
+    """!
       @brief Allow interrupt request output of the serial port, otherwise no actual interrupt request of the serial port will occur
       @param mode :
       @n       True: enable interrupt request output of the serial port 
       @n       False: no actual interrupt request of the serial port will occur
-    '''
+    """
     if mode:
       self._reg_bit_update(CH432T_MCR_REG, CH432T_MCR_OUT2, CH432T_MCR_OUT2)
     else:
       self._reg_bit_update(CH432T_MCR_REG, CH432T_MCR_OUT2, 0)
 
   def enable_MCR_out1(self, mode):
-    '''!
+    """!
       @brief This bit is user-definable MODEM control bit and is not connected to the actual output pin
       @param mode :
       @n       True: definable
       @n       False: definable
-    '''
+    """
     if mode:
       self._reg_bit_update(CH432T_MCR_REG, CH432T_MCR_OUT1, CH432T_MCR_OUT1)
     else:
       self._reg_bit_update(CH432T_MCR_REG, CH432T_MCR_OUT1, 0)
 
   def enable_MCR_RTS(self, mode):
-    '''!
+    """!
       @brief When the bit is set to 1, RTS pin output is valid (active low), otherwise it's invalid.
       @param mode :
       @n       True: RTS pin output is valid (active low)
       @n       False: RTS pin output is invalid
-    '''
+    """
     if mode:
       self._reg_bit_update(CH432T_MCR_REG, CH432T_MCR_RTS_BIT, CH432T_MCR_RTS_BIT)
     else:
       self._reg_bit_update(CH432T_MCR_REG, CH432T_MCR_RTS_BIT, 0)
 
   def enable_MCR_DTR(self, mode):
-    '''!
+    """!
       @brief When the bit is set to 1, DTR pin output is valid (active low), otherwise it's invalid.
       @param mode :
       @n       True: DTR pin output is valid (active low)
       @n       False: DTR pin output is invalid
-    '''
+    """
     if mode:
       self._reg_bit_update(CH432T_MCR_REG, CH432T_MCR_DTR_BIT, CH432T_MCR_DTR_BIT)
     else:

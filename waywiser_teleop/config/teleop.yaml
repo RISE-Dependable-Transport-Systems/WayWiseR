@@ -1,6 +1,7 @@
 /**:
   ros__parameters:
     joy_timeout: 1.0 #seconds
+
 joy:
   ros__parameters:
     # device_name: Sony Interactive Entertainment Wireless Controller
@@ -38,19 +39,11 @@ twist_keyboard:
     angular_speed_increment: 0.1
     speed_control_rate: 10.0
     publish_rate: 10.0
-
-joy_emergency_stop:
-  ros__parameters:
     emergency_stop_set_joy_button_index: 5
     emergency_stop_clear_joy_button_index: 7
-
-twist_angular_correction:
-  ros__parameters:
-    topic_names: ["joy_vel"]
-
-teleop_twist_mux:
-  ros__parameters:
-    topics:
+    mux_output_topic: teleop_mux_vel
+    mux_input:
+      sources: ["joystick", "keyboard", "teleop_nav2"]
       joystick:
         topic: joy_vel_corrected
         timeout: 0.5
@@ -63,3 +56,7 @@ teleop_twist_mux:
         topic: teleop_nav2_vel
         timeout: 0.5
         priority: 50
+
+twist_angular_correction:
+  ros__parameters:
+    topic_names: ["joy_vel"]

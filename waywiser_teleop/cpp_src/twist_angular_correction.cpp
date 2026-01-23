@@ -1,16 +1,14 @@
-#include <chrono>
 #include <cmath>
-#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include <rclcpp/rclcpp.hpp>
+
 #include "geometry_msgs/msg/twist.hpp"
-#include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/bool.hpp"
 
-using std::placeholders::_1;
 
 class TwistAngularCorrection : public rclcpp::Node
 {

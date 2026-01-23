@@ -18,11 +18,6 @@ If running with multiple sensors, make sure to set a unique slave address of eac
 
 ## Examples
 
-    ros2 launch waywiser_hwbringup rover.launch.py
-    ros2 launch waywiser_hwbringup rover.launch.py vehicle_config:=./src/WayWiseR/waywiser_hwbringup/config/rover.yaml
-    ros2 launch waywiser_hwbringup rover.launch.py lidar_config:=./src/WayWiseR/waywiser_hwbringup/config/lidar.yaml
-    ros2 launch waywiser_hwbringup rover.launch.py frame_prefix:=prefix_of_your_choice
-
     ros2 launch waywiser_hwbringup realsense_d435i.launch.py
     ros2 launch waywiser_hwbringup realsense_d435i.launch.py use_sim_time:=true
     ros2 launch waywiser_hwbringup realsense_d435i.launch.py log_level:=debug

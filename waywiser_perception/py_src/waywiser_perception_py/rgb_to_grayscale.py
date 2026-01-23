@@ -23,26 +23,27 @@ class RGBToGrayScale(Node):
         # Declare parameters
         self.declare_parameter('far_plane', 1000.0)
         self.declare_parameter('frame_id_override', '')
-        self.declare_parameter('rgb_topic', '/agrarsense/out/sensors/depthcamera')
-        self.declare_parameter('depth_topic', 'depth_image')
+        self.declare_parameter('depth_in_topic', 'depth_in')
+        self.declare_parameter('depth_out_topic', 'depth_out')
 
         # Get the parameters
         self.far_plane = self.get_parameter('far_plane').get_parameter_value().double_value
         self.frame_id_override = self.get_parameter('frame_id_override').value
-        self.rgb_topic = self.get_parameter('rgb_topic').get_parameter_value().string_value
-        self.depth_topic = self.get_parameter('depth_topic').get_parameter_value().string_value
+        self.depth_in_topic = (
+            self.get_parameter('depth_in_topic').get_parameter_value().string_value
+        )
+        self.depth_out_topic = (
+            self.get_parameter('depth_out_topic').get_parameter_value().string_value
+        )
 
         # Initialize CV bridge
         self.bridge = CvBridge()
 
         # Subscriptions and publishers
-        self.rgb_subscription = self.create_subscription(
-            Image, self.rgb_topic, self.rgb_callback, 10
+        self.depth_in_subscription = self.create_subscription(
+            Image, self.depth_in_topic, self.rgb_callback, 10
         )
-        self.raw_depth_publisher = self.create_publisher(Image, self.depth_topic + '_raw', 10)
-        self.mono16_depth_publisher = self.create_publisher(
-            Image, self.depth_topic + '_mono16', 10
-        )
+        self.grayscale_depth_publisher = self.create_publisher(Image, self.depth_out_topic, 10)
 
         self.get_logger().info(f'Node initialized with far_plane = {self.far_plane} meters.')
 
@@ -68,10 +69,6 @@ class RGBToGrayScale(Node):
             # self.get_logger().info(
             #     f'Min depth: {np.min(depth_image_m)}, Max depth: {np.max(depth_image_m)}'
             # )
-            mono16_depth_image = np.clip(
-                depth_image_m * 1000.0, 0.0, 256.0**2 - 1
-            )  # Convert to mm
-            mono16_depth_image = mono16_depth_image.astype(np.uint16)
 
             # Convert depth map to ROS Image message
             raw_depth_msg = self.bridge.cv2_to_imgmsg(depth_image_m, encoding='32FC1')
@@ -79,14 +76,8 @@ class RGBToGrayScale(Node):
             if self.frame_id_override:
                 raw_depth_msg.header.frame_id = self.frame_id_override
 
-            mono16_depth_msg = self.bridge.cv2_to_imgmsg(mono16_depth_image, encoding='16UC1')
-            mono16_depth_msg.header = msg.header
-            if self.frame_id_override:
-                mono16_depth_msg.header.frame_id = self.frame_id_override
-
             # Publish the depth Image
-            self.raw_depth_publisher.publish(raw_depth_msg)
-            self.mono16_depth_publisher.publish(mono16_depth_msg)
+            self.grayscale_depth_publisher.publish(raw_depth_msg)
         except Exception as e:
             self.get_logger().error(f'Error during depth conversion: {e}')
 

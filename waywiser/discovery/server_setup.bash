@@ -1,5 +1,18 @@
 #!/bin/bash
 
+# Check if the script is being sourced
+[[ "${BASH_SOURCE[0]}" != "${0}" ]] && is_sourced=true || is_sourced=false
+
+# Function to safely exit or return
+safe_exit() {
+    local exit_code=${1:-0}
+    if [[ "$is_sourced" == "true" ]]; then
+        return "$exit_code" 2>/dev/null || exit "$exit_code"
+    else
+        exit "$exit_code"
+    fi
+}
+
 # Function to display usage information
 display_usage() {
     echo "Usage: $(basename "$0") [-h] [-e] [-r] [-s server_ip] [-d domain_id]"
@@ -34,7 +47,7 @@ get_full_file_path() {
             file_path="$PWD/waywiser/discovery/$file_path"
         else
             echo "Error: Unable to find file $file_path"
-            exit 1
+            return 1
         fi
     fi
 
@@ -73,7 +86,14 @@ mkdir -p $tmp_dir
 
 edit_config=false
 start_remote=false
-server_ip=""
+server_ip=$ROS_REMOTE_DISCOVERY_SERVER_IP
+# Strip any literal quotes
+server_ip=${server_ip//\"/}
+server_ip=${server_ip//\'/}
+
+if [[ -n "$server_ip" ]] && [[ "$server_ip" != '""' ]] && [[ "$server_ip" != "''" ]]; then
+    start_remote=true
+fi
 domain_id_input=-1
 
 # Parse options
@@ -82,7 +102,7 @@ while getopts "hers:d:" opt; do
     case $opt in
     h)
         display_usage
-        exit 0
+        $is_sourced && return 0 || exit 0
         ;;
     e) edit_config=true ;;
     r) start_remote=true ;;
@@ -93,18 +113,18 @@ while getopts "hers:d:" opt; do
         else
             echo "Error: Invalid domain_id. It must be an integer >= 0 and < 200." >&2
             display_usage
-            exit 1
+            $is_sourced && return 1 || exit 1
         fi
         ;;
     \?)
         echo "Invalid option: -$OPTARG" >&2
         display_usage
-        exit 1
+        $is_sourced && return 1 || exit 1
         ;;
     :)
         echo "Option -$OPTARG requires an argument." >&2
         display_usage
-        exit 1
+        $is_sourced && return 1 || exit 1
         ;;
     esac
 done
@@ -127,7 +147,10 @@ else
     domain_id=$domain_id_input
 fi
 
-if [ "$configured_domain_id" -ne "$domain_id" ]; then
+# Ensure domain_id is set for both servers if not provided via -d
+domain_id_input=$domain_id
+
+if [ "$configured_domain_id" != "$domain_id" ]; then
     if ! $edit_config; then
         # Copy the configuration file to the tmp_dir and replace the domain_id in the file
         tmp_config_fullfilepath="$tmp_dir${local_server_config_file%.xml}_${domain_id}.xml"

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-from enum import auto
-from enum import Enum
+from enum import auto, Enum
 import json
 import os
 import re
@@ -11,17 +10,17 @@ import time
 from ament_index_python import get_package_share_directory
 import rclpy
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
-from rclpy.clock import Clock
-from rclpy.clock import ClockType
+from rclpy.clock import Clock, ClockType
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rosgraph_msgs.msg import Clock as ClockMsg
 from std_msgs.msg import String
-from waywiser_py.waywiser_utils import create_subprocess
-from waywiser_py.waywiser_utils import get_full_file_path
-from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
-from waywiser_py.waywiser_utils import terminate_subprocess
 
+from waywiser_py.waywiser_utils import (
+    FileUtils,
+    ProcessUtils,
+    RELIABLE_TRANSIENT_LOCAL_QOS,
+)
 from waywiser_test_runner.msg import SetupState
 
 PACKAGE_NAME = 'waywiser_agrarsense'
@@ -81,7 +80,7 @@ class AgrarsenseOrchestrator(Node):
                 self.get_parameter(f'spawn_point.{object_id}').get_parameter_value().string_value
             )
 
-        self.agrarsense_script_path = get_full_file_path(
+        self.agrarsense_script_path = FileUtils.get_full_file_path(
             self.get_parameter('agrarsense_script_path').get_parameter_value().string_value
         )
         self.ego_vehicle_role_name = (
@@ -109,7 +108,7 @@ class AgrarsenseOrchestrator(Node):
         )
 
         self.agrarsense_ros_bridge_params = {
-            'script_path': get_full_file_path(
+            'script_path': FileUtils.get_full_file_path(
                 self.get_parameter('agrarsense_ros_bridge.script_path')
                 .get_parameter_value()
                 .string_value,
@@ -144,7 +143,7 @@ class AgrarsenseOrchestrator(Node):
         self.weather_json_path = (
             self.get_parameter('weather_json_path').get_parameter_value().string_value
         )
-        self.weather_json_path = get_full_file_path(
+        self.weather_json_path = FileUtils.get_full_file_path(
             self.weather_json_path,
             os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
         )
@@ -226,7 +225,7 @@ class AgrarsenseOrchestrator(Node):
             # Set first clock received time after 3 consecutive stable messages
             if self.consecutive_stable_clocks_at_startup >= 3:
                 self.first_clock_received_time = current_sim_time
-                self.get_logger().info(
+                self.get_logger().warn(
                     f'Received first stable clock message at time {current_sim_time}.'
                 )
 
@@ -235,7 +234,7 @@ class AgrarsenseOrchestrator(Node):
             if current_sim_time < self.previous_sim_time:  # Detect clock reset
                 self.first_clock_received_time = None  # Reset first clock time
                 self.consecutive_stable_clocks_at_startup = 0  # Reset counter
-                self.get_logger().info('Detected clock reset!')
+                self.get_logger().warn('Detected clock reset!')
                 return
 
             # Check if we've passed the simulator startup time
@@ -292,7 +291,7 @@ class AgrarsenseOrchestrator(Node):
             and self.simulator_subprocess is not None
             or self.sim_state == AgrarsenseSimulatorState.INITIALIZING
         ):
-            terminate_subprocess(self.simulator_subprocess)
+            ProcessUtils.terminate_subprocess(self.simulator_subprocess)
             self.simulator_subprocess = None
             self.sim_state = AgrarsenseSimulatorState.UNKNOWN
         elif self.sim_state in [
@@ -306,7 +305,7 @@ class AgrarsenseOrchestrator(Node):
         if self.sim_clock_timeout_timer is not None:
             self.sim_clock_timeout_timer.cancel()
             self.sim_clock_timeout_timer = None
-            self.get_logger().info('Simulation clock timeout reached. Restarting simulation.')
+            self.get_logger().warn('Simulation clock timeout reached. Restarting simulation.')
 
         self.end_simulation()
 
@@ -325,9 +324,11 @@ class AgrarsenseOrchestrator(Node):
         ):
             self.simulation_config_to_process = json.loads(msg.data)
             if 'objects_json_path' in self.simulation_config_to_process:
-                self.simulation_config_to_process['objects_json_path'] = get_full_file_path(
-                    self.simulation_config_to_process['objects_json_path'],
-                    os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
+                self.simulation_config_to_process['objects_json_path'] = (
+                    FileUtils.get_full_file_path(
+                        self.simulation_config_to_process['objects_json_path'],
+                        os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
+                    )
                 )
             self.get_logger().info(
                 f'Processing setup request: {self.simulation_config_to_process}'
@@ -357,7 +358,7 @@ class AgrarsenseOrchestrator(Node):
         command.append(f'{self.agrarsense_ros_bridge_params["docker_container_name"]}')
 
         subprocess_name = 'agrarsense_ros_bridge'
-        self.ros_bridge_subprocess = create_subprocess(self, command, subprocess_name)
+        self.ros_bridge_subprocess = ProcessUtils.create_subprocess(self, command, subprocess_name)
         time.sleep(5.0)  # Wait for the bridge to start
 
     def initialize_simulation(self):
@@ -377,10 +378,10 @@ class AgrarsenseOrchestrator(Node):
             start_simulator_command.append(f'--quality-level={self.quality_level}')
 
         subprocess_name = 'simulator'
-        self.simulator_subprocess = create_subprocess(
+        self.simulator_subprocess = ProcessUtils.create_subprocess(
             self, start_simulator_command, subprocess_name
         )
-        self.get_logger().info(
+        self.get_logger().warn(
             'Waiting for the first clock message.'
         )  # will wait for the first clock message to spawn objects
         self.update_sim_state(AgrarsenseSimulatorState.INITIALIZING)
@@ -425,7 +426,7 @@ class AgrarsenseOrchestrator(Node):
         weather_json_path = self.weather_json_path
         if 'weather_json_path' in self.simulation_config_to_process:
             weather_json_path = self.simulation_config_to_process['weather_json_path']
-            weather_json_path = get_full_file_path(
+            weather_json_path = FileUtils.get_full_file_path(
                 weather_json_path,
                 os.path.join(get_package_share_directory(PACKAGE_NAME), 'config'),
             )
@@ -437,7 +438,7 @@ class AgrarsenseOrchestrator(Node):
         objects_json_path = self.objects_json_path
         if 'objects_json_path' in self.simulation_config_to_process:
             objects_json_path = self.simulation_config_to_process['objects_json_path']
-        objects_json_path = get_full_file_path(
+        objects_json_path = FileUtils.get_full_file_path(
             objects_json_path, os.path.join(get_package_share_directory(PACKAGE_NAME), 'config')
         )
         if objects_json_path == '':
@@ -527,8 +528,8 @@ class AgrarsenseOrchestrator(Node):
         docker_container_name = self.agrarsense_ros_bridge_params['docker_container_name']
         try:
             print('Shutting down carla_orchestrator node.')
-            terminate_subprocess(self.simulator_subprocess)
-            terminate_subprocess(self.ros_bridge_subprocess)
+            ProcessUtils.terminate_subprocess(self.simulator_subprocess)
+            ProcessUtils.terminate_subprocess(self.ros_bridge_subprocess)
 
             subprocess.run(['docker', 'rm', '-f', docker_container_name], check=True)
             print(f'Docker container {docker_container_name} removed.')

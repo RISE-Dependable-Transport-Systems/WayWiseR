@@ -2,66 +2,66 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <!-- Define lidar constants -->
-  <xacro:property name="lidar_mass" value="0.01"/>
-  <xacro:property name="lidar_support_mass" value="0.01"/>
-  <xacro:property name="lidar_radius" value="0.025"/>
-  <xacro:property name="lidar_length" value="0.03"/>
-  <xacro:property name="lidar_support_breadth" value="0.06"/>
-  <xacro:property name="lidar_support_length" value="0.06"/>
-  <xacro:property name="lidar_support_height" value="0.06"/>
+  <xacro:property name="lidar_mass" value="0.01" />
+  <xacro:property name="lidar_support_mass" value="0.01" />
+  <xacro:property name="lidar_radius" value="0.025" />
+  <xacro:property name="lidar_length" value="0.03" />
+  <xacro:property name="lidar_support_breadth" value="0.06" />
+  <xacro:property name="lidar_support_length" value="0.06" />
+  <xacro:property name="lidar_support_height" value="0.06" />
 
   <link name="lidar_link">
     <visual>
       <geometry>
-        <cylinder radius="${lidar_radius}" length="${lidar_length}"/>
+        <cylinder radius="${lidar_radius}" length="${lidar_length}" />
       </geometry>
-      <material name="black"/>
+      <material name="black" />
     </visual>
     <collision>
       <geometry>
-        <cylinder radius="${lidar_radius}" length="${lidar_length}"/>
+        <cylinder radius="${lidar_radius}" length="${lidar_length}" />
       </geometry>
     </collision>
     <xacro:inertial_cylinder mass="${lidar_mass}" length="${lidar_length}" radius="${lidar_radius}">
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="0 0 0" rpy="0 0 0" />
     </xacro:inertial_cylinder>
   </link>
 
   <link name="lidar_support_link">
     <visual>
       <geometry>
-        <box size="${lidar_support_length} ${lidar_support_breadth} ${lidar_support_height}"/>
+        <box size="${lidar_support_length} ${lidar_support_breadth} ${lidar_support_height}" />
       </geometry>
-      <material name="neon_blue"/>
+      <material name="neon_blue" />
     </visual>
     <collision>
       <geometry>
-        <box size="${lidar_support_length} ${lidar_support_breadth} ${lidar_support_height}"/>
+        <box size="${lidar_support_length} ${lidar_support_breadth} ${lidar_support_height}" />
       </geometry>
     </collision>
     <xacro:inertial_box mass="${lidar_mass}" length="${lidar_support_length}" breadth="${lidar_support_breadth}" height="${lidar_support_height}">
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="0 0 0" rpy="0 0 0" />
     </xacro:inertial_box>
   </link>
 
   <joint name="lidar_joint" type="fixed">
-    <parent link="lidar_support_link"/>
-    <child link="lidar_link"/>
-    <origin xyz="0 0 ${lidar_length/2 + lidar_support_height/2}" rpy="0 0 ${pi}"/>
+    <parent link="lidar_support_link" />
+    <child link="lidar_link" />
+    <origin xyz="0 0 ${lidar_length/2 + lidar_support_height/2}" rpy="0 0 ${pi}" />
   </joint>
 
   <joint name="lidar_support_joint" type="fixed">
-    <parent link="chassis_link"/>
-    <child link="lidar_support_link"/>
-    <origin xyz="0.12 0 ${chassis_height/2 + lidar_support_height/2}" rpy="0 0 0"/>
+    <parent link="chassis_link" />
+    <child link="lidar_support_link" />
+    <origin xyz="0.12 0 ${chassis_height/2 + lidar_support_height/2}" rpy="0 0 0" />
   </joint>
 
   <gazebo reference="lidar_link">
     <material>Gazebo/Black</material>
-    <sensor name='lidar_link' type='gpu_lidar'>"
-      <topic>scan_lidar</topic>
-      <ignition_frame_id>lidar_link</ignition_frame_id>
-      <pose relative_to='lidar_link'>0 0 0 0 0 0</pose>
+    <sensor name='lidar_link' type='gpu_lidar'>
+      <topic>${frame_prefix}scan_lidar</topic>
+      <ignition_frame_id>${frame_prefix}lidar_link</ignition_frame_id>
+      <pose relative_to="${frame_prefix}lidar_link">0 0 0 0 0 0</pose>
       <always_on>1</always_on>
       <visualize>0</visualize>
       <update_rate>10</update_rate>

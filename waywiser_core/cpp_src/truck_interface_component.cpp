@@ -1,10 +1,12 @@
 #include "truck_interface_component.hpp"
 #include "moc_truck_interface_component.cpp"
 
+#include "WayWise/sensors/angle/as5600updater.h"
+
 TruckInterfaceComponent::TruckInterfaceComponent(
-  QObject * parent, const QSharedPointer<TruckState> truckState, bool hasTrailer,
+  QObjectNode * parentQObjectNode, const QSharedPointer<TruckState> truckState, bool hasTrailer,
   bool autoActuateMotorAndServo)
-: CarInterfaceComponent(parent, truckState, autoActuateMotorAndServo)
+: CarInterfaceComponent(parentQObjectNode, truckState, autoActuateMotorAndServo)
 {
   mTruckState = truckState;
   mHasTrailer = hasTrailer;
@@ -18,13 +20,6 @@ TruckInterfaceComponent::~TruckInterfaceComponent()
 void TruckInterfaceComponent::reset()
 {
   mTruckState->setTrailerAngle(0.0);
-  if (mHasTrailer) {
-    auto initial_yaw_offset = getGnssChipOrientationOffset().z;
-    auto pospoint = PosPoint();
-    pospoint.setYaw(initial_yaw_offset);
-    pospoint.setType(PosType::odom);
-    mTruckState->getTrailingVehicle()->setPosition(pospoint);
-  }
   CarInterfaceComponent::reset();
 }
 
@@ -52,7 +47,7 @@ void TruckInterfaceComponent::setup_vehicle_interface()
           mAngleSensorUpdater.reset(new AS5600Updater(mTruckState, mAngleSensorOffset));
           if (!mAngleSensorUpdater->isConnected()) {
             mTruckState->setSimulateTrailer(true);
-            qDebug() << "AS5600 not connected. Trailer angle will be simulated.";
+            qWarning() << "AS5600 not connected. Trailer angle will be simulated.";
           }
         } break;
       default:

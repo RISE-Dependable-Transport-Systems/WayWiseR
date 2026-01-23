@@ -2,9 +2,7 @@ import os
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import IncludeLaunchDescription
-from launch.actions import OpaqueFunction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
@@ -36,8 +34,8 @@ def generate_launch_description():
         default_value='True',
         description='Launch rviz2',
     )
-    control_vehicle_node_name_la = DeclareLaunchArgument(
-        'control_vehicle_node',
+    control_vehicle_node_fqn_la = DeclareLaunchArgument(
+        'control_vehicle_node_fqn',
         default_value='',
         description='Name of the vehicle node to control',
     )
@@ -54,7 +52,7 @@ def generate_launch_description():
     ld.add_action(teleop_config_la)
     ld.add_action(teleop_la)
     ld.add_action(rviz2_la)
-    ld.add_action(control_vehicle_node_name_la)
+    ld.add_action(control_vehicle_node_fqn_la)
 
     # start nodes
     ld.add_action(teleop_rviz2_launch_action)
@@ -81,7 +79,7 @@ def teleop_rviz2_launch(context):
                 launch_arguments={
                     'use_sim_time': LaunchConfiguration('use_sim_time'),
                     'teleop_config': LaunchConfiguration('teleop_config'),
-                    'control_vehicle_node': LaunchConfiguration('control_vehicle_node'),
+                    'control_vehicle_node_fqn': LaunchConfiguration('control_vehicle_node_fqn'),
                 }.items(),
             )
         )

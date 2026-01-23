@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 from dataclasses import dataclass
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -18,11 +19,14 @@ from sensor_msgs.msg import CameraInfo, Image
 from ultralytics.engine.results import Results
 from ultralytics.models.yolo.model import YOLO
 from ultralytics.trackers import BOTSORT, BYTETracker
-from ultralytics.utils import IterableSimpleNamespace, YAML
+from ultralytics.utils import IterableSimpleNamespace, LOGGER, YAML
 from ultralytics.utils.checks import check_yaml
 from ultralytics.utils.plotting import Annotator, Colors
 from vision_msgs.msg import BoundingBox3D, Detection3D, Detection3DArray, ObjectHypothesisWithPose
 from visualization_msgs.msg import Marker, MarkerArray
+
+# Suppress noisy ultralytics warnings (e.g., 'not enough matching points')
+LOGGER.setLevel(logging.ERROR)
 
 
 class YoloNode(Node):
@@ -38,7 +42,6 @@ class YoloNode(Node):
         self.declare_parameter('color_image_topic', 'color_image')
         self.declare_parameter('publish_annotated_image', True)
         self.declare_parameter('annotated_color_image_topic', 'yolov8_annotated_image')
-        self.declare_parameter('camera_base_frame', 'camera_link')
         self.declare_parameter('depth_image_topic', '')
         self.declare_parameter('depth_camerainfo_topic', '')
         self.declare_parameter('maximum_object_depth_size', 0.5)
@@ -82,9 +85,6 @@ class YoloNode(Node):
                 durability=QoSDurabilityPolicy.VOLATILE,
                 depth=1,
             ),
-        )
-        self.camera_base_frame = (
-            self.get_parameter('camera_base_frame').get_parameter_value().string_value
         )
 
         self.depth_image_topic = (
@@ -176,7 +176,6 @@ class YoloNode(Node):
         cv_image = self.cv_bridge.imgmsg_to_cv2(msg)
         detection_array = Detection3DArray()
         detection_array.header = msg.header
-        detection_array.header.frame_id = self.camera_base_frame
 
         depth_image = self.depth_image  # TODO: check the time diff between depth & color
         if depth_image is not None:
@@ -464,13 +463,10 @@ class YoloNode(Node):
         visualization_marker.header = header
         visualization_marker.type = Marker.CUBE
         visualization_marker.id = object_id
-        visualization_marker.header.frame_id = self.camera_base_frame
         visualization_marker.lifetime = Duration(
             sec=1,
         )
-
-        # Set the pose of the marker
-        visualization_marker.pose = bbox_3d.center
+        visualization_marker.frame_locked = True
 
         # Set the scale of the marker
         visualization_marker.scale.x = bbox_3d.size.z

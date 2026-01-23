@@ -1,3 +1,7 @@
 # Visual studio files
 *.vscode
 .env
+log/
+.venv/
+**/__pycache__/
+.agent/

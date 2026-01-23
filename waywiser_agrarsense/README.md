@@ -5,7 +5,7 @@ The waywiser_agrarsense package integrates the [AGRARSENSE](https://agrarsense.f
 ## Agrarsense setup
 
 - Install the [Agrarsense](https://agrarsense.frostbit.fi/md_Docs_linux_install.html) simulator, if not already done.
-- Either create a symbolic link to the simulator script at "~/workspaces/agrarsense_ws/Agrarsense.sh" or update the script path in [agrarsense.yaml](./config/agrarsense.yaml).
+- Either create a symbolic link to the simulator script at "~/workspaces/agrarsense_ws/Agrarsense.sh" or update the script path in the yaml config file.
 - Ensure Docker is installed and configured for rootless mode. Follow the official [Docker rootless installation guide](https://docs.docker.com/engine/security/rootless/).
 - Build the agrarsense-ros bridge docker container by executing the [build_docker_container.sh](./ros_bridge/build_docker_container.sh) script, from the root directory of the workspace:
 

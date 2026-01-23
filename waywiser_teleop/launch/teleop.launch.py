@@ -2,11 +2,10 @@ import os
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import LogInfo
-from launch.actions import OpaqueFunction
+from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+
 import yaml
 
 
@@ -24,10 +23,10 @@ def generate_launch_description():
         'use_sim_time', default_value='False', description='Use simulation/Gazebo clock'
     )
 
-    control_vehicle_node_name_la = DeclareLaunchArgument(
-        'control_vehicle_node',
+    control_vehicle_node_fqn_la = DeclareLaunchArgument(
+        'control_vehicle_node_fqn',
         default_value='',
-        description='Name of the vehicle node to control',
+        description='Fully qualified name of the vehicle node to control',
     )
 
     # start nodes and use args to set parameters
@@ -68,31 +67,6 @@ def generate_launch_description():
         ],
     )
 
-    joy_emergency_stop_node = Node(
-        package='waywiser_teleop',
-        executable='joy_emergency_stop',
-        name='joy_emergency_stop',
-        parameters=[
-            LaunchConfiguration('teleop_config'),
-            {
-                'use_sim_time': LaunchConfiguration('use_sim_time'),
-            },
-        ],
-    )
-
-    teleop_twist_mux_node = Node(
-        package='twist_mux',
-        executable='twist_mux',
-        name='teleop_twist_mux',
-        parameters=[
-            LaunchConfiguration('teleop_config'),
-            {
-                'use_sim_time': LaunchConfiguration('use_sim_time'),
-            },
-        ],
-        remappings={('/cmd_vel_out', '/teleop_mux_vel')},
-    )
-
     twist_keyboard_conditional_launch_action = OpaqueFunction(
         function=twist_keyboard_conditional_launch
     )
@@ -103,15 +77,13 @@ def generate_launch_description():
     # declare launch args
     ld.add_action(teleop_config_la)
     ld.add_action(use_sim_time_la)
-    ld.add_action(control_vehicle_node_name_la)
+    ld.add_action(control_vehicle_node_fqn_la)
 
     # start nodes
     ld.add_action(joy_node)
     ld.add_action(teleop_twist_joy_node)
-    ld.add_action(joy_emergency_stop_node)
     ld.add_action(twist_angular_correction_node)
     ld.add_action(twist_keyboard_conditional_launch_action)
-    ld.add_action(teleop_twist_mux_node)
 
     return ld
 
@@ -122,9 +94,11 @@ def twist_keyboard_conditional_launch(context):
         if 'twist_keyboard' in config_data:
             twist_keyboard_params = config_data['twist_keyboard']['ros__parameters']
             enable_twist_keyboard = twist_keyboard_params['enable']
-            control_vehicle_node = LaunchConfiguration('control_vehicle_node').perform(context)
-            if control_vehicle_node != '':
-                twist_keyboard_params['control_vehicle_node'] = control_vehicle_node
+            control_vehicle_node_fqn = LaunchConfiguration('control_vehicle_node_fqn').perform(
+                context
+            )
+            if control_vehicle_node_fqn != '':
+                twist_keyboard_params['control_vehicle_node_fqn'] = control_vehicle_node_fqn
             if enable_twist_keyboard:
                 if 'DISPLAY' in os.environ:
                     twist_keyboard_node = Node(
@@ -136,7 +110,7 @@ def twist_keyboard_conditional_launch(context):
                             twist_keyboard_params,
                             {'use_sim_time': LaunchConfiguration('use_sim_time')},
                         ],
-                        remappings={('/cmd_vel', '/key_vel')},
+                        remappings={},
                     )
                     return [twist_keyboard_node]
                 else:

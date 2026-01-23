@@ -2,12 +2,11 @@ import os
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import IncludeLaunchDescription
-from launch.actions import OpaqueFunction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+
 import yaml
 
 
@@ -18,7 +17,9 @@ def generate_launch_description():
     # args that can be set from the command line or a default will be used
     sim_config_la = DeclareLaunchArgument(
         'sim_config',
-        default_value=os.path.join(waywiser_agrarsense_dir, 'config/agrarsense.yaml'),
+        default_value=os.path.join(
+            waywiser_agrarsense_dir, 'config/agrarsense_orchestrator_playground.yaml'
+        ),
         description='Full path to params file of simulator',
     )
 

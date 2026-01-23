@@ -6,7 +6,7 @@ from launch_ros.actions import Node
 from launch_ros.descriptions import ParameterValue
 
 
-def get_scaled_urdf_string(urdf_file, urdf_scale=1.0, extra_args=''):
+def get_scaled_urdf_string(context, urdf_file, urdf_scale=1.0, extra_args='', frame_prefix=''):
     urdf_scaler_script_path = os.path.join(
         get_package_share_directory('waywiser_description'),
         'scripts',
@@ -23,27 +23,26 @@ def get_scaled_urdf_string(urdf_file, urdf_scale=1.0, extra_args=''):
                 urdf_file,
             )
 
+        cmd_args = [
+            urdf_scaler_script_path,
+            urdf_file,
+            str(urdf_scale),
+            f"'{frame_prefix}'",
+        ]
+        if extra_args:
+            cmd_args.append(extra_args)
+
+        urdf_file_string = Command(' '.join(cmd_args))
+        # print(f'URDF string: {urdf_file_string.perform(context)}', flush=True)
         return ParameterValue(
-            Command(
-                ' '.join(
-                    filter(
-                        None,
-                        [
-                            urdf_scaler_script_path,
-                            urdf_file,
-                            str(urdf_scale),
-                            extra_args,
-                        ],
-                    )
-                )
-            ),
+            urdf_file_string,
             value_type=str,
         )
 
     return None
 
 
-def get_robot_state_publisher_node(node_params_dict, use_sim_time=False):
+def get_robot_state_publisher_node(context, node_params_dict, use_sim_time=False, frame_prefix=''):
     node = None
     urdf_scale = 1.0
     if 'urdf_scale' in node_params_dict:
@@ -54,7 +53,7 @@ def get_robot_state_publisher_node(node_params_dict, use_sim_time=False):
         urdf_extra_args = node_params_dict['urdf_extra_args']
 
     urdf_file_string = get_scaled_urdf_string(
-        node_params_dict['urdf_file'], urdf_scale, urdf_extra_args
+        context, node_params_dict['urdf_file'], urdf_scale, urdf_extra_args, frame_prefix
     )
     if urdf_file_string is not None:
         node_params_dict['urdf_file'] = urdf_file_string

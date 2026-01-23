@@ -1,52 +1,59 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <gazebo>
-      <plugin
-        filename="ignition-gazebo-ackermann-steering-system"
-        name="ignition::gazebo::systems::AckermannSteering">
+  <gazebo>
+    <plugin filename="ignition-gazebo-ackermann-steering-system" name="ignition::gazebo::systems::AckermannSteering">
 
-        <!-- Wheel Information -->
-        <left_joint>left_front_wheel_joint</left_joint>
-        <left_joint>left_rear_wheel_joint</left_joint>
-        <right_joint>right_front_wheel_joint</right_joint>
-        <right_joint>right_rear_wheel_joint</right_joint>
-        <left_steering_joint>left_front_wheel_steering_joint</left_steering_joint>
-        <right_steering_joint>right_front_wheel_steering_joint</right_steering_joint>
-        <wheel_separation>.21</wheel_separation>
-        <kingpin_width>.17</kingpin_width>
-        <steering_limit>0.5</steering_limit>
-        <steer_p_gain>1.0</steer_p_gain>
-        <wheel_base>.33</wheel_base>
-        <wheel_radius>0.055</wheel_radius>
+      <!-- Wheel Information -->
+      <left_joint>left_front_wheel_joint</left_joint>
+      <left_joint>left_rear_wheel_joint</left_joint>
+      <right_joint>right_front_wheel_joint</right_joint>
+      <right_joint>right_rear_wheel_joint</right_joint>
+      <left_steering_joint>left_front_wheel_steering_joint</left_steering_joint>
+      <right_steering_joint>right_front_wheel_steering_joint</right_steering_joint>
+      <wheel_separation>.21</wheel_separation>
+      <kingpin_width>.17</kingpin_width>
+      <steering_limit>0.5</steering_limit>
+      <steer_p_gain>1.0</steer_p_gain>
+      <wheel_base>.33</wheel_base>
+      <wheel_radius>0.055</wheel_radius>
 
-        <!-- Limits -->
-        <min_velocity>-100</min_velocity>
-        <max_velocity>100</max_velocity>
-        <min_acceleration>-5</min_acceleration>
-        <max_acceleration>5</max_acceleration>
+      <!-- Limits -->
+      <min_velocity>-100</min_velocity>
+      <max_velocity>100</max_velocity>
+      <min_acceleration>-5</min_acceleration>
+      <max_acceleration>5</max_acceleration>
 
-        <!-- Input -->
-        <topic>/cmd_vel</topic>
+      <!-- Input -->
+      <topic>${frame_prefix}cmd_vel</topic>
 
-        <!-- Output -->
-        <odom_publish_frequency>50</odom_publish_frequency>
-        <odom_topic>/odom</odom_topic>
-        <tf_topic>/tf</tf_topic>
-        <frame_id>odom</frame_id>
-        <child_frame_id>base_link</child_frame_id>
-      </plugin>
-    </gazebo>
+      <!-- Output -->
+      <odom_publish_frequency>50</odom_publish_frequency>
+      <tf_topic>/tf</tf_topic>
+      <odom_topic>${frame_prefix}odom</odom_topic>
+      <frame_id>${frame_prefix}odom</frame_id>
+      <child_frame_id>${frame_prefix}base_link</child_frame_id>
+    </plugin>
+  </gazebo>
 
-    <gazebo>
-      <plugin filename="libignition-gazebo-joint-state-publisher-system.so"
-        name="ignition::gazebo::systems::JointStatePublisher">
-        <joint_name>left_front_wheel_joint</joint_name>
-        <joint_name>left_rear_wheel_joint</joint_name>
-        <joint_name>right_front_wheel_joint</joint_name>
-        <joint_name>right_rear_wheel_joint</joint_name>
-        <joint_name>left_front_wheel_steering_joint</joint_name>
-        <joint_name>right_front_wheel_steering_joint</joint_name>
-        <topic>/joint_states</topic>
-      </plugin>
-    </gazebo>
+  <gazebo>
+    <plugin filename="libignition-gazebo-joint-state-publisher-system.so" name="ignition::gazebo::systems::JointStatePublisher">
+      <joint_name>left_front_wheel_joint</joint_name>
+      <joint_name>left_rear_wheel_joint</joint_name>
+      <joint_name>right_front_wheel_joint</joint_name>
+      <joint_name>right_rear_wheel_joint</joint_name>
+      <joint_name>left_front_wheel_steering_joint</joint_name>
+      <joint_name>right_front_wheel_steering_joint</joint_name>
+      <topic>/joint_states</topic>
+    </plugin>
+    <plugin filename="ignition-gazebo-pose-publisher-system" name="gz::sim::systems::PosePublisher">
+      <publish_link_pose>false</publish_link_pose>
+      <publish_collision_pose>false</publish_collision_pose>
+      <publish_visual_pose>false</publish_visual_pose>
+      <publish_sensor_pose>false</publish_sensor_pose>
+      <publish_model_pose>true</publish_model_pose>
+      <use_pose_vector_msg>true</use_pose_vector_msg>
+      <publish_nested_model_pose>true</publish_nested_model_pose>
+      <update_frequency>50</update_frequency>
+    </plugin>
+  </gazebo>
 </robot>

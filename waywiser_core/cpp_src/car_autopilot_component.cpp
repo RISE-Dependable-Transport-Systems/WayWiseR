@@ -11,11 +11,8 @@ void CarAutopilotComponent::reset()
   mWaypointList.clear();
 }
 
-void CarAutopilotComponent::setupAutopilot(
-  QSharedPointer<GNSSReceiver> gNSSReceiver,
-  QSharedPointer<EmergencyStopState> emergencyStopState)
+void CarAutopilotComponent::setupAutopilot(QSharedPointer<EmergencyStopState> emergencyStopState)
 {
-  mGNSSReceiver = gNSSReceiver;
   mEmergencyStopState = emergencyStopState;
 
   mCarState->setEndGoalAlignmentType(mEndGoalAlignmentType);
@@ -29,9 +26,7 @@ void CarAutopilotComponent::setupAutopilot(
         QHostAddress(QString::fromStdString(mWaywiseControlTowerAddress)),
         mWaywiseControlTowerPort));
     mMavsdkVehicleServer->setMovementController(mAutopilotMovementController);
-    if (mGNSSReceiver != nullptr) {
-      mMavsdkVehicleServer->setGNSSReceiver(mGNSSReceiver);
-    }
+    mMavsdkVehicleServer->setTransferLogs(false); // TODO: make this configurable
   }
 
   // --- Autopilot ---
@@ -58,102 +53,113 @@ void CarAutopilotComponent::provideParametersToParameterServer()
 
 void CarAutopilotComponent::processMissionStateMachine()
 {
-  if (mGNSSReceiver->getReceiverState() == RECEIVER_STATE::READY) {
-    switch (currentMissionState) {
-      case MissionState::WaitingForVehicleInit: {
-          updateMissionState(MissionState::Idle);
-        } break;
-      case MissionState::Idle: {
-          // Check if mWaypointFollower is started via MAVLINK
-          if (mWaypointFollower->isActive()) {
-            if (mWaypointFollower->getCurrentRoute().size() > 0) {
-              mWaypointList = mWaypointFollower->getCurrentRoute();
-              updateMissionState(
-                convertToMissionState(
-                  mWaypointFollower->getCurrentState().stmState));
-            } else {
-              updateMissionState(MissionState::WaitingForRoute);
-            }
-          }
-        } break;
-      case MissionState::WaitingForRoute: {
-          if (!mWaypointList.isEmpty()) {
-            if (mEmergencyStopState->is_active()) {
-              updateMissionState(MissionState::WaitingForEmergencyStopClear);
-            } else if (!assertGnssFixAccuracy()) {
-              updateMissionState(MissionState::WaitingForGnssAccuracy);
-            } else {
-              startWaypointFollower(mWaypointList);
-              updateMissionState(MissionState::FollowRouteInit);
-            }
-          } else if (mWaypointFollower->getCurrentRoute().size() > 0) {
-            mWaypointList = mWaypointFollower->getCurrentRoute();
-            updateMissionState(
-              convertToMissionState(
-                mWaypointFollower->getCurrentState().stmState));
-          }
-        } break;
-      case MissionState::WaitingForEmergencyStopClear: {
-          if (mEmergencyStopState->is_clear()) {
-            updateMissionState(MissionState::Idle);
-          }
-        } break;
-      case MissionState::WaitingForGnssAccuracy: {
-          if (assertGnssFixAccuracy()) {
-            if (mWaypointList.isEmpty()) {
-              updateMissionState(MissionState::WaitingForRoute);
-            } else if (mEmergencyStopState->is_active()) {
-              updateMissionState(MissionState::WaitingForEmergencyStopClear);
-            } else {
-              startWaypointFollower(mWaypointList);
-              updateMissionState(MissionState::FollowRouteInit);
-            }
-          } else if (mWaypointFollower->isActive()) {
-            stopWaypointFollower();
-          }
-        } break;
-      case MissionState::FollowRouteInit:
-      case MissionState::FollowRouteGotoBegin:
-      case MissionState::FollowRouteFollowing:
-      case MissionState::FollowRouteApproachingEndGoal:
-        {
-          if (mEmergencyStopState->is_active()) {
-            stopWaypointFollower();
-            updateMissionState(MissionState::WaitingForEmergencyStopClear);
-          } else if (!assertGnssFixAccuracy()) {
-            stopWaypointFollower();
-            updateMissionState(MissionState::WaitingForGnssAccuracy);
-          } else {
-            // Synchronize mission state with waypoint follower state
-            WayPointFollowerSTMstates wayPointFollowerSTMstate =
-              mWaypointFollower->getCurrentState().stmState;
-            if (convertToWayPointFollowerSTMstates(currentMissionState) !=
-              wayPointFollowerSTMstate)
-            {
-              updateMissionState(convertToMissionState(wayPointFollowerSTMstate));
-
-              if (currentMissionState == MissionState::Idle && mWaypointFollower->isActive()) {
-                stopWaypointFollower();
+  switch (mGnssFixStatus.fixType) {
+    case GNSS_FIX_TYPE::NO_FIX:
+    case GNSS_FIX_TYPE::TIME_ONLY_FIX:
+      {
+        if (currentMissionState != MissionState::WaitingForVehicleInit) {
+          updateMissionState(MissionState::WaitingForVehicleInit);
+        }
+      } break;
+    default:
+      {
+        switch (currentMissionState) {
+          case MissionState::WaitingForVehicleInit: {
+              updateMissionState(MissionState::Idle);
+            } break;
+          case MissionState::Idle: {
+              // Check if mWaypointFollower is started via MAVLINK
+              if (mWaypointFollower->isActive()) {
+                if (mWaypointFollower->getCurrentRoute().size() > 0) {
+                  mWaypointList = mWaypointFollower->getCurrentRoute();
+                  updateMissionState(
+                    CoreUtils::convertToMissionState(
+                      mWaypointFollower->getCurrentState().stmState));
+                } else {
+                  updateMissionState(MissionState::WaitingForRoute);
+                }
               }
-            }
-
-            // Check if the route is finished by overshooting the end goal
-            if (currentMissionState == MissionState::FollowRouteApproachingEndGoal &&
-              !mWaypointFollower->isActive())
+            } break;
+          case MissionState::WaitingForRoute: {
+              if (!mWaypointList.isEmpty()) {
+                if (mEmergencyStopState->is_active()) {
+                  updateMissionState(MissionState::WaitingForEmergencyStopClear);
+                } else if (!assertGnssFixAccuracy()) {
+                  updateMissionState(MissionState::WaitingForGnssAccuracy);
+                  emit gnssFixAccuracyAssertionFailed(mGnssFixStatus);
+                } else {
+                  startWaypointFollower(mWaypointList);
+                  updateMissionState(MissionState::FollowRouteInit);
+                }
+              } else if (mWaypointFollower->getCurrentRoute().size() > 0) {
+                mWaypointList = mWaypointFollower->getCurrentRoute();
+                updateMissionState(
+                  CoreUtils::convertToMissionState(
+                    mWaypointFollower->getCurrentState().stmState));
+              }
+            } break;
+          case MissionState::WaitingForEmergencyStopClear: {
+              if (mEmergencyStopState->is_clear()) {
+                updateMissionState(MissionState::Idle);
+              }
+            } break;
+          case MissionState::WaitingForGnssAccuracy: {
+              if (assertGnssFixAccuracy()) {
+                if (mWaypointList.isEmpty()) {
+                  updateMissionState(MissionState::WaitingForRoute);
+                } else if (mEmergencyStopState->is_active()) {
+                  updateMissionState(MissionState::WaitingForEmergencyStopClear);
+                } else {
+                  startWaypointFollower(mWaypointList);
+                  updateMissionState(MissionState::FollowRouteInit);
+                }
+              } else if (mWaypointFollower->isActive()) {
+                stopWaypointFollower();
+                emit gnssFixAccuracyAssertionFailed(mGnssFixStatus);
+              }
+            } break;
+          case MissionState::FollowRouteInit:
+          case MissionState::FollowRouteGotoBegin:
+          case MissionState::FollowRouteFollowing:
+          case MissionState::FollowRouteApproachingEndGoal:
             {
-              updateMissionState(MissionState::FollowRouteFinished);
-            }
-          }
-        } break;
-      case MissionState::FollowRouteFinished:
-        {
-          stopWaypointFollower();
-        } break;
-      default:
-        break;
-    }
-  } else if (currentMissionState != MissionState::WaitingForVehicleInit) {
-    updateMissionState(MissionState::WaitingForVehicleInit);
+              if (mEmergencyStopState->is_active()) {
+                stopWaypointFollower();
+                updateMissionState(MissionState::WaitingForEmergencyStopClear);
+              } else if (!assertGnssFixAccuracy()) {
+                stopWaypointFollower();
+                updateMissionState(MissionState::WaitingForGnssAccuracy);
+                emit gnssFixAccuracyAssertionFailed(mGnssFixStatus);
+              } else {
+                // Synchronize mission state with waypoint follower state
+                WayPointFollowerSTMstates wayPointFollowerSTMstate =
+                  mWaypointFollower->getCurrentState().stmState;
+                if (CoreUtils::convertToWayPointFollowerSTMstates(currentMissionState) !=
+                  wayPointFollowerSTMstate)
+                {
+                  updateMissionState(CoreUtils::convertToMissionState(wayPointFollowerSTMstate));
+
+                  if (currentMissionState == MissionState::Idle && mWaypointFollower->isActive()) {
+                    stopWaypointFollower();
+                  }
+                }
+
+                // Check if the route is finished by overshooting the end goal
+                if (currentMissionState == MissionState::FollowRouteApproachingEndGoal &&
+                  !mWaypointFollower->isActive())
+                {
+                  updateMissionState(MissionState::FollowRouteFinished);
+                }
+              }
+            } break;
+          case MissionState::FollowRouteFinished:
+            {
+              stopWaypointFollower();
+            } break;
+          default:
+            break;
+        }
+      } break;
   }
 }
 
@@ -236,14 +242,14 @@ void CarAutopilotComponent::updateWaypointFollowerRoute(QList<PosPoint> & waypoi
 void CarAutopilotComponent::updateMissionState(MissionState state)
 {
   currentMissionState = state;
-  qDebug() << "MissionState: " << missionStateToString(currentMissionState).c_str();
+  qDebug() << "MissionState: " << CoreUtils::missionStateToString(currentMissionState).c_str();
   emit updatedMissionState(currentMissionState);
 }
 
 bool CarAutopilotComponent::assertGnssFixAccuracy()
 {
-  if (mGNSSReceiver->getGnssFixAccuracy().horizontal > mPositionAccuracyThresholdForMission ||
-    mGNSSReceiver->getGnssFixAccuracy().vertical > mYawAccuracyThresholdForMission)
+  if (mGnssFixStatus.horizontalAccuracy > mPositionAccuracyThresholdForMission ||
+    mGnssFixStatus.verticalAccuracy > mYawAccuracyThresholdForMission)
   {
     return false;
   }

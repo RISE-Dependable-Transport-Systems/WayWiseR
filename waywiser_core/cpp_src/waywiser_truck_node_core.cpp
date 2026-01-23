@@ -1,8 +1,13 @@
 #include "waywiser_truck_node_core.hpp"
 #include "moc_waywiser_truck_node_core.cpp"
 
+#include "waywiser/waywiser_utils.hpp"
+
 void WaywiserTruck::initialize_node()
 {
+  node_logger_ = this->get_logger();
+  qInstallMessageHandler(qtMessageHandler);
+
   mTruckState.reset(new TruckState());
   has_trailer_ = this->declare_parameter("has_trailer", false);
   mTruckInterfaceComponent.reset(
@@ -30,17 +35,30 @@ void WaywiserTruck::setup_parameters()
       "trailer_wheel_joint_names",
       std::vector<std::string>{"semitrailer_rlw_link_joint", "semitrailer_rrw_link_joint"}
     );
-    truck_trailer_link_joint_name_ = declare_parameter<std::string>(
-      "truck_trailer_link_joint_name", "truck_trailer_link_joint"
-    );
 
-    hitch_frame_ = declare_parameter("hitch_frame", base_frame_);
-    trailer_base_frame_ = declare_parameter("trailer_base_frame", "trailer");
-    trailer_rear_axle_frame_ = this->declare_parameter(
-      "trailer_rear_axle_frame", trailer_base_frame_);
-    trailer_center_frame_ = this->declare_parameter("trailer_center_frame", trailer_base_frame_);
-    trailer_rear_end_frame_ = this->declare_parameter("trailer_rear_end_frame", "");
-    trailer_hitch_frame_ = this->declare_parameter("trailer_hitch_frame", "");
+    for (auto & name : trailer_wheel_joint_names_) {
+      name = RosUtils::joinFrame(frame_prefix_, name);
+    }
+
+    truck_trailer_link_joint_name_ = RosUtils::joinFrame(
+      frame_prefix_,
+      declare_parameter<std::string>(
+        "truck_trailer_link_joint_name", "truck_trailer_link_joint"
+    ));
+
+    hitch_frame_ =
+      RosUtils::joinFrame(frame_prefix_, declare_parameter("hitch_frame", base_frame_));
+    trailer_base_frame_ =
+      RosUtils::joinFrame(frame_prefix_, declare_parameter("trailer_base_frame", "trailer"));
+    trailer_rear_axle_frame_ = RosUtils::joinFrame(
+      frame_prefix_, this->declare_parameter(
+        "trailer_rear_axle_frame", trailer_base_frame_));
+    trailer_center_frame_ = RosUtils::joinFrame(
+      frame_prefix_, this->declare_parameter("trailer_center_frame", trailer_base_frame_));
+    trailer_rear_end_frame_ =
+      RosUtils::joinFrame(frame_prefix_, this->declare_parameter("trailer_rear_end_frame", ""));
+    trailer_hitch_frame_ =
+      RosUtils::joinFrame(frame_prefix_, this->declare_parameter("trailer_hitch_frame", ""));
 
     angle_sensor_topic_ = this->declare_parameter("angle_sensor_topic", "/sensors/angle");
     trailer_pose_topic_ = declare_parameter("trailer_pose_topic", "/trailer_pose");
@@ -65,28 +83,35 @@ void WaywiserTruck::setup_parameters()
     std::ostringstream log_stream;
     log_stream << "TruckInterfaceComponent offset parameters:\n";
     // Rear axle to hitch
-    auto vector3_param = get_vector3_param(this, "rear_axle_frame_to_hitch_frame_offset");
+    auto vector3_param = RosUtils::get_vector3_param(this, "rear_axle_frame_to_hitch_frame_offset");
     if (!vector3_param && mUrdfModel) {
-      vector3_param = getFramePositionOffset(mUrdfModel, hitch_frame_, rear_axle_frame_);
+      vector3_param = URDFUtils::getFramePositionOffset(
+        mUrdfModel, hitch_frame_,
+        rear_axle_frame_);
     }
     log_stream << "rear_axle_frame_to_hitch_frame_offset: " << vector3_param->c_str() << "\n";
     mTruckInterfaceComponent->setRearAxleToHitchOffset(vector3_param->to_type<xyz_t>());
 
     // Trailer rear axle to trailer base
-    vector3_param = get_vector3_param(this, "trailer_rear_axle_frame_to_trailer_base_frame_offset");
+    vector3_param = RosUtils::get_vector3_param(
+      this,
+      "trailer_rear_axle_frame_to_trailer_base_frame_offset");
     if (!vector3_param && mUrdfModel) {
       vector3_param =
-        getFramePositionOffset(mUrdfModel, trailer_base_frame_, trailer_rear_axle_frame_);
+        URDFUtils::getFramePositionOffset(
+        mUrdfModel, trailer_base_frame_,
+        trailer_rear_axle_frame_);
     }
     log_stream << "trailer_rear_axle_frame_to_trailer_base_frame_offset: " <<
       vector3_param->c_str() << "\n";
-    mTruckInterfaceComponent->setTrailerRearAxleToTrailerBaseOffset(vector3_param->to_type<xyz_t>());
+    mTruckInterfaceComponent->setTrailerRearAxleToTrailerBaseOffset(
+      vector3_param->to_type<xyz_t>());
 
     // Trailer rear axle to trailer rear end
     vector3_param =
-      get_vector3_param(this, "trailer_rear_axle_frame_to_trailer_rear_end_frame_offset");
+      RosUtils::get_vector3_param(this, "trailer_rear_axle_frame_to_trailer_rear_end_frame_offset");
     if (!vector3_param && mUrdfModel) {
-      vector3_param = getFramePositionOffset(
+      vector3_param = URDFUtils::getFramePositionOffset(
         mUrdfModel, trailer_rear_end_frame_,
         trailer_rear_axle_frame_);
     }
@@ -97,9 +122,9 @@ void WaywiserTruck::setup_parameters()
 
     // Trailer rear axle to trailer center
     vector3_param =
-      get_vector3_param(this, "trailer_rear_axle_frame_to_trailer_center_frame_offset");
+      RosUtils::get_vector3_param(this, "trailer_rear_axle_frame_to_trailer_center_frame_offset");
     if (!vector3_param && mUrdfModel) {
-      vector3_param = getFramePositionOffset(
+      vector3_param = URDFUtils::getFramePositionOffset(
         mUrdfModel, trailer_center_frame_,
         trailer_rear_axle_frame_);
     }
@@ -110,14 +135,17 @@ void WaywiserTruck::setup_parameters()
 
     // Trailer rear axle to trailer hitch
     vector3_param =
-      get_vector3_param(this, "trailer_rear_axle_frame_to_trailer_hitch_frame_offset");
+      RosUtils::get_vector3_param(this, "trailer_rear_axle_frame_to_trailer_hitch_frame_offset");
     if (!vector3_param && mUrdfModel) {
       vector3_param =
-        getFramePositionOffset(mUrdfModel, trailer_hitch_frame_, trailer_rear_axle_frame_);
+        URDFUtils::getFramePositionOffset(
+        mUrdfModel, trailer_hitch_frame_,
+        trailer_rear_axle_frame_);
     }
     log_stream << "trailer_rear_axle_frame_to_trailer_hitch_frame_offset: " <<
       vector3_param->c_str() << "\n";
-    mTruckInterfaceComponent->setTrailerRearAxleToTrailerHitchOffset(vector3_param->to_type<xyz_t>());
+    mTruckInterfaceComponent->setTrailerRearAxleToTrailerHitchOffset(
+      vector3_param->to_type<xyz_t>());
 
     // Output log_stream
     RCLCPP_INFO_STREAM(get_logger(), log_stream.str());
@@ -196,20 +224,23 @@ void WaywiserTruck::publish_tfs()
   WaywiserCar::publish_tfs();
 
   if (has_trailer_) {
-    if (publish_odom_to_baselink_tf_) {
+    if (false && publish_odom_to_baselink_tf_) {
       PosPoint odom_to_trailer_base_link_position =
         mTruckState->getTrailingVehicle()->posInVehicleFrameToPosPointENU(
         mTruckInterfaceComponent->getTrailerRearAxleToTrailerBaseOffset(), PosType::odom);
 
       double trailer_x = odom_to_trailer_base_link_position.getX();
       double trailer_y = odom_to_trailer_base_link_position.getY();
-      double trailer_yaw_rad = odom_to_trailer_base_link_position.getYaw() * M_PI / 180.0;
+      double trailer_roll_rad = odom_to_trailer_base_link_position.getRoll() * DEG2RAD;
+      double trailer_pitch_rad = odom_to_trailer_base_link_position.getPitch() * DEG2RAD;
+      double trailer_yaw_rad = odom_to_trailer_base_link_position.getYaw() * DEG2RAD;
+      tf2::Quaternion q_odom_to_trailer_base_link;
+      q_odom_to_trailer_base_link.setRPY(trailer_roll_rad, trailer_pitch_rad, trailer_yaw_rad);
 
       auto odom_to_trailer_msg_tf = geometry_msgs::msg::Transform();
       odom_to_trailer_msg_tf.translation.x = trailer_x;
       odom_to_trailer_msg_tf.translation.y = trailer_y;
-      odom_to_trailer_msg_tf.rotation.z = sin(trailer_yaw_rad / 2.0);
-      odom_to_trailer_msg_tf.rotation.w = cos(trailer_yaw_rad / 2.0);
+      odom_to_trailer_msg_tf.rotation = tf2::toMsg(q_odom_to_trailer_base_link);
 
       auto odom_to_trailer_msg_tfs = geometry_msgs::msg::TransformStamped();
       odom_to_trailer_msg_tfs.header.frame_id = odom_frame_;
@@ -238,7 +269,10 @@ void WaywiserTruck::publish_world_pose()
     world_pose_stamped.pose.position.y = currentTrailerPosition.getY();
     world_pose_stamped.pose.position.z = currentTrailerPosition.getHeight();
     tf2::Quaternion orientation;
-    orientation.setRPY(0.0, 0.0, currentTrailerPosition.getYaw() * M_PI / 180.0);
+    orientation.setRPY(
+      currentTrailerPosition.getRoll() * DEG2RAD,
+      currentTrailerPosition.getPitch() * DEG2RAD,
+      currentTrailerPosition.getYaw() * DEG2RAD);
     world_pose_stamped.pose.orientation = tf2::toMsg(orientation);
     trailer_pose_pub_->publish(world_pose_stamped);
   }

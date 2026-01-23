@@ -2,10 +2,17 @@ import os
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import IncludeLaunchDescription
+from launch.actions import (
+    DeclareLaunchArgument,
+    GroupAction,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node, PushRosNamespace, SetRemap
+
+from waywiser_py.waywiser_utils import FileUtils, RosUtils
 
 
 def generate_launch_description():
@@ -32,9 +39,9 @@ def generate_launch_description():
         ),
         description='Full path to params file for agrarsense orchestrator',
     )
-    enable_collision_monitor_la = DeclareLaunchArgument(
-        'enable_collision_monitor',
-        default_value='True',
+    enable_nav2_collision_monitor_la = DeclareLaunchArgument(
+        'enable_nav2_collision_monitor',
+        default_value='False',
         description='Use Nav2 collision monitoring',
     )
     rviz_config_la = DeclareLaunchArgument(
@@ -46,18 +53,13 @@ def generate_launch_description():
     )
     teleop_config_la = DeclareLaunchArgument(
         'teleop_config',
-        default_value=os.path.join(waywiser_teleop_dir, 'config/teleop_sim.yaml'),
+        default_value=os.path.join(waywiser_teleop_dir, 'config/teleop.yaml'),
         description='Full path to params file',
     )
     vehicle_config_la = DeclareLaunchArgument(
         'vehicle_config',
         default_value=os.path.join(waywiser_agrarsense_dir, 'config/forwarder.yaml'),
         description='Full path to params file of vehicle',
-    )
-    ego_vehicle_identifier_la = DeclareLaunchArgument(
-        'ego_vehicle_identifier',
-        default_value='forwarder',
-        description='Identifier of ego vehicle',
     )
     teleop_la = DeclareLaunchArgument(
         'teleop',
@@ -69,23 +71,149 @@ def generate_launch_description():
         default_value='True',
         description='Launch rviz2',
     )
-    yolo_config_la = DeclareLaunchArgument(
-        'yolo_config',
-        default_value=os.path.join(waywiser_perception_dir, 'config/yolov3_tinyu.yaml'),
-        description='Full path to params file of yolo',
-    )
-    collision_monitor_config_la = DeclareLaunchArgument(
-        'collision_monitor_config',
-        default_value=os.path.join(waywiser_perception_dir, 'config/collision_monitor.yaml'),
-        description='Full path to params file for CollisionMonitor node.',
-    )
     control_vehicle_node_name_la = DeclareLaunchArgument(
-        'control_vehicle_node',
+        'control_vehicle_node_name',
         default_value='waywiser_car_node',
         description='Name of the vehicle node to control',
     )
+    localization_node_name_la = DeclareLaunchArgument(
+        'localization_node_name',
+        default_value='waywiser_car_localization_node',
+        description='Name of the node to be launched',
+    )
+    vehicle_name_la = DeclareLaunchArgument(
+        'vehicle_name',
+        default_value='forwarder',
+        description='Name of the vehicle',
+    )
+
+    vehicle_name = LaunchConfiguration('vehicle_name')
+    frame_prefix = [vehicle_name, '/']
 
     # include launch files
+    waywiser_car_launch = GroupAction(
+        actions=[
+            PushRosNamespace(vehicle_name),
+            SetRemap(src='/tf', dst='/tf'),
+            SetRemap(src='/tf_static', dst='/tf_static'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            waywiser_core_dir,
+                            'launch',
+                            'waywiser_car.launch.py',
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    'use_sim_time': LaunchConfiguration('use_sim_time'),
+                    'vehicle_config': LaunchConfiguration('vehicle_config'),
+                    'frame_prefix': frame_prefix,
+                }.items(),
+            ),
+        ]
+    )
+
+    vehicle_tf_navsatfix_extended_wrapper = GroupAction(
+        actions=[
+            PushRosNamespace(vehicle_name),
+            SetRemap(src='/tf', dst='/tf'),
+            SetRemap(src='/tf_static', dst='/tf_static'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            get_package_share_directory('waywiser_core'),
+                            'launch',
+                            'navsatfix_extended_wrapper.launch.py',
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    'config': LaunchConfiguration('vehicle_config'),
+                    'use_sim_time': LaunchConfiguration('use_sim_time'),
+                    'frame_prefix': frame_prefix,
+                }.items(),
+            ),
+        ]
+    )
+
+    vehicle_localization = GroupAction(
+        actions=[
+            PushRosNamespace(vehicle_name),
+            SetRemap(src='/tf', dst='/tf'),
+            SetRemap(src='/tf_static', dst='/tf_static'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            waywiser_core_dir,
+                            'launch',
+                            'waywiser_localization.launch.py',
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    'use_sim_time': LaunchConfiguration('use_sim_time'),
+                    'localization_config': LaunchConfiguration('vehicle_config'),
+                    'localization_node_name': LaunchConfiguration('localization_node_name'),
+                    'frame_prefix': frame_prefix,
+                }.items(),
+            ),
+        ]
+    )
+
+    vehicle_twist_safety = GroupAction(
+        actions=[
+            PushRosNamespace(vehicle_name),
+            SetRemap(src='/tf', dst='/tf'),
+            SetRemap(src='/tf_static', dst='/tf_static'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            waywiser_twist_safety_dir,
+                            'launch',
+                            'twist_safety.launch.py',
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    'use_sim_time': LaunchConfiguration('use_sim_time'),
+                    'enable_nav2_collision_monitor': LaunchConfiguration(
+                        'enable_nav2_collision_monitor'
+                    ),
+                    'twist_safety_config': LaunchConfiguration('vehicle_config'),
+                    'frame_prefix': frame_prefix,
+                }.items(),
+            ),
+        ]
+    )
+
+    vehicle_yolo = GroupAction(
+        actions=[
+            PushRosNamespace(vehicle_name),
+            SetRemap(src='/tf', dst='/tf'),
+            SetRemap(src='/tf_static', dst='/tf_static'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            waywiser_perception_dir,
+                            'launch',
+                            'yolo.launch.py',
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    'use_sim_time': LaunchConfiguration('use_sim_time'),
+                    'yolo_config': LaunchConfiguration('vehicle_config'),
+                }.items(),
+            ),
+        ]
+    )
+
     agrarsense_orchestrator = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -115,41 +243,6 @@ def generate_launch_description():
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'sim_config': LaunchConfiguration('agrarsense_orchestrator_config'),
-            'vehicle_config': LaunchConfiguration('vehicle_config'),
-            'ego_vehicle_identifier': LaunchConfiguration('ego_vehicle_identifier'),
-        }.items(),
-    )
-
-    waywiser_car = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                os.path.join(
-                    waywiser_core_dir,
-                    'launch',
-                    'waywiser_car.launch.py',
-                )
-            ]
-        ),
-        launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'vehicle_config': LaunchConfiguration('vehicle_config'),
-        }.items(),
-    )
-
-    twist_safety = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                os.path.join(
-                    waywiser_twist_safety_dir,
-                    'launch',
-                    'twist_safety.launch.py',
-                )
-            ]
-        ),
-        launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'enable_collision_monitor': LaunchConfiguration('enable_collision_monitor'),
-            'twist_safety_config': LaunchConfiguration('vehicle_config'),
         }.items(),
     )
 
@@ -169,39 +262,40 @@ def generate_launch_description():
             'teleop_config': LaunchConfiguration('teleop_config'),
             'teleop': LaunchConfiguration('teleop'),
             'rviz2': LaunchConfiguration('rviz2'),
-            'control_vehicle_node': LaunchConfiguration('control_vehicle_node'),
+            'control_vehicle_node_fqn': [
+                vehicle_name,
+                '/',
+                LaunchConfiguration('control_vehicle_node_name'),
+            ],
         }.items(),
     )
 
-    yolo = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                os.path.join(
-                    waywiser_perception_dir,
-                    'launch',
-                    'yolo.launch.py',
-                )
-            ]
-        ),
-        launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'yolo_config': LaunchConfiguration('yolo_config'),
-        }.items(),
+    waywiser_collision_monitor = GroupAction(
+        actions=[
+            PushRosNamespace(vehicle_name),
+            SetRemap(src='/tf', dst='/tf'),
+            SetRemap(src='/tf_static', dst='/tf_static'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            waywiser_perception_dir,
+                            'launch',
+                            'collision_monitor.launch.py',
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    'use_sim_time': LaunchConfiguration('use_sim_time'),
+                    'collision_monitor_config': LaunchConfiguration('vehicle_config'),
+                }.items(),
+            ),
+        ]
     )
-    collision_monitor = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                os.path.join(
-                    waywiser_perception_dir,
-                    'launch',
-                    'collision_monitor.launch.py',
-                )
-            ]
-        ),
-        launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'collision_monitor_config': LaunchConfiguration('collision_monitor_config'),
-        }.items(),
+
+    # Define OpaqueFunction actions to launch nodes with context
+    waywiser_to_agrarsense_control_launch_action = OpaqueFunction(
+        function=waywiser_to_agrarsense_control_launch
     )
 
     # create launch description
@@ -211,24 +305,51 @@ def generate_launch_description():
     ld.add_action(use_sim_time_la)
     ld.add_action(ego_vehicle_role_name_la)
     ld.add_action(agrarsense_orchestrator_config_la)
-    ld.add_action(enable_collision_monitor_la)
+    ld.add_action(enable_nav2_collision_monitor_la)
     ld.add_action(rviz_config_la)
     ld.add_action(teleop_config_la)
     ld.add_action(vehicle_config_la)
-    ld.add_action(ego_vehicle_identifier_la)
     ld.add_action(teleop_la)
     ld.add_action(rviz2_la)
-    ld.add_action(yolo_config_la)
-    ld.add_action(collision_monitor_config_la)
     ld.add_action(control_vehicle_node_name_la)
+    ld.add_action(localization_node_name_la)
+    ld.add_action(vehicle_name_la)
 
     # start nodes
     ld.add_action(agrarsense_orchestrator)
     ld.add_action(waywiser_agrarsense_relay)
-    ld.add_action(waywiser_car)
-    ld.add_action(twist_safety)
+    ld.add_action(waywiser_car_launch)
+    ld.add_action(waywiser_to_agrarsense_control_launch_action)
+    ld.add_action(vehicle_tf_navsatfix_extended_wrapper)
+    ld.add_action(vehicle_localization)
+    ld.add_action(vehicle_twist_safety)
     ld.add_action(teleop_rviz2)
-    ld.add_action(yolo)
-    ld.add_action(collision_monitor)
+    ld.add_action(vehicle_yolo)
+    ld.add_action(waywiser_collision_monitor)
 
     return ld
+
+
+def waywiser_to_agrarsense_control_launch(context):
+    vehicle_config = FileUtils.get_full_file_path(
+        LaunchConfiguration('vehicle_config').perform(context)
+    )
+    node_params_dict = RosUtils.get_node_params(vehicle_config, 'waywiser_to_agrarsense_control')
+    ego_vehicle_role_name = LaunchConfiguration('ego_vehicle_role_name').perform(context)
+    return [
+        Node(
+            package='waywiser_agrarsense',
+            executable='waywiser_to_agrarsense_control.py',
+            name='waywiser_to_agrarsense_control',
+            namespace=ego_vehicle_role_name,
+            parameters=[
+                node_params_dict,
+                {
+                    'use_sim_time': LaunchConfiguration('use_sim_time'),
+                    'ego_vehicle_role_name': LaunchConfiguration('ego_vehicle_role_name'),
+                },
+            ],
+            output='screen',
+            emulate_tty=True,
+        )
+    ]

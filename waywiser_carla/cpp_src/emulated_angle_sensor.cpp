@@ -1,12 +1,14 @@
-#include "rclcpp/rclcpp.hpp"
-#include "tf2_ros/transform_listener.h"
-#include "tf2_ros/buffer.h"
+#include <cmath>
+
+#include <rclcpp/rclcpp.hpp>
+
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "std_msgs/msg/float32.hpp"
-#include <cmath>
 #include "std_msgs/msg/bool.hpp"
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-#include <tf2/utils.h>
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2/utils.h"
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer.h"
 
 #include "waywiser/waywiser_utils.hpp"
 
@@ -35,15 +37,15 @@ public:
       while (rclcpp::ok() && this->get_clock()->now().nanoseconds() == 0) {
         rclcpp::sleep_for(std::chrono::milliseconds(1000));
       }
-      RCLCPP_INFO(this->get_logger(), "Receiving /clock msgs now.");
+      RCLCPP_WARN(this->get_logger(), "Receiving /clock msgs now.");
     }
 
     // Rear axle to base
-    auto vector3_param = get_vector3_param(this, "rear_axle_frame_to_base_frame_offset");
+    auto vector3_param = RosUtils::get_vector3_param(this, "rear_axle_frame_to_base_frame_offset");
     if (vector3_param) {
       rear_axle_frame_to_base_frame_offset_ = vector3_param->to_type<vector3_t>();
     }
-    vector3_param = get_vector3_param(this, "rear_axle_frame_to_hitch_frame_offset");
+    vector3_param = RosUtils::get_vector3_param(this, "rear_axle_frame_to_hitch_frame_offset");
     if (vector3_param) {
       rear_axle_frame_to_hitch_frame_offset_ = vector3_param->to_type<vector3_t>();
     }
@@ -90,7 +92,7 @@ private:
       }
 
       std_msgs::msg::Float32 angle_msg;
-      angle_msg.data = yawDiff * 180.0 / M_PI + angle_offset_;
+      angle_msg.data = yawDiff * RAD2DEG + angle_offset_;
       angle_pub_->publish(angle_msg);
     } catch (tf2::TransformException & ex) {
       // do nothing

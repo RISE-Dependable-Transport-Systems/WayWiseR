@@ -5,7 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded: ~
       Splitter Ratio: 0.7233009934425354
-    Tree Height: 738
+    Tree Height: 778
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -45,54 +45,58 @@ Visualization Manager:
         Z: -0.20000000298023224
       Plane: XY
       Plane Cell Count: 100
-      Reference Frame: odom
+      Reference Frame: map
       Value: true
     - Class: rviz_default_plugins/TF
       Enabled: true
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        base_link:
-          Value: false
-        camera_link:
-          Value: false
-        chassis_link:
-          Value: false
-        front_axle_link:
-          Value: false
-        front_bumper_link:
-          Value: false
-        front_end_link:
-          Value: false
-        imu_link:
-          Value: false
-        left_end_link:
-          Value: false
-        left_front_wheel_link:
-          Value: false
-        left_front_wheel_steering_link:
-          Value: false
-        left_rear_wheel_link:
-          Value: false
-        lidar_link:
-          Value: false
-        lidar_support_link:
-          Value: false
-        odom:
+        map:
           Value: true
-        rear_axle_link:
+        rover/base_link:
           Value: true
-        rear_bumper_link:
+        rover/camera_link:
           Value: false
-        rear_end_link:
+        rover/chassis_link:
           Value: false
-        right_end_link:
+        rover/front_axle_link:
           Value: false
-        right_front_wheel_link:
+        rover/front_bumper_link:
           Value: false
-        right_front_wheel_steering_link:
+        rover/front_end_link:
           Value: false
-        right_rear_wheel_link:
+        rover/gps_link:
+          Value: false
+        rover/imu_link:
+          Value: false
+        rover/left_end_link:
+          Value: false
+        rover/left_front_wheel_link:
+          Value: false
+        rover/left_front_wheel_steering_link:
+          Value: false
+        rover/left_rear_wheel_link:
+          Value: false
+        rover/lidar_link:
+          Value: false
+        rover/lidar_support_link:
+          Value: false
+        rover/odom:
+          Value: true
+        rover/rear_axle_link:
+          Value: true
+        rover/rear_bumper_link:
+          Value: false
+        rover/rear_end_link:
+          Value: false
+        rover/right_end_link:
+          Value: false
+        rover/right_front_wheel_link:
+          Value: false
+        rover/right_front_wheel_steering_link:
+          Value: false
+        rover/right_rear_wheel_link:
           Value: false
       Marker Scale: 1
       Name: TF
@@ -100,38 +104,41 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        odom:
-          base_link:
-            chassis_link:
-              camera_link:
-                {}
-              front_axle_link:
-                left_front_wheel_steering_link:
-                  left_front_wheel_link:
+        map:
+          rover/odom:
+            rover/base_link:
+              rover/chassis_link:
+                rover/camera_link:
+                  {}
+                rover/front_axle_link:
+                  rover/left_front_wheel_steering_link:
+                    rover/left_front_wheel_link:
+                      {}
+                  rover/right_front_wheel_steering_link:
+                    rover/right_front_wheel_link:
+                      {}
+                rover/front_bumper_link:
+                  rover/front_end_link:
                     {}
-                right_front_wheel_steering_link:
-                  right_front_wheel_link:
+                rover/gps_link:
+                  {}
+                rover/imu_link:
+                  {}
+                rover/left_end_link:
+                  {}
+                rover/lidar_support_link:
+                  rover/lidar_link:
                     {}
-              front_bumper_link:
-                front_end_link:
+                rover/rear_axle_link:
+                  rover/left_rear_wheel_link:
+                    {}
+                  rover/right_rear_wheel_link:
+                    {}
+                rover/rear_bumper_link:
+                  rover/rear_end_link:
+                    {}
+                rover/right_end_link:
                   {}
-              imu_link:
-                {}
-              left_end_link:
-                {}
-              lidar_support_link:
-                lidar_link:
-                  {}
-              rear_axle_link:
-                left_rear_wheel_link:
-                  {}
-                right_rear_wheel_link:
-                  {}
-              rear_bumper_link:
-                rear_end_link:
-                  {}
-              right_end_link:
-                {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -144,7 +151,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: robot_description
+        Value: /rover/robot_description
       Enabled: true
       Links:
         All Links Enabled: true
@@ -152,97 +159,102 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        base_link:
+        rover/base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        camera_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        chassis_link:
+        rover/camera_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        front_axle_link:
+        rover/chassis_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        front_bumper_link:
+        rover/front_axle_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        front_end_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        imu_link:
+        rover/front_bumper_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        left_end_link:
+        rover/front_end_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        left_front_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        left_front_wheel_steering_link:
+        rover/gps_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        left_rear_wheel_link:
+        rover/imu_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        lidar_link:
+        rover/left_end_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        rover/left_front_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        lidar_support_link:
+        rover/left_front_wheel_steering_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rear_axle_link:
+        rover/left_rear_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rear_bumper_link:
+        rover/lidar_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rear_end_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        right_end_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        right_front_wheel_link:
+        rover/lidar_support_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_front_wheel_steering_link:
+        rover/rear_axle_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_rear_wheel_link:
+        rover/rear_bumper_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rover/rear_end_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        rover/right_end_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        rover/right_front_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rover/right_front_wheel_steering_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rover/right_rear_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -326,7 +338,7 @@ Visualization Manager:
     - Alpha: 1
       Class: rviz_default_plugins/Polygon
       Color: 165; 29; 45
-      Enabled: true
+      Enabled: false
       Name: Collison monitoring zone
       Topic:
         Depth: 5
@@ -335,7 +347,7 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /polygon_slowdown
-      Value: true
+      Value: false
     - Class: rviz_default_plugins/Image
       Enabled: false
       Max Value: 1
@@ -399,7 +411,7 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: odom
+    Fixed Frame: map
     Frame Rate: 10
   Name: root
   Tools:
@@ -465,12 +477,12 @@ Visualization Manager:
 Window Geometry:
   Displays:
     collapsed: true
-  Height: 1043
+  Height: 1016
   Hide Left Dock: true
   Hide Right Dock: false
   Object detection:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000019e0000033cfc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000008800fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c00610079007300000000580000033c0000012a00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000220053006c0061006d0054006f006f006c0062006f00780050006c007500670069006e0000000353000001cc0000025400fffffffb00000020004f0062006a00650063007400200064006500740065006300740069006f006e000000024c0000016b0000003a00ffffff00000001000001000000037afc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d0000037a000000f200fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000005000000004efc0100000002fb0000000800540069006d0065010000000000000500000003c600fffffffb0000000800540069006d00650100000000000004500000000000000000000005000000033c00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000019e00000348fc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073000000003e00000348000000ca00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000220053006c0061006d0054006f006f006c0062006f00780050006c007500670069006e0000000353000001cc0000019100fffffffb00000020004f0062006a00650063007400200064006500740065006300740069006f006e000000024c0000016b0000002800ffffff00000001000001000000037afc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d0000037a000000a600fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000005000000004efc0100000002fb0000000800540069006d00650100000000000005000000028e00fffffffb0000000800540069006d00650100000000000004500000000000000000000005000000034800000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   SlamToolboxPlugin:
@@ -482,5 +494,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1280
-  X: 1280
-  Y: 41
+  X: 640
+  Y: 27

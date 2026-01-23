@@ -185,7 +185,7 @@ class CollisionMonitor(Node):
                     msg.header.stamp
                 )  # Forwarding time stamp of detections
                 self.emergency_stop_publisher.publish(self.emergency_stop_target_state_msg)
-                self.get_logger().info(
+                self.get_logger().warn(
                     f'Emergency stop triggered for class {closest_best.hypothesis.class_id}'
                     f' at {distance:.2f} m from {self.reference_frame}'
                 )

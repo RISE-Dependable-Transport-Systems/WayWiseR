@@ -1,10 +1,7 @@
 #ifndef WAYWISER_TRUCK_NODE_CORE_HPP_
 #define WAYWISER_TRUCK_NODE_CORE_HPP_
 
-#include <map>
-
 #include "WayWise/vehicles/truckstate.h"
-#include "WayWise/vehicles/trailerstate.h"
 
 #include "truck_autopilot_component.hpp"
 #include "truck_interface_component.hpp"
@@ -18,9 +15,9 @@ class WaywiserTruck : public WaywiserCar
 
 public:
   WaywiserTruck(
-    const rclcpp::NodeOptions & options = rclcpp::NodeOptions(),
-    const std::string & node_name = "waywiser_truck_node")
-  : WaywiserCar(options, node_name) {}
+    const std::string & node_name = "waywiser_truck_node",
+    const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
+  : WaywiserCar(node_name, options) {}
 
   virtual ~WaywiserTruck() = default;
 

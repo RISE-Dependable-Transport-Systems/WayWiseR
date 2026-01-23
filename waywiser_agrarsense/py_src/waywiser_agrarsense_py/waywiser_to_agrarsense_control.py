@@ -27,7 +27,7 @@ class WaywiserToAgrarsenseControl(Node):
         # Create subscribers
         self.waywiser_car_control_sub = self.create_subscription(
             CarControlCommand,
-            '/waywiser_control_cmd',
+            'waywiser_control_cmd',
             self.waywiser_control_cmd_callback,
             10,
         )

@@ -4,6 +4,8 @@
     <!-- ros2_control not implemented yet -->
     <xacro:arg name="use_ros2_control" default="false" />
     <xacro:arg name="sim_mode" default="false" />
+    <xacro:arg name="frame_prefix" default="/" />
+    <xacro:property name="frame_prefix" value="$(arg frame_prefix)" />
 
     <!-- Robot model without sensors -->
     <xacro:include filename="rover_core.xacro" />
@@ -14,6 +16,8 @@
     <!-- <xacro:include filename="camera.xacro" /> -->
     <!-- <xacro:include filename="depth_camera.xacro" /> -->
     <xacro:include filename="realsense_d435i_camera.xacro" />
+    <xacro:property name="gps_parent_link" value="chassis_link" />
+    <xacro:include filename="gps.xacro" />
 
     <!-- Controller -->
 

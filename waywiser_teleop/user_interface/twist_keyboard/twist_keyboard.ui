@@ -128,9 +128,9 @@
                             <property name="geometry">
                                 <rect>
                                     <x>0</x>
-                                    <y>-72</y>
+                                    <y>-91</y>
                                     <width>846</width>
-                                    <height>866</height>
+                                    <height>882</height>
                                 </rect>
                             </property>
                             <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -701,13 +701,13 @@
                                             <property name="spacing">
                                                 <number>10</number>
                                             </property>
-                                            <item row="0" column="0" colspan="2">
-                                                <widget class="QGroupBox" name="general_group">
+                                            <item row="3" column="0">
+                                                <widget class="QGroupBox" name="odom_group">
                                                     <property name="title">
-                                                        <string>General</string>
+                                                        <string>Odometry</string>
                                                     </property>
-                                                    <layout class="QGridLayout" name="gridLayout_5"
-                                                        columnstretch="0,1,0">
+                                                    <layout class="QGridLayout" name="gridLayout_8"
+                                                        columnstretch="0,1">
                                                         <property name="leftMargin">
                                                             <number>10</number>
                                                         </property>
@@ -723,15 +723,136 @@
                                                         <property name="spacing">
                                                             <number>10</number>
                                                         </property>
-                                                        <item row="0" column="0">
+                                                        <item row="0" column="1">
                                                             <widget class="QLabel"
-                                                                name="node_static_label">
+                                                                name="odom_pos_label">
+                                                                <property name="styleSheet">
+                                                                    <string notr="true">color:
+                                                                        #6b7280; font-weight: 700;</string>
+                                                                </property>
+                                                                <property name="text">
+                                                                    <string>N/A</string>
+                                                                </property>
+                                                            </widget>
+                                                        </item>
+                                                        <item row="2" column="1">
+                                                            <widget class="QLabel"
+                                                                name="odom_vel_label">
+                                                                <property name="styleSheet">
+                                                                    <string notr="true">color:
+                                                                        #6b7280; font-weight: 700;</string>
+                                                                </property>
+                                                                <property name="text">
+                                                                    <string>N/A</string>
+                                                                </property>
+                                                            </widget>
+                                                        </item>
+                                                        <item row="3" column="1">
+                                                            <widget class="QLabel"
+                                                                name="odom_time_label">
+                                                                <property name="styleSheet">
+                                                                    <string notr="true">color:
+                                                                        #6b7280; font-weight: 700;</string>
+                                                                </property>
+                                                                <property name="text">
+                                                                    <string>N/A</string>
+                                                                </property>
+                                                            </widget>
+                                                        </item>
+                                                        <item row="1" column="0">
+                                                            <widget class="QLabel"
+                                                                name="odom_yaw_static_label">
                                                                 <property name="styleSheet">
                                                                     <string notr="true">color:
                                                                         #9ca3af; font-weight: 600;</string>
                                                                 </property>
                                                                 <property name="text">
-                                                                    <string>Node:</string>
+                                                                    <string>Yaw:</string>
+                                                                </property>
+                                                            </widget>
+                                                        </item>
+                                                        <item row="1" column="1">
+                                                            <widget class="QLabel"
+                                                                name="odom_yaw_label">
+                                                                <property name="styleSheet">
+                                                                    <string notr="true">color:
+                                                                        #6b7280; font-weight: 700;</string>
+                                                                </property>
+                                                                <property name="text">
+                                                                    <string>N/A</string>
+                                                                </property>
+                                                            </widget>
+                                                        </item>
+                                                        <item row="3" column="0">
+                                                            <widget class="QLabel"
+                                                                name="odom_time_static_label">
+                                                                <property name="styleSheet">
+                                                                    <string notr="true">color:
+                                                                        #9ca3af; font-weight: 600;</string>
+                                                                </property>
+                                                                <property name="text">
+                                                                    <string>Last updated:</string>
+                                                                </property>
+                                                            </widget>
+                                                        </item>
+                                                        <item row="2" column="0">
+                                                            <widget class="QLabel"
+                                                                name="odom_vel_static_label">
+                                                                <property name="styleSheet">
+                                                                    <string notr="true">color:
+                                                                        #9ca3af; font-weight: 600;</string>
+                                                                </property>
+                                                                <property name="text">
+                                                                    <string>Velocity (Vx, Vy):</string>
+                                                                </property>
+                                                            </widget>
+                                                        </item>
+                                                        <item row="0" column="0">
+                                                            <widget class="QLabel"
+                                                                name="odom_pos_static_label">
+                                                                <property name="styleSheet">
+                                                                    <string notr="true">color:
+                                                                        #9ca3af; font-weight: 600;</string>
+                                                                </property>
+                                                                <property name="text">
+                                                                    <string>Position (x, y):</string>
+                                                                </property>
+                                                            </widget>
+                                                        </item>
+                                                    </layout>
+                                                </widget>
+                                            </item>
+                                            <item row="0" column="0" colspan="2">
+                                                <widget class="QGroupBox" name="general_group">
+                                                    <property name="title">
+                                                        <string>General</string>
+                                                    </property>
+                                                    <layout class="QGridLayout" name="gridLayout_5"
+                                                        columnstretch="0,0,0">
+                                                        <property name="leftMargin">
+                                                            <number>10</number>
+                                                        </property>
+                                                        <property name="topMargin">
+                                                            <number>10</number>
+                                                        </property>
+                                                        <property name="rightMargin">
+                                                            <number>10</number>
+                                                        </property>
+                                                        <property name="bottomMargin">
+                                                            <number>10</number>
+                                                        </property>
+                                                        <property name="spacing">
+                                                            <number>10</number>
+                                                        </property>
+                                                        <item row="3" column="0">
+                                                            <widget class="QLabel"
+                                                                name="battery_static_label">
+                                                                <property name="styleSheet">
+                                                                    <string notr="true">color:
+                                                                        #9ca3af; font-weight: 600;</string>
+                                                                </property>
+                                                                <property name="text">
+                                                                    <string>Battery:</string>
                                                                 </property>
                                                             </widget>
                                                         </item>
@@ -747,31 +868,19 @@
                                                                 </property>
                                                             </widget>
                                                         </item>
-                                                        <item row="1" column="0">
+                                                        <item row="0" column="0">
                                                             <widget class="QLabel"
-                                                                name="estop_static_label">
+                                                                name="node_static_label">
                                                                 <property name="styleSheet">
                                                                     <string notr="true">color:
                                                                         #9ca3af; font-weight: 600;</string>
                                                                 </property>
                                                                 <property name="text">
-                                                                    <string>E-Stop:</string>
+                                                                    <string>Node:</string>
                                                                 </property>
                                                             </widget>
                                                         </item>
-                                                        <item row="1" column="1">
-                                                            <widget class="QLabel"
-                                                                name="estop_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #6b7280; font-weight: 700;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>UNKNOWN</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
-                                                        <item row="1" column="2">
+                                                        <item row="2" column="2">
                                                             <widget class="QLabel"
                                                                 name="estop_time_label">
                                                                 <property name="styleSheet">
@@ -783,19 +892,7 @@
                                                                 </property>
                                                             </widget>
                                                         </item>
-                                                        <item row="2" column="0">
-                                                            <widget class="QLabel"
-                                                                name="battery_static_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #9ca3af; font-weight: 600;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>Battery:</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
-                                                        <item row="2" column="1">
+                                                        <item row="3" column="1">
                                                             <widget class="QLabel"
                                                                 name="battery_label">
                                                                 <property name="styleSheet">
@@ -807,7 +904,31 @@
                                                                 </property>
                                                             </widget>
                                                         </item>
-                                                        <item row="2" column="2">
+                                                        <item row="2" column="1">
+                                                            <widget class="QLabel"
+                                                                name="estop_label">
+                                                                <property name="styleSheet">
+                                                                    <string notr="true">color:
+                                                                        #6b7280; font-weight: 700;</string>
+                                                                </property>
+                                                                <property name="text">
+                                                                    <string>UNKNOWN</string>
+                                                                </property>
+                                                            </widget>
+                                                        </item>
+                                                        <item row="2" column="0">
+                                                            <widget class="QLabel"
+                                                                name="estop_static_label">
+                                                                <property name="styleSheet">
+                                                                    <string notr="true">color:
+                                                                        #9ca3af; font-weight: 600;</string>
+                                                                </property>
+                                                                <property name="text">
+                                                                    <string>E-Stop:</string>
+                                                                </property>
+                                                            </widget>
+                                                        </item>
+                                                        <item row="3" column="2">
                                                             <widget class="QLabel"
                                                                 name="battery_time_label">
                                                                 <property name="styleSheet">
@@ -819,38 +940,27 @@
                                                                 </property>
                                                             </widget>
                                                         </item>
-                                                        <item row="3" column="0">
+                                                        <item row="1" column="0">
                                                             <widget class="QLabel"
-                                                                name="rtcm_static_label">
+                                                                name="enuref_static_label">
                                                                 <property name="styleSheet">
                                                                     <string notr="true">color:
                                                                         #9ca3af; font-weight: 600;</string>
                                                                 </property>
                                                                 <property name="text">
-                                                                    <string>RTCM rate:</string>
+                                                                    <string><![CDATA[ENU reference (lat, lon, alt):]]></string>
                                                                 </property>
                                                             </widget>
                                                         </item>
-                                                        <item row="3" column="1">
-                                                            <widget class="QLabel" name="rtcm_label">
+                                                        <item row="1" column="1" colspan="2">
+                                                            <widget class="QLabel"
+                                                                name="enuref_label">
                                                                 <property name="styleSheet">
                                                                     <string notr="true">color:
                                                                         #6b7280; font-weight: 700;</string>
                                                                 </property>
                                                                 <property name="text">
                                                                     <string>N/A</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
-                                                        <item row="3" column="2">
-                                                            <widget class="QLabel"
-                                                                name="rtcm_time_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #6b7280; font-size: 9pt;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>Last updated: N/A</string>
                                                                 </property>
                                                             </widget>
                                                         </item>
@@ -954,10 +1064,10 @@
                                                     </layout>
                                                 </widget>
                                             </item>
-                                            <item row="1" column="1">
+                                            <item row="1" column="1" rowspan="3">
                                                 <widget class="QGroupBox" name="gnssfix_group">
                                                     <property name="title">
-                                                        <string>GNSS Fix</string>
+                                                        <string>GNSS Fused</string>
                                                     </property>
                                                     <layout class="QGridLayout" name="gridLayout_7"
                                                         columnstretch="0,1">
@@ -976,6 +1086,54 @@
                                                         <property name="spacing">
                                                             <number>10</number>
                                                         </property>
+                                                        <item row="0" column="1">
+                                                            <widget class="QLabel"
+                                                                name="gnss_fix_label">
+                                                                <property name="styleSheet">
+                                                                    <string notr="true">color:
+                                                                        #6b7280; font-weight: 700;</string>
+                                                                </property>
+                                                                <property name="text">
+                                                                    <string>N/A</string>
+                                                                </property>
+                                                            </widget>
+                                                        </item>
+                                                        <item row="7" column="0">
+                                                            <widget class="QLabel"
+                                                                name="gnss_time_static_label">
+                                                                <property name="styleSheet">
+                                                                    <string notr="true">color:
+                                                                        #9ca3af; font-weight: 600;</string>
+                                                                </property>
+                                                                <property name="text">
+                                                                    <string>Last updated:</string>
+                                                                </property>
+                                                            </widget>
+                                                        </item>
+                                                        <item row="7" column="1">
+                                                            <widget class="QLabel"
+                                                                name="gnss_time_label">
+                                                                <property name="styleSheet">
+                                                                    <string notr="true">color:
+                                                                        #6b7280; font-weight: 700;</string>
+                                                                </property>
+                                                                <property name="text">
+                                                                    <string>N/A</string>
+                                                                </property>
+                                                            </widget>
+                                                        </item>
+                                                        <item row="2" column="1">
+                                                            <widget class="QLabel"
+                                                                name="gnss_head_label">
+                                                                <property name="styleSheet">
+                                                                    <string notr="true">color:
+                                                                        #6b7280; font-weight: 700;</string>
+                                                                </property>
+                                                                <property name="text">
+                                                                    <string>N/A</string>
+                                                                </property>
+                                                            </widget>
+                                                        </item>
                                                         <item row="0" column="0">
                                                             <widget class="QLabel"
                                                                 name="gnss_fix_static_label">
@@ -988,15 +1146,15 @@
                                                                 </property>
                                                             </widget>
                                                         </item>
-                                                        <item row="0" column="1">
+                                                        <item row="2" column="0">
                                                             <widget class="QLabel"
-                                                                name="gnss_fix_label">
+                                                                name="gnss_head_static_label">
                                                                 <property name="styleSheet">
                                                                     <string notr="true">color:
-                                                                        #6b7280; font-weight: 700;</string>
+                                                                        #9ca3af; font-weight: 600;</string>
                                                                 </property>
                                                                 <property name="text">
-                                                                    <string>N/A</string>
+                                                                    <string>Heading (NED)</string>
                                                                 </property>
                                                             </widget>
                                                         </item>
@@ -1024,177 +1182,7 @@
                                                                 </property>
                                                             </widget>
                                                         </item>
-                                                        <item row="2" column="0">
-                                                            <widget class="QLabel"
-                                                                name="gnss_time_static_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #9ca3af; font-weight: 600;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>Last updated:</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
-                                                        <item row="2" column="1">
-                                                            <widget class="QLabel"
-                                                                name="gnss_time_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #6b7280; font-weight: 700;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>N/A</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
-                                                    </layout>
-                                                </widget>
-                                            </item>
-                                            <item row="2" column="0">
-                                                <widget class="QGroupBox" name="odom_group">
-                                                    <property name="title">
-                                                        <string>Odometry</string>
-                                                    </property>
-                                                    <layout class="QGridLayout" name="gridLayout_8"
-                                                        columnstretch="0,1">
-                                                        <property name="leftMargin">
-                                                            <number>10</number>
-                                                        </property>
-                                                        <property name="topMargin">
-                                                            <number>10</number>
-                                                        </property>
-                                                        <property name="rightMargin">
-                                                            <number>10</number>
-                                                        </property>
-                                                        <property name="bottomMargin">
-                                                            <number>10</number>
-                                                        </property>
-                                                        <property name="spacing">
-                                                            <number>10</number>
-                                                        </property>
-                                                        <item row="0" column="0">
-                                                            <widget class="QLabel"
-                                                                name="odom_pos_static_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #9ca3af; font-weight: 600;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>Position (x, y):</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
-                                                        <item row="0" column="1">
-                                                            <widget class="QLabel"
-                                                                name="odom_pos_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #6b7280; font-weight: 700;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>N/A</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
-                                                        <item row="1" column="0">
-                                                            <widget class="QLabel"
-                                                                name="odom_yaw_static_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #9ca3af; font-weight: 600;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>Yaw:</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
-                                                        <item row="1" column="1">
-                                                            <widget class="QLabel"
-                                                                name="odom_yaw_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #6b7280; font-weight: 700;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>N/A</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
-                                                        <item row="2" column="0">
-                                                            <widget class="QLabel"
-                                                                name="odom_vel_static_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #9ca3af; font-weight: 600;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>Velocity (Vx, Vy):</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
-                                                        <item row="2" column="1">
-                                                            <widget class="QLabel"
-                                                                name="odom_vel_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #6b7280; font-weight: 700;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>N/A</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
                                                         <item row="3" column="0">
-                                                            <widget class="QLabel"
-                                                                name="odom_time_static_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #9ca3af; font-weight: 600;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>Last updated:</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
-                                                        <item row="3" column="1">
-                                                            <widget class="QLabel"
-                                                                name="odom_time_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #6b7280; font-weight: 700;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>N/A</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
-                                                    </layout>
-                                                </widget>
-                                            </item>
-                                            <item row="2" column="1">
-                                                <widget class="QGroupBox" name="gnssdiag_group">
-                                                    <property name="title">
-                                                        <string>GNSS Diagnostics</string>
-                                                    </property>
-                                                    <layout class="QGridLayout" name="gridLayout_9"
-                                                        columnstretch="0,1">
-                                                        <property name="leftMargin">
-                                                            <number>10</number>
-                                                        </property>
-                                                        <property name="topMargin">
-                                                            <number>10</number>
-                                                        </property>
-                                                        <property name="rightMargin">
-                                                            <number>10</number>
-                                                        </property>
-                                                        <property name="bottomMargin">
-                                                            <number>10</number>
-                                                        </property>
-                                                        <property name="spacing">
-                                                            <number>10</number>
-                                                        </property>
-                                                        <item row="0" column="0">
                                                             <widget class="QLabel"
                                                                 name="gnss_accuracy_static_label">
                                                                 <property name="styleSheet">
@@ -1206,19 +1194,7 @@
                                                                 </property>
                                                             </widget>
                                                         </item>
-                                                        <item row="0" column="1">
-                                                            <widget class="QLabel"
-                                                                name="gnss_accuracy_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #6b7280; font-weight: 700;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>N/A</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
-                                                        <item row="1" column="0">
+                                                        <item row="5" column="0">
                                                             <widget class="QLabel"
                                                                 name="gnss_last_rtcm_static_label">
                                                                 <property name="styleSheet">
@@ -1230,31 +1206,7 @@
                                                                 </property>
                                                             </widget>
                                                         </item>
-                                                        <item row="1" column="1">
-                                                            <widget class="QLabel"
-                                                                name="gnss_last_rtcm_correction_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #6b7280; font-weight: 700;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>N/A</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
-                                                        <item row="2" column="0">
-                                                            <widget class="QLabel"
-                                                                name="gnss_num_satellites_static_label">
-                                                                <property name="styleSheet">
-                                                                    <string notr="true">color:
-                                                                        #9ca3af; font-weight: 600;</string>
-                                                                </property>
-                                                                <property name="text">
-                                                                    <string>Number of satellites:</string>
-                                                                </property>
-                                                            </widget>
-                                                        </item>
-                                                        <item row="2" column="1">
+                                                        <item row="6" column="1">
                                                             <widget class="QLabel"
                                                                 name="gnss_num_satellites_label">
                                                                 <property name="styleSheet">
@@ -1266,21 +1218,33 @@
                                                                 </property>
                                                             </widget>
                                                         </item>
-                                                        <item row="3" column="0">
+                                                        <item row="5" column="1">
                                                             <widget class="QLabel"
-                                                                name="gnssdiag_time_static_label">
+                                                                name="gnss_last_rtcm_correction_label">
+                                                                <property name="styleSheet">
+                                                                    <string notr="true">color:
+                                                                        #6b7280; font-weight: 700;</string>
+                                                                </property>
+                                                                <property name="text">
+                                                                    <string>N/A</string>
+                                                                </property>
+                                                            </widget>
+                                                        </item>
+                                                        <item row="6" column="0">
+                                                            <widget class="QLabel"
+                                                                name="gnss_num_satellites_static_label">
                                                                 <property name="styleSheet">
                                                                     <string notr="true">color:
                                                                         #9ca3af; font-weight: 600;</string>
                                                                 </property>
                                                                 <property name="text">
-                                                                    <string>Last updated:</string>
+                                                                    <string>Number of satellites:</string>
                                                                 </property>
                                                             </widget>
                                                         </item>
                                                         <item row="3" column="1">
                                                             <widget class="QLabel"
-                                                                name="gnssdiag_time_label">
+                                                                name="gnss_accuracy_label">
                                                                 <property name="styleSheet">
                                                                     <string notr="true">color:
                                                                         #6b7280; font-weight: 700;</string>

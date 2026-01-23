@@ -17,18 +17,8 @@ find_package(sensor_msgs REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(waywiser_twist_safety REQUIRED)
+find_package(waywiser_core REQUIRED)
 find_package(waywiser REQUIRED)
-
-add_executable(joy_emergency_stop cpp_src/joy_emergency_stop.cpp)
-ament_target_dependencies(joy_emergency_stop
-  rclcpp
-  sensor_msgs
-  std_msgs
-  waywiser_twist_safety
-  waywiser
-)
-target_include_directories(joy_emergency_stop
-  PRIVATE ${waywiser_twist_safety_INCLUDE_DIRS})
 
 add_executable(twist_angular_correction cpp_src/twist_angular_correction.cpp)
 ament_target_dependencies(twist_angular_correction
@@ -39,7 +29,7 @@ ament_target_dependencies(twist_angular_correction
 )
 
 install(
-  TARGETS joy_emergency_stop twist_angular_correction
+  TARGETS twist_angular_correction
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 

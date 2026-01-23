@@ -2,11 +2,9 @@
 #include "moc_truck_autopilot_component.cpp"
 
 
-void TruckAutopilotComponent::setupAutopilot(
-  QSharedPointer<GNSSReceiver> gNSSReceiver,
-  QSharedPointer<EmergencyStopState> emergencyStopState)
+void TruckAutopilotComponent::setupAutopilot(QSharedPointer<EmergencyStopState> emergencyStopState)
 {
-  CarAutopilotComponent::setupAutopilot(gNSSReceiver, emergencyStopState);
+  CarAutopilotComponent::setupAutopilot(emergencyStopState);
 
   mTruckState->setPurePursuitForwardGain(mPurePursuitForwardGain);
   mTruckState->setPurePursuitReverseGain(mPurePursuitReverseGain);

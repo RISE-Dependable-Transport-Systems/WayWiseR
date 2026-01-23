@@ -1,86 +1,74 @@
-### Email Configuration
+# WayWiseR Meta Package
 
-To enable email functionality in WayWiseR nodes (for example, notifications from `waywiser_test_runner`), you need to provide email credentials in a `.env` file and set the environment variable `WAYWISER_DOTENV_PATH` to point to it.
+The `waywiser` package is a core component that provides global environment configurations and discovery tools for the entire WayWiseR project. It contains:
 
-    export WAYWISER_DOTENV_PATH=$WAYWISER_WS/.env
-    echo "export WAYWISER_DOTENV_PATH=$WAYWISER_DOTENV_PATH" >> .venv/bin/activate
+- **Environment Hooks**: Automatically loads project-wide `.env` settings during workspace sourcing.
+- **Launch Files**: Top-level launch files for various use cases (Simulator, Hardware Bringup, Teleop).
+- **Discovery Tools**: Scripts and FastDDS profiles for stable communication.
+- **Shared Utilities**: Common Python and C++ helper functions.
 
-The `.env` file should contain the following variables:
+## FastDDS Discovery Server and Client Setup
 
-    EMAIL_USER=''
-    EMAIL_PASSWORD=''
-    EMAIL_RECIPIENT=''
-    SMTP_SERVER=smtp.gmail.com
-    SMTP_PORT=465
+The `waywiser` package provides a robust setup for FastDDS Discovery Server and Client modes. This is recommended for stable communication in multi-machine environments or networks where standard multicast discovery is unreliable.
 
-Note: If you are using Gmail, use an App Password for the `EMAIL_PASSWORD` variable.
-
-## (Optional) FastDDS discovery server and client setup
+> [!IMPORTANT]
+> Before proceeding, ensure you have followed the steps in the **[How to install and build](../README.md#how-to-install-and-build-on-ubuntu-2204)** section of the main README.
 
 ### On server
 
-- Open a new terminal and run (optionally, add these lines to ~/.bashrc):
+- Ensure `ROS_USE_DISCOVERY_SERVER=1` is set in your `.env`.
+- If running a remote server, ensure `ROS_REMOTE_DISCOVERY_SERVER_IP` is set to your server's IP.
 
-  ```
-  export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-  export ROS_DOMAIN_ID=0
-  ```
+1. **Open a new terminal** and activate the workspace:
 
-- In the same terminal, run:
+   ```bash
+   cd $WAYWISER_WS
+   source .venv/bin/activate
+   ```
 
-  ```
-  cd ~/waywiser_ws
-  ./install/waywiser/discovery/server_setup.sh
-  # To enable remote server, run:
-  # ./install/waywiser/discovery/server_setup.sh -r -s <server_ip>
-  # To display help for this script, run:
-  # ./install/waywiser/discovery/server_setup.sh -h
-  ```
+2. **Start the server**:
+
+   ```bash
+   # This automatically starts Server 0 (local) and Server 1 (remote) if configured
+   ./install/waywiser/discovery/server_setup.bash
+   ```
 
 ### On client
 
-- Open a new terminal and run (optionally, add these lines to ~/.bashrc):
+- Ensure your `.env` matches the server's `ROS_DOMAIN_ID`.
+- For remote clients, set `ROS_REMOTE_DISCOVERY_SERVER_IP` to the server's IP and `ROS_REMOTE_DISCOVERY_CLIENT_IP` to your client's IP.
 
-  ```
-  export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-  export ROS_DOMAIN_ID=0
-  ```
+1. **Open a terminal** and activate/configure:
 
-- In the same terminal, run:
+   ```bash
+   cd $WAYWISER_WS
+   source .venv/bin/activate
+   # The client is configured automatically during sourcing if enabled in .env
 
-  ```
-  cd ~/waywiser_ws
-  source install/waywiser/discovery/client_setup.sh
-  # If running on remote machine, run:
-  # source install/waywiser/discovery/client_setup.sh -r -s <server_ip> -c <client_ip>
-  # To display help for this script, run:
-  # ./install/waywiser/discovery/client_setup.sh -h
-  ros2 daemon stop && ros2 daemon start
-  ros2 run demo_nodes_cpp talker
-  ```
+   # Optional: If you changed .env recently, restart the daemon
+   ros2 daemon stop
+   ```
 
-- Open a new terminal and run:
+2. **Verify connectivity**:
 
-  ```
-  export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-  export ROS_DOMAIN_ID=0
-  cd ~/waywiser_ws
-  source install/waywiser/discovery/client_setup.sh
-  # If running on remote machine, run:
-  # source install/waywiser/discovery/client_setup.sh -r -s <server_ip> -c <client_ip>
-  ros2 run demo_nodes_cpp listener
-  ```
+   ```bash
+   ros2 run demo_nodes_cpp talker
+   ```
 
-- Open a new terminal and run:
+3. **In another terminal** (also sourced):
 
-  ```
-  export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-  export ROS_DOMAIN_ID=0
-  cd ~/waywiser_ws
-  source install/waywiser/discovery/client_setup.sh -su
-  # If running on remote machine, run:
-  # source install/waywiser/discovery/client_setup.sh -su -r -s <server_ip> -c <client_ip>
-  ros2 node list
-  ```
+   ```bash
+   ros2 run demo_nodes_cpp listener
+   ```
 
-Few system-level network parameter tunings can address some issues faced while using various DDS implementations on Linux in real-world situations. See [here](https://docs.ros.org/en/humble/How-To-Guides/DDS-tuning.html#cross-vendor-tuning) for additional guidance.
+### Manual Configuration
+
+If you need to override `.env` settings for a specific terminal, you can still source the script manually with flags:
+
+```bash
+# Example: Manually setting a remote client
+source install/waywiser/discovery/client_setup.bash -r -s <server_ip> -c <client_ip>
+```
+
+> [!NOTE]
+> System-level network parameter tunings can address issues faced with large messages or real-world networks. See [the ROS 2 documentation](https://docs.ros.org/en/humble/How-To-Guides/DDS-tuning.html#cross-vendor-tuning) for guidance.

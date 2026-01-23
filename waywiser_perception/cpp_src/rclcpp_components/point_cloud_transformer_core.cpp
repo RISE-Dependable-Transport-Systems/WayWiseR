@@ -1,8 +1,3 @@
-#include <chrono>
-#include <functional>
-#include <memory>
-#include <string>
-
 #include "point_cloud_transformer.hpp"
 
 namespace waywiser_perception

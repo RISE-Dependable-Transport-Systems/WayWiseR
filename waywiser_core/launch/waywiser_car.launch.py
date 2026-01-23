@@ -1,11 +1,12 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import OpaqueFunction
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from waywiser_description_py.waywiser_description_utils import get_robot_state_publisher_node
-from waywiser_py.waywiser_utils import get_full_file_path
-import yaml
+
+from waywiser_description_py.waywiser_description_utils import (
+    get_robot_state_publisher_node,
+)
+from waywiser_py.waywiser_utils import FileUtils, RosUtils
 
 
 def generate_launch_description():
@@ -23,6 +24,9 @@ def generate_launch_description():
     use_sim_time_la = DeclareLaunchArgument(
         'use_sim_time', default_value='False', description='Use simulation/Gazebo clock'
     )
+    publish_map_to_odom_tf_la = DeclareLaunchArgument(
+        'publish_world_to_odom_tf', default_value='True', description='Publish map to odom tf'
+    )
 
     # start nodes and use args to set parameters
     waywiser_car_node_launch_action = OpaqueFunction(function=waywiser_car_node_launch)
@@ -34,6 +38,7 @@ def generate_launch_description():
     ld.add_action(vehicle_config_la)
     ld.add_action(frame_prefix_la)
     ld.add_action(use_sim_time_la)
+    ld.add_action(publish_map_to_odom_tf_la)
 
     # start nodes
     ld.add_action(waywiser_car_node_launch_action)
@@ -43,56 +48,76 @@ def generate_launch_description():
 
 def waywiser_car_node_launch(context):
     nodes = []
-    vehicle_config = get_full_file_path(LaunchConfiguration('vehicle_config').perform(context))
+    vehicle_config = FileUtils.get_full_file_path(
+        LaunchConfiguration('vehicle_config').perform(context)
+    )
     if vehicle_config == '':
         print('vehicle_config is empty! Skipping launching waywiser_car_node.')
         return nodes
+    frame_prefix = LaunchConfiguration('frame_prefix').perform(context)
+    publish_world_to_odom_tf = LaunchConfiguration('publish_world_to_odom_tf').perform(context)
 
     use_sim_time_raw = LaunchConfiguration('use_sim_time').perform(context)
     use_sim_time = use_sim_time_raw.lower() in ['true', '1', 'yes']
-    with open(vehicle_config, 'r', encoding='utf-8') as f:
-        config_data = yaml.safe_load(f)
-        node_params_dict = config_data['/**']['ros__parameters']
-        node_params_dict.update(config_data['waywiser_car_node']['ros__parameters'])
 
-        if 'urdf_file' in node_params_dict:
-            robot_state_publisher_node = get_robot_state_publisher_node(
-                node_params_dict, use_sim_time
-            )
-            if robot_state_publisher_node is not None:
-                nodes.append(robot_state_publisher_node)
-            else:
-                node_params_dict.pop('urdf_file')
+    node_params_dict = RosUtils.get_node_params(vehicle_config, 'waywiser_car_node')
+    publish_world_to_odom_tf = publish_world_to_odom_tf.lower() in [
+        'true',
+        '1',
+        'yes',
+    ]
 
-        nodes.append(
-            Node(
-                package='waywiser_core',
-                executable='waywiser_car_node',
-                name='waywiser_car_node',
-                parameters=[
-                    node_params_dict,
-                    {'use_sim_time': use_sim_time},
-                ],
-                remappings=[('/cmd_vel', '/cmd_vel_out')],
-                arguments=['--ros-args', '--log-level', 'info'],
-                output='screen',
-                emulate_tty=True,
-                # prefix='gdb -ex run --args',
-            )
+    if 'publish_world_to_odom_tf' in node_params_dict:
+        node_params_dict['publish_world_to_odom_tf'] = (
+            publish_world_to_odom_tf and node_params_dict['publish_world_to_odom_tf']
         )
+    else:
+        node_params_dict['publish_world_to_odom_tf'] = publish_world_to_odom_tf
 
-        nodes.append(
-            Node(
-                package='joint_state_publisher',
-                executable='joint_state_publisher',
-                name='ego_veh_joint_state_publisher',
-                parameters=[
-                    {
-                        'use_sim_time': use_sim_time,
-                        'source_list': ['/waywiser_joint_states'],
-                    }
-                ],
-            )
+    if 'urdf_file' in node_params_dict:
+        robot_state_publisher_node = get_robot_state_publisher_node(
+            context, node_params_dict, use_sim_time, frame_prefix
         )
+        if robot_state_publisher_node is not None:
+            nodes.append(robot_state_publisher_node)
+        else:
+            node_params_dict.pop('urdf_file')
+
+    joint_states_topic = node_params_dict.get('joint_states_topic', '/joint_states')
+
+    nodes.append(
+        Node(
+            package='waywiser_core',
+            executable='waywiser_car_node',
+            name='waywiser_car_node',
+            parameters=[
+                node_params_dict,
+                {
+                    'use_sim_time': use_sim_time,
+                    'frame_prefix': frame_prefix,
+                },
+            ],
+            remappings=[('/cmd_vel_in', 'twist_safety_vel'), ('/cmd_vel_out', 'cmd_vel_out')],
+            arguments=['--ros-args', '--log-level', 'info'],
+            output='screen',
+            emulate_tty=True,
+            # prefix='xterm -e gdb -q -ex run --args',
+        )
+    )
+
+    nodes.append(
+        Node(
+            package='joint_state_publisher',
+            executable='joint_state_publisher',
+            name='ego_veh_joint_state_publisher',
+            parameters=[
+                {
+                    'use_sim_time': use_sim_time,
+                    'source_list': [joint_states_topic],
+                    'frame_prefix': frame_prefix,
+                }
+            ],
+        )
+    )
 
     return nodes
