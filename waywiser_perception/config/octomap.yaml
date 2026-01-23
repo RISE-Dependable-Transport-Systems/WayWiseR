@@ -1,0 +1,13 @@
+octomap_node:
+  ros__parameters:
+    # Frame and topic configuration
+    map_frame: "odom"
+    cloud_topic: "sensors/camera/color/points"
+    tf_timeout_sec: 0.5
+
+    # OctoMap parameters
+    resolution: 0.10 # resolution in meters per voxel # TODO: theoretic resolution can be calculated from pixel resolution and focal length
+    max_range: 5.0 # maximum ray casting range in meters
+    enable_degrade: true # enable degrading of outdated nodes for dynamic environments
+    degrade_timeout: 2.0 # timeout in seconds for degradation
+    degrade_every_n_scans: 5 # perform degradation every N scans

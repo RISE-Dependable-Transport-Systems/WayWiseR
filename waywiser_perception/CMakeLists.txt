@@ -21,11 +21,31 @@ find_package(geometry_msgs REQUIRED)
 
 find_package(rclcpp REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
 find_package(rclcpp_components REQUIRED)
 
+find_package(octomap REQUIRED)
+find_package(octomap_msgs REQUIRED)
+
 include_directories(include)
 ament_export_include_directories(include)
+
+add_executable(octomap_node cpp_src/octomap.cpp)
+ament_target_dependencies(octomap_node
+  rclcpp
+  sensor_msgs
+  geometry_msgs
+  tf2_ros
+  tf2_sensor_msgs
+  octomap_msgs
+)
+target_link_libraries(octomap_node octomap)
+
+install(
+  TARGETS octomap_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
 
 add_library(point_cloud_transformer_core SHARED
   cpp_src/rclcpp_components/point_cloud_transformer_core.cpp
