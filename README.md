@@ -69,7 +69,8 @@ WayWiseR is divided into modular ROS2 packages:
 
    ```bash
    cd $WAYWISER_WS
-   uv venv --clear && source .venv/bin/activate
+   uv venv --clear
+   source .venv/bin/activate
    export PYTHONPATH=$WAYWISER_WS/.venv/lib/python3.10/site-packages:$PYTHONPATH
    uv pip install -e src/WayWiseR
    ```
