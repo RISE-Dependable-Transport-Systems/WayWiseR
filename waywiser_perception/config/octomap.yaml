@@ -1,31 +1,13 @@
-octomap_node:  
-  ros__parameters:  
-    # Frame and topic configuration  
-    map_frame: "odom"  
-    cloud_topic: "sensors/camera/color/points"  
-    tf_timeout_sec: 0.5  
-      
-    # OctoMap parameters  
-    resolution: 0.10          # resolution in meters per voxel (default: 0.05m)
-    max_range: 5.0            # maximum ray casting range in meters  
-    enable_degrade: true      # enable degrading of outdated nodes for dynamic environments
-    degrade_timeout: 2.0      # timeout in seconds for degradation  
-    degrade_every_n_scans: 5  # perform degradation every N scans
+octomap_node:
+  ros__parameters:
+    # Frame and topic configuration
+    map_frame: "odom"
+    cloud_topic: "sensors/camera/color/points"
+    tf_timeout_sec: 0.5
 
-octomap_occlusions_node:  
-  ros__parameters:  
-    # Frame and topic configuration  
-    octomap_topic: "octomap_full"
-    frame_id: 'camera_link'
-    tf_timeout_sec: 0.5    
-    
-    # Occlusion detection parameters
-    volume_threshold: 1.2  
-    horizontal_steps: 20  # Adjust for density vs performance (20x15 = 300 rays)
-    vertical_steps: 15
-
-    # Frustum parameters
-    horizontal_fov: 127.0
-    vertical_fov: 79.5
-    min_range: 0.4
-    max_range: 5.0
+    # OctoMap parameters
+    resolution: 0.10 # resolution in meters per voxel # TODO: theoretic resolution can be calculated from pixel resolution and focal length
+    max_range: 5.0 # maximum ray casting range in meters
+    enable_degrade: true # enable degrading of outdated nodes for dynamic environments
+    degrade_timeout: 2.0 # timeout in seconds for degradation
+    degrade_every_n_scans: 5 # perform degradation every N scans

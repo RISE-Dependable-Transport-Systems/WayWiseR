@@ -145,14 +145,14 @@ private:
   }
 
   // Safe initialisers for cached values (before parameters are loaded)
-  std::string map_frame_ {"odom"};
-  std::string cloud_topic_ {"/sensors/camera/color/points"};
-  double tf_timeout_sec_ {0.5};
-  double resolution_{0.10};
-  double max_range_{5.0};
-  bool enable_degrade_{true};
-  double degrade_timeout_{2.0};
-  int degrade_every_n_scans_{5};
+  std::string map_frame_;
+  std::string cloud_topic_;
+  double tf_timeout_sec_;
+  double resolution_;
+  double max_range_;
+  bool enable_degrade_;
+  double degrade_timeout_;
+  int degrade_every_n_scans_;
   uint32_t scan_count_{0};
 
   // TF2 components

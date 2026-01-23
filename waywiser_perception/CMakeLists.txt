@@ -28,9 +28,6 @@ find_package(rclcpp_components REQUIRED)
 find_package(octomap REQUIRED)
 find_package(octomap_msgs REQUIRED)
 
-find_package(waywiser_twist_safety REQUIRED)
-find_package(waywiser REQUIRED)
-
 include_directories(include)
 ament_export_include_directories(include)
 
@@ -45,20 +42,8 @@ ament_target_dependencies(octomap_node
 )
 target_link_libraries(octomap_node octomap)
 
-add_executable(octomap_occlusions_node cpp_src/octomap_occlusions.cpp)
-ament_target_dependencies(octomap_occlusions_node
-  rclcpp
-  geometry_msgs
-  tf2_ros
-  tf2_geometry_msgs
-  octomap_msgs
-  waywiser_twist_safety
-  waywiser
-)
-target_link_libraries(octomap_occlusions_node octomap octomath)
-
 install(
-  TARGETS octomap_node octomap_occlusions_node
+  TARGETS octomap_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
