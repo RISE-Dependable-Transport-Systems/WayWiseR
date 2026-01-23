@@ -77,6 +77,7 @@ WayWiseR is divided into modular ROS2 packages:
 4. **Build the workspace:**
 
    ```bash
+   cd $WAYWISER_WS
    source /opt/ros/humble/setup.bash
    # Skip simulator packages for now:
    export WAYWISER_SKIPPED_PACKAGES="waywiser_agrarsense waywiser_carla waywiser_gazebo"
