@@ -98,6 +98,11 @@ def generate_launch_description():
         default_value=os.path.join(waywiser_perception_dir, 'config/yolov8.yaml'),
         description='Full path to params file of yolo',
     )
+    rover_octomap_config_la = DeclareLaunchArgument(
+        'rover_octomap_config',
+        default_value=os.path.join(waywiser_perception_dir, 'config/octomap.yaml'),
+        description='Full path to params file of octomap',
+    )
     rover_name_la = DeclareLaunchArgument(
         'rover_name',
         default_value='rover',
@@ -117,6 +122,11 @@ def generate_launch_description():
         'drone_yolo_config',
         default_value=os.path.join(waywiser_perception_dir, 'config/yolov8.yaml'),
         description='Full path to params file of yolo',
+    )
+    drone_octomap_config_la = DeclareLaunchArgument(
+        'drone_octomap_config',
+        default_value=os.path.join(waywiser_perception_dir, 'config/octomap.yaml'),
+        description='Full path to params file of octomap',
     )
     drone_name_la = DeclareLaunchArgument(
         'drone_name',
@@ -160,6 +170,7 @@ def generate_launch_description():
             'rover_slam_config': LaunchConfiguration('rover_slam_config'),
             'rover_spawn_config_file': LaunchConfiguration('rover_spawn_config_file'),
             'rover_yolo_config': LaunchConfiguration('rover_yolo_config'),
+            'rover_octomap_config': LaunchConfiguration('rover_octomap_config'),
             'rover_name': LaunchConfiguration('rover_name'),
         }.items(),
     )
@@ -236,6 +247,29 @@ def generate_launch_description():
         ]
     )
 
+    drone_octomap = GroupAction(
+        actions=[
+            PushRosNamespace(drone_name),
+            SetRemap(src='/tf', dst='/tf'),
+            SetRemap(src='/tf_static', dst='/tf_static'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            waywiser_perception_dir,
+                            'launch',
+                            'octomap.launch.py',
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    'use_sim_time': LaunchConfiguration('use_sim_time'),
+                    'octomap_config': LaunchConfiguration('drone_octomap_config'),
+                }.items(),
+            ),
+        ]
+    )
+
     drone_gazebo_spawn = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -271,10 +305,12 @@ def generate_launch_description():
     ld.add_action(rover_slam_config_la)
     ld.add_action(rover_spawn_config_file_la)
     ld.add_action(rover_yolo_config_la)
+    ld.add_action(rover_octomap_config_la)
     ld.add_action(rover_name_la)
     ld.add_action(drone_config_la)
     ld.add_action(drone_spawn_config_file_la)
     ld.add_action(drone_yolo_config_la)
+    ld.add_action(drone_octomap_config_la)
     ld.add_action(drone_name_la)
     ld.add_action(drone_localization_node_name_la)
 
@@ -284,6 +320,7 @@ def generate_launch_description():
     ld.add_action(drone_gazebo_spawn)
     ld.add_action(drone_yolo)
     ld.add_action(drone_localization)
+    ld.add_action(drone_octomap)
     ld.add_action(drone_state_publisher)
 
     return ld

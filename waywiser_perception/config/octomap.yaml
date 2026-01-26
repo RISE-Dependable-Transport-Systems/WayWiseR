@@ -1,7 +1,7 @@
 octomap_node:
   ros__parameters:
     # Frame and topic configuration
-    map_frame: "odom"
+    map_frame: "map"
     cloud_topic: "sensors/camera/color/points"
     tf_timeout_sec: 0.5
 
