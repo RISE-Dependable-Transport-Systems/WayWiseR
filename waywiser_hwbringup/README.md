@@ -6,11 +6,11 @@ If running with multiple sensors, make sure to set a unique slave address of eac
 
 ## Slamtech lidars
 
-    sudo apt-get install ros-humble-rplidar-ros
+    sudo apt-get install ros-$ROS_DISTRO-rplidar-ros
 
 ## DepthAI camera
 
-    sudo apt-get install ros-humble-depthai-ros
+    sudo apt-get install ros-$ROS_DISTRO-depthai-ros
 
 ## Intel realsense camera
 
