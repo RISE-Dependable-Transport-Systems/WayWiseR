@@ -5,7 +5,7 @@
 - Install waywiser dependencies using rosdep:
 
   ```
-  rosdep install --from-paths $(colcon list --paths-only | grep "waywiser_gazebo") --ignore-src --rosdistro humble -r -y
+  rosdep install --from-paths $(colcon list --paths-only | grep "waywiser_gazebo") --ignore-src --rosdistro $ROS_DISTRO -r -y
   ```
 
 - Build waywiser_gazebo package:

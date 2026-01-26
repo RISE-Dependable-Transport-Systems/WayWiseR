@@ -91,6 +91,11 @@ def generate_launch_description():
         default_value=os.path.join(waywiser_perception_dir, 'config/yolov8.yaml'),
         description='Full path to params file of yolo',
     )
+    rover_octomap_config_la = DeclareLaunchArgument(
+        'rover_octomap_config',
+        default_value=os.path.join(waywiser_perception_dir, 'config/octomap.yaml'),
+        description='Full path to params file of octomap',
+    )
     rover_name_la = DeclareLaunchArgument(
         'rover_name',
         default_value='rover',
@@ -223,6 +228,29 @@ def generate_launch_description():
         ]
     )
 
+    rover_octomap = GroupAction(
+        actions=[
+            PushRosNamespace(rover_name),
+            SetRemap(src='/tf', dst='/tf'),
+            SetRemap(src='/tf_static', dst='/tf_static'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            waywiser_perception_dir,
+                            'launch',
+                            'octomap.launch.py',
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    'use_sim_time': LaunchConfiguration('use_sim_time'),
+                    'octomap_config': LaunchConfiguration('rover_octomap_config'),
+                }.items(),
+            ),
+        ]
+    )
+
     rover_lidar_based_slam = GroupAction(
         actions=[
             PushRosNamespace(rover_name),
@@ -321,6 +349,7 @@ def generate_launch_description():
     ld.add_action(rover_slam_config_la)
     ld.add_action(rover_spawn_config_file_la)
     ld.add_action(rover_yolo_config_la)
+    ld.add_action(rover_octomap_config_la)
     ld.add_action(rover_name_la)
 
     # start nodes
@@ -333,5 +362,6 @@ def generate_launch_description():
     ld.add_action(rover_lidar_based_slam)
     ld.add_action(rover_gazebo_spawn)
     ld.add_action(rover_yolo)
+    ld.add_action(rover_octomap)
 
     return ld

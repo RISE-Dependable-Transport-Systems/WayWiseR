@@ -16,7 +16,7 @@ The waywiser_agrarsense package integrates the [AGRARSENSE](https://agrarsense.f
 - Install waywiser dependencies using rosdep:
 
   ```
-  rosdep install --from-paths $(colcon list --paths-only | grep "waywiser_agrarsense") --ignore-src --rosdistro humble -r -y
+  rosdep install --from-paths $(colcon list --paths-only | grep "waywiser_agrarsense") --ignore-src --rosdistro $ROS_DISTRO -r -y
   ```
 
 - Build waywiser_agrarsense package:
