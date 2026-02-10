@@ -69,7 +69,7 @@ WayWiseR is divided into modular ROS2 packages:
 
    ```bash
    cd $WAYWISER_WS
-   uv venv --clear
+   uv venv --python 3.10 --clear
    source .venv/bin/activate
    export PYTHONPATH=$WAYWISER_WS/.venv/lib/python3.10/site-packages:$PYTHONPATH
    uv pip install -e src/WayWiseR
@@ -155,13 +155,13 @@ Previous maintainers:
 If you use WayWiseR in your research, please cite:
 
 ```bibtex
-@inproceedings{avula2025waywiser,
-  title     = {WayWiseR: A Rapid Prototyping Platform for Validating Connected and Automated Vehicles},
-  author    = {Avula, Ramana Reddy and Damschen, Marvin and Mirzai, Aria and Lundgren, Karl and Farooqui, Ashfaq and Thorsen, Anders},
-  booktitle = {Proceedings of the 13th International Conference on Control, Mechatronics and Automation (ICCMA)},
-  year      = {2025},
-  address   = {Paris, France},
-  publisher = {IEEE},
+@INPROCEEDINGS{11369551,
+  author={Avula, Ramana Reddy and Damschen, Marvin and Mirzai, Aria and Lundgren, Karl and Farooqui, Ashfaq and Thorsén, Anders},
+  booktitle={2025 13th International Conference on Control, Mechatronics and Automation (ICCMA)},
+  title={WayWiseR: A Rapid Prototyping Platform for Validating Connected and Automated Vehicles},
+  year={2025},
+  pages={306-311},
+  doi={10.1109/ICCMA67641.2025.11369551}
 }
 ```
 
