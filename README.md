@@ -156,7 +156,7 @@ If you use WayWiseR in your research, please cite:
 
 ```bibtex
 @INPROCEEDINGS{11369551,
-  author={Avula, Ramana Reddy and Damschen, Marvin and Mirzai, Aria and Lundgren, Karl and Farooqui, Ashfaq and Thorsén, Anders},
+  author={Avula, Ramana Reddy and Damschen, Marvin and Mirzai, Aria and Lundgren, Karl and Farooqui, Ashfaq and Thors\'{e}n, Anders},
   booktitle={2025 13th International Conference on Control, Mechatronics and Automation (ICCMA)},
   title={WayWiseR: A Rapid Prototyping Platform for Validating Connected and Automated Vehicles},
   year={2025},
