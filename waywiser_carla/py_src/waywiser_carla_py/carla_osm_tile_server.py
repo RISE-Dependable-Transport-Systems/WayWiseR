@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
+import concurrent.futures
 import io
 import math
 import os
 import socket
 import threading
+import time
 
 import carla
 import numpy as np
@@ -54,6 +56,10 @@ class CarlaMapper(object):
         aerial_view_camera_fov=5.0,
         aerial_view_camera_height=1500.0,
         reset_base_map_image=False,
+        enuref=[0.0, 0.0, 0.0],
+        rendering_wait_ticks=10,
+        map_region=None,
+        image_processing_workers=2,
     ):
         """
         Initialize the CarlaMapper.
@@ -62,6 +68,8 @@ class CarlaMapper(object):
         information about the road network.
         """
         self.logger = logger
+        self.rendering_wait_ticks = rendering_wait_ticks
+        self.image_processing_workers = max(1, int(image_processing_workers))
 
         aerial_view_camera_focus_length = aerial_view_camera_resolution / (
             2 * math.tan(math.radians(aerial_view_camera_fov) / 2)
@@ -79,11 +87,6 @@ class CarlaMapper(object):
                 EARTH_CIRCUMFERENCE / (self.aerial_view_camera_image_meters_per_pixel * TILE_SIZE)
             )
         )
-        self.min_meters_per_pixel = (
-            EARTH_CIRCUMFERENCE
-            * math.cos(math.radians(EARTH_REF_LATITUDE))
-            / ((2**self.earth_max_zoom_level) * TILE_SIZE)
-        )
         self.aerial_view_camera_fov = aerial_view_camera_fov
         self.aerial_view_camera_height = aerial_view_camera_height
         self.aerial_view_camera_resolution = aerial_view_camera_resolution
@@ -100,9 +103,32 @@ class CarlaMapper(object):
             world_bounds_string = metadata['world_bounds']
             min_x, max_x, min_y, max_y = tuple(float(x) for x in world_bounds_string.split(', '))
 
+            if 'ref_lat' in metadata and 'ref_lon' in metadata:
+                self.earth_ref_lat = float(metadata['ref_lat'])
+                self.earth_ref_lon = float(metadata['ref_lon'])
+            else:
+                self.earth_ref_lat = enuref[0]
+                self.earth_ref_lon = enuref[1]
+
+            self.logger.info(
+                f'Loaded cached map image from {full_path} with ENU ref: Lat={self.earth_ref_lat}, Lon={self.earth_ref_lon}'
+            )
+
+            self.min_meters_per_pixel = (
+                EARTH_CIRCUMFERENCE
+                * math.cos(math.radians(self.earth_ref_lat))
+                / ((2**self.earth_max_zoom_level) * TILE_SIZE)
+            )
+
             self.world_bounds = (min_x, max_x, min_y, max_y)
             self.width = max_x - min_x
             self.height = max_y - min_y
+            if self.width <= 0 or self.height <= 0:
+                raise ValueError(
+                    'Invalid cached map bounds produce non-positive image size. '
+                    f'world_bounds={self.world_bounds}. '
+                    'Delete cached image or launch with reset_base_map_image:=true.'
+                )
             self.world_offset = (min_x, min_y)
             self.width_in_pixels = math.ceil(self.width / self.min_meters_per_pixel)
             self.height_in_pixels = math.ceil(self.height / self.min_meters_per_pixel)
@@ -111,17 +137,41 @@ class CarlaMapper(object):
 
             self.client = carla.Client(host, port)
             self.client.set_timeout(timeout)
-            carla_world = self.client.get_world()
-            carla_map = carla_world.get_map()
+            carla_world = self._call_with_timeout_retry('client.get_world', self.client.get_world)
+            carla_map = self._call_with_timeout_retry('world.get_map', carla_world.get_map)
+
+            carla_georef = carla_map.transform_to_geolocation(carla.Location(0, 0, 0))
+            if carla_georef.latitude != 0.0 and carla_georef.longitude != 0.0:
+                self.earth_ref_lat = carla_georef.latitude
+                self.earth_ref_lon = carla_georef.longitude
+                self.logger.info(
+                    f'Using ENU reference from carla map: Lat={carla_georef.latitude}, Lon={carla_georef.longitude}'
+                )
+            else:
+                self.earth_ref_lat = enuref[0]
+                self.earth_ref_lon = enuref[1]
+                self.logger.info(
+                    f'Using ENU reference from params: Lat={self.earth_ref_lat}, Lon={self.earth_ref_lon}'
+                )
+
             carla_map_name = carla_map.name.split('/')[-1]
             if town != carla_map_name:
                 raise ValueError(
                     f'Carla map "{carla_map_name}" does not match the town param: {town}'
                 )
 
-            waypoints = carla_map.generate_waypoints(1)
+            self.min_meters_per_pixel = (
+                EARTH_CIRCUMFERENCE
+                * math.cos(math.radians(self.earth_ref_lat))
+                / ((2**self.earth_max_zoom_level) * TILE_SIZE)
+            )
+
+            waypoints = self._call_with_timeout_retry(
+                'map.generate_waypoints', lambda: carla_map.generate_waypoints(1)
+            )
             margin = 50
             precision_digits = 4
+
             max_x = round(
                 max(waypoints, key=lambda x: x.transform.location.x).transform.location.x + margin,
                 precision_digits,
@@ -138,10 +188,45 @@ class CarlaMapper(object):
                 min(waypoints, key=lambda x: x.transform.location.y).transform.location.y - margin,
                 precision_digits,
             )
+            auto_world_bounds = (min_x, max_x, min_y, max_y)
+
+            if map_region and len(map_region) == 4 and any(v != 0.0 for v in map_region):
+                # Extract user bounds
+                # Convert User Y-Up (North+, South-) to CARLA Y-Down (North-, South+)
+                u_min_y = -map_region[0]
+                u_max_x = map_region[1]
+                u_max_y = map_region[2]
+                u_min_x = -map_region[3]
+
+                min_x, max_x, min_y, max_y = u_min_x, u_max_x, u_min_y, u_max_y
+
+                # Log overlap information for diagnostics only
+                overlap_min_x = max(u_min_x, auto_world_bounds[0])
+                overlap_max_x = min(u_max_x, auto_world_bounds[1])
+                overlap_min_y = max(u_min_y, auto_world_bounds[2])
+                overlap_max_y = min(u_max_y, auto_world_bounds[3])
+                if overlap_max_x <= overlap_min_x or overlap_max_y <= overlap_min_y:
+                    self.logger.warning(
+                        'Configured map_region does not overlap with map waypoints. '
+                        'Proceeding with requested region; output may contain mostly empty tiles. '
+                        f'map_region_carla=({min_x}, {max_x}, {min_y}, {max_y}), '
+                        f'auto_world_bounds={auto_world_bounds}'
+                    )
+                else:
+                    self.logger.info(
+                        'Using configured map_region in CARLA frame: '
+                        f'({min_x}, {max_x}, {min_y}, {max_y})'
+                    )
 
             self.world_bounds = (min_x, max_x, min_y, max_y)
+            self.logger.info(f'Calculated world bounds: {self.world_bounds}')
             self.width = max_x - min_x
             self.height = max_y - min_y
+            if self.width <= 0 or self.height <= 0:
+                raise ValueError(
+                    'Invalid world bounds produce non-positive image size. '
+                    f'world_bounds={self.world_bounds}, map_region={list(map_region) if map_region is not None else None}'
+                )
             self.world_offset = (min_x, min_y)
             self.width_in_pixels = math.ceil(self.width / self.min_meters_per_pixel)
             self.height_in_pixels = math.ceil(self.height / self.min_meters_per_pixel)
@@ -149,6 +234,9 @@ class CarlaMapper(object):
             self.logger.info('Resetting the weather to ClearNoon to capture aerial images.')
             clear_noon_weather = carla.WeatherParameters.ClearNoon
             carla_world.set_weather(clear_noon_weather)
+            carla_topology = self._call_with_timeout_retry(
+                'map.get_topology', carla_map.get_topology
+            )
 
             self.map_image = Image.new(
                 'RGBA',
@@ -163,7 +251,17 @@ class CarlaMapper(object):
             self.capture_aerial_view(carla_world)
 
             # Render road network map
-            self.draw_road_map(carla_world, carla_map)
+            road_draw_start = time.perf_counter()
+            try:
+                self.draw_road_map(carla_world, carla_map, carla_topology=carla_topology)
+            except Exception as error:
+                self.logger.warning(
+                    f'Failed to render road network overlay due to timeout/error: {error}. '
+                    'Continuing with aerial imagery only.'
+                )
+            finally:
+                road_draw_elapsed = time.perf_counter() - road_draw_start
+                self.logger.info(f'Road network drawing took {road_draw_elapsed:.3f} s')
 
             self.logger.info('Completed rendering map image.')
 
@@ -177,13 +275,13 @@ class CarlaMapper(object):
             metadata = PngInfo()
             world_bounds_string = ', '.join(f'{x:.{precision_digits}f}' for x in self.world_bounds)
             metadata.add_text('world_bounds', world_bounds_string)
+            metadata.add_text('ref_lat', str(self.earth_ref_lat))
+            metadata.add_text('ref_lon', str(self.earth_ref_lon))
             self.logger.info(f'Saving the map image to {full_path}')
 
             self.map_image.save(full_path, format='PNG', pnginfo=metadata)
 
         self.meters_per_degree_lat = METERS_PER_DEG_LATITUDE
-        self.earth_ref_lat = EARTH_REF_LATITUDE
-        self.earth_ref_lon = EARTH_REF_LONGITUDE
         self.carla_world_center = self.pixel_to_carla_world(
             (self.map_image.width / 2, self.map_image.height / 2)
         )
@@ -199,7 +297,38 @@ class CarlaMapper(object):
             math.log2(EARTH_CIRCUMFERENCE / (10 * max(self.width, self.height)))
         )
 
+    def _call_with_timeout_retry(self, operation_name, operation, retries=5, retry_delay=1.0):
+        last_error = None
+        for attempt in range(1, retries + 1):
+            try:
+                return operation()
+            except RuntimeError as error:
+                last_error = error
+            except Exception as error:
+                message = str(error).lower()
+                if 'timeout' not in message and 'time-out' not in message:
+                    raise
+                last_error = error
+
+            if attempt < retries:
+                self.logger.warning(
+                    f'{operation_name} failed ({attempt}/{retries}) due to timeout: {last_error}. '
+                    f'Retrying in {retry_delay:.1f}s...'
+                )
+                time.sleep(retry_delay)
+
+        raise RuntimeError(
+            f'{operation_name} failed after {retries} attempts due to timeout: {last_error}'
+        )
+
     def capture_aerial_view(self, carla_world):
+        # Save original settings
+        original_settings = carla_world.get_settings()
+        settings = carla_world.get_settings()
+        settings.synchronous_mode = True
+        settings.fixed_delta_seconds = 0.05
+        carla_world.apply_settings(settings)
+
         camera_count_x = math.ceil(self.width_in_pixels / self.aerial_view_camera_resolution)
         camera_count_y = math.ceil(self.height_in_pixels / self.aerial_view_camera_resolution)
         base_image = Image.new(
@@ -217,14 +346,17 @@ class CarlaMapper(object):
             min_x, max_x, min_y, max_y = self.world_bounds
             spawn_locations = []
 
-            x = min_x + image_width_meters / 2
-            while x <= max_x + image_width_meters:
-                y = min_y + image_width_meters / 2
-                while y <= max_y + image_width_meters:
-                    location = carla.Location(x, y, camera_height)
-                    spawn_locations.append(location)
-                    y += image_height_meters
-                x += image_width_meters
+            x_count = max(1, math.ceil((max_x - min_x) / image_width_meters))
+            y_count = max(1, math.ceil((max_y - min_y) / image_height_meters))
+
+            x_start = min_x + image_width_meters / 2
+            y_start = min_y + image_height_meters / 2
+
+            for ix in range(x_count):
+                x = x_start + ix * image_width_meters
+                for iy in range(y_count):
+                    y = y_start + iy * image_height_meters
+                    spawn_locations.append(carla.Location(x, y, camera_height))
 
             return spawn_locations
 
@@ -259,53 +391,89 @@ class CarlaMapper(object):
             int(self.aerial_view_camera_resolution / 2),
             int(self.aerial_view_camera_resolution / 2),
         )
+        executor = None
+        pending_pastes = []
+        rgb_camera = None
+        depth_camera = None
+        rgb_camera_listening = False
+        depth_camera_listening = False
 
-        rgb_camera_bp = carla_world.get_blueprint_library().find('sensor.camera.rgb')
-        rgb_camera_bp.set_attribute('image_size_x', str(self.aerial_view_camera_resolution))
-        rgb_camera_bp.set_attribute('image_size_y', str(self.aerial_view_camera_resolution))
-        rgb_camera_bp.set_attribute('fov', str(self.aerial_view_camera_fov))
+        try:
+            rgb_camera_bp = carla_world.get_blueprint_library().find('sensor.camera.rgb')
+            rgb_camera_bp.set_attribute('image_size_x', str(self.aerial_view_camera_resolution))
+            rgb_camera_bp.set_attribute('image_size_y', str(self.aerial_view_camera_resolution))
+            rgb_camera_bp.set_attribute('fov', str(self.aerial_view_camera_fov))
+            rgb_camera_bp.set_attribute('role_name', 'hero')
 
-        depth_camera_bp = carla_world.get_blueprint_library().find('sensor.camera.depth')
-        depth_camera_bp.set_attribute('image_size_x', str(self.aerial_view_camera_resolution))
-        depth_camera_bp.set_attribute('image_size_y', str(self.aerial_view_camera_resolution))
-        depth_camera_bp.set_attribute('fov', str(self.aerial_view_camera_fov))
+            depth_camera_bp = carla_world.get_blueprint_library().find('sensor.camera.depth')
+            depth_camera_bp.set_attribute('image_size_x', str(self.aerial_view_camera_resolution))
+            depth_camera_bp.set_attribute('image_size_y', str(self.aerial_view_camera_resolution))
+            depth_camera_bp.set_attribute('fov', str(self.aerial_view_camera_fov))
+            depth_camera_bp.set_attribute('role_name', 'hero')
 
-        # Get spawn locations to cover the whole world
-        camera_spawn_locations = get_camera_spawn_locations(
-            image_width_meters, image_width_meters, self.aerial_view_camera_height
-        )
-        num_camera_spawn_locations = len(camera_spawn_locations)
-        logger.info(
-            f'Number of images to cover the world at {self.aerial_view_camera_height}m '
-            f'camera height: {num_camera_spawn_locations}'
-        )
-
-        # Define a dictionary to store captured images
-        images = {'rgb': None, 'depth': None}
-
-        # Create pixel coordinates
-        y, x = np.indices((self.aerial_view_camera_resolution, self.aerial_view_camera_resolution))
-        pixel_coords = np.stack((x.flatten(), y.flatten(), np.ones_like(x.flatten())), axis=0)
-
-        intrinsic_matrix = np.identity(3)
-        focus_length = self.aerial_view_camera_resolution / (
-            2 * np.tan(np.radians(self.aerial_view_camera_fov) / 2)
-        )
-        intrinsic_matrix[0, 0] = intrinsic_matrix[1, 1] = focus_length
-        intrinsic_matrix[0, 2] = self.aerial_view_camera_resolution / 2.0
-        intrinsic_matrix[1, 2] = self.aerial_view_camera_resolution / 2.0
-
-        inverse_instrinsic_matrix = np.linalg.inv(intrinsic_matrix)
-        image_plane_coords = inverse_instrinsic_matrix @ pixel_coords
-
-        for index, location in enumerate(camera_spawn_locations):
-            transform = carla.Transform(location, carla.Rotation(pitch=-90.0, yaw=-90.0, roll=0.0))
-            logger.info(
-                f'Capturing image {index + 1}/{num_camera_spawn_locations} at {transform.location}'
+            # Get spawn locations to cover the whole world
+            camera_spawn_locations = get_camera_spawn_locations(
+                image_width_meters, image_width_meters, self.aerial_view_camera_height
             )
-            # Update camera transform
-            rgb_camera = carla_world.spawn_actor(rgb_camera_bp, transform)
-            depth_camera = carla_world.spawn_actor(depth_camera_bp, transform)
+            num_camera_spawn_locations = len(camera_spawn_locations)
+            logger.info(
+                f'Number of images to cover the world at {self.aerial_view_camera_height}m '
+                f'camera height: {num_camera_spawn_locations}'
+            )
+
+            if self.image_processing_workers > 1:
+                executor = concurrent.futures.ThreadPoolExecutor(
+                    max_workers=self.image_processing_workers
+                )
+
+            def flush_completed_pastes(block=False):
+                nonlocal pending_pastes
+                if not pending_pastes:
+                    return
+
+                if block:
+                    concurrent.futures.wait(
+                        [future for future, _, _ in pending_pastes],
+                        return_when=concurrent.futures.FIRST_COMPLETED,
+                    )
+
+                remaining = []
+                for future, position, image_index in pending_pastes:
+                    if future.done():
+                        ortho_image = future.result()
+                        img_pil = Image.fromarray(ortho_image, 'RGBA')
+                        logger.info(f'Pasting image {image_index}/{num_camera_spawn_locations}...')
+                        Image.Image.paste(base_image, img_pil, position)
+                    else:
+                        remaining.append((future, position, image_index))
+                pending_pastes = remaining
+
+            # Define a dictionary to store captured images
+            images = {'rgb': None, 'depth': None}
+
+            # Create pixel coordinates
+            y, x = np.indices(
+                (self.aerial_view_camera_resolution, self.aerial_view_camera_resolution)
+            )
+            pixel_coords = np.stack((x.flatten(), y.flatten(), np.ones_like(x.flatten())), axis=0)
+
+            intrinsic_matrix = np.identity(3)
+            focus_length = self.aerial_view_camera_resolution / (
+                2 * np.tan(np.radians(self.aerial_view_camera_fov) / 2)
+            )
+            intrinsic_matrix[0, 0] = intrinsic_matrix[1, 1] = focus_length
+            intrinsic_matrix[0, 2] = self.aerial_view_camera_resolution / 2.0
+            intrinsic_matrix[1, 2] = self.aerial_view_camera_resolution / 2.0
+
+            inverse_instrinsic_matrix = np.linalg.inv(intrinsic_matrix)
+            image_plane_coords = inverse_instrinsic_matrix @ pixel_coords
+
+            # Spawn cameras once
+            initial_transform = carla.Transform(
+                camera_spawn_locations[0], carla.Rotation(pitch=-90.0, yaw=-90.0, roll=0.0)
+            )
+            rgb_camera = carla_world.spawn_actor(rgb_camera_bp, initial_transform)
+            depth_camera = carla_world.spawn_actor(depth_camera_bp, initial_transform)
 
             def on_rgb_image_received(image):
                 nonlocal images
@@ -336,50 +504,125 @@ class CarlaMapper(object):
 
             rgb_camera.listen(on_rgb_image_received)
             depth_camera.listen(on_depth_image_received)
+            rgb_camera_listening = True
+            depth_camera_listening = True
 
-            # Wait for images to be captured
-            images['rgb'] = None
-            images['depth'] = None
-            while images['rgb'] is None or images['depth'] is None:
-                carla_world.wait_for_tick()
+            for index, location in enumerate(camera_spawn_locations):
+                transform = carla.Transform(
+                    location, carla.Rotation(pitch=-90.0, yaw=-90.0, roll=0.0)
+                )
+                logger.info(
+                    f'Capturing image {index + 1}/{num_camera_spawn_locations} at {transform.location}'
+                )
 
-            # Remove the cameras after capturing image
-            rgb_camera.destroy()
-            depth_camera.destroy()
+                # Teleport cameras to new location
+                rgb_camera.set_transform(transform)
+                depth_camera.set_transform(transform)
 
-            ortho_image = perspective_to_orthographic(
-                self.aerial_view_camera_resolution,
-                images['rgb'],
-                images['depth'],
-                image_plane_coords,
-                intrinsic_matrix,
+                # Send ticks to apply the transform and let the engine settle
+                for _ in range(self.rendering_wait_ticks):
+                    while True:
+                        try:
+                            carla_world.tick()
+                            break
+                        except RuntimeError as e:
+                            logger.warn(
+                                f'Simulation tick timed out during settling: {e}. Retrying...'
+                            )
+                            time.sleep(1.0)
+
+                # Wait for images to be captured
+                images['rgb'] = None
+                images['depth'] = None
+
+                # Use tick() instead of wait_for_tick() because we are driving the simulation
+                while images['rgb'] is None or images['depth'] is None:
+                    try:
+                        carla_world.tick()
+                    except RuntimeError as e:
+                        logger.warn(f'Simulation tick timed out: {e}. Retrying...')
+                        time.sleep(1.0)
+
+                logger.info(f'Processing image {index + 1}/{num_camera_spawn_locations}...')
+                position = self.carla_world_to_pixel(
+                    transform.location,
+                    offset=image_center,
+                    meters_per_pixel=self.aerial_view_camera_image_meters_per_pixel,
+                )
+
+                if executor is None:
+                    ortho_image = perspective_to_orthographic(
+                        self.aerial_view_camera_resolution,
+                        images['rgb'],
+                        images['depth'],
+                        image_plane_coords,
+                        intrinsic_matrix,
+                    )
+                    img_pil = Image.fromarray(ortho_image, 'RGBA')
+                    logger.info(f'Pasting image {index + 1}/{num_camera_spawn_locations}...')
+                    Image.Image.paste(base_image, img_pil, position)
+                else:
+                    future = executor.submit(
+                        perspective_to_orthographic,
+                        self.aerial_view_camera_resolution,
+                        images['rgb'].copy(),
+                        images['depth'].copy(),
+                        image_plane_coords,
+                        intrinsic_matrix,
+                    )
+                    pending_pastes.append((future, position, index + 1))
+                    if len(pending_pastes) >= self.image_processing_workers * 2:
+                        flush_completed_pastes(block=True)
+                    else:
+                        flush_completed_pastes(block=False)
+
+            while pending_pastes:
+                flush_completed_pastes(block=True)
+
+            corrected_width = (
+                self.width_in_pixels
+                * self.min_meters_per_pixel
+                / self.aerial_view_camera_image_meters_per_pixel
             )
-            img_pil = Image.fromarray(ortho_image, 'RGBA')
-
-            position = self.carla_world_to_pixel(
-                transform.location,
-                offset=image_center,
-                meters_per_pixel=self.aerial_view_camera_image_meters_per_pixel,
+            corrected_height = (
+                self.height_in_pixels
+                * self.min_meters_per_pixel
+                / self.aerial_view_camera_image_meters_per_pixel
             )
-            Image.Image.paste(base_image, img_pil, position)
+            base_image = base_image.crop((0, 0, int(corrected_width), int(corrected_height)))
+            base_image = base_image.resize(
+                (self.width_in_pixels, self.height_in_pixels), Image.Resampling.LANCZOS
+            )
+            self.map_image = base_image
+        finally:
+            if executor is not None:
+                executor.shutdown(wait=False)
 
-        corrected_width = (
-            self.width_in_pixels
-            * self.min_meters_per_pixel
-            / self.aerial_view_camera_image_meters_per_pixel
-        )
-        corrected_height = (
-            self.height_in_pixels
-            * self.min_meters_per_pixel
-            / self.aerial_view_camera_image_meters_per_pixel
-        )
-        base_image = base_image.crop((0, 0, corrected_width - 1, corrected_height - 1))
-        base_image = base_image.resize(
-            (self.width_in_pixels, self.height_in_pixels), Image.Resampling.LANCZOS
-        )
-        self.map_image = base_image
+            if rgb_camera is not None:
+                if rgb_camera_listening:
+                    try:
+                        rgb_camera.stop()
+                    except Exception:
+                        pass
+                try:
+                    rgb_camera.destroy()
+                except Exception:
+                    pass
 
-    def draw_road_map(self, carla_world, carla_map, add_traffic_signs=False):
+            if depth_camera is not None:
+                if depth_camera_listening:
+                    try:
+                        depth_camera.stop()
+                    except Exception:
+                        pass
+                try:
+                    depth_camera.destroy()
+                except Exception:
+                    pass
+
+            carla_world.apply_settings(original_settings)
+
+    def draw_road_map(self, carla_world, carla_map, add_traffic_signs=False, carla_topology=None):
         """Draw all roads, including lane markings, arrows, and traffic signs."""
         # Adapted from
         # https://github.com/carla-simulator/carla/blob/b23c01ae4a3bd3ec15
@@ -444,7 +687,10 @@ class CarlaMapper(object):
 
         # Draw Roads
         logger.info('Drawing road network from opendrive data')
-        carla_topology = carla_map.get_topology()
+        if carla_topology is None:
+            carla_topology = self._call_with_timeout_retry(
+                'map.get_topology', carla_map.get_topology
+            )
         topology = [x[0] for x in carla_topology]
         topology = sorted(topology, key=lambda w: w.transform.location.z)
         set_waypoints = []
@@ -467,6 +713,23 @@ class CarlaMapper(object):
 
         road_color_with_alpha = COLOR_ROAD + (128,)
         for waypoints in set_waypoints:
+            if not waypoints:
+                continue
+
+            # Check if road segment is within bounds
+            xs = [w.transform.location.x for w in waypoints]
+            ys = [w.transform.location.y for w in waypoints]
+            w_min_x, w_max_x = min(xs), max(xs)
+            w_min_y, w_max_y = min(ys), max(ys)
+
+            if (
+                w_max_x < self.world_bounds[0]
+                or w_min_x > self.world_bounds[1]
+                or w_max_y < self.world_bounds[2]
+                or w_min_y > self.world_bounds[3]
+            ):
+                continue
+
             waypoint = waypoints[0]
             road_left_side = [lateral_shift(w.transform, -w.lane_width * 0.5) for w in waypoints]
             road_right_side = [lateral_shift(w.transform, w.lane_width * 0.5) for w in waypoints]
@@ -483,8 +746,22 @@ class CarlaMapper(object):
             font_size = int(1.0 / self.min_meters_per_pixel * 1)
             font = ImageFont.truetype('arial.ttf', font_size)
 
-            stops = [actor for actor in actors if 'stop' in actor.type_id]
-            yields = [actor for actor in actors if 'yield' in actor.type_id]
+            def is_inside(loc):
+                return (
+                    self.world_bounds[0] <= loc.x <= self.world_bounds[1]
+                    and self.world_bounds[2] <= loc.y <= self.world_bounds[3]
+                )
+
+            stops = [
+                actor
+                for actor in actors
+                if 'stop' in actor.type_id and is_inside(actor.get_transform().location)
+            ]
+            yields = [
+                actor
+                for actor in actors
+                if 'yield' in actor.type_id and is_inside(actor.get_transform().location)
+            ]
 
             for ts_stop in stops:
                 draw_traffic_signs(draw, font, ts_stop)
@@ -518,7 +795,7 @@ class CarlaMapper(object):
         pixel_x, pixel_y = self.carla_world_to_pixel(carla_location)
 
         # Calculate tile size in pixels for the current zoom level
-        tile_size_pixels = TILE_SIZE * (2 ** (self.carla_max_zoom_level - carla_zoom_level))
+        tile_size_pixels = int(TILE_SIZE * (2 ** (self.carla_max_zoom_level - carla_zoom_level)))
 
         # Calculate the bounds of the tile in the map image
         left = pixel_x
@@ -536,18 +813,18 @@ class CarlaMapper(object):
             return self.out_of_range_tile
 
         # Adjust cropping to stay within image bounds
-        crop_left = max(0, left)
-        crop_top = max(0, top)
-        crop_right = min(self.map_image.width, right)
-        crop_bottom = min(self.map_image.height, bottom)
+        crop_left = int(max(0, left))
+        crop_top = int(max(0, top))
+        crop_right = int(min(self.map_image.width, right))
+        crop_bottom = int(min(self.map_image.height, bottom))
 
         # Crop the relevant part of the map image
         cropped_image = self.map_image.crop((crop_left, crop_top, crop_right, crop_bottom))
 
         # Create a new tile and paste the cropped image
         map_tile = Image.new('RGB', (tile_size_pixels, tile_size_pixels), COLOR_WHITE)
-        paste_x = max(0, -left)
-        paste_y = max(0, -top)
+        paste_x = int(max(0, -left))
+        paste_y = int(max(0, -top))
         map_tile.paste(cropped_image, (paste_x, paste_y))
 
         # Resize to standard tile size
@@ -646,6 +923,10 @@ class CarlaOsmTileServer(Node):
         self.declare_parameter('aerial_view_camera_resolution', 1920)
         self.declare_parameter('aerial_view_camera_fov', 5.0)
         self.declare_parameter('aerial_view_camera_height', 1500.0)
+        self.declare_parameter('enuref', [0.0, 0.0, 0.0])
+        self.declare_parameter('rendering_wait_ticks', 10)
+        self.declare_parameter('map_region', [0.0, 0.0, 0.0, 0.0])
+        self.declare_parameter('image_processing_workers', 2)
 
         self.reset_base_map_image = (
             self.get_parameter('reset_base_map_image').get_parameter_value().bool_value
@@ -674,6 +955,14 @@ class CarlaOsmTileServer(Node):
         self.aerial_view_camera_height = (
             self.get_parameter('aerial_view_camera_height').get_parameter_value().double_value
         )
+        self.enuref = self.get_parameter('enuref').get_parameter_value().double_array_value
+        self.rendering_wait_ticks = (
+            self.get_parameter('rendering_wait_ticks').get_parameter_value().integer_value
+        )
+        self.map_region = self.get_parameter('map_region').get_parameter_value().double_array_value
+        self.image_processing_workers = (
+            self.get_parameter('image_processing_workers').get_parameter_value().integer_value
+        )
 
         self.logger = rclpy.logging.get_logger(self.get_name())
 
@@ -693,6 +982,10 @@ class CarlaOsmTileServer(Node):
             self.aerial_view_camera_fov,
             self.aerial_view_camera_height,
             self.reset_base_map_image,
+            enuref=self.enuref,
+            rendering_wait_ticks=self.rendering_wait_ticks,
+            map_region=self.map_region,
+            image_processing_workers=self.image_processing_workers,
         )
 
         # Start TCP server in a separate thread

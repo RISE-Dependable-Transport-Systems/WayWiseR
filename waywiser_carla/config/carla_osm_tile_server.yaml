@@ -18,3 +18,6 @@ carla_osm_tile_server_node:
     aerial_view_camera_resolution: 1920
     aerial_view_camera_fov: 5.0
     aerial_view_camera_height: 1500.0
+    image_processing_workers: 16
+    rendering_wait_ticks: 10
+    map_region: [0.0, 0.0, 0.0, 0.0] # Top, right, bottom, left
