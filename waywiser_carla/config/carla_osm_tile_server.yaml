@@ -5,8 +5,8 @@
     role_name: truck
     host: localhost
     port: 2000
-    timeout: 10
-    town: Sunrise_from_Town05
+    timeout: 20
+    town: GbgSaroRound
 
 carla_osm_tile_server_node:
   ros__parameters:
@@ -15,9 +15,10 @@ carla_osm_tile_server_node:
     carla_world_origin_offset_x: 0.0
     carla_world_origin_offset_y: 0.0
     reset_base_map_image: false
-    aerial_view_camera_resolution: 1920
-    aerial_view_camera_fov: 5.0
-    aerial_view_camera_height: 1500.0
+    carla_bev_view_camera_resolution: 640
+    carla_bev_view_camera_fov: 10.0
+    carla_bev_view_camera_height: 1500.0
     image_processing_workers: 16
     rendering_wait_ticks: 10
-    map_region: [0.0, 0.0, 0.0, 0.0] # Top, right, bottom, left
+    map_region: [1400.0, 1800.0, -800.0, -1200.0] # Top, right, bottom, left
+    # map_region: [0.0, 0.0, 0.0, 0.0] # Top, right, bottom, left
