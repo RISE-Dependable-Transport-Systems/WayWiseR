@@ -1,8 +1,8 @@
 # WayWiseR
 
-![Workflow build result](https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/actions/workflows/build.yaml/badge.svg) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/RISE-Dependable-Transport-Systems/WayWiseR)
+![Workflow build result](https://github.com/das-rise/WayWiseR/actions/workflows/build.yaml/badge.svg) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/das-rise/WayWiseR)
 
-**WayWiseR** is a [ROS2](https://docs.ros.org/)-based rapid prototyping platform designed for **Connected and Automated Vehicle (CAV)** validation research. Extending the low-level functionalities provided by the [WayWise](https://github.com/RISE-Dependable-Transport-Systems/WayWise) library with standardized ROS2 interfaces, WayWiseR enables systematic scenario-based validation across both simulated and physical environments.
+**WayWiseR** is a [ROS2](https://docs.ros.org/)-based rapid prototyping platform designed for **Connected and Automated Vehicle (CAV)** validation research. Extending the low-level functionalities provided by the [WayWise](https://github.com/das-rise/WayWise) library with standardized ROS2 interfaces, WayWiseR enables systematic scenario-based validation across both simulated and physical environments.
 
 WayWiseR is divided into modular ROS2 packages:
 
@@ -40,7 +40,7 @@ WayWiseR is divided into modular ROS2 packages:
      sudo dpkg -i libmavsdk-dev*.deb
      ```
 
-     Alternatively, MAVSDK can be built from source by using the scripts [here](https://github.com/RISE-Dependable-Transport-Systems/WayWise/tree/main/tools/build_MAVSDK).
+     Alternatively, MAVSDK can be built from source by using the scripts [here](https://github.com/das-rise/WayWise/tree/main/tools/build_MAVSDK).
 
    - Install system dependencies:
 
@@ -60,7 +60,7 @@ WayWiseR is divided into modular ROS2 packages:
    ```bash
    export WAYWISER_WS=~/waywiser_ws # Update with your desired path
    mkdir -p $WAYWISER_WS/src
-   git clone git@github.com:RISE-Dependable-Transport-Systems/WayWiseR.git $WAYWISER_WS/src/WayWiseR
+   git clone git@github.com:das-rise/WayWiseR.git $WAYWISER_WS/src/WayWiseR
    cd $WAYWISER_WS/src/WayWiseR
    git submodule update --init waywiser_core/WayWise
    ```
