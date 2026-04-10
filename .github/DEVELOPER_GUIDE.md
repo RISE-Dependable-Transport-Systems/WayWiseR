@@ -102,7 +102,7 @@ Before running the pipeline for the first time or after changing the CI environm
 ```bash
 # Build the CI image
 cd $WAYWISER_WS/src/WayWiseR
-docker build -t ghcr.io/rise-dependable-transport-systems/waywiser/ci-image:humble -f .github/workflows/Dockerfile.ci .
+docker build -t ghcr.io/das-rise/waywiser/ci-image:humble -f .github/workflows/Dockerfile.ci .
 ```
 
 Then, run the build and test job using `act`. The `--pull=false` flag ensures `act` uses your local image:
@@ -110,5 +110,5 @@ Then, run the build and test job using `act`. The `--pull=false` flag ensures `a
 ```bash
 # Run the CI pipeline locally
 cd $WAYWISER_WS/src/WayWiseR
-act -j build-and-test --pull=false -P ubuntu-22.04=ghcr.io/rise-dependable-transport-systems/waywiser/ci-image:humble
+act -j build-and-test --pull=false -P ubuntu-22.04=ghcr.io/das-rise/waywiser/ci-image:humble
 ```

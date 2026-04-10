@@ -8,7 +8,7 @@
    ```bash
    export CARLA_ROS_BRIDGE_WS=~/carla_ros_bridge_ws     # Update with desired path
    mkdir -p $CARLA_ROS_BRIDGE_WS/src
-   git clone --recurse-submodules git@github.com:RISE-Dependable-Transport-Systems/carla-ros-bridge.git $CARLA_ROS_BRIDGE_WS/src/carla-ros-bridge
+   git clone --recurse-submodules git@github.com:das-rise/carla-ros-bridge.git $CARLA_ROS_BRIDGE_WS/src/carla-ros-bridge
    ```
 
 2. **Install carla-ros-bridge dependencies:**
@@ -63,6 +63,6 @@ EOT
 
 ## CARLA OSM Tile Server
 
-The carla_osm_tile_server node implements a TCP/IP based server that generates map tiles from CARLA simulator data and serves them in a format similar to OpenStreetMap (OSM) tile servers, making WayWiseR compatible with OSM-based mapping applications like [ControlTower](https://github.com/RISE-Dependable-Transport-Systems/ControlTower). When the node is run for the first time, it connects to CARLA via ros-bridge and renders a 2D top-view image of the CARLA world, including roads and lane markings from opendrive data. The high-resolution map image is saved locally and is used to generate map tiles on demand.
+The carla_osm_tile_server node implements a TCP/IP based server that generates map tiles from CARLA simulator data and serves them in a format similar to OpenStreetMap (OSM) tile servers, making WayWiseR compatible with OSM-based mapping applications like [ControlTower](https://github.com/das-rise/ControlTower). When the node is run for the first time, it connects to CARLA via ros-bridge and renders a 2D top-view image of the CARLA world, including roads and lane markings from opendrive data. The high-resolution map image is saved locally and is used to generate map tiles on demand.
 
 <https://github.com/user-attachments/assets/edb4115a-6099-4ebc-97ff-f9e2919c92bc>

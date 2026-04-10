@@ -37,7 +37,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/rise-dependable-transport-systems/waywiser/ci-image
+          images: ghcr.io/das-rise/waywiser/ci-image
           tags: |
             type=raw,value=humble
 

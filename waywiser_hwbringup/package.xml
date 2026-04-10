@@ -11,7 +11,7 @@
 
   <license>GPLv3</license>
 
-  <url type="website">https://github.com/RISE-Dependable-Transport-Systems/WayWise</url>
+  <url type="website">https://github.com/das-rise/WayWise</url>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

@@ -41,7 +41,7 @@ RUN rosdep update
 # Pre-install project and external dependencies
 # 1. Setup workspace and clone all repositories (WayWiseR + carla-ros-bridge)
 RUN mkdir -p /tmp/ws/src && \
-    printf "repositories:\n  WayWiseR:\n    type: git\n    url: https://github.com/RISE-Dependable-Transport-Systems/WayWiseR.git\n    version: humble\n  carla_ros_bridge:\n    type: git\n    url: https://github.com/RISE-Dependable-Transport-Systems/carla-ros-bridge.git\n    version: v0.9.15-humble-dev" > /tmp/ws/deps.repos && \
+    printf "repositories:\n  WayWiseR:\n    type: git\n    url: https://github.com/das-rise/WayWiseR.git\n    version: humble\n  carla_ros_bridge:\n    type: git\n    url: https://github.com/das-rise/carla-ros-bridge.git\n    version: v0.9.15-humble-dev" > /tmp/ws/deps.repos && \
     vcs import /tmp/ws/src < /tmp/ws/deps.repos
 
 # 2. Recursive submodule update for project and external repos

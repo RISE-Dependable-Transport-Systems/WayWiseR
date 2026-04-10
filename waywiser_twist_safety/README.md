@@ -26,4 +26,4 @@
 3. **emergency_stop_monitor**: Upon receiving a 'waywiser_twist_safety/msg/EmergencyStopState' type message with the state field set to '2' on the "/emergency_stop/target_state" topic, it suspends the input twist commands and publishes a zero-velocity twist command on its output topic. Instead, when the state field is set to '1', the emergency stop is deactivated, allowing the commands to pass through from the input to the output twist topics.
 
 A typical node graph would look as follows:
-![collision_monitor](https://github.com/RISE-Dependable-Transport-Systems/WayWiseR/assets/58977950/263c7c78-2cd9-4a8e-a50e-f1ab23c32e6e)
+![collision_monitor](https://github.com/das-rise/WayWiseR/assets/58977950/263c7c78-2cd9-4a8e-a50e-f1ab23c32e6e)
