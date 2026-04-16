@@ -54,6 +54,7 @@ install(
 
 ament_environment_hooks(00_load_dotenv.bash)
 ament_environment_hooks(discovery/client_setup.bash)
+ament_environment_hooks(discovery/zenoh_client_setup.bash)
 ament_export_include_directories(include)
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_dependencies(rclcpp)

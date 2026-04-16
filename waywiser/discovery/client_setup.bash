@@ -3,6 +3,12 @@
 # Check if the script is being sourced
 [[ "${BASH_SOURCE[0]}" != "${0}" ]] && is_sourced=true || is_sourced=false
 
+# Skip FastDDS client setup if using a non-FastDDS middleware (e.g. rmw_zenoh_cpp)
+if [[ "$is_sourced" == "true" ]] && [[ -n "$RMW_IMPLEMENTATION" ]] && [[ "$RMW_IMPLEMENTATION" != "rmw_fastrtps_cpp" ]] && [[ "$RMW_IMPLEMENTATION" != "rmw_fastrtps_dynamic_cpp" ]]; then
+    OPTIND=1
+    return 0
+fi
+
 # Function to display usage information
 display_usage() {
     echo "Usage: $(basename "$0") [-h] [-e] [-r] [-su] [-s server_ip] [-c client_ip] [-d domain_id]"
