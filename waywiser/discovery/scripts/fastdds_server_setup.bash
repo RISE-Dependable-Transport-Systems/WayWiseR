@@ -40,13 +40,10 @@ get_full_file_path() {
     local file_path=$1
 
     if [ ! -f "$file_path" ]; then
-        # Find config fullfilepath
-        if [ -d "src" ]; then
-            file_path="$PWD/src/WayWiseR/waywiser/discovery/$file_path"
-        elif [ -d "waywiser" ]; then
-            file_path="$PWD/waywiser/discovery/$file_path"
+        if [[ -n "$WAYWISER_WS" ]]; then
+            file_path="$WAYWISER_WS/src/WayWiseR/waywiser/discovery/config/$file_path"
         else
-            echo "Error: Unable to find file $file_path"
+            echo "Error: Unable to find file $file_path (WAYWISER_WS not set)"
             return 1
         fi
     fi
@@ -79,14 +76,14 @@ has_ip_in_interfaces() {
 ########################################################################
 
 # Default values
-local_server_config_file="local_server.xml"
-remote_server_config_file="remote_server.xml"
+local_server_config_file="fastdds_local_server.xml"
+remote_server_config_file="fastdds_remote_server.xml"
 tmp_dir="$HOME/.waywiser/discovery/"
 mkdir -p $tmp_dir
 
 edit_config=false
 start_remote=false
-server_ip=$ROS_REMOTE_DISCOVERY_SERVER_IP
+server_ip=$FASTDDS_REMOTE_DISCOVERY_SERVER_IP
 # Strip any literal quotes
 server_ip=${server_ip//\"/}
 server_ip=${server_ip//\'/}

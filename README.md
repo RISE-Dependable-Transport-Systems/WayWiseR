@@ -57,21 +57,39 @@ WayWiseR is divided into modular ROS2 packages:
 
 2. **Initialize the workspace:**
 
+   First, define the path to your workspace. It is recommended to add this to your `~/.bashrc` to make it persistent across all your terminal sessions:
+
    ```bash
    export WAYWISER_WS=~/waywiser_ws # Update with your desired path
+   grep -q '^export WAYWISER_WS=' ~/.bashrc && { sed -i "s|^export WAYWISER_WS=.*|export WAYWISER_WS=$WAYWISER_WS|" ~/.bashrc && echo "Updated WAYWISER_WS=$WAYWISER_WS in ~/.bashrc"; } || { echo "export WAYWISER_WS=$WAYWISER_WS" >> ~/.bashrc && echo "Added WAYWISER_WS=$WAYWISER_WS to ~/.bashrc"; }
+   ```
+
+   Now, create the workspace and clone the repository:
+
+   ```bash
    mkdir -p $WAYWISER_WS/src
    git clone git@github.com:das-rise/WayWiseR.git $WAYWISER_WS/src/WayWiseR
-   cd $WAYWISER_WS/src/WayWiseR
-   git submodule update --init waywiser_core/WayWise
+   git -C $WAYWISER_WS/src/WayWiseR submodule update --init waywiser_core/WayWise
    ```
+
+   WayWiseR uses a `.env` file to manage ROS configuration and skipped packages. First, copy the `.env.example` to establish your environment settings:
+
+   ```bash
+   cp $WAYWISER_WS/src/WayWiseR/.env.example $WAYWISER_WS/src/WayWiseR/.env
+   ```
+
+   Open `.env` and verify/update `WAYWISER_SKIPPED_PACKAGES` and your desired configurations. 
+   
+   > ⚠️ **Important**: Because the simulation packages (`waywiser_agrarsense`, `waywiser_carla`, `waywiser_gazebo`) require significant additional system setup, it is **strictly recommended** to include them in the `WAYWISER_SKIPPED_PACKAGES` list for this initial workspace build. You should proceed with building the core workspace first, and then build each of these packages later by following the specialized instructions in their respective package `README.md` files.
 
 3. **Setup Python virtual environment:**
 
    ```bash
    cd $WAYWISER_WS
-   uv venv --python 3.10 --clear
+   export PY_VER=$(cat src/WayWiseR/.python-version)
+   uv venv --python $PY_VER --clear
    source .venv/bin/activate
-   export PYTHONPATH=$WAYWISER_WS/.venv/lib/python3.10/site-packages:$PYTHONPATH
+   export PYTHONPATH=$WAYWISER_WS/.venv/lib/python${PY_VER}/site-packages:$PYTHONPATH
    uv pip install -e src/WayWiseR
    ```
 
@@ -80,8 +98,7 @@ WayWiseR is divided into modular ROS2 packages:
    ```bash
    cd $WAYWISER_WS
    source /opt/ros/humble/setup.bash
-   # Skip simulator packages for now:
-   export WAYWISER_SKIPPED_PACKAGES="waywiser_agrarsense waywiser_carla waywiser_gazebo"
+   set -a && source $WAYWISER_WS/src/WayWiseR/.env && set +a
    rosdep install --from-paths $(colcon list --paths-only | grep -Evw "$(echo "$WAYWISER_SKIPPED_PACKAGES" | tr ' ' '|')") --ignore-src --rosdistro $ROS_DISTRO -r -y
    colcon build --symlink-install --packages-skip $WAYWISER_SKIPPED_PACKAGES
    ```
@@ -91,28 +108,23 @@ WayWiseR is divided into modular ROS2 packages:
    > ```bash
    > cat <<EOT >> $WAYWISER_WS/.venv/bin/activate
    > # WayWiseR Environment Setup
+   > set -a; source "\$WAYWISER_WS/src/WayWiseR/.env"; set +a
    > source /opt/ros/humble/setup.bash
-   > export WAYWISER_WS=$WAYWISER_WS
-   > export WAYWISER_SKIPPED_PACKAGES="$WAYWISER_SKIPPED_PACKAGES"
-   > export PYTHONPATH=$WAYWISER_WS/.venv/lib/python3.10/site-packages:\$PYTHONPATH
+   > export PYTHONPATH=\$WAYWISER_WS/.venv/lib/python${PY_VER}/site-packages:\$PYTHONPATH
    >
-   > if [ -f "$WAYWISER_WS/install/setup.bash" ]; then
-   >   source "$WAYWISER_WS/install/setup.bash"
+   > if [ -f "\$WAYWISER_WS/install/setup.bash" ]; then
+   >   source "\$WAYWISER_WS/install/setup.bash"
    > fi
    > EOT
    > ```
 
    To build simulator-related packages such as waywiser_agrarsense, waywiser_carla, and waywiser_gazebo, follow the instructions in the respective packages.
 
-5. **Environment Configuration (.env):**
-
-   WayWiseR uses a `.env` file to manage settings such as ROS2 Domain ID and FastDDS Discovery Server configurations.
+5. **Source the workspace:**
 
    ```bash
-   cp src/WayWiseR/.env.example src/WayWiseR/.env
+   source $WAYWISER_WS/install/setup.bash
    ```
-
-   Update the configurations in the `.env` file as needed. The `.env` file is automatically sourced whenever the virtual environment is activated via `source $WAYWISER_WS/.venv/bin/activate`.
 
 ---
 

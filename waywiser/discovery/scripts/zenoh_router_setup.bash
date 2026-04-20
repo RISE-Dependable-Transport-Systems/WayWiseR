@@ -26,10 +26,10 @@ display_usage() {
     echo "Starts a Zenoh router for ROS 2 node discovery."
     echo ""
     echo "Options:"
-    echo "  -h                    Display this help message"
-    echo "  -r remote_router_ip   Connect to a remote Zenoh router at this IP"
-    echo "  -p port               Port for the remote router (default: 7447)"
-    echo "  -4                    Use IPv4 only (for systems without IPv6)"
+    echo "  -h, --help            Display this help message"
+    echo "  -r, --remote <ip>     Connect to a remote Zenoh router at this IP"
+    echo "  -p, --port <port>     Port for the remote router (default: 7447)"
+    echo "  -4, --ipv4            Use IPv4 only (for systems without IPv6)"
     echo ""
     echo "Environment variables (can be set in .env):"
     echo "  ZENOH_ROUTER_CONFIG_URI     Path to custom router config file"
@@ -67,30 +67,32 @@ if [[ -n "$ZENOH_REMOTE_ROUTER_PORT" ]] && [[ "$ZENOH_REMOTE_ROUTER_PORT" != '""
     remote_router_port=${remote_router_port//\'/}
 fi
 
-# Parse options
-OPTIND=1
-while getopts "hr:p:4" opt; do
-    case $opt in
-    h)
-        display_usage
-        $is_sourced && return 0 || exit 0
-        ;;
-    r) remote_router_ip="$OPTARG" ;;
-    p) remote_router_port="$OPTARG" ;;
-    4) ipv4_only=true ;;
-    \?)
-        echo "Invalid option: -$OPTARG" >&2
-        display_usage
-        $is_sourced && return 1 || exit 1
-        ;;
-    :)
-        echo "Option -$OPTARG requires an argument." >&2
-        display_usage
-        $is_sourced && return 1 || exit 1
-        ;;
+# Parse options dynamically
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            display_usage
+            $is_sourced && return 0 || exit 0
+            ;;
+        -r|--remote)
+            remote_router_ip="$2"
+            shift 2
+            ;;
+        -p|--port)
+            remote_router_port="$2"
+            shift 2
+            ;;
+        -4|--ipv4)
+            ipv4_only=true
+            shift 1
+            ;;
+        *)
+            echo "Invalid option: $1" >&2
+            display_usage
+            $is_sourced && return 1 || exit 1
+            ;;
     esac
 done
-shift $((OPTIND - 1))
 
 ########################################################################
 

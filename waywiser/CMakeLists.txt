@@ -22,11 +22,11 @@ ament_target_dependencies(${PROJECT_NAME} rclcpp)
 
 include_directories(include)
 
-file(GLOB DISCOVERY_SETUP_FILES "discovery/*.bash")
+file(GLOB DISCOVERY_SETUP_FILES "discovery/scripts/*.bash")
 
 install(
   FILES ${DISCOVERY_SETUP_FILES}
-  DESTINATION discovery
+  DESTINATION "."
 )
 
 install(
@@ -53,8 +53,8 @@ install(
 )
 
 ament_environment_hooks(00_load_dotenv.bash)
-ament_environment_hooks(discovery/client_setup.bash)
-ament_environment_hooks(discovery/zenoh_client_setup.bash)
+ament_environment_hooks(discovery/scripts/fastdds_client_setup.bash)
+ament_environment_hooks(discovery/scripts/zenoh_client_setup.bash)
 ament_export_include_directories(include)
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_dependencies(rclcpp)

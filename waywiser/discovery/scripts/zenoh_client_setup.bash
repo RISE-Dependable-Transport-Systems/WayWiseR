@@ -32,6 +32,7 @@ display_usage() {
     echo ""
     echo "Configured via environment variables (set in .env):"
     echo "  RMW_IMPLEMENTATION=rmw_zenoh_cpp    (required to activate)"
+    echo "  ZENOH_USE_LOCAL_ROUTER              Set to 1 to force nodes to use a local router"
     echo "  ZENOH_REMOTE_ROUTER_IP              IP of remote Zenoh router"
     echo "  ZENOH_REMOTE_ROUTER_PORT            Port of remote router (default: 7447)"
     echo "  ZENOH_SESSION_CONFIG_URI            Path to custom session config"
@@ -67,8 +68,11 @@ if [[ -n "$ZENOH_REMOTE_ROUTER_PORT" ]] && [[ "$ZENOH_REMOTE_ROUTER_PORT" != '""
     remote_router_port=${remote_router_port//\'/}
 fi
 
-# Configure session for remote router connection
-if [[ -n "$remote_router_ip" ]]; then
+if [[ "$ZENOH_USE_LOCAL_ROUTER" == "1" ]]; then
+    echo "    Mode: local (using local router, ignoring remote IP for nodes)"
+    # If the local router runs on a non-standard port or needs explicit connecting, we could set connect/endpoints here
+    # However, rmw_zenoh_cpp's default behavior will natively find the local router via UDP/shm.
+elif [[ -n "$remote_router_ip" ]]; then
     if is_valid_ip "$remote_router_ip"; then
         echo "    Remote router: tcp/$remote_router_ip:$remote_router_port"
 

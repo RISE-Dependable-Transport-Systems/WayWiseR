@@ -5,3 +5,5 @@ log/
 .venv/
 **/__pycache__/
 .agent/
+build/
+install/

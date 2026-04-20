@@ -27,13 +27,10 @@ get_full_file_path() {
     local file_path=$1
 
     if [ ! -f "$file_path" ]; then
-        # Find config fullfilepath
-        if [ -d "src" ]; then
-            file_path="$PWD/src/WayWiseR/waywiser/discovery/$file_path"
-        elif [ -d "waywiser" ]; then
-            file_path="$PWD/waywiser/discovery/$file_path"
+        if [[ -n "$WAYWISER_WS" ]]; then
+            file_path="$WAYWISER_WS/src/WayWiseR/waywiser/discovery/config/$file_path"
         else
-            echo "Error: Unable to find file $file_path"
+            echo "Error: Unable to find file $file_path (WAYWISER_WS not set)"
             return 1
         fi
     fi
@@ -66,14 +63,14 @@ has_ip_in_interfaces() {
 ########################################################################
 
 # Default values
-local_client_config_file="local_client.xml"
-remote_client_config_file="remote_client.xml"
+local_client_config_file="fastdds_local_client.xml"
+remote_client_config_file="fastdds_remote_client.xml"
 tmp_dir="$HOME/.waywiser/discovery/"
 mkdir -p $tmp_dir
 
 edit_config=false
 remote_client=false
-is_super_client=${ROS_SUPER_CLIENT:-0}
+is_super_client=${FASTDDS_SUPER_CLIENT:-0}
 server_ip=""
 client_ip=""
 domain_id_input=-1
@@ -122,17 +119,19 @@ shift $((OPTIND - 1))
 # If remote client is not explicitly set, but discovery environment variables are present,
 # then we assume we are running in remote mode.
 # We also check that they are not just empty strings or literal empty quotes.
-if ! $remote_client && [[ -n "$ROS_REMOTE_DISCOVERY_CLIENT_IP" ]] && [[ "$ROS_REMOTE_DISCOVERY_CLIENT_IP" != '""' ]] && [[ "$ROS_REMOTE_DISCOVERY_CLIENT_IP" != "''" ]]; then
+if ! $remote_client && [[ -n "$FASTDDS_REMOTE_DISCOVERY_CLIENT_IP" ]] && [[ "$FASTDDS_REMOTE_DISCOVERY_CLIENT_IP" != '""' ]] && [[ "$FASTDDS_REMOTE_DISCOVERY_CLIENT_IP" != "''" ]]; then
     remote_client=true
 fi
 
 # Detect if discovery server mode should be activated
 # 1. Explicit remote IPs in environment
-# 2. ROS_USE_DISCOVERY_SERVER=1
+# 2. FASTDDS_USE_DISCOVERY_SERVER=1
+# 3. FastDDS is already set as the RMW implementation
+# (Handled by ament environment hooks)
 use_discovery_server=false
 if $remote_client; then
     use_discovery_server=true
-elif [[ "$ROS_USE_DISCOVERY_SERVER" == "1" ]]; then
+elif [[ "$FASTDDS_USE_DISCOVERY_SERVER" == "1" ]]; then
     use_discovery_server=true
 fi
 
@@ -174,8 +173,8 @@ if $remote_client; then
     configured_server_ip=$(grep -oP -m 1 '(?<=<address _marker="server">)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(?=</address>)' $config_fullfilepath)
 
     if [ -z "$server_ip" ]; then
-        if [[ -n "$ROS_REMOTE_DISCOVERY_SERVER_IP" ]] && [[ "$ROS_REMOTE_DISCOVERY_SERVER_IP" != '""' ]] && [[ "$ROS_REMOTE_DISCOVERY_SERVER_IP" != "''" ]]; then
-            server_ip=${ROS_REMOTE_DISCOVERY_SERVER_IP//\"/}
+        if [[ -n "$FASTDDS_REMOTE_DISCOVERY_SERVER_IP" ]] && [[ "$FASTDDS_REMOTE_DISCOVERY_SERVER_IP" != '""' ]] && [[ "$FASTDDS_REMOTE_DISCOVERY_SERVER_IP" != "''" ]]; then
+            server_ip=${FASTDDS_REMOTE_DISCOVERY_SERVER_IP//\"/}
             server_ip=${server_ip//\'/}
         else
             server_ip=$configured_server_ip
@@ -184,8 +183,8 @@ if $remote_client; then
 
     configured_client_ip=$(grep -oP -m 1 '(?<=<address _marker="client">)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(?=</address>)' $config_fullfilepath)
     if [ -z "$client_ip" ]; then
-        if [[ -n "$ROS_REMOTE_DISCOVERY_CLIENT_IP" ]] && [[ "$ROS_REMOTE_DISCOVERY_CLIENT_IP" != '""' ]] && [[ "$ROS_REMOTE_DISCOVERY_CLIENT_IP" != "''" ]]; then
-            client_ip=${ROS_REMOTE_DISCOVERY_CLIENT_IP//\"/}
+        if [[ -n "$FASTDDS_REMOTE_DISCOVERY_CLIENT_IP" ]] && [[ "$FASTDDS_REMOTE_DISCOVERY_CLIENT_IP" != '""' ]] && [[ "$FASTDDS_REMOTE_DISCOVERY_CLIENT_IP" != "''" ]]; then
+            client_ip=${FASTDDS_REMOTE_DISCOVERY_CLIENT_IP//\"/}
             client_ip=${client_ip//\'/}
         else
             client_ip=$configured_client_ip
