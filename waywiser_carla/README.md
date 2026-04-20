@@ -3,57 +3,43 @@
 > [!IMPORTANT]
 > Before proceeding, ensure you have followed the steps in the **[How to install and build](../README.md#how-to-install-and-build-on-ubuntu-2204)** section of the main README.
 
-1. **Clone carla-ros-bridge** (fork from [ros-bridge](https://github.com/carla-simulator/ros-bridge)):
+1. **Initialize the carla-ros-bridge submodule:**
+
+   The `carla-ros-bridge` is included as a git submodule. To fetch it, run:
 
    ```bash
-   export CARLA_ROS_BRIDGE_WS=~/carla_ros_bridge_ws     # Update with desired path
-   mkdir -p $CARLA_ROS_BRIDGE_WS/src
-   git clone --recurse-submodules git@github.com:das-rise/carla-ros-bridge.git $CARLA_ROS_BRIDGE_WS/src/carla-ros-bridge
-   ```
-
-2. **Install carla-ros-bridge dependencies:**
-
-   ```bash
-   source $WAYWISER_WS/.venv/bin/activate
-   cd $CARLA_ROS_BRIDGE_WS
-   rosdep install -i --from-path src/carla-ros-bridge --rosdistro $ROS_DISTRO -r -y
-   uv pip install -r src/carla-ros-bridge/requirements.txt
-   ```
-
-3. **Build carla-ros-bridge:**
-
-   ```bash
-   colcon build --symlink-install --base-paths $CARLA_ROS_BRIDGE_WS/src/carla-ros-bridge
-   ```
-
-4. **Install waywiser_carla dependencies:**
-
-   ```bash
-   # Source the bridge workspace first
-   source $CARLA_ROS_BRIDGE_WS/install/setup.bash
-
    cd $WAYWISER_WS
-   rosdep install --from-paths $(colcon list --paths-only | grep "waywiser_carla") --ignore-src --rosdistro $ROS_DISTRO -r -y
+   git -C src/WayWiseR submodule update --init --recursive waywiser_carla/external/carla-ros-bridge
    ```
 
-5. **Build waywiser_carla:**
+2. **Install dependencies:**
 
    ```bash
-   colcon build --symlink-install --packages-up-to waywiser_carla
+   cd $WAYWISER_WS
+   source .venv/bin/activate
+   rosdep install --from-paths src/WayWiseR/waywiser_carla src/WayWiseR/waywiser_carla/external/carla-ros-bridge --ignore-src --rosdistro $ROS_DISTRO -r -y
+   uv pip install -r src/WayWiseR/waywiser_carla/external/carla-ros-bridge/requirements.txt
    ```
 
-To persist the environment variables and source CARLA_ROS_BRIDGE_WS automatically when activating the virtual environment, run the following command (copy-paste the entire block):
+3. **Build waywiser_carla and the bridge:**
 
-```bash
-cat <<EOT >> $WAYWISER_WS/.venv/bin/activate
+   If `waywiser_carla` is in your `$WAYWISER_SKIPPED_PACKAGES` list (from the main setup), you need to update that list and build the workspace:
 
-# Carla ROS Bridge Setup
-export CARLA_ROS_BRIDGE_WS=$CARLA_ROS_BRIDGE_WS
-if [ -f "$CARLA_ROS_BRIDGE_WS/install/setup.bash" ]; then
-source "$CARLA_ROS_BRIDGE_WS/install/setup.bash"
-fi
-EOT
-```
+   ```bash
+   # Remove waywiser_carla from the skipped packages list and persist to .env
+   source $WAYWISER_WS/src/WayWiseR/.env
+   export WAYWISER_SKIPPED_PACKAGES="$(echo ${WAYWISER_SKIPPED_PACKAGES//\"/} | sed 's/waywiser_carla//' | xargs)"
+   sed -i "s|^WAYWISER_SKIPPED_PACKAGES=.*|WAYWISER_SKIPPED_PACKAGES=\"$WAYWISER_SKIPPED_PACKAGES\"|" $WAYWISER_WS/src/WayWiseR/.env
+
+   # Build the workspace
+   colcon build --symlink-install --base-paths src src/WayWiseR/waywiser_carla/external/carla-ros-bridge --packages-up-to waywiser_carla
+   ```
+
+4. **Source the workspace:**
+
+   ```bash
+   source $WAYWISER_WS/install/setup.bash
+   ```
 
 ## Examples
 

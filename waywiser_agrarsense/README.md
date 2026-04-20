@@ -5,30 +5,42 @@ The waywiser_agrarsense package integrates the [AGRARSENSE](https://agrarsense.f
 ## Agrarsense setup
 
 - Install the [Agrarsense](https://agrarsense.frostbit.fi/md_Docs_linux_install.html) simulator, if not already done.
+
 - Either create a symbolic link to the simulator script at "~/workspaces/agrarsense_ws/Agrarsense.sh" or update the script path in the yaml config file.
 - Ensure Docker is installed and configured for rootless mode. Follow the official [Docker rootless installation guide](https://docs.docker.com/engine/security/rootless/).
-- Build the agrarsense-ros bridge docker container by executing the [build_docker_container.sh](./ros_bridge/build_docker_container.sh) script, from the root directory of the workspace:
 
-  ```
-  ./src/WayWiseR/waywiser_agrarsense/ros_bridge/build_docker_container.sh
-  ```
+- **Install all dependencies:**
 
-- Install waywiser dependencies using rosdep:
-
-  ```
-  rosdep install --from-paths $(colcon list --paths-only | grep "waywiser_agrarsense") --ignore-src --rosdistro $ROS_DISTRO -r -y
+  ```bash
+  cd $WAYWISER_WS
+  source .venv/bin/activate
+  rosdep install --from-paths src/WayWiseR/waywiser_agrarsense --ignore-src --rosdistro $ROS_DISTRO -r -y
   ```
 
-- Build waywiser_agrarsense package:
+- **Build `waywiser_agrarsense`:**
+
+  If `waywiser_agrarsense` is in your `$WAYWISER_SKIPPED_PACKAGES` list (from the main setup), you need to update that list and build the workspace:
+
+     ```bash
+   # Remove waywiser_agrarsense from the skipped packages list and persist to .env
+   source $WAYWISER_WS/src/WayWiseR/.env
+   export WAYWISER_SKIPPED_PACKAGES="$(echo ${WAYWISER_SKIPPED_PACKAGES//\"/} | sed 's/waywiser_agrarsense//' | xargs)"
+   sed -i "s|^WAYWISER_SKIPPED_PACKAGES=.*|WAYWISER_SKIPPED_PACKAGES=\"$WAYWISER_SKIPPED_PACKAGES\"|" $WAYWISER_WS/src/WayWiseR/.env
+
+   # Build the workspace
+   colcon build --symlink-install --packages-up-to waywiser_agrarsense
+   ```
+
+- Source the workspace:
+
+  ```bash
+  source $WAYWISER_WS/install/setup.bash
+  ```
+
+- Build the agrarsense-ros bridge docker container natively using the installed symbolic link script:
 
   ```
-  colcon build --symlink-install --packages-select waywiser_agrarsense
-  ```
-
-- Source the overlay:
-
-  ```
-  source install/local_setup.bash
+  ./install/waywiser_agrarsense/build_docker_container.sh
   ```
 
 ## Examples

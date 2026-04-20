@@ -24,8 +24,21 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-echo "Building Docker image $DOCKER_IMAGE_NAME from $DOCKERFILE_DIR..."
-docker build -t "$DOCKER_IMAGE_NAME" $DOCKERFILE_DIR
+# Resolve symlink if Dockerfile is a link (common with colcon --symlink-install)
+DOCKERFILE_PATH="$DOCKERFILE_DIR/Dockerfile"
+if [ -L "$DOCKERFILE_PATH" ]; then
+    echo "Resolving symlink for Dockerfile..."
+    DOCKERFILE_PATH="$(readlink -f "$DOCKERFILE_PATH")"
+    DOCKERFILE_DIR="$(dirname "$DOCKERFILE_PATH")"
+fi
+
+if [ ! -f "$DOCKERFILE_PATH" ]; then
+    echo "Error: Dockerfile not found at $DOCKERFILE_PATH"
+    exit 1
+fi
+
+echo "Building Docker image $DOCKER_IMAGE_NAME from context $DOCKERFILE_DIR..."
+docker build -t "$DOCKER_IMAGE_NAME" -f "$DOCKERFILE_PATH" "$DOCKERFILE_DIR"
 
 # Check if the Docker container exists
 if docker ps -a --format '{{.Names}}' | grep -q "^${DOCKER_CONTAINER_NAME}$"; then

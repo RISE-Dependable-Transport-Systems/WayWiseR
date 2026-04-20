@@ -11,7 +11,7 @@ RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C1CF6E31E6
 
 # Set up workspace and clone repositories
 WORKDIR "/home/workspace"
-RUN colcon build --symlink-install --packages-skip ros1_bridge
+RUN colcon build --symlink-install --packages-skip ros1_bridge --event-handlers console_direct+
 
 # build AGRARSENSE_ROS_Messages
 RUN git clone https://AMKFrostBit@dev.azure.com/AMKFrostBit/AGRARSENSE/_git/AGRARSENSE_ROS_Messages src/AGRARSENSE_ROS_Messages
@@ -28,7 +28,7 @@ RUN . /opt/ros/noetic/setup.sh \
   && . /opt/ros/foxy/setup.sh \
   && . /home/workspace/src/AGRARSENSE_ROS_Messages/ros1ws/devel/setup.sh \
   && . /home/workspace/src/AGRARSENSE_ROS_Messages/ros2ws/install/setup.sh \
-  && colcon build --symlink-install --packages-select ros1_bridge --cmake-force-configure
+  && colcon build --symlink-install --packages-select ros1_bridge --cmake-force-configure --event-handlers console_direct+
 
 # Set environment variables
 ENV ROS_DOMAIN_ID=0

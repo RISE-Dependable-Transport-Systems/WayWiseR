@@ -8,7 +8,7 @@
 - Install torch and torchvision following the instructions from https://forums.developer.nvidia.com/t/pytorch-for-jetson/
 - Install pip dependencies:
   ```
-  uv pip install numpy==1.23 ultralytics opencv-python pycuda
+  uv pip install numpy==1.23 ultralytics opencv-python pycuda tensorrt==10.0.1
   ```
 
 ### x86_64
@@ -23,7 +23,7 @@
 - Install pip dependencies:
 
   ```
-  uv pip install numpy ultralytics opencv-python torch torchvision
+  uv pip install numpy ultralytics opencv-python torch torchvision tensorrt==10.0.1
   ```
 
 ## Setup

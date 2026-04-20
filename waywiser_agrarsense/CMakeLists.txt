@@ -33,6 +33,16 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(
+  FILES ros_bridge/Dockerfile
+  DESTINATION "."
+)
+
+install(
+  PROGRAMS ros_bridge/build_docker_container.sh
+  DESTINATION "."
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)

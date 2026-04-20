@@ -17,6 +17,8 @@
 
   <depend>rviz2</depend>
 
+  <exec_depend>octomap_rviz_plugins</exec_depend>
+
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
