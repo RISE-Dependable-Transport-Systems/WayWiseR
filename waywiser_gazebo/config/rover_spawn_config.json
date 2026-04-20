@@ -11,12 +11,5 @@
             "path": "./src/WayWiseR/waywiser_description/sdf/actor_stand/model.sdf",
             "bridge_config": ""
         }
-    ],
-    "static_transforms": [
-        {
-            "frame_id": "car_world",
-            "child_frame_id": "map",
-            "pose": "0 0 0 0 0 0"
-        }
     ]
 }

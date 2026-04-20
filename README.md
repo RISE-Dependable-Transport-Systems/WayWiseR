@@ -97,6 +97,7 @@ WayWiseR is divided into modular ROS2 packages:
 
    ```bash
    cd $WAYWISER_WS
+   source .venv/bin/activate
    source /opt/ros/humble/setup.bash
    set -a && source $WAYWISER_WS/src/WayWiseR/.env && set +a
    rosdep install --from-paths $(colcon list --paths-only | grep -Evw "$(echo "$WAYWISER_SKIPPED_PACKAGES" | tr ' ' '|')") --ignore-src --rosdistro $ROS_DISTRO -r -y

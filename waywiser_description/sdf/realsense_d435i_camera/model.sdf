@@ -64,9 +64,9 @@
       <sensor name="camera_sensor" type="rgbd_camera">
         <update_rate>60</update_rate>
         <pose>0 0 0 0 0 -1.570795</pose>
-        <topic>"sensors/camera"</topic>
+        <topic>/sensors/drone/camera</topic>
         <camera>
-          <optical_frame_id>"camera_link"</optical_frame_id>
+          <optical_frame_id>drone/camera_link</optical_frame_id>
           <horizontal_fov>1.089</horizontal_fov>
           <!-- <lens> -->
           <!-- <intrinsics> -->
@@ -98,7 +98,7 @@
             <far>30</far>
           </clip>
           <depth_camera>
-            <optical_frame_id>"camera_link"</optical_frame_id>
+            <optical_frame_id>drone/camera_link</optical_frame_id>
             <clip>
               <near>0.1</near>
               <far>10</far>

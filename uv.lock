@@ -481,6 +481,15 @@ wheels = [
 ]
 
 [[package]]
+name = "kconfiglib"
+version = "14.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/59/29/d557718c84ef1a8f275faa4caf8e353778121beefbe9fadfa0055ca99aae/kconfiglib-14.1.0.tar.gz", hash = "sha256:bed2cc2216f538eca4255a83a4588d8823563cdd50114f86cf1a2674e602c93c", size = 162613, upload-time = "2020-01-31T06:40:50.563Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8a/f1/d98a89231e779b079b977590efcc31249d959c8f1d4b5858cad69695ff9c/kconfiglib-14.1.0-py2.py3-none-any.whl", hash = "sha256:edcd35a20e7e138a9a9e96149027f805f785e818d2eae400b6fa8b0c8845114a", size = 145875, upload-time = "2020-01-31T06:40:47.252Z" },
+]
+
+[[package]]
 name = "kiwisolver"
 version = "1.4.9"
 source = { registry = "https://pypi.org/simple" }
@@ -1929,6 +1938,7 @@ dependencies = [
     { name = "depthai" },
     { name = "empy" },
     { name = "jinja2" },
+    { name = "kconfiglib" },
     { name = "lark" },
     { name = "modbus-tk" },
     { name = "numpy" },
@@ -1954,6 +1964,7 @@ requires-dist = [
     { name = "depthai", specifier = "==2.30.0.0" },
     { name = "empy", specifier = "==3.3.2" },
     { name = "jinja2", specifier = ">=3.1.6" },
+    { name = "kconfiglib", specifier = ">=14.1.0" },
     { name = "lark", specifier = ">=1.3.1" },
     { name = "modbus-tk", specifier = ">=1.1.5" },
     { name = "numpy", specifier = "<2" },

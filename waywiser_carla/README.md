@@ -28,8 +28,9 @@
    ```bash
    # Remove waywiser_carla from the skipped packages list and persist to .env
    source $WAYWISER_WS/src/WayWiseR/.env
-   export WAYWISER_SKIPPED_PACKAGES="$(echo ${WAYWISER_SKIPPED_PACKAGES//\"/} | sed 's/waywiser_carla//' | xargs)"
-   sed -i "s|^WAYWISER_SKIPPED_PACKAGES=.*|WAYWISER_SKIPPED_PACKAGES=\"$WAYWISER_SKIPPED_PACKAGES\"|" $WAYWISER_WS/src/WayWiseR/.env
+   export WAYWISER_SKIPPED_PACKAGES="$(printf '%s\n' ${WAYWISER_SKIPPED_PACKAGES//\"/} | grep -vx 'waywiser_carla' | xargs)"
+   if [ -n "$WAYWISER_SKIPPED_PACKAGES" ]; then printf -v WAYWISER_SKIPPED_PACKAGES_ESCAPED '%q' "$WAYWISER_SKIPPED_PACKAGES"; else WAYWISER_SKIPPED_PACKAGES_ESCAPED=; fi
+   sed -i "s|^WAYWISER_SKIPPED_PACKAGES=.*|WAYWISER_SKIPPED_PACKAGES=$WAYWISER_SKIPPED_PACKAGES_ESCAPED|" $WAYWISER_WS/src/WayWiseR/.env
 
    # Build the workspace
    colcon build --symlink-install --base-paths src src/WayWiseR/waywiser_carla/external/carla-ros-bridge --packages-up-to waywiser_carla

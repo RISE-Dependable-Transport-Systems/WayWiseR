@@ -6,7 +6,7 @@
   <model name='drone'>
     <pose>5.5 -1.0 0.24 0 0 3.14159</pose>
     <self_collide>false</self_collide>
-    <static>true</static>
+    <static>false</static>
     <link name="base_link">
       <inertial>
         <mass>2.0</mass>
@@ -224,7 +224,7 @@
       <pose>0.153 0 -0.015 0 0 3.14159</pose>
       <experimental:params>
         <sensor element_id="camera_link::camera_sensor">
-          <topic action="modify">sensors/drone/camera</topic>
+          <topic action="modify">/sensors/drone/camera</topic>
           <camera action="modify">
             <optical_frame_id action="modify">drone/camera_link</optical_frame_id>
           </camera>
@@ -656,7 +656,47 @@
       <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
       <motorType>velocity</motorType>
     </plugin>
-    <plugin filename="libignition-gazebo-joint-state-publisher-system.so"
+    <plugin
+      filename="ignition-gazebo-multicopter-control-system"
+      name="ignition::gazebo::systems::MulticopterVelocityControl">
+      <robotNamespace>drone</robotNamespace>
+      <commandSubTopic>cmd_vel</commandSubTopic>
+      <enableSubTopic>enable</enableSubTopic>
+      <comLinkName>base_link</comLinkName>
+      <velocityGain>2.7 2.7 2.7</velocityGain>
+      <attitudeGain>2 3 0.15</attitudeGain>
+      <angularRateGain>0.4 0.52 0.18</angularRateGain>
+      <maximumLinearAcceleration>2 2 2</maximumLinearAcceleration>
+      <maximumLinearVelocity>5 5 5</maximumLinearVelocity>
+      <maximumAngularVelocity>3 3 3</maximumAngularVelocity>
+      <rotorConfiguration>
+        <rotor>
+          <jointName>drone/rotor_0_joint</jointName>
+          <forceConstant>8.54858e-06</forceConstant>
+          <momentConstant>0.016</momentConstant>
+          <direction>1</direction>
+        </rotor>
+        <rotor>
+          <jointName>drone/rotor_1_joint</jointName>
+          <forceConstant>8.54858e-06</forceConstant>
+          <momentConstant>0.016</momentConstant>
+          <direction>1</direction>
+        </rotor>
+        <rotor>
+          <jointName>drone/rotor_2_joint</jointName>
+          <forceConstant>8.54858e-06</forceConstant>
+          <momentConstant>0.016</momentConstant>
+          <direction>-1</direction>
+        </rotor>
+        <rotor>
+          <jointName>drone/rotor_3_joint</jointName>
+          <forceConstant>8.54858e-06</forceConstant>
+          <momentConstant>0.016</momentConstant>
+          <direction>-1</direction>
+        </rotor>
+      </rotorConfiguration>
+    </plugin>
+    <plugin filename="ignition-gazebo-joint-state-publisher-system"
       name="ignition::gazebo::systems::JointStatePublisher">
       <joint_name>drone/rotor_0_joint</joint_name>
       <joint_name>drone/rotor_1_joint</joint_name>
@@ -669,7 +709,7 @@
     </plugin>
     <plugin
       filename="ignition-gazebo-pose-publisher-system"
-      name="gz::sim::systems::PosePublisher">
+      name="ignition::gazebo::systems::PosePublisher">
       <publish_link_pose>false</publish_link_pose>
       <publish_collision_pose>false</publish_collision_pose>
       <publish_visual_pose>false</publish_visual_pose>

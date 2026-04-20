@@ -7,6 +7,7 @@ from launch.actions import (
     GroupAction,
     IncludeLaunchDescription,
     OpaqueFunction,
+    TimerAction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
@@ -24,7 +25,6 @@ def generate_launch_description():
     waywiser_rviz2_dir = get_package_share_directory('waywiser_rviz2')
     waywiser_teleop_dir = get_package_share_directory('waywiser_teleop')
     waywiser_perception_dir = get_package_share_directory('waywiser_perception')
-    waywiser_slam_dir = get_package_share_directory('waywiser_slam')
     waywiser_core_dir = get_package_share_directory('waywiser_core')
 
     # args that can be set from the command line or a default will be used
@@ -33,24 +33,12 @@ def generate_launch_description():
     )
     gazebo_world_la = DeclareLaunchArgument(
         'world',
-        default_value=os.path.join(waywiser_gazebo_dir, 'worlds/car_world.sdf'),
+        default_value=os.path.join(waywiser_gazebo_dir, 'worlds/bounded_world.sdf'),
         description='Full path to gazebo sdf file',
-    )
-    rover_enable_collision_monitor_la = DeclareLaunchArgument(
-        'rover_enable_collision_monitor',
-        default_value='False',
-        description='Use Nav2 collision monitoring',
-    )
-    rover_config_la = DeclareLaunchArgument(
-        'rover_config',
-        default_value=os.path.join(waywiser_gazebo_dir, 'config/rover.yaml'),
-        description='Full path to params file of rover',
     )
     rviz_config_la = DeclareLaunchArgument(
         'rviz_config',
-        default_value=os.path.join(
-            waywiser_rviz2_dir, 'config/map_reference_frame_rover_drone_collab.rviz'
-        ),
+        default_value=os.path.join(waywiser_rviz2_dir, 'config/map_reference_frame_drone.rviz'),
         description='Full path of rviz display config file or path to their directory',
     )
     teleop_config_la = DeclareLaunchArgument(
@@ -70,43 +58,8 @@ def generate_launch_description():
     )
     control_vehicle_node_name_la = DeclareLaunchArgument(
         'control_vehicle_node_name',
-        default_value='waywiser_car_node',
+        default_value='waywiser_drone_node',
         description='Name of the vehicle node to control',
-    )
-    rover_localization_node_name_la = DeclareLaunchArgument(
-        'rover_localization_node_name',
-        default_value='waywiser_car_localization_node',
-        description='Name of the node to be launched',
-    )
-    rover_lidar_based_slam_la = DeclareLaunchArgument(
-        'rover_lidar_based_slam',
-        default_value='True',
-        description='Use lidar based slam',
-    )
-    rover_slam_config_la = DeclareLaunchArgument(
-        'rover_slam_config',
-        default_value=os.path.join(waywiser_slam_dir, 'config/slam.yaml'),
-        description='Full path to params file for slam toolbox',
-    )
-    rover_spawn_config_file_la = DeclareLaunchArgument(
-        'rover_spawn_config_file',
-        default_value=os.path.join(waywiser_gazebo_dir, 'config/rover_spawn_config.json'),
-        description='Full path to spawn config file',
-    )
-    rover_yolo_config_la = DeclareLaunchArgument(
-        'rover_yolo_config',
-        default_value=os.path.join(waywiser_perception_dir, 'config/yolov8.yaml'),
-        description='Full path to params file of yolo',
-    )
-    rover_octomap_config_la = DeclareLaunchArgument(
-        'rover_octomap_config',
-        default_value=os.path.join(waywiser_perception_dir, 'config/octomap.yaml'),
-        description='Full path to params file of octomap',
-    )
-    rover_name_la = DeclareLaunchArgument(
-        'rover_name',
-        default_value='rover',
-        description='Name of the rover, used as ROS namespace and prefix for robot frames',
     )
     drone_config_la = DeclareLaunchArgument(
         'drone_config',
@@ -117,6 +70,11 @@ def generate_launch_description():
         'drone_spawn_config_file',
         default_value=os.path.join(waywiser_gazebo_dir, 'config/drone_spawn_config.json'),
         description='Full path to spawn config file',
+    )
+    drone_spawn_delay_la = DeclareLaunchArgument(
+        'drone_spawn_delay',
+        default_value='5.0',
+        description='Delay in seconds before spawning drone models after Gazebo starts',
     )
     drone_yolo_config_la = DeclareLaunchArgument(
         'drone_yolo_config',
@@ -143,35 +101,43 @@ def generate_launch_description():
     drone_frame_prefix = [drone_name, '/']
 
     # include launch files
-    gazebo_rover = IncludeLaunchDescription(
+    gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
                 os.path.join(
-                    waywiser_dir,
+                    waywiser_gazebo_dir,
                     'launch',
-                    'gazebo_rover.launch.py',
+                    'gazebo.launch.py',
                 )
             ]
         ),
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'world': LaunchConfiguration('world'),
-            'rover_enable_collision_monitor': LaunchConfiguration(
-                'rover_enable_collision_monitor'
-            ),
-            'rover_config': LaunchConfiguration('rover_config'),
+        }.items(),
+    )
+
+    teleop_rviz2 = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(
+                    waywiser_dir,
+                    'launch',
+                    'teleop_rviz2.launch.py',
+                )
+            ]
+        ),
+        launch_arguments={
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
             'rviz_config': LaunchConfiguration('rviz_config'),
             'teleop_config': LaunchConfiguration('teleop_config'),
             'teleop': LaunchConfiguration('teleop'),
             'rviz2': LaunchConfiguration('rviz2'),
-            'control_vehicle_node_name': LaunchConfiguration('control_vehicle_node_name'),
-            'rover_localization_node_name': LaunchConfiguration('rover_localization_node_name'),
-            'rover_lidar_based_slam': LaunchConfiguration('rover_lidar_based_slam'),
-            'rover_slam_config': LaunchConfiguration('rover_slam_config'),
-            'rover_spawn_config_file': LaunchConfiguration('rover_spawn_config_file'),
-            'rover_yolo_config': LaunchConfiguration('rover_yolo_config'),
-            'rover_octomap_config': LaunchConfiguration('rover_octomap_config'),
-            'rover_name': LaunchConfiguration('rover_name'),
+            'control_vehicle_node_fqn': [
+                drone_name,
+                '/',
+                LaunchConfiguration('control_vehicle_node_name'),
+            ],
         }.items(),
     )
 
@@ -270,19 +236,26 @@ def generate_launch_description():
         ]
     )
 
-    drone_gazebo_spawn = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                os.path.join(
-                    waywiser_gazebo_dir,
-                    'launch',
-                    'spawn.launch.py',
-                )
-            ]
-        ),
-        launch_arguments={
-            'spawn_config_file': LaunchConfiguration('drone_spawn_config_file'),
-        }.items(),
+    drone_gazebo_spawn = TimerAction(
+        period=LaunchConfiguration('drone_spawn_delay'),
+        actions=[
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(
+                            waywiser_gazebo_dir,
+                            'launch',
+                            'spawn.launch.py',
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    'use_sim_time': LaunchConfiguration('use_sim_time'),
+                    'world': LaunchConfiguration('world'),
+                    'spawn_config_file': LaunchConfiguration('drone_spawn_config_file'),
+                }.items(),
+            )
+        ],
     )
 
     drone_state_publisher = OpaqueFunction(function=drone_state_publisher_launch)
@@ -293,29 +266,22 @@ def generate_launch_description():
     # declare launch args
     ld.add_action(use_sim_time_la)
     ld.add_action(gazebo_world_la)
-    ld.add_action(rover_enable_collision_monitor_la)
-    ld.add_action(rover_config_la)
     ld.add_action(rviz_config_la)
     ld.add_action(teleop_config_la)
     ld.add_action(teleop_la)
     ld.add_action(rviz2_la)
     ld.add_action(control_vehicle_node_name_la)
-    ld.add_action(rover_localization_node_name_la)
-    ld.add_action(rover_lidar_based_slam_la)
-    ld.add_action(rover_slam_config_la)
-    ld.add_action(rover_spawn_config_file_la)
-    ld.add_action(rover_yolo_config_la)
-    ld.add_action(rover_octomap_config_la)
-    ld.add_action(rover_name_la)
     ld.add_action(drone_config_la)
     ld.add_action(drone_spawn_config_file_la)
+    ld.add_action(drone_spawn_delay_la)
     ld.add_action(drone_yolo_config_la)
     ld.add_action(drone_octomap_config_la)
     ld.add_action(drone_name_la)
     ld.add_action(drone_localization_node_name_la)
 
     # start nodes
-    ld.add_action(gazebo_rover)
+    ld.add_action(gazebo)
+    ld.add_action(teleop_rviz2)
     ld.add_action(drone_navsatfix_extended_wrapper)
     ld.add_action(drone_gazebo_spawn)
     ld.add_action(drone_yolo)

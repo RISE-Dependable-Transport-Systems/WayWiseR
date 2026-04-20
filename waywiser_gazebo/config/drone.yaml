@@ -43,3 +43,31 @@ navsatfix_extended_wrapper_node:
     gnss_heading_accuracy: 0.1
     gnss_last_rtcm_correction_age: 0
     gnss_num_satellites: 0
+
+waywiser_drone_node:
+  ros__parameters:
+    vehicle_interface_type: "ext_simulated"
+    odom_topic: "odometry"
+    vehicle_pose_topic: "drone_pose"
+    battery_state_topic: ""
+    fused_nav_sat_fix_extended_topic: "sensors/gnss/fused_nav_sat_fix_extended"
+    emergency_stop_status_topic: "emergency_stop/current_state"
+    emergency_stop_update_topic: "emergency_stop/target_state"
+    publish_odom_to_baselink_tf: false
+    publish_world_to_odom_tf: true
+    vehicle_state_poll_rate: 30
+
+emergency_stop_monitor:
+  ros__parameters:
+    start_with_emergency_stop: true
+    cmd_vel_in_timeout: 0.5
+    emergency_stop_state_publish_rate: 10
+
+onboard_twist_mux:
+  ros__parameters:
+    use_stamped: false
+    topics:
+      teleop:
+        topic: teleop_mux_vel
+        timeout: 0.5
+        priority: 100
