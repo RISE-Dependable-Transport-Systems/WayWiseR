@@ -4,10 +4,13 @@
 [submodule "waywiser_carla/external/carla-ros-bridge"]
 	path = waywiser_carla/external/carla-ros-bridge
 	url = https://github.com/das-rise/carla-ros-bridge.git
-
 [submodule "waywiser_gazebo/external/PX4-Autopilot"]
 	path = waywiser_gazebo/external/PX4-Autopilot
 	url = https://github.com/PX4/PX4-Autopilot.git
 [submodule "waywiser_gazebo/external/ros_gz_harmonic"]
 	path = waywiser_gazebo/external/ros_gz_harmonic
 	url = https://github.com/gazebosim/ros_gz.git
+[submodule "waywiser_core/external/px4_msgs"]
+	path = waywiser_core/external/px4_msgs
+	url = https://github.com/PX4/px4_msgs.git
+	branch = release/1.17
