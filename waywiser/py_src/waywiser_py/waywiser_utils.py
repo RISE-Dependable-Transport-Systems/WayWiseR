@@ -7,6 +7,8 @@ import time
 from typing import Union
 
 from geometry_msgs.msg import PoseStamped
+from launch.actions import EmitEvent, LogInfo
+from launch.events import Shutdown
 import psutil
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 import yagmail
@@ -26,6 +28,22 @@ RELIABLE_VOLATILE_QOS = QoSProfile(
     history=HistoryPolicy.KEEP_LAST,
     depth=1,
 )
+
+
+def shutdown_on_process_error(event, _context):
+    """Shutdown a launch when a process exits with a non-zero status."""
+    returncode = getattr(event, 'returncode', 0)
+    if returncode == 0:
+        return []
+
+    action = getattr(event, 'action', None)
+    action_name = getattr(action, 'name', None) or getattr(action, '__class__', type(action)).__name__
+    reason = f"Shutting down launch because '{action_name}' exited with code {returncode}."
+
+    return [
+        LogInfo(msg=reason),
+        EmitEvent(event=Shutdown(reason=reason)),
+    ]
 
 
 class FileUtils:

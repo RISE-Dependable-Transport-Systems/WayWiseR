@@ -25,7 +25,7 @@ public:
 
     start_with_emergency_stop_ = this->declare_parameter("start_with_emergency_stop", true);
     emergency_stop_status_topic_ = this->declare_parameter(
-      "emergency_stop_status_topic", "emergency_stop/status");
+      "emergency_stop_status_topic", "emergency_stop/current_state");
     emergency_stop_update_topic_ = this->declare_parameter(
       "emergency_stop_update_topic", "emergency_stop/target_state");
 
@@ -108,8 +108,6 @@ private:
           emergency_stop_target_state_msg->sender_id.c_str());
 
         auto twist_msg = geometry_msgs::msg::Twist();
-        twist_msg.linear.x = 0.0;
-        twist_msg.angular.z = 0.0;
         twist_publisher_->publish(twist_msg);
       }
     } else if (emergency_stop_target_state_msg->state == EmergencyStopState::CLEAR) {
@@ -162,8 +160,7 @@ private:
     twist_watchdog_timer_->reset();
 
     if (is_emergency_stop_active()) {
-      twist_msg->linear.x = 0.0;
-      twist_msg->angular.z = 0.0;
+      *twist_msg = geometry_msgs::msg::Twist();
     }
     twist_publisher_->publish(*twist_msg);
   }
@@ -176,8 +173,6 @@ private:
       cmd_vel_in_timeout_);
 
     auto twist_msg = geometry_msgs::msg::Twist();
-    twist_msg.linear.x = 0.0;
-    twist_msg.angular.z = 0.0;
     twist_publisher_->publish(twist_msg);
 
     twist_watchdog_timer_->cancel();

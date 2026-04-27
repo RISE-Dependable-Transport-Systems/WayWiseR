@@ -218,6 +218,149 @@
           </friction>
         </surface>
       </collision>
+      <sensor name="air_pressure_sensor" type="air_pressure">
+        <gz_frame_id>base_link</gz_frame_id>
+        <always_on>1</always_on>
+        <update_rate>50</update_rate>
+        <air_pressure>
+          <!-- Noise modeled after BMP390 -->
+          <pressure>
+            <noise type="gaussian">
+              <mean>0</mean>
+              <stddev>3</stddev>
+            </noise>
+          </pressure>
+        </air_pressure>
+      </sensor>
+      <sensor name="magnetometer_sensor" type="magnetometer">
+        <gz_frame_id>base_link</gz_frame_id>
+        <always_on>1</always_on>
+        <update_rate>100</update_rate>
+        <magnetometer>
+          <!-- TODO: update to fix units and coordinate system when we move past Harmonic -->
+          <!-- See https://github.com/gazebosim/gz-sim/pull/2460 -->
+          <!-- 3mgauss RMS: NOTE: noise is in tesla but sensor reports data in gauss -->
+          <!-- Noise modeled after IIS2MDC -->
+          <x>
+            <noise type="gaussian">
+              <stddev>0.0001</stddev>
+            </noise>
+          </x>
+          <y>
+            <noise type="gaussian">
+              <stddev>0.0001</stddev>
+            </noise>
+          </y>
+          <z>
+            <noise type="gaussian">
+              <stddev>0.0001</stddev>
+            </noise>
+          </z>
+        </magnetometer>
+      </sensor>
+      <sensor name="imu_sensor" type="imu">
+        <gz_frame_id>base_link</gz_frame_id>
+        <always_on>1</always_on>
+        <update_rate>250</update_rate>
+        <imu>
+          <angular_velocity>
+            <!-- Noise modeled after IIM42653 -->
+            <!-- 0.05 deg/s converted to rad/s -->
+            <x>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.0008726646</stddev>
+              </noise>
+            </x>
+            <y>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.0008726646</stddev>
+              </noise>
+            </y>
+            <z>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.0008726646</stddev>
+              </noise>
+            </z>
+          </angular_velocity>
+          <linear_acceleration>
+            <!-- Noise modeled after IIM42653 -->
+            <!-- X & Y axis: 0.65 mg-rms converted to m/ss -->
+            <x>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.00637</stddev>
+              </noise>
+            </x>
+            <y>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.00637</stddev>
+              </noise>
+            </y>
+            <!-- Z axis: 0.70 mg-rms converted to m/ss-->
+            <z>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.00686</stddev>
+              </noise>
+            </z>
+          </linear_acceleration>
+        </imu>
+      </sensor>
+      <sensor name="navsat_sensor" type="navsat">
+        <gz_frame_id>base_link</gz_frame_id>
+        <always_on>1</always_on>
+        <update_rate>30</update_rate>
+      </sensor>
+    </link>
+    <joint name="drone/lidar_sensor_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>lidar_sensor_link</child>
+    </joint>
+    <link name="lidar_sensor_link">
+      <pose relative_to="base_link">0 0 -0.05 0 1.57 0</pose>
+      <inertial>
+        <mass>0.001</mass>
+        <inertia>
+          <ixx>0.00001</ixx>
+          <iyy>0.00001</iyy>
+          <izz>0.00001</izz>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+        </inertia>
+      </inertial>
+      <sensor name="lidar" type="gpu_lidar">
+        <gz_frame_id>lidar_sensor_link</gz_frame_id>
+        <pose>0 0 0 3.14 0 0</pose>
+        <update_rate>50</update_rate>
+        <ray>
+          <scan>
+            <horizontal>
+              <samples>1</samples>
+              <resolution>1</resolution>
+              <min_angle>0</min_angle>
+              <max_angle>0</max_angle>
+            </horizontal>
+            <vertical>
+              <samples>1</samples>
+              <resolution>1</resolution>
+              <min_angle>0</min_angle>
+              <max_angle>0</max_angle>
+            </vertical>
+          </scan>
+          <range>
+            <min>0.1</min>
+            <max>100.0</max>
+            <resolution>0.01</resolution>
+          </range>
+        </ray>
+        <always_on>1</always_on>
+        <visualize>false</visualize>
+      </sensor>
     </link>
     <include>
       <uri>model://realsense_d435i_camera/model.sdf</uri>
@@ -233,65 +376,6 @@
     </include>
     <joint name="drone/camera_joint" type="fixed">
       <child>realsense_d435i_camera::camera_link</child>
-      <parent>base_link</parent>
-    </joint>
-    <link name="imu_link">
-      <pose>0 0 0.05 0 0 0</pose>
-      <sensor name="imu_link" type="imu">
-        <always_on>1</always_on>
-        <update_rate>50</update_rate>
-        <topic>drone/imu</topic>
-        <ignition_frame_id>drone/imu_link</ignition_frame_id>
-        <pose relative_to='imu_link'>0 0 0 0 0 0</pose>
-      </sensor>
-    </link>
-    <joint name="drone/imu_joint" type="fixed">
-      <child>imu_link</child>
-      <parent>base_link</parent>
-    </joint>
-    <link name="gps_link">
-      <pose>0 0 0.05 0 0 0</pose>
-      <sensor name="gps_link" type="navsat">
-        <always_on>1</always_on>
-        <update_rate>50</update_rate>
-        <visualize>0</visualize>
-        <topic>drone/gps/navsat</topic>
-        <ignition_frame_id>drone/gps_link</ignition_frame_id>
-        <pose relative_to='gps_link'>0 0 0 0 0 0</pose>
-        <navsat>
-          <position_sensing>
-            <horizontal>
-              <noise type="gaussian">
-                <mean>0.0</mean>
-                <stddev>4e-10</stddev>
-              </noise>
-            </horizontal>
-            <vertical>
-              <noise type="gaussian">
-                <mean>0.0</mean>
-                <stddev>4e-4</stddev>
-              </noise>
-            </vertical>
-          </position_sensing>
-          <velocity_sensing>
-            <horizontal>
-              <noise type="gaussian">
-                <mean>0.0</mean>
-                <stddev>0.1</stddev>
-              </noise>
-            </horizontal>
-            <vertical>
-              <noise type="gaussian">
-                <mean>0.0</mean>
-                <stddev>0.1</stddev>
-              </noise>
-            </vertical>
-          </velocity_sensing>
-        </navsat>
-      </sensor>
-    </link>
-    <joint name="drone/gps_joint" type="fixed">
-      <child>gps_link</child>
       <parent>base_link</parent>
     </joint>
     <link name="rotor_0">
@@ -364,7 +448,6 @@
           <spring_reference>0</spring_reference>
           <spring_stiffness>0</spring_stiffness>
         </dynamics>
-        <use_parent_model_frame>1</use_parent_model_frame>
       </axis>
     </joint>
     <link name="rotor_1">
@@ -437,7 +520,6 @@
           <spring_reference>0</spring_reference>
           <spring_stiffness>0</spring_stiffness>
         </dynamics>
-        <use_parent_model_frame>1</use_parent_model_frame>
       </axis>
     </joint>
     <link name="rotor_2">
@@ -510,7 +592,6 @@
           <spring_reference>0</spring_reference>
           <spring_stiffness>0</spring_stiffness>
         </dynamics>
-        <use_parent_model_frame>1</use_parent_model_frame>
       </axis>
     </joint>
     <link name="rotor_3">
@@ -583,7 +664,6 @@
           <spring_reference>0</spring_reference>
           <spring_stiffness>0</spring_stiffness>
         </dynamics>
-        <use_parent_model_frame>1</use_parent_model_frame>
       </axis>
     </joint>
     <!-- FOR UPDATED ignition::gazebo::systems::MulticopterMotorModel with
@@ -702,9 +782,8 @@
       <joint_name>drone/rotor_1_joint</joint_name>
       <joint_name>drone/rotor_2_joint</joint_name>
       <joint_name>drone/rotor_3_joint</joint_name>
-      <joint_name>drone/imu_joint</joint_name>
-      <joint_name>drone/gps_joint</joint_name>
       <joint_name>drone/camera_joint</joint_name>
+      <joint_name>drone/lidar_sensor_joint</joint_name>
       <topic>/drone/joint_states</topic>
     </plugin>
     <plugin
@@ -718,6 +797,13 @@
       <use_pose_vector_msg>true</use_pose_vector_msg>
       <publish_nested_model_pose>true</publish_nested_model_pose>
       <update_frequency>50</update_frequency>
+    </plugin>
+    <plugin
+      filename="ignition-gazebo-odometry-publisher-system"
+      name="ignition::gazebo::systems::OdometryPublisher">
+      <dimensions>3</dimensions>
+      <odom_frame>drone/odom</odom_frame>
+      <robot_base_frame>drone/base_link</robot_base_frame>
     </plugin>
   </model>
 </sdf>

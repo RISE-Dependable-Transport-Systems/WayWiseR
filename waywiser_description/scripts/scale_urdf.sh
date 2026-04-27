@@ -46,8 +46,10 @@ cat <<EOF >$XSLT_STYLESHEET
 
     <!-- Prefix link/name, joint/name, joint/parent/link, joint/child/link, and gazebo/reference -->
     <xsl:template match="link/@name | joint/@name | joint/parent/@link | joint/child/@link | gazebo/@reference">
-        <xsl:attribute name="{name()}">
-            <xsl:value-of select="concat(\$frame_prefix, .)"/>
+        <xsl:variable name="name" select="."/>
+        <xsl:variable name="attr" select="name()"/>
+        <xsl:attribute name="{\$attr}">
+            <xsl:value-of select="concat(\$frame_prefix, \$name)"/>
         </xsl:attribute>
     </xsl:template>
 

@@ -5,7 +5,7 @@
   <model name="realsense_d435i_camera">
     <pose>4 -1.5 0.1 0 0 0</pose>
     <self_collide>false</self_collide>
-    <static>true</static>
+    <static>false</static>
     <link name="camera_link">
       <pose>0 0 0 0 0 -1.570795</pose>
       <inertial>

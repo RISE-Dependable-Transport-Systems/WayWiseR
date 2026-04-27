@@ -5,7 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded: ~
       Splitter Ratio: 0.84935063123703
-    Tree Height: 585
+    Tree Height: 655
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -52,8 +52,8 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        car_world:
-          Value: false
+        bounded_world:
+          Value: true
         drone:
           Value: false
         drone/base_link:
@@ -78,59 +78,13 @@ Visualization Manager:
           Value: false
         map:
           Value: true
-        rover:
-          Value: false
-        rover/base_link:
-          Value: true
-        rover/camera_link:
-          Value: false
-        rover/chassis_link:
-          Value: false
-        rover/front_axle_link:
-          Value: false
-        rover/front_bumper_link:
-          Value: false
-        rover/front_end_link:
-          Value: false
-        rover/gps_link:
-          Value: false
-        rover/imu_link:
-          Value: false
-        rover/left_end_link:
-          Value: false
-        rover/left_front_wheel_link:
-          Value: false
-        rover/left_front_wheel_steering_link:
-          Value: false
-        rover/left_rear_wheel_link:
-          Value: false
-        rover/lidar_link:
-          Value: false
-        rover/lidar_support_link:
-          Value: false
-        rover/odom:
-          Value: true
-        rover/rear_axle_link:
-          Value: true
-        rover/rear_bumper_link:
-          Value: false
-        rover/rear_end_link:
-          Value: false
-        rover/right_end_link:
-          Value: false
-        rover/right_front_wheel_link:
-          Value: false
-        rover/right_front_wheel_steering_link:
-          Value: false
-        rover/right_rear_wheel_link:
-          Value: false
       Marker Scale: 1
       Name: TF
       Show Arrows: false
       Show Axes: true
       Show Names: true
       Tree:
-        car_world:
+        bounded_world:
           drone:
             drone/base_link:
               drone/chassis_link:
@@ -151,41 +105,6 @@ Visualization Manager:
             drone/realsense_d435i_camera:
               {}
           map:
-            rover/odom:
-              rover/base_link:
-                rover/chassis_link:
-                  rover/camera_link:
-                    {}
-                  rover/front_axle_link:
-                    rover/left_front_wheel_steering_link:
-                      rover/left_front_wheel_link:
-                        {}
-                    rover/right_front_wheel_steering_link:
-                      rover/right_front_wheel_link:
-                        {}
-                  rover/front_bumper_link:
-                    rover/front_end_link:
-                      {}
-                  rover/gps_link:
-                    {}
-                  rover/imu_link:
-                    {}
-                  rover/left_end_link:
-                    {}
-                  rover/lidar_support_link:
-                    rover/lidar_link:
-                      {}
-                  rover/rear_axle_link:
-                    rover/left_rear_wheel_link:
-                      {}
-                    rover/right_rear_wheel_link:
-                      {}
-                  rover/rear_bumper_link:
-                    rover/rear_end_link:
-                      {}
-                  rover/right_end_link:
-                    {}
-          rover:
             {}
       Update Interval: 0
       Value: true
@@ -305,257 +224,11 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /drone/sensors/camera/color/yolo_annotated_image
       Value: true
-    - Alpha: 1
-      Class: rviz_default_plugins/RobotModel
-      Collision Enabled: false
-      Description File: ""
-      Description Source: Topic
-      Description Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /rover/robot_description
-      Enabled: true
-      Links:
-        All Links Enabled: true
-        Expand Joint Details: false
-        Expand Link Details: false
-        Expand Tree: false
-        Link Tree Style: Links in Alphabetic Order
-        rover/base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        rover/camera_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rover/chassis_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rover/front_axle_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rover/front_bumper_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rover/front_end_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        rover/gps_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rover/imu_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rover/left_end_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        rover/left_front_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rover/left_front_wheel_steering_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rover/left_rear_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rover/lidar_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rover/lidar_support_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rover/rear_axle_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rover/rear_bumper_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rover/rear_end_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        rover/right_end_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        rover/right_front_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rover/right_front_wheel_steering_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rover/right_rear_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-      Mass Properties:
-        Inertia: false
-        Mass: false
-      Name: Rover Robot model
-      TF Prefix: ""
-      Update Interval: 0
-      Value: true
-      Visual Enabled: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz_default_plugins/PointCloud2
-      Color: 255; 255; 255
-      Color Transformer: RGB8
-      Decay Time: 0
-      Enabled: true
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 4096
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: Rover Color pointcloud
-      Position Transformer: XYZ
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.009999999776482582
-      Style: Flat Squares
-      Topic:
-        Depth: 5
-        Durability Policy: System Default
-        Filter size: 10
-        History Policy: System Default
-        Reliability Policy: System Default
-        Value: /rover/sensors/camera/color/points
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: true
-    - Class: rviz_default_plugins/Image
-      Enabled: true
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
-      Name: Rover Object detection
-      Normalize Range: true
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /rover/sensors/camera/color/yolo_annotated_image
-      Value: true
-    - Alpha: 0.699999988079071
-      Class: rviz_default_plugins/Map
-      Color Scheme: map
-      Draw Behind: false
-      Enabled: true
-      Name: Rover Slam Map
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /map
-      Update Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /map_updates
-      Use Timestamp: false
-      Value: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz_default_plugins/LaserScan
-      Color: 255; 255; 255
-      Color Transformer: Intensity
-      Decay Time: 0
-      Enabled: true
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 0
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: Rover LaserScan
-      Position Transformer: XYZ
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.009999999776482582
-      Style: Flat Squares
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /rover/scan_lidar
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: true
     - Class: octomap_rviz_plugins/OccupancyGridStamped
       Enabled: true
-      Max. Height Display: inf
+      Max. Height Display: 3.4028234663852886e+38
       Max. Octree Depth: 16
-      Min. Height Display: -inf
-      Name: Rover OccupancyGridStamped
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /rover/octomap_full
-      Value: true
-      Voxel Alpha: 1
-      Voxel Coloring: Z-Axis
-      Voxel Rendering: Occupied Voxels
-    - Class: octomap_rviz_plugins/OccupancyGridStamped
-      Enabled: true
-      Max. Height Display: inf
-      Max. Octree Depth: 16
-      Min. Height Display: -inf
+      Min. Height Display: -3.4028234663852886e+38
       Name: Drone OccupancyGridStamped
       Topic:
         Depth: 5
@@ -642,9 +315,7 @@ Window Geometry:
   Height: 890
   Hide Left Dock: true
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd000000040000000000000183000002a3fc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000008800fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730000000058000002a30000012a00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000220053006c0061006d0054006f006f006c0062006f00780050006c007500670069006e0000000353000001cc0000025400ffffff0000000100000116000002a3fc0200000006fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a005600690065007700730100000058000000f2000000f200fffffffb0000002c0052006f0076006500720020004f0062006a00650063007400200064006500740065006300740069006f006e0100000153000000d20000003a00fffffffb0000002c0052006f0076006500720020004f0062006a00650063007400200064006500740065006300740069006f006e010000011e000000db0000000000000000fb0000002c00440072006f006e00650020004f0062006a00650063007400200064006500740065006300740069006f006e010000022e000000cd0000003a00fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000005000000004efc0100000002fb0000000800540069006d0065010000000000000500000003c600fffffffb0000000800540069006d00650100000000000004500000000000000000000003e1000002a300000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
-  Rover Object detection:
-    collapsed: false
+  QMainWindow State: 000000ff00000000fd000000040000000000000183000002ccfc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073000000003d000002cc000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000220053006c0061006d0054006f006f006c0062006f00780050006c007500670069006e0000000353000001cc0000018500ffffff0000000100000116000002ccfc0200000006fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000003d00000180000000a400fffffffb0000002c0052006f0076006500720020004f0062006a00650063007400200064006500740065006300740069006f006e0100000146000000e10000000000000000fb0000002c0052006f0076006500720020004f0062006a00650063007400200064006500740065006300740069006f006e010000011e000000db0000000000000000fb0000002c00440072006f006e00650020004f0062006a00650063007400200064006500740065006300740069006f006e01000001c3000001460000002800fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000005000000004efc0100000002fb0000000800540069006d0065010000000000000500000002fb00fffffffb0000000800540069006d00650100000000000004500000000000000000000003e4000002cc00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   SlamToolboxPlugin:
@@ -656,5 +327,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1280
-  X: 1099
-  Y: 293
+  X: 640
+  Y: 273

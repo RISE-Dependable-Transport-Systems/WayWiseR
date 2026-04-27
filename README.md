@@ -46,6 +46,7 @@ WayWiseR is divided into modular ROS2 packages:
 
      ```bash
      sudo apt update && sudo apt install -y \
+         ccache \
          libunwind-dev \
          libqt5serialport5-dev \
          git \

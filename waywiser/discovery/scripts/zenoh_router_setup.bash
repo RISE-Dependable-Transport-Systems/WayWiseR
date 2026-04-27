@@ -137,10 +137,6 @@ fi
 echo "  ZENOH_ROUTER_CONFIG_URI=${ZENOH_ROUTER_CONFIG_URI:-<default>}"
 echo "  ZENOH_CONFIG_OVERRIDE=${ZENOH_CONFIG_OVERRIDE:-<none>}"
 echo "  RUST_LOG=${RUST_LOG:-<unset>}"
-echo ""
-echo "Starting Zenoh router (rmw_zenohd)..."
-echo "Press Ctrl+C to stop."
-echo ""
 
 # Start the Zenoh router
 ros2 run rmw_zenoh_cpp rmw_zenohd
