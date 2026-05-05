@@ -17,6 +17,33 @@ code --install-extension esbenp.prettier-vscode
 code --install-extension DotJoshJohnson.xml
 ```
 
+## Configure VS Code Workspace
+
+To keep `src/`, `resources/`, and workspace-level build outputs visible in Explorer while still using repository-managed VS Code settings, create a workspace file at `$WAYWISER_WS` and symlink the `.vscode` folder:
+
+```bash
+cd $WAYWISER_WS
+ln -sfn src/WayWiseR/.vscode .vscode
+cat > waywiser.code-workspace <<'EOF'
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "git.scanRepositories": ["src/WayWiseR"]
+  }
+}
+EOF
+```
+
+Then open this workspace in VS Code:
+
+```bash
+code $WAYWISER_WS/waywiser.code-workspace
+```
+
 ## Configure Uncrustify for C++
 
 Run the following command to download the `ament_code_style.cfg` to your `.vscode` directory:

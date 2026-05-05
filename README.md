@@ -79,8 +79,8 @@ WayWiseR is divided into modular ROS2 packages:
    cp $WAYWISER_WS/src/WayWiseR/.env.example $WAYWISER_WS/src/WayWiseR/.env
    ```
 
-   Open `.env` and verify/update `WAYWISER_SKIPPED_PACKAGES` and your desired configurations. 
-   
+   Open `.env` and verify/update `WAYWISER_SKIPPED_PACKAGES` and your desired configurations.
+
    > ⚠️ **Important**: Because the simulation packages (`waywiser_agrarsense`, `waywiser_carla`, `waywiser_gazebo`) require significant additional system setup, it is **strictly recommended** to include them in the `WAYWISER_SKIPPED_PACKAGES` list for this initial workspace build. You should proceed with building the core workspace first, and then build each of these packages later by following the specialized instructions in their respective package `README.md` files.
 
 3. **Setup Python virtual environment:**
