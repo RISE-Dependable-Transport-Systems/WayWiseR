@@ -129,6 +129,55 @@
                                                         all movement)&lt;/td&gt;
                                                         &lt;/tr&gt;
                                                         &lt;/table&gt;
+                                                        &lt;p style='margin-top: 12px; color: #9ca3af;'&gt;
+                                                        Quadcopter only:
+                                                        &lt;/p&gt;
+                                                        &lt;table style='width: 100%;
+                                                        border-collapse: collapse;'&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px; width:
+                                                        120px;'&gt;&lt;span style='color: #34d399;
+                                                        font-weight:
+                                                        700;'&gt;Q&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Strafe Left
+                                                        (positive Y)&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #34d399; font-weight:
+                                                        700;'&gt;E&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Strafe Right
+                                                        (negative Y)&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #34d399; font-weight:
+                                                        700;'&gt;R&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Move Up
+                                                        (positive Z)&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #34d399; font-weight:
+                                                        700;'&gt;F&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Move Down
+                                                        (negative Z)&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #fb7185; font-weight:
+                                                        700;'&gt;Ctrl + L&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Auto lift-off
+                                                        to 2 m when Auto lift off is enabled&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #fb7185; font-weight:
+                                                        700;'&gt;Ctrl + Shift + L&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Auto
+                                                        Land &amp;amp; Disarm&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;/table&gt;
                                                         &lt;/div&gt;</string>
                                                 </property>
                                                 <property name="wordWrap">
@@ -220,6 +269,46 @@
                                                         E&lt;/span&gt;&lt;/td&gt;
                                                         &lt;td style='padding: 8px;'&gt;Clear
                                                         Emergency Stop&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;/table&gt;
+                                                        &lt;/div&gt;</string>
+                                                </property>
+                                                <property name="wordWrap">
+                                                    <bool>true</bool>
+                                                </property>
+                                            </widget>
+                                        </item>
+                                    </layout>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QGroupBox" name="quadcopter_arm_group">
+                                    <property name="title">
+                                        <string>QUADCOPTER ARM MANAGEMENT</string>
+                                    </property>
+                                    <layout class="QVBoxLayout" name="verticalLayout_arm_group">
+                                        <item>
+                                            <widget class="QLabel" name="quadcopter_arm_text">
+                                                <property name="text">
+                                                    <string>&lt;div style='line-height: 1.8;
+                                                        font-size: 11pt;'&gt;
+                                                        &lt;table style='width: 100%;
+                                                        border-collapse: collapse;'&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px; width:
+                                                        180px;'&gt;&lt;span style='color: #34d399;
+                                                        font-weight: 700;'&gt;Ctrl +
+                                                        M&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Request arm
+                                                        (only when ready for takeoff)&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #fbbf24; font-weight:
+                                                        700;'&gt;Ctrl + Shift +
+                                                        M&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Request
+                                                        disarm (only when not in air)&lt;/td&gt;
                                                         &lt;/tr&gt;
                                                         &lt;/table&gt;
                                                         &lt;/div&gt;</string>

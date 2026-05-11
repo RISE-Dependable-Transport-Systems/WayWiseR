@@ -38,14 +38,21 @@ with suppress_stderr():
 with suppress_stderr():
     from PyQt5.QtWidgets import QApplication, QDialog, QMainWindow
     from PyQt5.uic import loadUi
-    from rcl_interfaces.srv import GetParameters
+    from rcl_interfaces.msg import Parameter as ParameterMsg
+    from rcl_interfaces.msg import ParameterType, ParameterValue
+    from rcl_interfaces.srv import GetParameters, SetParameters
     import rclpy
     from rclpy.node import Node
     from sensor_msgs.msg import Joy
+    from std_msgs.msg import Bool
     from tf_transformations import euler_from_quaternion
 
 
-from waywiser_core.msg import BatteryState, NavSatFixExtended  # noqa: E402
+from waywiser_core.msg import (
+    BatteryState,
+    NavSatFixExtended,
+    QuadcopterState,
+)  # noqa: E402
 from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS, RosUtils  # noqa: E402
 from waywiser_twist_safety.msg import EmergencyStopState  # noqa: E402
 
@@ -132,19 +139,24 @@ class TwistKeyboard(Node):
         self.odom_topic = ''
         self.vehicle_pose_topic = ''
         self.battery_state_topic = ''
+        self.arm_command_topic = ''
+        self.quadcopter_state_topic = ''
         self.nav_sat_fix_extended_topic = ''
         self.emergency_stop_status_topic = ''
         self.emergency_stop_update_topic = ''
         self.enuref = [0.0, 0.0, 0.0]
         self.vehicle_namespace = ''
+        self.waywise_object_type = 'generic'
 
         # Subscribers (will be created after fetching topics)
         self.odom_subscriber = None
         self.vehicle_pose_subscriber = None
         self.battery_state_subscriber = None
+        self.quadcopter_state_subscriber = None
         self.nav_sat_fix_extended_subscriber = None
         self.emergency_stop_state_subscriber = None
         self.emergency_stop_request_publisher = None
+        self.arm_command_publisher = None
         self.mux_publisher = None
 
         # Mux initialization
@@ -162,20 +174,31 @@ class TwistKeyboard(Node):
         # Joy subscribers and timers
         self.joy_subscriber = self.create_subscription(Joy, '/joy', self.joy_callback, 10)
         self.joy_watchdog_timer = self.create_timer(self.joy_timeout, self.joy_watchdog_callback)
+        self.joy_watchdog_timer.cancel()
 
         # State variables
         self.last_emergency_stop_state = {'msg': None, 'stamp': self.get_clock().now()}
         self.last_odom = {'pose': None, 'twist': None, 'stamp': self.get_clock().now()}
         self.last_vehicle_pose = {'pose': None, 'stamp': self.get_clock().now()}
         self.last_battery_state = {'msg': None, 'stamp': self.get_clock().now()}
+        self.last_quadcopter_state = {'msg': None, 'stamp': self.get_clock().now()}
         self.last_nav_sat_fix_extended = {'msg': None, 'stamp': self.get_clock().now()}
 
         # Current twist command
         self.current_twist = Twist()
 
+        # Auto arm state
+        self.auto_arm_enabled = True
+        self.hold_position_on_idle_enabled = True
+        self.auto_lift_off_enabled = True
+        self.auto_lift_off_active = False
+        self.arm_request_debounce_period = 1.0
+        self.last_arm_request = {'arm': None, 'time': 0.0}
+
         # Key states
         self.keys_pressed = set()
         self.is_actuation_requested = False
+        self.auto_landing_active = False
 
         # RTCM correction age mapping
         self.rtcm_correction_age_mapping = {
@@ -217,6 +240,7 @@ class TwistKeyboard(Node):
             'emergency_stop_status_topic',
             'emergency_stop_update_topic',
             'enuref',
+            'waywise_object_type',
         ]
 
         future = client.call_async(request)
@@ -224,7 +248,7 @@ class TwistKeyboard(Node):
 
         if future.result() is not None:
             vals = future.result().values
-            if len(vals) >= 7:
+            if len(vals) >= 8:
                 self.odom_topic = self._prefix_with_vehicle_namespace(
                     vals[0].string_value or self.odom_topic
                 )
@@ -244,6 +268,34 @@ class TwistKeyboard(Node):
                     vals[5].string_value or self.emergency_stop_update_topic
                 )
                 self.enuref = vals[6].double_array_value or self.enuref
+                self.waywise_object_type = vals[7].string_value or self.waywise_object_type
+
+                if self.waywise_object_type == 'quadcopter':
+                    qc_request = GetParameters.Request()
+                    qc_request.names = [
+                        'arm_command_topic',
+                        'quadcopter_state_topic',
+                        'auto_lift_off_enabled',
+                    ]
+                    qc_future = client.call_async(qc_request)
+                    rclpy.spin_until_future_complete(self, qc_future, timeout_sec=5.0)
+
+                    if qc_future.result() is not None:
+                        qc_vals = qc_future.result().values
+                        if len(qc_vals) >= 3:
+                            self.arm_command_topic = self._prefix_with_vehicle_namespace(
+                                qc_vals[0].string_value or self.arm_command_topic
+                            )
+                            self.quadcopter_state_topic = self._prefix_with_vehicle_namespace(
+                                qc_vals[1].string_value or self.quadcopter_state_topic
+                            )
+                            if qc_vals[2].type == ParameterType.PARAMETER_BOOL:
+                                self.auto_lift_off_enabled = qc_vals[2].bool_value
+                        else:
+                            self.get_logger().warn(
+                                f'Received {len(qc_vals)} quadcopter params instead of at least 3 from '
+                                f"'{self.control_vehicle_node_fqn}'"
+                            )
 
                 # Create subscribers
                 self._create_subscribers()
@@ -251,19 +303,118 @@ class TwistKeyboard(Node):
                 # Create publishers
                 self._create_publishers()
 
-                self.get_logger().info(f"Updated topics from '{self.control_vehicle_node_fqn}'")
+                self.get_logger().info(
+                    f"Updated topics from '{self.control_vehicle_node_fqn}' "
+                    f"(waywise_object_type={self.waywise_object_type})"
+                )
 
-                self.joy_watchdog_timer.reset()
+                # We don't reset the joy_watchdog_timer here; we wait for the first /joy message
+                self.set_hover_hold_enabled(self.hold_position_on_idle_enabled)
+
             else:
                 self.get_logger().warn(
-                    f'Received {len(vals)} topics instead of 7 from '
+                    f'Received {len(vals)} topics instead of at least 8 from '
                     f"'{self.control_vehicle_node_fqn}'"
                 )
 
         self.destroy_client(client)
 
     def _prefix_with_vehicle_namespace(self, topic):
+        if not topic:
+            return ''
         return RosUtils.prefix_topic_with_namespace(topic, self.vehicle_namespace)
+
+    def bridge_node_fqn(self):
+        return RosUtils.prefix_topic_with_namespace('px4_zenoh_offboard_bridge', self.vehicle_namespace)
+
+    def set_remote_node_parameter(self, node_fqn, name, value):
+        """Set a single parameter on a remote node."""
+        if not node_fqn:
+            return
+
+        service_name = f'/{node_fqn}/set_parameters'.replace('//', '/')
+        client = self.create_client(SetParameters, service_name)
+        if not client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().warn(f"Parameter service of '{node_fqn}' not available")
+            self.destroy_client(client)
+            return
+
+        request = SetParameters.Request()
+        param_msg = ParameterMsg()
+        param_msg.name = name
+        if isinstance(value, bool):
+            param_msg.value = ParameterValue(type=ParameterType.PARAMETER_BOOL, bool_value=value)
+        elif isinstance(value, int):
+            param_msg.value = ParameterValue(type=ParameterType.PARAMETER_INTEGER, integer_value=value)
+        elif isinstance(value, float):
+            param_msg.value = ParameterValue(type=ParameterType.PARAMETER_DOUBLE, double_value=value)
+        elif isinstance(value, str):
+            param_msg.value = ParameterValue(type=ParameterType.PARAMETER_STRING, string_value=value)
+        request.parameters.append(param_msg)
+
+        future = client.call_async(request)
+        rclpy.spin_until_future_complete(self, future, timeout_sec=2.0)
+        self.destroy_client(client)
+
+    def set_hover_hold_enabled(self, enabled):
+        """Update hover hold behavior on the PX4 offboard bridge and vehicle node."""
+        self.hold_position_on_idle_enabled = bool(enabled)
+
+        if self.waywise_object_type != 'quadcopter':
+            return
+
+        # Update bridge node
+        self.set_remote_node_parameter(
+            self.bridge_node_fqn(), 'hold_position_on_idle', self.hold_position_on_idle_enabled
+        )
+
+        # Update vehicle node
+        self.set_remote_node_parameter(
+            self.control_vehicle_node_fqn,
+            'hold_position_on_idle',
+            self.hold_position_on_idle_enabled,
+        )
+
+    def set_auto_lift_off_enabled(self, enabled):
+        """Update auto lift-off availability on the vehicle node."""
+        self.auto_lift_off_enabled = bool(enabled)
+        if not self.auto_lift_off_enabled and self.auto_lift_off_active:
+            self.auto_lift_off_active = False
+        self.set_remote_node_parameter(
+            self.control_vehicle_node_fqn,
+            'auto_lift_off_enabled',
+            self.auto_lift_off_enabled,
+        )
+        if not self.auto_lift_off_enabled:
+            self.set_remote_node_parameter(self.control_vehicle_node_fqn, 'auto_lift_off', False)
+
+    def start_auto_lift_off(self):
+        """Request automatic lift-off from the vehicle node."""
+        if self.waywise_object_type != 'quadcopter':
+            self.get_logger().warn('Auto lift-off is only available for quadcopters.')
+            return
+        if not self.auto_lift_off_enabled:
+            self.get_logger().warn('Auto lift-off is disabled. Enable the Auto lift off option first.')
+            return
+
+        if self.auto_landing_active:
+            self.set_auto_landing_active(False)
+
+        self.auto_lift_off_active = True
+        self.set_remote_node_parameter(self.control_vehicle_node_fqn, 'auto_lift_off', True)
+        self.get_logger().info('Auto lift-off requested.')
+
+    def set_auto_arm_enabled(self, enabled):
+        """Update auto arm behavior on the vehicle node."""
+        self.auto_arm_enabled = bool(enabled)
+        self.set_remote_node_parameter(self.control_vehicle_node_fqn, 'auto_arm', self.auto_arm_enabled)
+
+    def set_auto_landing_active(self, active):
+        """Update auto landing behavior on the vehicle node."""
+        self.auto_landing_active = bool(active)
+        self.set_remote_node_parameter(
+            self.control_vehicle_node_fqn, 'auto_landing', self.auto_landing_active
+        )
 
     def _create_subscribers(self):
         """Create or recreate subscribers based on topic names."""
@@ -290,6 +441,16 @@ class TwistKeyboard(Node):
                 self.battery_state_topic,
                 self.battery_state_callback,
                 10,
+            )
+
+        if self.quadcopter_state_topic:
+            if self.quadcopter_state_subscriber:
+                self.destroy_subscription(self.quadcopter_state_subscriber)
+            self.quadcopter_state_subscriber = self.create_subscription(
+                QuadcopterState,
+                self.quadcopter_state_topic,
+                self.quadcopter_state_callback,
+                RELIABLE_TRANSIENT_LOCAL_QOS,
             )
 
         if self.nav_sat_fix_extended_topic:
@@ -322,6 +483,14 @@ class TwistKeyboard(Node):
                 RELIABLE_TRANSIENT_LOCAL_QOS,
             )
 
+        if self.arm_command_topic:
+            if self.arm_command_publisher:
+                self.destroy_publisher(self.arm_command_publisher)
+            self.arm_command_publisher = self.create_publisher(Bool, self.arm_command_topic, 10)
+        elif self.arm_command_publisher:
+            self.destroy_publisher(self.arm_command_publisher)
+            self.arm_command_publisher = None
+
         if self.mux_output_topic:
             if self.mux_publisher:
                 self.destroy_publisher(self.mux_publisher)
@@ -345,6 +514,15 @@ class TwistKeyboard(Node):
         """Handle battery state messages."""
         self.last_battery_state['msg'] = msg
         self.last_battery_state['stamp'] = self.get_clock().now()
+
+    def quadcopter_state_callback(self, msg):
+        """Handle quadcopter high-level state updates."""
+        self.last_quadcopter_state['msg'] = msg
+        self.last_quadcopter_state['stamp'] = self.get_clock().now()
+
+        # Sync auto landing state from vehicle node
+        self.auto_landing_active = (msg.state_code == QuadcopterState.LANDING)
+        self.auto_lift_off_active = (msg.state_code == QuadcopterState.AUTO_LIFTING_OFF)
 
     def nav_sat_fix_extended_callback(self, msg):
         """Handle extended GPS/FIX messages."""
@@ -496,11 +674,12 @@ class TwistKeyboard(Node):
 
         # Check for actuation keys
         actuation_keys = {Qt.Key.Key_W, Qt.Key.Key_X, Qt.Key.Key_A, Qt.Key.Key_D, Qt.Key.Key_S}
+        if self.waywise_object_type == 'quadcopter':
+            actuation_keys.update(
+                {Qt.Key.Key_Q, Qt.Key.Key_E, Qt.Key.Key_R, Qt.Key.Key_F}
+            )
         is_actuation_requested_now = bool(self.keys_pressed & actuation_keys)
 
-        if self.is_actuation_requested and not is_actuation_requested_now:
-            # Just released all actuation keys - update keyboard source with zero twist
-            pass
         if is_actuation_requested_now:
             if Qt.Key.Key_S not in self.keys_pressed:
                 if Qt.Key.Key_W in self.keys_pressed:
@@ -508,15 +687,24 @@ class TwistKeyboard(Node):
                 if Qt.Key.Key_X in self.keys_pressed:
                     twist.linear.x -= self.linear_speed
                 if Qt.Key.Key_A in self.keys_pressed:
-                    if twist.linear.x > 0:
-                        twist.angular.z += self.angular_speed
+                    if abs(twist.linear.x) > 0.01:
+                        twist.angular.z += self.angular_speed if twist.linear.x > 0 else -self.angular_speed
                     else:
-                        twist.angular.z -= self.angular_speed
+                        twist.angular.z += self.angular_speed
                 if Qt.Key.Key_D in self.keys_pressed:
-                    if twist.linear.x > 0:
-                        twist.angular.z -= self.angular_speed
+                    if abs(twist.linear.x) > 0.01:
+                        twist.angular.z -= self.angular_speed if twist.linear.x > 0 else +self.angular_speed
                     else:
-                        twist.angular.z += self.angular_speed
+                        twist.angular.z -= self.angular_speed
+                if self.waywise_object_type == 'quadcopter':
+                    if Qt.Key.Key_Q in self.keys_pressed:
+                        twist.linear.y += self.linear_speed
+                    if Qt.Key.Key_E in self.keys_pressed:
+                        twist.linear.y -= self.linear_speed
+                    if Qt.Key.Key_R in self.keys_pressed:
+                        twist.linear.z += self.linear_speed
+                    if Qt.Key.Key_F in self.keys_pressed:
+                        twist.linear.z -= self.linear_speed
 
         # Always update keyboard source in mux
         self._update_mux_source('keyboard', twist)
@@ -538,6 +726,45 @@ class TwistKeyboard(Node):
         self.emergency_stop_target_state_msg.stamp = self.get_clock().now().to_msg()
         if self.emergency_stop_request_publisher is not None:
             self.emergency_stop_request_publisher.publish(self.emergency_stop_target_state_msg)
+
+    def request_arm_state(self, arm=True):
+        """Request arm or disarm through the selected vehicle node."""
+        if self.waywise_object_type != 'quadcopter':
+            self.get_logger().warn('Arm/disarm keys are only available for quadcopters.')
+            return
+
+        if arm:
+            # Check if PX4 is ready for takeoff before requesting arm
+            state_msg = self.last_quadcopter_state.get('msg')
+            if not state_msg or state_msg.state_code != QuadcopterState.READY_TO_ARM:
+                self.get_logger().warn('Ignoring arm request: PX4 is not ready for offboard arming.')
+                return
+        else:
+            # Check if PX4 is in air before requesting disarm
+            state_msg = self.last_quadcopter_state.get('msg')
+            if state_msg and state_msg.state_code == QuadcopterState.IN_FLIGHT:
+                self.get_logger().warn('Ignoring disarm request: vehicle is still in flight.')
+                return
+
+        if self.arm_command_publisher is None:
+            self.get_logger().warn('Arm/disarm command topic is not available for this vehicle.')
+            return
+
+        now_monotonic = time.monotonic()
+        if (
+            self.last_arm_request['arm'] == bool(arm)
+            and (now_monotonic - self.last_arm_request['time']) < self.arm_request_debounce_period
+        ):
+            return
+
+        msg = Bool()
+        msg.data = bool(arm)
+        self.arm_command_publisher.publish(msg)
+        self.last_arm_request = {'arm': bool(arm), 'time': now_monotonic}
+        if arm:
+            self.get_logger().info('Requested arm through waywiser_copter_node.')
+        else:
+            self.get_logger().info('Requested disarm through waywiser_copter_node.')
 
     def is_battery_low(self):
         """Check if battery is low."""
@@ -802,6 +1029,27 @@ class TwistKeyboardUI(QMainWindow):
         """Connect UI signals to slots."""
         self.vehicle_node_button.clicked.connect(self.show_vehicle_node_dialog)
         self.usage_button.clicked.connect(self.show_usage_guide)
+        self.auto_arm_checkbox.stateChanged.connect(self.on_auto_arm_changed)
+        self.hover_hold_checkbox.stateChanged.connect(self.on_hover_hold_changed)
+        self.auto_lift_off_checkbox.stateChanged.connect(self.on_auto_lift_off_changed)
+
+    def on_auto_arm_changed(self, state):
+        """Handle auto arm checkbox state change."""
+        self.node.set_auto_arm_enabled(state == Qt.Checked)
+
+    def on_hover_hold_changed(self, state):
+        """Handle hover hold checkbox state change."""
+        self.node.set_hover_hold_enabled(state == Qt.Checked)
+
+    def on_auto_lift_off_changed(self, state):
+        """Handle auto lift-off checkbox state change."""
+        self.node.set_auto_lift_off_enabled(state == Qt.Checked)
+
+    def sync_control_options_from_node(self):
+        """Update control option widgets from the node without writing parameters back."""
+        self.auto_lift_off_checkbox.blockSignals(True)
+        self.auto_lift_off_checkbox.setChecked(self.node.auto_lift_off_enabled)
+        self.auto_lift_off_checkbox.blockSignals(False)
 
     def setup_audio(self):
         """Set up audio for low battery warning beep."""
@@ -885,6 +1133,19 @@ class TwistKeyboardUI(QMainWindow):
                     self.node.control_vehicle_node_fqn
                 )
                 self.node.request_params_from_vehicle_node()
+                self.sync_control_options_from_node()
+                self.update_ui_for_vehicle_type()
+
+    def update_ui_for_vehicle_type(self):
+        """Update UI elements based on the waywise_object_type."""
+        if self.node.waywise_object_type == 'quadcopter':
+            self.auto_arm_status_box.show()
+            self.hover_hold_status_box.show()
+            self.auto_lift_off_status_box.show()
+        else:
+            self.auto_arm_status_box.hide()
+            self.hover_hold_status_box.hide()
+            self.auto_lift_off_status_box.hide()
 
     def keyPressEvent(self, event):
         """Handle key press events."""
@@ -912,7 +1173,18 @@ class TwistKeyboardUI(QMainWindow):
         elif key == Qt.Key.Key_O:
             self.node.update_speed(angular_delta=self.node.angular_speed_increment)
         elif key == Qt.Key.Key_L:
-            self.node.update_speed(angular_delta=-self.node.angular_speed_increment)
+            if modifiers & Qt.KeyboardModifier.ControlModifier:
+                if self.node.waywise_object_type == 'quadcopter':
+                    if modifiers & Qt.KeyboardModifier.ShiftModifier:
+                        self.node.set_auto_landing_active(not self.node.auto_landing_active)
+                        state_str = 'ENABLED' if self.node.auto_landing_active else 'DISABLED'
+                        self.node.get_logger().info(f'Auto landing {state_str}')
+                    else:
+                        self.node.start_auto_lift_off()
+                else:
+                    self.node.get_logger().warn('Auto lift-off/landing is only available for quadcopters.')
+            else:
+                self.node.update_speed(angular_delta=-self.node.angular_speed_increment)
 
         # Handle emergency stop
         if key == Qt.Key.Key_E and modifiers & Qt.KeyboardModifier.ControlModifier:
@@ -920,6 +1192,17 @@ class TwistKeyboardUI(QMainWindow):
                 self.node.set_emergency_stop(active=False)
             else:
                 self.node.set_emergency_stop(active=True)
+
+        # Handle quadcopter arm/disarm
+        if (
+            not event.isAutoRepeat()
+            and key == Qt.Key.Key_M
+            and modifiers & Qt.KeyboardModifier.ControlModifier
+        ):
+            if modifiers & Qt.KeyboardModifier.ShiftModifier:
+                self.node.request_arm_state(arm=False)
+            else:
+                self.node.request_arm_state(arm=True)
 
     def keyReleaseEvent(self, event):
         """Handle key release events."""
@@ -951,6 +1234,8 @@ class TwistKeyboardUI(QMainWindow):
         """Update the status display with modern UI elements."""
         self.vehicle_node_label.setText(self.node.control_vehicle_node_fqn)
         self.vehicle_node_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
+        self.vehicle_type_label.setText(self.node.waywise_object_type.replace('_', ' ').title())
+        self.vehicle_type_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
 
         self.enuref_label.setText(
             f'({self.node.enuref[0]:.6f}°, {self.node.enuref[1]:.6f}°, {self.node.enuref[2]:.2f}m)'
@@ -958,6 +1243,7 @@ class TwistKeyboardUI(QMainWindow):
         self.enuref_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
 
         self._update_estop_display()
+        self._update_quadcopter_state_display()
         self._update_speed_display()
         self._update_battery_display()
         self._update_odom_display()
@@ -1008,6 +1294,68 @@ class TwistKeyboardUI(QMainWindow):
                 self.estop_label.setText('[?] UNKNOWN')
                 self.estop_label.setStyleSheet(f'color: {self.gray_color}; font-weight: 700;')
 
+    def _set_indicator_light(self, widget, is_on):
+        """Set a status light to green, red, or gray."""
+        if is_on is None:
+            color = self.gray_color
+        else:
+            color = self.green_color if is_on else self.red_color
+        widget.setText('●')
+        widget.setStyleSheet(f'color: {color}; font-size: 14pt; font-weight: 700;')
+
+    def _update_quadcopter_state_display(self):
+        """Update quadcopter-only high-level status display."""
+        is_quadcopter = self.node.waywise_object_type == 'quadcopter'
+
+        self.copter_state_static_label.setVisible(is_quadcopter)
+        self.copter_state_label.setVisible(is_quadcopter)
+        self.copter_state_time_label.setVisible(is_quadcopter)
+
+        if not is_quadcopter:
+            return
+
+        msg = self.node.last_quadcopter_state['msg']
+        if msg is None:
+            state_text = 'UNKNOWN'
+            time_str, time_color = 'never', self.gray_color
+        else:
+            state_text = msg.state_str.upper()
+            time_str, time_color = self._get_time_ago_and_color(self.node.last_quadcopter_state['stamp'])
+
+        self.copter_state_label.setText(state_text)
+        self.copter_state_time_label.setText(f'Last updated: {time_str}')
+        self.copter_state_time_label.setStyleSheet(f'color: {time_color}; font-size: 9pt;')
+
+        # Set color based on state
+        if msg:
+            if msg.state_code == QuadcopterState.EMERGENCY:
+                color = self.red_color
+            elif msg.state_code in [QuadcopterState.ARMED, QuadcopterState.IN_FLIGHT]:
+                color = self.green_color
+            elif msg.state_code in [
+                QuadcopterState.ARMING,
+                QuadcopterState.LANDING,
+                QuadcopterState.LIFTING_OFF,
+                QuadcopterState.AUTO_LIFTING_OFF,
+            ]:
+                color = '#fbbf24'  # Amber
+            else:
+                color = '#60a5fa'  # Blue
+            self.copter_state_label.setStyleSheet(f'color: {color}; font-weight: 700;')
+
+        if self.node.auto_landing_active:
+            self.warning_label.setText('AUTO LANDING ACTIVE - MANUAL INPUT TO CANCEL')
+            self.warning_label.show()
+        elif self.node.auto_lift_off_active:
+            self.warning_label.setText('AUTO LIFT-OFF ACTIVE - MANUAL INPUT TO CANCEL')
+            self.warning_label.show()
+        elif self.warning_label.text() == 'AUTO LANDING ACTIVE - MANUAL INPUT TO CANCEL':
+            self.warning_label.hide()
+            self.warning_label.setText('')
+        elif self.warning_label.text() == 'AUTO LIFT-OFF ACTIVE - MANUAL INPUT TO CANCEL':
+            self.warning_label.hide()
+            self.warning_label.setText('')
+
     def _update_speed_display(self):
         """Update speed bars and labels on the UI."""
         max_lin = self.node.max_linear_speed
@@ -1020,40 +1368,91 @@ class TwistKeyboardUI(QMainWindow):
         ang_pct = int((self.node.angular_speed / max_ang) * 100) if max_ang > 0 else 0
 
         self.linear_progress_bg.setValue(lin_pct)
-        self.angular_progress_left_bg.setValue(ang_pct)
-        self.angular_progress_right_bg.setValue(ang_pct)
+        self.angular_progress_bg.setValue(ang_pct)
 
         self._update_active_speed(lin_pct, ang_pct)
 
     def _update_active_speed(self, lin_pct, ang_pct):
         """Update active speed display based on keypresses."""
-        is_th = Qt.Key.Key_W in self.node.keys_pressed or Qt.Key.Key_X in self.node.keys_pressed
+        is_lin = any(
+            k in self.node.keys_pressed
+            for k in [
+                Qt.Key.Key_W,
+                Qt.Key.Key_X,
+                Qt.Key.Key_Q,
+                Qt.Key.Key_E,
+                Qt.Key.Key_R,
+                Qt.Key.Key_F,
+            ]
+        )
         is_tl = Qt.Key.Key_A in self.node.keys_pressed
         is_tr = Qt.Key.Key_D in self.node.keys_pressed
+        is_ang = is_tl or is_tr
 
         msg = self.node.last_emergency_stop_state['msg']
         if msg is not None and msg.state == EmergencyStopState.ACTIVE:
             self.linear_value_label.setText(f'{0:+.2f} m/s')
             self.angular_value_label.setText(f'{0:+.2f} rad/s')
-            if is_th or is_tl or is_tr:
+            if is_lin or is_ang:
                 self.start_estop_blink()
         else:
-            self._update_progress_bars(is_th, is_tl, is_tr, lin_pct, ang_pct)
+            self._update_progress_bars(is_lin, is_ang, lin_pct, ang_pct)
+            self._update_joysticks(is_tl, is_tr, lin_pct, ang_pct)
             self.linear_value_label.setText(f'{self.node.current_twist.linear.x:+.2f} m/s')
             self.angular_value_label.setText(f'{self.node.current_twist.angular.z:+.2f} rad/s')
 
-    def _update_progress_bars(self, is_th, is_tl, is_tr, lin_pct, ang_pct):
+    def _update_progress_bars(self, is_lin, is_ang, lin_pct, ang_pct):
         """Update speed progress bars."""
-        self.linear_progress_fg.setValue(lin_pct if is_th else 0)
+        self.linear_progress_fg.setValue(lin_pct if is_lin else 0)
+        self.angular_progress_fg.setValue(ang_pct if is_ang else 0)
 
-        l_val = ang_pct if (is_tl and not is_tr) else 0
-        r_val = ang_pct if (is_tr and not is_tl) else 0
+    def _update_joysticks(self, is_tl, is_tr, lin_pct, ang_pct):
+        """Update the position of the joystick thumbs based on current controls."""
+        # Max displacement of the thumb stick from the center (56 is base, 18 is stick)
+        # Center is at x=19, y=19.
+        # Max movement is 19 pixels in any direction.
+        max_displacement = 19
 
-        self.angular_progress_left_fg.setValue(l_val)
-        self.angular_progress_right_fg.setValue(r_val)
+        # Left stick:
+        # Y-axis (Forward/Back): W moves forward (up, -y), X moves backward (down, +y)
+        # X-axis (Lateral): Q moves left (-x), E moves right (+x) [Quadcopter]
+        l_x_disp = 0
+        l_y_disp = 0
+
+        if Qt.Key.Key_W in self.node.keys_pressed:
+            l_y_disp = -int((lin_pct / 100.0) * max_displacement)
+        elif Qt.Key.Key_X in self.node.keys_pressed:
+            l_y_disp = int((lin_pct / 100.0) * max_displacement)
+
+        if self.node.waywise_object_type == 'quadcopter':
+            if Qt.Key.Key_Q in self.node.keys_pressed:
+                l_x_disp = -int((lin_pct / 100.0) * max_displacement)
+            elif Qt.Key.Key_E in self.node.keys_pressed:
+                l_x_disp = int((lin_pct / 100.0) * max_displacement)
+
+        self.left_joystick_stick.move(19 + l_x_disp, 19 + l_y_disp)
+
+        # Right stick:
+        # X-axis (Yaw): A moves left (-x), D moves right (+x)
+        # Y-axis (Vertical): R moves up (-y), F moves down (+y) [Quadcopter]
+        r_x_disp = 0
+        r_y_disp = 0
+
+        if is_tl:
+            r_x_disp = -int((ang_pct / 100.0) * max_displacement)
+        elif is_tr:
+            r_x_disp = int((ang_pct / 100.0) * max_displacement)
+
+        if self.node.waywise_object_type == 'quadcopter':
+            if Qt.Key.Key_R in self.node.keys_pressed:
+                r_y_disp = -int((lin_pct / 100.0) * max_displacement)
+            elif Qt.Key.Key_F in self.node.keys_pressed:
+                r_y_disp = int((lin_pct / 100.0) * max_displacement)
+
+        self.right_joystick_stick.move(19 + r_x_disp, 19 + r_y_disp)
 
     def _update_battery_display(self):
-        """Update battery voltage display on the UI."""
+        """Update battery information on the UI."""
         if self.node.last_battery_state['msg'] is not None:
             time_label, time_based_color = self._get_time_ago_and_color(
                 self.node.last_battery_state['stamp']
@@ -1080,20 +1479,27 @@ class TwistKeyboardUI(QMainWindow):
     def _set_odom_ui_values(self, time_label, time_based_color):
         """Set odometry UI labels and styles."""
         p = self.node.last_odom['pose']
-        yaw = euler_from_quaternion(
+        roll, pitch, yaw = euler_from_quaternion(
             [p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w]
-        )[2]
+        )
 
-        self.odom_pos_label.setText(f'({p.position.x:.2f}, {p.position.y:.2f}) m')
-        self.odom_yaw_label.setText(f'{yaw * 180.0 / 3.14159:.1f}°')
+        self.odom_pos_label.setText(
+            f'({p.position.x:.2f}, {p.position.y:.2f}, {p.position.z:.2f}) m'
+        )
+        self.odom_yaw_label.setText(
+            f'({roll * 180.0 / 3.14159:.1f}, {pitch * 180.0 / 3.14159:.1f}, '
+            f'{yaw * 180.0 / 3.14159:.1f})°'
+        )
 
         if self.node.last_odom['twist'] is not None:
             vx = self.node.last_odom['twist'].linear.x
             vy = self.node.last_odom['twist'].linear.y
+            vz = self.node.last_odom['twist'].linear.z
         else:
             vx = 0.0
             vy = 0.0
-        self.odom_vel_label.setText(f'({vx:.2f}, {vy:.2f}) m/s')
+            vz = 0.0
+        self.odom_vel_label.setText(f'({vx:.2f}, {vy:.2f}, {vz:.2f}) m/s')
         self.odom_time_label.setText(time_label)
 
         style = f'color: {time_based_color}; font-weight: 700;'
@@ -1106,7 +1512,7 @@ class TwistKeyboardUI(QMainWindow):
             lbl.setStyleSheet(style)
 
     def _update_world_pose_display(self):
-        """Update world pose labels (ENU position and heading)."""
+        """Update world pose labels (ENU position and roll/pitch/yaw)."""
         if self.node.last_vehicle_pose['pose'] is None:
             return
 
@@ -1117,18 +1523,22 @@ class TwistKeyboardUI(QMainWindow):
         self.world_pose_time_label.setStyleSheet(f'color: {time_based_color}; font-weight: 700;')
 
         pose = self.node.last_vehicle_pose['pose']
-        yaw_rad = euler_from_quaternion(
+        roll_rad, pitch_rad, yaw_rad = euler_from_quaternion(
             [
                 pose.orientation.x,
                 pose.orientation.y,
                 pose.orientation.z,
                 pose.orientation.w,
             ]
-        )[2]
+        )
+        roll_deg = roll_rad * 180.0 / 3.14159265359
+        pitch_deg = pitch_rad * 180.0 / 3.14159265359
         yaw_deg = yaw_rad * 180.0 / 3.14159265359
 
-        self.world_pose_pos_label.setText(f'({pose.position.x:.2f}, {pose.position.y:.2f}) m')
-        self.world_pose_yaw_label.setText(f'{yaw_deg:.1f}°')
+        self.world_pose_pos_label.setText(
+            f'({pose.position.x:.2f}, {pose.position.y:.2f}, {pose.position.z:.2f}) m'
+        )
+        self.world_pose_yaw_label.setText(f'({roll_deg:.1f}, {pitch_deg:.1f}, {yaw_deg:.1f})°')
 
         style = f'color: {time_based_color}; font-weight: 700;'
         self.world_pose_pos_label.setStyleSheet(style)
