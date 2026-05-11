@@ -335,41 +335,6 @@ wheels = [
 ]
 
 [[package]]
-name = "depthai"
-version = "2.30.0.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e1/54/5b056e10555acadf356a1480639a85327606e5c90f6ace3d1f57ad25111c/depthai-2.30.0.0.tar.gz", hash = "sha256:6f1de5abdca2a615eb29803d82a002da42ebf1d3c6d261187762f0dcc5b2a836", size = 453954, upload-time = "2025-03-18T15:07:32.26Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b0/a0/89c977958d6f5b5027e7ac1afb69aa49294a0cf842f6cc6016ec6ca6cf0f/depthai-2.30.0.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:1e8f2fb002a95395c398f1c843cf761425b98619737c6c088b110f72382a3597", size = 12746115, upload-time = "2025-03-18T15:05:11.259Z" },
-    { url = "https://files.pythonhosted.org/packages/87/4d/fe2085af19c6019bda502b30a60ee1daf82baf29688d8a2a8889e7c03ecf/depthai-2.30.0.0-cp310-cp310-macosx_13_0_x86_64.whl", hash = "sha256:dce435678ba01c4396cd9adfdfef7fabeb7c598abcccee0cfe18cf2817f36525", size = 13336417, upload-time = "2025-03-18T15:05:14.883Z" },
-    { url = "https://files.pythonhosted.org/packages/8b/5a/463ee9975a1cdbc3094a6620996e1e170df3c2c561d88e2ebdbc17761c53/depthai-2.30.0.0-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:2a185107326570cf2681a42bb6a3d952b58813a9e76308c6649ddb40ace79f0e", size = 13629705, upload-time = "2025-03-18T15:05:17.784Z" },
-    { url = "https://files.pythonhosted.org/packages/59/2e/441f474157a09d1e127e7b0b85986eb91f1db1cdd63d2b8c89b8f1d0415f/depthai-2.30.0.0-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:a3bb410e84fa882afe26626c3966f2451faff545e340323bd1ec643f1f1ea8d7", size = 14122922, upload-time = "2025-03-18T15:05:22.874Z" },
-    { url = "https://files.pythonhosted.org/packages/25/19/774d30555ff1e0c15eadc5c6a215bded89429ea6f7f8ce3726dda40e0c33/depthai-2.30.0.0-cp310-cp310-win32.whl", hash = "sha256:4e32f4d74caa70fbfabf956ba6a059e47918c890c3a009ebc6f69af5da1ac0ba", size = 10855702, upload-time = "2025-03-18T15:05:25.618Z" },
-    { url = "https://files.pythonhosted.org/packages/f6/31/f014704927c1766d3cf2046e0232cabe7e00f745462df542165702e4e06c/depthai-2.30.0.0-cp310-cp310-win_amd64.whl", hash = "sha256:4f1238e7bb90339a110f48863052dc2a1d3500bd86d4fe053ffa48f58890c840", size = 11191372, upload-time = "2025-03-18T15:05:28.35Z" },
-    { url = "https://files.pythonhosted.org/packages/b3/fe/e1d112e6c8c28b40cd3ed104e59dcc18169648de28bdf29f39fd56b92819/depthai-2.30.0.0-cp311-cp311-linux_armv6l.linux_armv7l.whl", hash = "sha256:d3199fb8a493349cc3f800a8529947aa3206f9cab75554f17ff0eab3a3f3f07f", size = 12784016, upload-time = "2025-03-18T15:05:31.632Z" },
-    { url = "https://files.pythonhosted.org/packages/aa/cc/87547b22a7dd53f872862b446547c9d7dc460baf4eebbdec46481ff51569/depthai-2.30.0.0-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:c228b4babcc54decf7238d066650d1ab3085dc350c80edb4217edd61867f8f61", size = 13337339, upload-time = "2025-03-18T15:05:34.664Z" },
-    { url = "https://files.pythonhosted.org/packages/84/04/2250694f9ef3bf137938365ba5e6f8461ec8fabedcad787cd84bbc330733/depthai-2.30.0.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:1e929ad152e5f492087d078471211da92fc9835274fe22569cf0b99437198766", size = 12746515, upload-time = "2025-03-18T15:05:37.411Z" },
-    { url = "https://files.pythonhosted.org/packages/db/3b/93941aab97aa8deef759a12254bd218da442afb4fa129712736da4d963d4/depthai-2.30.0.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:28750c2b856120e27df8088ad826b856f64cde42bbf3b7f341e31bfbbe15521c", size = 13630896, upload-time = "2025-03-18T15:05:40.216Z" },
-    { url = "https://files.pythonhosted.org/packages/1f/69/d37a19f4502a672d8e1a5d41e105f05b11db96ceea2e928a942b32b1c87d/depthai-2.30.0.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:e7c36e9d552049a6d333022234a031a336d8a49aeb51cad667a805eb9fa4bad8", size = 14122925, upload-time = "2025-03-18T15:05:43.478Z" },
-    { url = "https://files.pythonhosted.org/packages/4f/f2/314286e4bb09104315b41bc9c4cb62d7f319c7b62389b7771edbddaee6c2/depthai-2.30.0.0-cp311-cp311-win32.whl", hash = "sha256:1a2367fdd023d3af01aa67683b6cafc3c53dbb6bcc79ccc234912c69bca51c7d", size = 10857448, upload-time = "2025-03-18T15:05:46.206Z" },
-    { url = "https://files.pythonhosted.org/packages/6a/2e/83071a3c2159e9b20b7ab217b4cd08efacdb0a115f49b98942b69e346b17/depthai-2.30.0.0-cp311-cp311-win_amd64.whl", hash = "sha256:06d68545eb55abf342a6d0c5df6ed9a16bbaabffaff28800ee8e61895d191028", size = 11192326, upload-time = "2025-03-18T15:05:48.833Z" },
-    { url = "https://files.pythonhosted.org/packages/7b/d5/af052d03760fa3fd3bc3492dd144d5d0df708cb53fdc09d239e4d4e4097e/depthai-2.30.0.0-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:af64afc5a4f2bed7259df478f971afbae3ce3542567e759065cc35d1e9520c08", size = 13376602, upload-time = "2025-03-18T15:05:51.958Z" },
-    { url = "https://files.pythonhosted.org/packages/97/35/aed4335d9a17d5e8f21f7fe6d8d7f0098bab955f2e6331b8e203d873c527/depthai-2.30.0.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:aa54948e78f51495301dd131284b125d0023b0235433735e75281dfc42fdc3f7", size = 12761516, upload-time = "2025-03-18T15:05:54.943Z" },
-    { url = "https://files.pythonhosted.org/packages/ea/97/20465aac9e8baed73c9ad9b01bab24f16183c995bfa04626feb8a6666fda/depthai-2.30.0.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:d95531ff0d70720aee7f5de1f698570b6a8b1cbd7b1b79efabd88c49d57868df", size = 13629045, upload-time = "2025-03-18T15:05:58.802Z" },
-    { url = "https://files.pythonhosted.org/packages/4b/d4/46c27563ff5f232d56d3c803aa026dcb7e694098a31ec100c266c62cccdf/depthai-2.30.0.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:c4eb4789b8d49e1bdeaedb215f24282924e0634813802c0ea9e599a9c639b492", size = 14125507, upload-time = "2025-03-18T15:06:01.759Z" },
-    { url = "https://files.pythonhosted.org/packages/15/88/4eed0edb00cbff7de01ae2c4b4e4250f125a5db340a9b3b3a37edc3bd756/depthai-2.30.0.0-cp312-cp312-win32.whl", hash = "sha256:9bf3eff22d2dc2255a442c2ef6c4aa140789641639dc1f83d211eaada686dd98", size = 10865752, upload-time = "2025-03-18T15:06:04.475Z" },
-    { url = "https://files.pythonhosted.org/packages/54/65/f2d44dc3adc7bef142c721ced1f23229a26925773bac7840b86c9776e4e7/depthai-2.30.0.0-cp312-cp312-win_amd64.whl", hash = "sha256:850870777c53a332dba50187d5ddbb929c95e7a100730ccedf7b58ae32c70638", size = 11199913, upload-time = "2025-03-18T15:06:07.27Z" },
-    { url = "https://files.pythonhosted.org/packages/dc/91/ce13af2e6b47a5ae36b792167d6ae948c59cd9baa815e811b4f40c94fad5/depthai-2.30.0.0-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:869668afb027cfe2c14ca2b81e39a29769846d8e8e7c4b7cbd40a4a261773b1c", size = 13378230, upload-time = "2025-03-18T15:06:10.192Z" },
-    { url = "https://files.pythonhosted.org/packages/f6/5e/06d373253afddad54100e31e20fe1c066bbec11294478c9b75ff4c26ec97/depthai-2.30.0.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:278272edbab1437217db633c71f2c2c90ec2b76f20c9c6ee9f6664342f7609eb", size = 12763590, upload-time = "2025-03-18T15:06:13.015Z" },
-    { url = "https://files.pythonhosted.org/packages/96/28/95f226d1232fc13f139a15399d4e64c443ea96cb25819f5266d0e0d43830/depthai-2.30.0.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:5675545d9b354d1c51e902cc08d39649fe1a1c2fbe59bc411424687ab5e245da", size = 13628971, upload-time = "2025-03-18T15:06:16.161Z" },
-    { url = "https://files.pythonhosted.org/packages/43/f2/68adcb44aca0adc2b15e526665e501997cdde6a236cc60561061ba1de196/depthai-2.30.0.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:b2ae397de204ba84d00a26a241c94d1c3fbed31386f22ab6fadcd35a74aee347", size = 14125537, upload-time = "2025-03-18T15:06:19.115Z" },
-    { url = "https://files.pythonhosted.org/packages/8c/f6/d9a2b7f68b61f3e424b36d781c1be46944b4cd5376f8e5c076e9f3ae6274/depthai-2.30.0.0-cp313-cp313-win32.whl", hash = "sha256:e98806b3a50322ae7bcea3e0bc085b8ede398e230af2b92f6a81cb5e60c5e4e1", size = 10865621, upload-time = "2025-03-18T15:06:21.844Z" },
-    { url = "https://files.pythonhosted.org/packages/ce/89/dbcf8568d9bb103975cafd16a6560d0534182404bd29551ad05bcd78df06/depthai-2.30.0.0-cp313-cp313-win_amd64.whl", hash = "sha256:d2f78457f8df21d8b21fff4c9cecc40b7925cae617be8fe9d8e4bcb1a01fd329", size = 11199600, upload-time = "2025-03-18T15:06:24.624Z" },
-    { url = "https://files.pythonhosted.org/packages/7c/ab/4f309c326f83b0b4ef6efbceb601bfca20e7cf61dfe3a8a28f819b95e889/depthai-2.30.0.0-cp313-cp313t-manylinux_2_28_aarch64.whl", hash = "sha256:1f8261bec4ebb747c6e2c20dc1adc7c86a9025c2a36e16c0adfad468ee86d41d", size = 13658477, upload-time = "2025-03-18T15:06:27.591Z" },
-    { url = "https://files.pythonhosted.org/packages/2c/23/247e948204e8f1b60c427675f4e6c945456615986eca8970603df53fd115/depthai-2.30.0.0-cp313-cp313t-manylinux_2_28_x86_64.whl", hash = "sha256:8c14045e7c5e313b134cc3c10320dad2dda8815f4f2ea9b1c72dc36981f6b71b", size = 14165908, upload-time = "2025-03-18T15:06:30.608Z" },
-]
-
-[[package]]
 name = "docutils"
 version = "0.22.4"
 source = { registry = "https://pypi.org/simple" }
@@ -1736,6 +1701,46 @@ wheels = [
 ]
 
 [[package]]
+name = "tensorrt"
+version = "10.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tensorrt-cu12" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a9/d4/a19ff3c83b679c96bdd56f2e58de989cbeb8d8e6a0de750e0ba440049d90/tensorrt-10.0.1.tar.gz", hash = "sha256:7e9c8666f5bee86771451f007e25f81d65a411a26e6ea0b41faa5ec83ab863af", size = 16394, upload-time = "2024-04-24T19:43:54.318Z" }
+
+[[package]]
+name = "tensorrt-cu12"
+version = "10.16.1.11"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tensorrt-cu12-bindings" },
+    { name = "tensorrt-cu12-libs" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d5/a1/4841ac6b5e6d1d4a7f289013d359ed8479ec186a946e84446822cd4f5cc5/tensorrt_cu12-10.16.1.11.tar.gz", hash = "sha256:a044fe4a2e2e51fc205d806534102529c6f744402350b7730d221c99ffa6d269", size = 17921, upload-time = "2026-04-07T19:42:03.606Z" }
+
+[[package]]
+name = "tensorrt-cu12-bindings"
+version = "10.16.1.11"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/29/10/104667d40f08f0e8f3bf45a958deedc14fb49711e2d76ddb27bda86f19f3/tensorrt_cu12_bindings-10.16.1.11-cp310-none-manylinux_2_28_x86_64.whl", hash = "sha256:c1b6a156db4eab526360f5dba375e5c33e1275e3f36b0a7d375febb3db6202fc", size = 1346282, upload-time = "2026-04-07T19:45:01.555Z" },
+    { url = "https://files.pythonhosted.org/packages/98/b2/17a49e8146b9ef4d5c3551674f482d98c6ab54cdf72af00d2c3ba30952fd/tensorrt_cu12_bindings-10.16.1.11-cp310-none-win_amd64.whl", hash = "sha256:10cecfe6ea2e9b8ba11a5e4c0f2ae104ea3c5d22d2ff7799d7f87569cf936942", size = 963353, upload-time = "2026-04-07T19:46:54.038Z" },
+    { url = "https://files.pythonhosted.org/packages/88/9a/0b148ab0e3019d0a43e0a2404ff52ac0b3c230dbf776f4aed8960c647cc9/tensorrt_cu12_bindings-10.16.1.11-cp311-none-manylinux_2_28_x86_64.whl", hash = "sha256:150ef2b672487e29a8ea916353467c3e199994fb33589167e3641a928e243aa7", size = 1346362, upload-time = "2026-04-07T19:48:43.236Z" },
+    { url = "https://files.pythonhosted.org/packages/9a/f8/a264f4837ac8196ba4764a989e3526edc72ac83799c3b7659208e57b70dd/tensorrt_cu12_bindings-10.16.1.11-cp311-none-win_amd64.whl", hash = "sha256:425382e26ea149ac4a3cba3ae9b1abb4187a14c0cf9add58206d9bb1a236aa26", size = 963754, upload-time = "2026-04-07T19:46:28.672Z" },
+    { url = "https://files.pythonhosted.org/packages/81/93/8364c6e89d9a0ad596ddbefe1545e334c55bf1e85491d8cd3af6f5853572/tensorrt_cu12_bindings-10.16.1.11-cp312-none-manylinux_2_28_x86_64.whl", hash = "sha256:8e339335e7255b3fb3954eca61b4acbbdfcf7b28505bd711914519647ba310c8", size = 1341247, upload-time = "2026-04-07T19:49:05.057Z" },
+    { url = "https://files.pythonhosted.org/packages/82/50/2153496271c772e9fb6e46de7f00c7d5bd08fea33bdf7a38d60521f5a396/tensorrt_cu12_bindings-10.16.1.11-cp312-none-win_amd64.whl", hash = "sha256:e4d7105b9700987b4fd9362adacc0dfa7bee3025c8ad147a86a4316b6362a85b", size = 964884, upload-time = "2026-04-07T19:47:17.234Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/d4/ad07d2448df6ae02f980d9092a067b685604121bc471b7e81f0ede345239/tensorrt_cu12_bindings-10.16.1.11-cp313-none-manylinux_2_28_x86_64.whl", hash = "sha256:f2a08cedfa48e300720e5bed070a45e390ea67dbcf475ffce725d10e0a2b3ba7", size = 1341148, upload-time = "2026-04-07T19:47:39.718Z" },
+    { url = "https://files.pythonhosted.org/packages/44/8a/a4763ff95242b97dcd750c6d4a0a61e08431849304c4aa2b30c09fb5c0cb/tensorrt_cu12_bindings-10.16.1.11-cp313-none-win_amd64.whl", hash = "sha256:9794032093940924429957c89ebf27f893a7823b3daf48fd9427bfa23a9a52de", size = 964908, upload-time = "2026-04-07T19:45:42.506Z" },
+]
+
+[[package]]
+name = "tensorrt-cu12-libs"
+version = "10.16.1.11"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/56/9b/8d5b85c7cb7feaead7d462e81a4592a9d4ad3f581798f65ed34b765441f3/tensorrt_cu12_libs-10.16.1.11.tar.gz", hash = "sha256:53b45a3e82bead09638e7a3ddf4b927254b81fa0d924fe3fe594420a09ebf48b", size = 15757, upload-time = "2026-04-07T19:42:58.348Z" }
+
+[[package]]
 name = "torch"
 version = "2.9.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1863,18 +1868,6 @@ wheels = [
 ]
 
 [[package]]
-name = "typeguard"
-version = "4.4.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c7/68/71c1a15b5f65f40e91b65da23b8224dad41349894535a97f63a52e462196/typeguard-4.4.4.tar.gz", hash = "sha256:3a7fd2dffb705d4d0efaed4306a704c89b9dee850b688f060a8b1615a79e5f74", size = 75203, upload-time = "2025-06-18T09:56:07.624Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1b/a9/e3aee762739c1d7528da1c3e06d518503f8b6c439c35549b53735ba52ead/typeguard-4.4.4-py3-none-any.whl", hash = "sha256:b5f562281b6bfa1f5492470464730ef001646128b180769880468bd84b68b09e", size = 34874, upload-time = "2025-06-18T09:56:05.999Z" },
-]
-
-[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1934,8 +1927,14 @@ name = "waywiser"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "psutil" },
+    { name = "python-dotenv" },
+    { name = "pyyaml" },
+]
+
+[package.optional-dependencies]
+all = [
     { name = "catkin-pkg" },
-    { name = "depthai" },
     { name = "empy" },
     { name = "jinja2" },
     { name = "kconfiglib" },
@@ -1943,46 +1942,99 @@ dependencies = [
     { name = "modbus-tk" },
     { name = "numpy" },
     { name = "opencv-python" },
-    { name = "psutil" },
     { name = "pymap3d" },
     { name = "pyqt5" },
     { name = "pyserial" },
-    { name = "python-dotenv" },
-    { name = "pyyaml" },
     { name = "setuptools" },
     { name = "shapely" },
     { name = "spidev" },
     { name = "transforms3d" },
-    { name = "typeguard" },
     { name = "ultralytics" },
     { name = "yagmail" },
+]
+build = [
+    { name = "catkin-pkg" },
+    { name = "empy" },
+    { name = "jinja2" },
+    { name = "kconfiglib" },
+    { name = "lark" },
+    { name = "setuptools" },
+]
+email = [
+    { name = "yagmail" },
+]
+waywiser-carla = [
+    { name = "numpy" },
+    { name = "transforms3d" },
+]
+waywiser-hwbringup = [
+    { name = "modbus-tk" },
+    { name = "pyserial" },
+    { name = "spidev" },
+]
+waywiser-perception = [
+    { name = "opencv-python" },
+    { name = "ultralytics" },
+]
+waywiser-perception-jetson = [
+    { name = "numpy" },
+    { name = "tensorrt" },
+]
+waywiser-perception-x86 = [
+    { name = "numpy" },
+    { name = "tensorrt" },
+    { name = "torch" },
+    { name = "torchvision" },
+]
+waywiser-teleop = [
+    { name = "numpy" },
+    { name = "pyqt5" },
+]
+waywiser-test-runner = [
+    { name = "numpy" },
+    { name = "pymap3d" },
+    { name = "shapely" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "catkin-pkg", specifier = ">=1.1.0" },
-    { name = "depthai", specifier = "==2.30.0.0" },
-    { name = "empy", specifier = "==3.3.2" },
-    { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "kconfiglib", specifier = ">=14.1.0" },
-    { name = "lark", specifier = ">=1.3.1" },
-    { name = "modbus-tk", specifier = ">=1.1.5" },
-    { name = "numpy", specifier = "<2" },
-    { name = "opencv-python", specifier = "==4.11.0.86" },
+    { name = "catkin-pkg", marker = "extra == 'build'", specifier = ">=1.1.0" },
+    { name = "empy", marker = "extra == 'build'", specifier = "==3.3.2" },
+    { name = "jinja2", marker = "extra == 'build'", specifier = ">=3.1.6" },
+    { name = "kconfiglib", marker = "extra == 'build'", specifier = ">=14.1.0" },
+    { name = "lark", marker = "extra == 'build'", specifier = ">=1.3.1" },
+    { name = "modbus-tk", marker = "extra == 'waywiser-hwbringup'", specifier = ">=1.1.5" },
+    { name = "numpy", marker = "extra == 'waywiser-carla'", specifier = "<2" },
+    { name = "numpy", marker = "extra == 'waywiser-perception-jetson'", specifier = ">=1.23.5,<2" },
+    { name = "numpy", marker = "extra == 'waywiser-perception-x86'", specifier = "<2" },
+    { name = "numpy", marker = "extra == 'waywiser-teleop'", specifier = "<2" },
+    { name = "numpy", marker = "extra == 'waywiser-test-runner'", specifier = "<2" },
+    { name = "opencv-python", marker = "extra == 'waywiser-perception'", specifier = "==4.11.0.86" },
     { name = "psutil", specifier = ">=7.2.1" },
-    { name = "pymap3d", specifier = ">=3.2.0" },
-    { name = "pyqt5", specifier = ">=5.15.11" },
-    { name = "pyserial", specifier = ">=3.5" },
+    { name = "pymap3d", marker = "extra == 'waywiser-test-runner'", specifier = ">=3.2.0" },
+    { name = "pyqt5", marker = "extra == 'waywiser-teleop'", specifier = ">=5.15.11" },
+    { name = "pyserial", marker = "extra == 'waywiser-hwbringup'", specifier = ">=3.5" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "setuptools", specifier = ">=80.9.0" },
-    { name = "shapely", specifier = ">=2.1.2" },
-    { name = "spidev", specifier = ">=3.8" },
-    { name = "transforms3d", specifier = ">=0.4.2" },
-    { name = "typeguard", specifier = ">=4.4.4" },
-    { name = "ultralytics", specifier = "==8.3.235" },
-    { name = "yagmail", specifier = ">=0.15.293" },
+    { name = "setuptools", marker = "extra == 'build'", specifier = ">=80.9.0" },
+    { name = "shapely", marker = "extra == 'waywiser-test-runner'", specifier = ">=2.1.2" },
+    { name = "spidev", marker = "extra == 'waywiser-hwbringup'", specifier = ">=3.8" },
+    { name = "tensorrt", marker = "extra == 'waywiser-perception-jetson'", specifier = "==10.0.1" },
+    { name = "tensorrt", marker = "extra == 'waywiser-perception-x86'", specifier = "==10.0.1" },
+    { name = "torch", marker = "extra == 'waywiser-perception-x86'" },
+    { name = "torchvision", marker = "extra == 'waywiser-perception-x86'" },
+    { name = "transforms3d", marker = "extra == 'waywiser-carla'", specifier = ">=0.4.2" },
+    { name = "ultralytics", marker = "extra == 'waywiser-perception'", specifier = "==8.3.235" },
+    { name = "waywiser", extras = ["build"], marker = "extra == 'all'" },
+    { name = "waywiser", extras = ["email"], marker = "extra == 'all'" },
+    { name = "waywiser", extras = ["waywiser-carla"], marker = "extra == 'all'" },
+    { name = "waywiser", extras = ["waywiser-hwbringup"], marker = "extra == 'all'" },
+    { name = "waywiser", extras = ["waywiser-perception"], marker = "extra == 'all'" },
+    { name = "waywiser", extras = ["waywiser-teleop"], marker = "extra == 'all'" },
+    { name = "waywiser", extras = ["waywiser-test-runner"], marker = "extra == 'all'" },
+    { name = "yagmail", marker = "extra == 'email'", specifier = ">=0.15.293" },
 ]
+provides-extras = ["build", "waywiser-carla", "waywiser-hwbringup", "waywiser-perception", "waywiser-perception-jetson", "waywiser-perception-x86", "waywiser-teleop", "waywiser-test-runner", "email", "all"]
 
 [[package]]
 name = "yagmail"
