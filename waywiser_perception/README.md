@@ -1,36 +1,7 @@
-## Requirements
+# waywiser_perception
 
-### Jetson
+## YOLO Model Setup
 
-- ```
-  sudo apt-get install python3-pip libopenblas-base libopenmpi-dev libomp-dev python3-libnvinfer-dev libjpeg-dev zlib1g-dev libpython3-dev libavcodec-dev libavformat-dev libswscale-dev
-  ```
-- Install torch and torchvision following the instructions from https://forums.developer.nvidia.com/t/pytorch-for-jetson/
-- Install pip dependencies:
-  ```
-  uv pip install numpy==1.23 ultralytics opencv-python pycuda tensorrt==10.0.1
-  ```
-
-### x86_64
-
-- To use Nvidia GPUs for inference,
-
-  - install cuda toolkit if not already installed (https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#ubuntu).
-  - ```
-    uv pip install pycuda
-    ```
-
-- Install pip dependencies:
-
-  ```
-  uv pip install numpy ultralytics opencv-python torch torchvision tensorrt==10.0.1
-  ```
-
-## Setup
-
-- ```
-  rosdep install --from-paths src/WayWiseR/waywiser_perception -y -r --ignore-src
-  ```
 - Download yolo model from https://docs.ultralytics.com/models/
 - (Optional) To use TensorRT, export the model using
   ```

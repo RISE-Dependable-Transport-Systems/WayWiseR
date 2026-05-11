@@ -1,34 +1,6 @@
-## Gazebo setup
+## Gazebo simulator setup
 
 - Install [Ignition Fortress](https://gazebosim.org/docs/fortress/install_ubuntu/), by following the offical instructions.
-
-- **Install all dependencies:**
-
-  ```bash
-  cd $WAYWISER_WS
-  source .venv/bin/activate
-  rosdep install --from-paths src/WayWiseR/waywiser_gazebo --ignore-src --rosdistro $ROS_DISTRO -r -y
-  ```
-
-- **Build `waywiser_gazebo`:**
-
-  If `waywiser_gazebo` is in your `$WAYWISER_SKIPPED_PACKAGES` list (from the main setup), you need to update that list and build the workspace:
-
-     ```bash
-   # Remove waywiser_gazebo from the skipped packages list and persist to .env
-   source $WAYWISER_WS/src/WayWiseR/.env
-   export WAYWISER_SKIPPED_PACKAGES="$(printf '%s\n' ${WAYWISER_SKIPPED_PACKAGES//\"/} | grep -vx 'waywiser_gazebo' | xargs)"
-   if [ -n "$WAYWISER_SKIPPED_PACKAGES" ]; then printf -v WAYWISER_SKIPPED_PACKAGES_ESCAPED '%q' "$WAYWISER_SKIPPED_PACKAGES"; else WAYWISER_SKIPPED_PACKAGES_ESCAPED=; fi
-   sed -i "s|^WAYWISER_SKIPPED_PACKAGES=.*|WAYWISER_SKIPPED_PACKAGES=$WAYWISER_SKIPPED_PACKAGES_ESCAPED|" $WAYWISER_WS/src/WayWiseR/.env
-
-   # Build the workspace
-   colcon build --symlink-install --packages-up-to waywiser_gazebo
-   ```
-
-- Source the workspace:
-  ```bash
-  source $WAYWISER_WS/install/setup.bash
-  ```
 
 ## Examples
 
