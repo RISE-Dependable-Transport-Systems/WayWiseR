@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo="@PX4_AUTOPILOT_DIR@"
+patch_file="@PX4_ZENOH_PATCH_FILE@"
+make_executable="@MAKE_EXECUTABLE@"
+applied_now=0
+kconfig_topics_path="src/modules/zenoh/Kconfig.topics"
+zenoh_pico_path="src/modules/zenoh/zenoh-pico"
+kconfig_topics_was_clean=0
+zenoh_pico_was_clean=0
+
+if [ -z "$("@GIT_EXECUTABLE@" -C "$repo" status --porcelain -- "$kconfig_topics_path")" ]; then
+  kconfig_topics_was_clean=1
+fi
+
+if [ -z "$("@GIT_EXECUTABLE@" -C "$repo" status --porcelain -- "$zenoh_pico_path")" ] \
+  && [ -d "$repo/$zenoh_pico_path/.git" ] \
+  && [ -z "$("@GIT_EXECUTABLE@" -C "$repo/$zenoh_pico_path" status --porcelain)" ]; then
+  zenoh_pico_was_clean=1
+fi
+
+cleanup() {
+  if [ "$applied_now" -eq 1 ]; then
+    "@GIT_EXECUTABLE@" -C "$repo" apply --reverse "$patch_file"
+  fi
+
+  if [ "$kconfig_topics_was_clean" -eq 1 ] \
+    && [ -n "$("@GIT_EXECUTABLE@" -C "$repo" status --porcelain -- "$kconfig_topics_path")" ]; then
+    "@GIT_EXECUTABLE@" -C "$repo" restore --source=HEAD --worktree -- "$kconfig_topics_path"
+  fi
+
+  if [ "$zenoh_pico_was_clean" -eq 1 ]; then
+    if [ -d "$repo/$zenoh_pico_path/.git" ] \
+      && [ -n "$("@GIT_EXECUTABLE@" -C "$repo/$zenoh_pico_path" status --porcelain)" ]; then
+      "@GIT_EXECUTABLE@" -C "$repo/$zenoh_pico_path" restore --source=HEAD --worktree --staged -- .
+      "@GIT_EXECUTABLE@" -C "$repo/$zenoh_pico_path" clean -fd
+    fi
+    if [ -n "$("@GIT_EXECUTABLE@" -C "$repo" status --porcelain -- "$zenoh_pico_path")" ]; then
+      "@GIT_EXECUTABLE@" -C "$repo" submodule update --checkout -- "$zenoh_pico_path"
+    fi
+  fi
+}
+
+trap cleanup EXIT
+
+if "@GIT_EXECUTABLE@" -C "$repo" apply --reverse --check "$patch_file" >/dev/null 2>&1; then
+  echo "PX4 Zenoh compatibility patch is already present in the checkout; building with existing changes."
+elif "@GIT_EXECUTABLE@" -C "$repo" apply --check "$patch_file" >/dev/null 2>&1; then
+  "@GIT_EXECUTABLE@" -C "$repo" apply "$patch_file"
+  applied_now=1
+else
+  echo "Unable to apply $patch_file cleanly to $repo." >&2
+  "@GIT_EXECUTABLE@" -C "$repo" status --short >&2 || true
+  exit 1
+fi
+
+cd "$repo"
+"$make_executable" px4_sitl_zenoh

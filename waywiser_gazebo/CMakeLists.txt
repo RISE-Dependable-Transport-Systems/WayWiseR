@@ -11,10 +11,19 @@ find_package(ament_cmake REQUIRED)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_package(xacro REQUIRED)
 
+find_program(BASH_EXECUTABLE bash REQUIRED)
+find_program(COLCON_EXECUTABLE colcon)
+find_program(GIT_EXECUTABLE git REQUIRED)
 find_program(MAKE_EXECUTABLE make REQUIRED)
+set(PX4_ZENOH_PATCH_FILE "${CMAKE_CURRENT_SOURCE_DIR}/external/px4_zenoh_humble_compat.patch")
 
 set(PX4_AUTOPILOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/PX4-Autopilot")
 set(PX4_GZ_MODELS_DIR "${PX4_AUTOPILOT_DIR}/Tools/simulation/gz/models")
+set(ROS_GZ_HARMONIC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/ros_gz_harmonic")
+set(ROS_GZ_HARMONIC_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/ros_gz_harmonic")
+set(PX4_PATCHED_BUILD_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/build_px4_sitl_with_patch.sh")
+get_filename_component(WAYWISER_INSTALL_ROOT "${CMAKE_INSTALL_PREFIX}" DIRECTORY)
+set(ROS_GZ_HARMONIC_INSTALL_DIR "${WAYWISER_INSTALL_ROOT}/ros_gz_harmonic")
 execute_process(
   COMMAND ${Python3_EXECUTABLE} -c "import site; print(site.getusersitepackages())"
   OUTPUT_VARIABLE PYTHON3_USER_SITE
@@ -27,6 +36,47 @@ else()
   set(PX4_PYTHONPATH "${PYTHON3_USER_SITE}")
 endif()
 
+if(EXISTS "${ROS_GZ_HARMONIC_DIR}/ros_gz_bridge/package.xml")
+  if(COLCON_EXECUTABLE)
+    add_custom_target(
+      waywiser_gazebo_ros_gz_harmonic ALL
+      COMMAND ${CMAKE_COMMAND} -E env
+        MAKEFLAGS=
+        GZ_VERSION=harmonic
+        GZ_SIM_DIR=/usr/lib/x86_64-linux-gnu/cmake/gz-sim8
+        GZ_TRANSPORT_DIR=/usr/lib/x86_64-linux-gnu/cmake/gz-transport13
+        GZ_MSGS_DIR=/usr/lib/x86_64-linux-gnu/cmake/gz-msgs10
+        GZ_SENSORS_DIR=/usr/lib/x86_64-linux-gnu/cmake/gz-sensors8
+        ${COLCON_EXECUTABLE}
+          --log-base ${ROS_GZ_HARMONIC_BUILD_DIR}/log
+          build
+          --merge-install
+          --symlink-install
+          --base-paths ${ROS_GZ_HARMONIC_DIR}
+          --build-base ${ROS_GZ_HARMONIC_BUILD_DIR}/build
+          --install-base ${ROS_GZ_HARMONIC_INSTALL_DIR}
+          --packages-up-to ros_gz_bridge
+          --allow-overriding ros_gz_bridge
+          --cmake-args -DBUILD_TESTING=OFF
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      USES_TERMINAL
+      COMMENT "Building optional Gazebo Harmonic ros_gz_bridge workspace for PX4 SITL"
+    )
+  else()
+    message(
+      WARNING
+      "ros_gz_harmonic submodule was found at ${ROS_GZ_HARMONIC_DIR}, but 'colcon' "
+      "is not available in PATH. Skipping optional Harmonic bridge build."
+    )
+  endif()
+else()
+  message(
+    STATUS
+    "Optional ros_gz_harmonic submodule not found at ${ROS_GZ_HARMONIC_DIR}. "
+    "Skipping Harmonic bridge build."
+  )
+endif()
+
 if(EXISTS "${PX4_AUTOPILOT_DIR}/Makefile")
   if(NOT EXISTS "${PX4_GZ_MODELS_DIR}")
     message(
@@ -37,17 +87,28 @@ if(EXISTS "${PX4_AUTOPILOT_DIR}/Makefile")
     )
   endif()
 
+  configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build_px4_sitl_with_patch.sh.in
+    ${PX4_PATCHED_BUILD_SCRIPT}
+    @ONLY
+  )
+
   add_custom_target(
     waywiser_gazebo_px4_sitl ALL
     COMMAND ${CMAKE_COMMAND} -E env
       PYTHONPATH=${PX4_PYTHONPATH}
       PX4_GZ_STANDALONE=1
       HEADLESS=1
-      ${MAKE_EXECUTABLE} px4_sitl_default
+      MAKEFLAGS=$ENV{MAKEFLAGS}
+      ${BASH_EXECUTABLE} ${PX4_PATCHED_BUILD_SCRIPT}
     WORKING_DIRECTORY ${PX4_AUTOPILOT_DIR}
     USES_TERMINAL
-    COMMENT "Building PX4 SITL default target for waywiser_gazebo"
+    COMMENT "Building PX4 SITL Zenoh target for waywiser_gazebo"
   )
+
+  if(TARGET waywiser_gazebo_ros_gz_harmonic)
+    add_dependencies(waywiser_gazebo_px4_sitl waywiser_gazebo_ros_gz_harmonic)
+  endif()
 else()
   message(
     WARNING

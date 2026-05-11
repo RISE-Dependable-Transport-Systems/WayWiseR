@@ -1,4 +1,5 @@
 import json
+import math
 import os
 from pathlib import Path
 import tempfile
@@ -6,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction, TimerAction
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction, TimerAction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -38,7 +39,16 @@ def generate_launch_description():
         default_value='1.0',
         description='Delay between model spawn requests from the same config file',
     )
-
+    start_gazebo_bridge_la = DeclareLaunchArgument(
+        'start_gazebo_bridge',
+        default_value='True',
+        description='Start model-specific ROS-Gazebo bridge nodes from the spawn config.',
+    )
+    spawn_backend_la = DeclareLaunchArgument(
+        'spawn_backend',
+        default_value='ros_gz_sim',
+        description='Model spawn backend: ros_gz_sim or gz_service.',
+    )
     # create launch description
     ld = LaunchDescription()
 
@@ -48,6 +58,8 @@ def generate_launch_description():
     ld.add_action(spawn_config_file_la)
     ld.add_action(spawn_start_delay_la)
     ld.add_action(spawn_interval_la)
+    ld.add_action(start_gazebo_bridge_la)
+    ld.add_action(spawn_backend_la)
 
     # spawn models if spawn_config_file is set
     ld.add_action(OpaqueFunction(function=spawn_models))
@@ -62,11 +74,21 @@ def spawn_models(context):
     spawn_config_file = LaunchConfiguration('spawn_config_file').perform(context)
     spawn_start_delay = float(LaunchConfiguration('spawn_start_delay').perform(context))
     spawn_interval = float(LaunchConfiguration('spawn_interval').perform(context))
+    start_gazebo_bridge = (
+        LaunchConfiguration('start_gazebo_bridge').perform(context).lower() == 'true'
+    )
+    spawn_backend = LaunchConfiguration('spawn_backend').perform(context)
 
     # JSON based spawning
     if spawn_config_file != '':
         json_actions = spawn_from_json(
-            spawn_config_file, world_name, use_sim_time, spawn_start_delay, spawn_interval
+            spawn_config_file,
+            world_name,
+            use_sim_time,
+            spawn_start_delay,
+            spawn_interval,
+            start_gazebo_bridge,
+            spawn_backend,
         )
         if json_actions:
             spawn_action.extend(json_actions)
@@ -91,7 +113,15 @@ def read_world_name(world_path: Path):
     return world_path.stem
 
 
-def spawn_from_json(config_file, world_name, use_sim_time, spawn_start_delay=0.0, spawn_interval=1.0):
+def spawn_from_json(
+    config_file,
+    world_name,
+    use_sim_time,
+    spawn_start_delay=0.0,
+    spawn_interval=1.0,
+    start_gazebo_bridge=True,
+    spawn_backend='ros_gz_sim',
+):
     actions = []
     model_index = 0
     try:
@@ -107,10 +137,11 @@ def spawn_from_json(config_file, world_name, use_sim_time, spawn_start_delay=0.0
                             path,
                             world_name,
                             use_sim_time,
-                            model.get('bridge_config'),
+                            model.get('bridge_config') if start_gazebo_bridge else None,
                             model.get('pose'),
                             model.get('name'),
                             model.get('static'),
+                            spawn_backend,
                         ),
                         spawn_start_delay,
                         spawn_interval,
@@ -128,7 +159,7 @@ def spawn_from_json(config_file, world_name, use_sim_time, spawn_start_delay=0.0
                             topic,
                             world_name,
                             use_sim_time,
-                            model.get('bridge_config'),
+                            model.get('bridge_config') if start_gazebo_bridge else None,
                             model.get('pose'),
                             model.get('name'),
                         ),
@@ -195,7 +226,14 @@ def make_timed_model_actions(actions, spawn_start_delay, spawn_interval, model_i
 
 
 def create_sdf_spawn_actions(
-    sdf_path, world_name, use_sim_time, bridge_path=None, pose=None, name=None, static=None
+    sdf_path,
+    world_name,
+    use_sim_time,
+    bridge_path=None,
+    pose=None,
+    name=None,
+    static=None,
+    spawn_backend='ros_gz_sim',
 ):
     actions = []
     sdf_path = create_sdf_with_static_override(sdf_path, static)
@@ -214,6 +252,9 @@ def create_sdf_spawn_actions(
         # Override only provided values, fallback to 0 for missing ones in the override list
         for i in range(min(len(pose_vals), 6)):
             spawn_pose[i] = pose_vals[i]
+        if add_px4_sim_sensors:
+            spawn_pose[3] = '0'
+            spawn_pose[4] = '0'
     else:
         try:
             tree = ET.parse(sdf_path)
@@ -250,21 +291,77 @@ def create_sdf_spawn_actions(
     if name:
         arguments.extend(['-name', name])
 
-    actions.append(
-        Node(
-            package='ros_gz_sim',
-            executable='create',
-            arguments=arguments,
-            ros_arguments=['--log-level', 'fatal'],
-            parameters=[{'use_sim_time': use_sim_time}],
-            output='screen',
+    if spawn_backend == 'gz_service':
+        actions.append(create_gz_service_spawn_action(sdf_path, world_name, spawn_pose, name))
+    else:
+        actions.append(
+            Node(
+                package='ros_gz_sim',
+                executable='create',
+                arguments=arguments,
+                ros_arguments=['--log-level', 'fatal'],
+                parameters=[{'use_sim_time': use_sim_time}],
+                output='screen',
+            )
         )
-    )
 
     if bridge_path:
         actions.append(create_bridge_node(bridge_path, use_sim_time, world_name))
 
     return actions
+
+
+def create_gz_service_spawn_action(sdf_path, world_name, spawn_pose, name=None):
+    pose = [float(value) for value in spawn_pose[:6]]
+    quaternion = quaternion_from_rpy(pose[3], pose[4], pose[5])
+    request_parts = [
+        f'sdf_filename: "{Path(sdf_path).resolve()}"',
+        'allow_renaming: false',
+        (
+            'pose { '
+            f'position {{ x: {pose[0]} y: {pose[1]} z: {pose[2]} }} '
+            'orientation { '
+            f'x: {quaternion[0]} y: {quaternion[1]} z: {quaternion[2]} w: {quaternion[3]} '
+            '} '
+            '}'
+        ),
+    ]
+    if name:
+        request_parts.insert(0, f'name: "{name}"')
+
+    return ExecuteProcess(
+        cmd=[
+            'gz',
+            'service',
+            '-s',
+            f'/world/{world_name}/create',
+            '--reqtype',
+            'gz.msgs.EntityFactory',
+            '--reptype',
+            'gz.msgs.Boolean',
+            '--timeout',
+            '5000',
+            '--req',
+            ', '.join(request_parts),
+        ],
+        output='screen',
+    )
+
+
+def quaternion_from_rpy(roll, pitch, yaw):
+    cy = math.cos(yaw * 0.5)
+    sy = math.sin(yaw * 0.5)
+    cp = math.cos(pitch * 0.5)
+    sp = math.sin(pitch * 0.5)
+    cr = math.cos(roll * 0.5)
+    sr = math.sin(roll * 0.5)
+
+    return (
+        sr * cp * cy - cr * sp * sy,
+        cr * sp * cy + sr * cp * sy,
+        cr * cp * sy - sr * sp * cy,
+        cr * cp * cy + sr * sp * sy,
+    )
 
 
 def create_sdf_with_static_override(sdf_path, static):

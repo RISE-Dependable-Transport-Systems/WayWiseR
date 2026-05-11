@@ -1,0 +1,251 @@
+diff --git a/cmake/package.cmake b/cmake/package.cmake
+index 331a48692e..3aceebce7f 100644
+--- a/cmake/package.cmake
++++ b/cmake/package.cmake
+@@ -71,11 +71,9 @@ if("${CMAKE_SYSTEM}" MATCHES "Linux")
+ 		set(CPACK_PACKAGING_INSTALL_PREFIX "/tmp")
+ 
+ 		execute_process(COMMAND ${DPKG_PROGRAM} --print-architecture OUTPUT_VARIABLE DEB_ARCHITECTURE OUTPUT_STRIP_TRAILING_WHITESPACE)
+-		message("Architecture:  " ${DEB_ARCHITECTURE})
+ 		set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}_${DEB_ARCHITECTURE}")
+ 
+ 		set(CPACK_INSTALL_PREFIX @DEB_INSTALL_PREFIX@)
+-		message ("==> CPACK_INSTALL_PREFIX = " ${CPACK_INSTALL_PREFIX})
+ 
+ 		################################################################################
+ 
+diff --git a/src/modules/simulation/gz_plugins/CMakeLists.txt b/src/modules/simulation/gz_plugins/CMakeLists.txt
+index b9e9e5bd49..53448aa01b 100644
+--- a/src/modules/simulation/gz_plugins/CMakeLists.txt
++++ b/src/modules/simulation/gz_plugins/CMakeLists.txt
+@@ -58,7 +58,14 @@ if (gz-transport_FOUND)
+     # Add our plugins as subdirectories
+     add_subdirectory(optical_flow)
+     add_subdirectory(template_plugin)
+-    add_subdirectory(gstreamer)
++    find_package(PkgConfig QUIET)
++    if (PkgConfig_FOUND)
++        pkg_check_modules(GSTREAMER QUIET gstreamer-1.0)
++        pkg_check_modules(GSTREAMER_APP QUIET gstreamer-app-1.0)
++    endif()
++    if (GSTREAMER_FOUND AND GSTREAMER_APP_FOUND)
++        add_subdirectory(gstreamer)
++    endif()
+     add_subdirectory(moving_platform_controller)
+     add_subdirectory(generic_motor)
+     add_subdirectory(buoyancy)
+diff --git a/src/modules/zenoh/CMakeLists.txt b/src/modules/zenoh/CMakeLists.txt
+index 5854b0fd88..b2553750cf 100644
+--- a/src/modules/zenoh/CMakeLists.txt
++++ b/src/modules/zenoh/CMakeLists.txt
+@@ -62,8 +62,15 @@ set(BATCH_MULTICAST_SIZE 256 CACHE STRING "Use this to override the maximum mult
+ 
+ set(Z_FEATURE_UNSTABLE_API 1 CACHE STRING "Toggle unstable Zenoh-C API")
+ 
++set(ZENOH_PICO_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/zenoh-pico)
++set(ZENOH_PICO_SOURCE_PARENT_DIR ${CMAKE_CURRENT_BINARY_DIR})
++set(ZENOH_PICO_SOURCE_COPY_DIR ${ZENOH_PICO_SOURCE_PARENT_DIR}/zenoh-pico)
++set(ZENOH_PICO_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/zenoh-pico-build)
++
+ px4_add_git_submodule(TARGET git_zenoh-pico PATH "zenoh-pico")
+-add_subdirectory(zenoh-pico)
++file(REMOVE_RECURSE ${ZENOH_PICO_SOURCE_COPY_DIR})
++file(COPY ${ZENOH_PICO_SOURCE_DIR} DESTINATION ${ZENOH_PICO_SOURCE_PARENT_DIR})
++add_subdirectory(${ZENOH_PICO_SOURCE_COPY_DIR} ${ZENOH_PICO_BINARY_DIR})
+ unset(MESSAGE_QUIET)
+ add_dependencies(zenohpico_static git_zenoh-pico px4_platform)
+ target_compile_options(zenohpico_static PUBLIC -Wno-cast-align
+@@ -121,7 +128,7 @@ px4_add_module(
+ 			default_topics_config
+ 		INCLUDES
+ 			${PX4_BINARY_DIR}/msg
+-			zenoh-pico/include
++			${ZENOH_PICO_SOURCE_COPY_DIR}/include
+ 			${CMAKE_CURRENT_LIST_DIR}
+ 			${PX4_BINARY_DIR}/src/modules/zenoh/
+ 		COMPILE_FLAGS
+diff --git a/src/modules/zenoh/Kconfig.topics b/src/modules/zenoh/Kconfig.topics
+index b16a0c41fa..7a8278eaef 100644
+--- a/src/modules/zenoh/Kconfig.topics
++++ b/src/modules/zenoh/Kconfig.topics
+@@ -645,20 +645,20 @@ menu "Zenoh publishers/subscribers"
+ 		bool "rover_rate_status"
+ 		default n
+ 
+-	config ZENOH_PUBSUB_ROVER_STEERING_SETPOINT
+-		bool "rover_steering_setpoint"
++	config ZENOH_PUBSUB_ROVER_SPEED_SETPOINT
++		bool "rover_speed_setpoint"
+ 		default n
+ 
+-	config ZENOH_PUBSUB_ROVER_THROTTLE_SETPOINT
+-		bool "rover_throttle_setpoint"
++	config ZENOH_PUBSUB_ROVER_SPEED_STATUS
++		bool "rover_speed_status"
+ 		default n
+ 
+-	config ZENOH_PUBSUB_ROVER_VELOCITY_SETPOINT
+-		bool "rover_velocity_setpoint"
++	config ZENOH_PUBSUB_ROVER_STEERING_SETPOINT
++		bool "rover_steering_setpoint"
+ 		default n
+ 
+-	config ZENOH_PUBSUB_ROVER_VELOCITY_STATUS
+-		bool "rover_velocity_status"
++	config ZENOH_PUBSUB_ROVER_THROTTLE_SETPOINT
++		bool "rover_throttle_setpoint"
+ 		default n
+ 
+ 	config ZENOH_PUBSUB_RPM
+@@ -705,6 +705,10 @@ menu "Zenoh publishers/subscribers"
+ 		bool "sensor_gnss_relative"
+ 		default n
+ 
++	config ZENOH_PUBSUB_SENSOR_GNSS_STATUS
++		bool "sensor_gnss_status"
++		default n
++
+ 	config ZENOH_PUBSUB_SENSOR_GPS
+ 		bool "sensor_gps"
+ 		default n
+@@ -1103,10 +1107,10 @@ config ZENOH_PUBSUB_ALL_SELECTION
+ 	select ZENOH_PUBSUB_ROVER_POSITION_SETPOINT
+ 	select ZENOH_PUBSUB_ROVER_RATE_SETPOINT
+ 	select ZENOH_PUBSUB_ROVER_RATE_STATUS
++	select ZENOH_PUBSUB_ROVER_SPEED_SETPOINT
++	select ZENOH_PUBSUB_ROVER_SPEED_STATUS
+ 	select ZENOH_PUBSUB_ROVER_STEERING_SETPOINT
+ 	select ZENOH_PUBSUB_ROVER_THROTTLE_SETPOINT
+-	select ZENOH_PUBSUB_ROVER_VELOCITY_SETPOINT
+-	select ZENOH_PUBSUB_ROVER_VELOCITY_STATUS
+ 	select ZENOH_PUBSUB_RPM
+ 	select ZENOH_PUBSUB_RTL_STATUS
+ 	select ZENOH_PUBSUB_RTL_TIME_ESTIMATE
+@@ -1118,6 +1122,7 @@ config ZENOH_PUBSUB_ALL_SELECTION
+ 	select ZENOH_PUBSUB_SENSOR_COMBINED
+ 	select ZENOH_PUBSUB_SENSOR_CORRECTION
+ 	select ZENOH_PUBSUB_SENSOR_GNSS_RELATIVE
++	select ZENOH_PUBSUB_SENSOR_GNSS_STATUS
+ 	select ZENOH_PUBSUB_SENSOR_GPS
+ 	select ZENOH_PUBSUB_SENSOR_GYRO
+ 	select ZENOH_PUBSUB_SENSOR_GYRO_FFT
+diff --git a/src/modules/zenoh/dds_topics.yaml b/src/modules/zenoh/dds_topics.yaml
+--- a/src/modules/zenoh/dds_topics.yaml
++++ b/src/modules/zenoh/dds_topics.yaml
+@@ -15,15 +15,21 @@ publications:
+   - topic: /fmu/out/mode_completed
+     type: px4_msgs::msg::ModeCompleted
+ 
+   - topic: /fmu/out/battery_status
+     type: px4_msgs::msg::BatteryStatus
+ 
++  - topic: /fmu/out/actuator_armed
++    type: px4_msgs::msg::ActuatorArmed
++
+   - topic: /fmu/out/collision_constraints
+     type: px4_msgs::msg::CollisionConstraints
+ 
+   - topic: /fmu/out/estimator_status_flags
+     type: px4_msgs::msg::EstimatorStatusFlags
+ 
+   - topic: /fmu/out/failsafe_flags
+     type: px4_msgs::msg::FailsafeFlags
++
++  - topic: /fmu/out/health_report
++    type: px4_msgs::msg::HealthReport
+ 
+   - topic: /fmu/out/manual_control_setpoint
+     type: px4_msgs::msg::ManualControlSetpoint
+ 
+diff --git a/src/modules/zenoh/zenoh.cpp b/src/modules/zenoh/zenoh.cpp
+index ec4bc5e06f..5e26cc554e 100644
+--- a/src/modules/zenoh/zenoh.cpp
++++ b/src/modules/zenoh/zenoh.cpp
+@@ -110,25 +110,14 @@ int ZENOH::generate_rmw_zenoh_topic_keyexpr(const char *topic, const uint8_t *ri
+ {
+ 	const char *type_name = getTypeName(type);
+ 
++	(void)rihs_hash;
++
+ 	if (type_name) {
+ 		strncpy(type, type_name, TOPIC_INFO_SIZE);
+ 		toCamelCase(type); // Convert uORB type to camel case
+ 		return snprintf(keyexpr, KEYEXPR_SIZE, "%" PRId32 "%s/"
+-				KEYEXPR_MSG_NAME "%s_/RIHS01_"
+-				"%02x%02x%02x%02x%02x%02x%02x%02x"
+-				"%02x%02x%02x%02x%02x%02x%02x%02x"
+-				"%02x%02x%02x%02x%02x%02x%02x%02x"
+-				"%02x%02x%02x%02x%02x%02x%02x%02x",
+-				_zenoh_domain_id.get(), topic, type,
+-				rihs_hash[0], rihs_hash[1], rihs_hash[2], rihs_hash[3],
+-				rihs_hash[4], rihs_hash[5], rihs_hash[6], rihs_hash[7],
+-				rihs_hash[8], rihs_hash[9], rihs_hash[10], rihs_hash[11],
+-				rihs_hash[12], rihs_hash[13], rihs_hash[14], rihs_hash[15],
+-				rihs_hash[16], rihs_hash[17], rihs_hash[18], rihs_hash[19],
+-				rihs_hash[20], rihs_hash[21], rihs_hash[22], rihs_hash[23],
+-				rihs_hash[24], rihs_hash[25], rihs_hash[26], rihs_hash[27],
+-				rihs_hash[28], rihs_hash[29], rihs_hash[30], rihs_hash[31]
+-			       );
++				KEYEXPR_MSG_NAME "%s_/TypeHashNotSupported",
++				_zenoh_domain_id.get(), topic, type);
+ 	}
+ 
+ 	return -1;
+@@ -140,6 +129,8 @@ int ZENOH::generate_rmw_zenoh_topic_liveliness_keyexpr(const z_id_t *id, const c
+ 	// NOT REALLY COMPLIANT WITH RMW_ZENOH_CPP but get's the job done
+ 	// TODO build a correct keyexpr
+ 
++	(void)rihs_hash;
++
+ 	char topic_lv[TOPIC_INFO_SIZE];
+ 	char *str = &topic_lv[0];
+ 
+@@ -157,11 +148,7 @@ int ZENOH::generate_rmw_zenoh_topic_liveliness_keyexpr(const z_id_t *id, const c
+ 			"@ros2_lv/%" PRId32 "/"
+ 			"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x/"
+ 			"0/11/%s/%%/%%/px4_%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x/%s/"
+-			KEYEXPR_MSG_NAME "%s_/RIHS01_"
+-			"%02x%02x%02x%02x%02x%02x%02x%02x"
+-			"%02x%02x%02x%02x%02x%02x%02x%02x"
+-			"%02x%02x%02x%02x%02x%02x%02x%02x"
+-			"%02x%02x%02x%02x%02x%02x%02x%02x"
++			KEYEXPR_MSG_NAME "%s_/TypeHashNotSupported"
+ 			"/::,7:,:,:,,",
+ 			_zenoh_domain_id.get(),
+ 			id->id[0], id->id[1],  id->id[2], id->id[3], id->id[4], id->id[5], id->id[6],
+@@ -172,16 +159,7 @@ int ZENOH::generate_rmw_zenoh_topic_liveliness_keyexpr(const z_id_t *id, const c
+ 			_px4_guid[4], _px4_guid[5], _px4_guid[6], _px4_guid[7],
+ 			_px4_guid[8], _px4_guid[9], _px4_guid[10], _px4_guid[11],
+ 			_px4_guid[12], _px4_guid[13], _px4_guid[14], _px4_guid[15],
+-			topic_lv, type_camel_case,
+-			rihs_hash[0], rihs_hash[1], rihs_hash[2], rihs_hash[3],
+-			rihs_hash[4], rihs_hash[5], rihs_hash[6], rihs_hash[7],
+-			rihs_hash[8], rihs_hash[9], rihs_hash[10], rihs_hash[11],
+-			rihs_hash[12], rihs_hash[13], rihs_hash[14], rihs_hash[15],
+-			rihs_hash[16], rihs_hash[17], rihs_hash[18], rihs_hash[19],
+-			rihs_hash[20], rihs_hash[21], rihs_hash[22], rihs_hash[23],
+-			rihs_hash[24], rihs_hash[25], rihs_hash[26], rihs_hash[27],
+-			rihs_hash[28], rihs_hash[29], rihs_hash[30], rihs_hash[31]
+-		       );
++			topic_lv, type_camel_case);
+ }
+ 
+ int ZENOH::setupSession()
+diff --git a/src/modules/zenoh/zenoh_config.hpp b/src/modules/zenoh/zenoh_config.hpp
+index e92abdb1c7..4a77ee0443 100644
+--- a/src/modules/zenoh/zenoh_config.hpp
++++ b/src/modules/zenoh/zenoh_config.hpp
+@@ -57,12 +57,11 @@
+ #define NET_MODE_SIZE sizeof("client")
+ #define NET_LOCATOR_SIZE 64
+ #define NET_CONFIG_LINE_SIZE (NET_MODE_SIZE + NET_LOCATOR_SIZE)
+-#define KEYEXPR_RIHS01_SIZE sizeof("RIHS01_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+ #define KEYEXPR_MSG_NAME "px4_msgs::msg::dds_::"
+ #define KEYEXPR_MSG_NAME_SIZE sizeof(KEYEXPR_MSG_NAME)
+ #define TOPIC_INFO_SIZE (96)
+ #define MAX_LINE_SIZE (2 * TOPIC_INFO_SIZE)
+-#define KEYEXPR_SIZE (MAX_LINE_SIZE + KEYEXPR_MSG_NAME_SIZE + KEYEXPR_RIHS01_SIZE + 128)
++#define KEYEXPR_SIZE (MAX_LINE_SIZE + KEYEXPR_MSG_NAME_SIZE + 64)
+ 
+ class Zenoh_Config
+ {
