@@ -48,18 +48,30 @@ waywiser_drone_node:
   ros__parameters:
     vehicle_interface_type: "ext_simulated"
     odom_topic: "odometry"
+    input_odom_topic: "gazebo/odometry"
     vehicle_pose_topic: "drone_pose"
+    range_topic: "sensors/range/down"
     battery_state_topic: ""
     fused_nav_sat_fix_extended_topic: "sensors/gnss/fused_nav_sat_fix_extended"
     emergency_stop_status_topic: "emergency_stop/current_state"
     emergency_stop_update_topic: "emergency_stop/target_state"
-    publish_odom_to_baselink_tf: false
+    publish_odom_to_baselink_tf: true
     publish_world_to_odom_tf: true
     vehicle_state_poll_rate: 30
+    in_air_range_threshold: 0.20
+    # PX4 offboard setpoint bridge parameters
+    command_timeout: 0.5
+    setpoint_rate: 20.0
+    request_retry_period: 1.0
+    auto_arm: true
+    require_local_position_before_arm: false
+    auto_lift_off_speed: 1.5 # m/s climb rate during auto lift-off (matches MPC_TKO_SPEED)
+    auto_lift_off_height: 2.0 # m above ground to hover after lift-off
+    auto_lift_off_tolerance: 0.1 # m position tolerance to consider hover reached
 
 emergency_stop_monitor:
   ros__parameters:
-    start_with_emergency_stop: true
+    start_with_emergency_stop: false
     cmd_vel_in_timeout: 0.5
     emergency_stop_state_publish_rate: 10
 

@@ -1,4 +1,15 @@
 # Full set of configurations
+- ros_topic_name: "/drone/gazebo/odometry"
+  gz_topic_name: "/model/drone/odometry"
+  ros_type_name: "nav_msgs/msg/Odometry"
+  gz_type_name: "gz.msgs.Odometry"
+  subscriber_queue: 5       # Default 10
+  publisher_queue: 6        # Default 10
+  lazy: false               # Default "false"
+  direction: GZ_TO_ROS      # Default "BIDIRECTIONAL" - Bridge both directions
+                            # "GZ_TO_ROS" - Bridge Ignition topic to ROS
+                            # "ROS_TO_GZ" - Bridge ROS topic to Ignition
+
 - ros_topic_name: "/drone/sensors/camera/color/image_rect"
   gz_topic_name: "/sensors/drone/camera/image"
   ros_type_name: "sensor_msgs/msg/Image"
@@ -33,21 +44,10 @@
                             # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
 
-- ros_topic_name: "/drone/sensors/camera/depth/points"
-  gz_topic_name: "/sensors/drone/camera/points"
-  ros_type_name: "sensor_msgs/msg/PointCloud2"
-  gz_type_name: "gz.msgs.PointCloudPacked"
-  subscriber_queue: 5       # Default 10
-  publisher_queue: 6        # Default 10
-  lazy: false               # Default "false"
-  direction: GZ_TO_ROS      # Default "BIDIRECTIONAL" - Bridge both directions
-                            # "GZ_TO_ROS" - Bridge Ignition topic to ROS
-                            # "ROS_TO_GZ" - Bridge ROS topic to Ignition
-
-- ros_topic_name: "/drone/sensors/camera/color/points"
-  gz_topic_name: "/sensors/drone/camera/points"
-  ros_type_name: "sensor_msgs/msg/PointCloud2"
-  gz_type_name: "gz.msgs.PointCloudPacked"
+- ros_topic_name: "/drone/joint_states"
+  gz_topic_name: "/drone/joint_states"
+  ros_type_name: "sensor_msgs/msg/JointState"
+  gz_type_name: "gz.msgs.Model"
   subscriber_queue: 5       # Default 10
   publisher_queue: 6        # Default 10
   lazy: false               # Default "false"
@@ -56,7 +56,7 @@
                             # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
 - ros_topic_name: "/drone/sensors/gnss/navsat"
-  gz_topic_name: "/drone/gps/navsat"
+  gz_topic_name: "/world/{world_name}/model/drone/link/base_link/sensor/navsat_sensor/navsat"
   ros_type_name: "sensor_msgs/msg/NavSatFix"
   gz_type_name: "gz.msgs.NavSat"
   subscriber_queue: 5       # Default 10
@@ -65,7 +65,7 @@
   direction: GZ_TO_ROS
 
 - ros_topic_name: "/drone/sensors/imu/raw"
-  gz_topic_name: "/drone/imu"
+  gz_topic_name: "/world/{world_name}/model/drone/link/base_link/sensor/imu_sensor/imu"
   ros_type_name: "sensor_msgs/msg/Imu"
   gz_type_name: "gz.msgs.IMU"
   subscriber_queue: 5       # Default 10
@@ -75,10 +75,10 @@
                             # "GZ_TO_ROS" - Bridge Ignition topic to ROS
                             # "ROS_TO_GZ" - Bridge ROS topic to Ignition
 
-- ros_topic_name: "/drone/joint_states"
-  gz_topic_name: "/drone/joint_states"
-  ros_type_name: "sensor_msgs/msg/JointState"
-  gz_type_name: "gz.msgs.Model"
+- ros_topic_name: "/drone/sensors/range/down"
+  gz_topic_name: "/world/{world_name}/model/drone/link/lidar_sensor_link/sensor/lidar/scan"
+  ros_type_name: "sensor_msgs/msg/Range"
+  gz_type_name: "gz.msgs.LaserScan"
   subscriber_queue: 5       # Default 10
   publisher_queue: 6        # Default 10
   lazy: false               # Default "false"
