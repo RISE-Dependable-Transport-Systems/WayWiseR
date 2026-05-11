@@ -11,7 +11,6 @@ from launch.actions import EmitEvent, LogInfo
 from launch.events import Shutdown
 import psutil
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
-import yagmail
 
 import yaml
 
@@ -89,6 +88,8 @@ class NotificationUtils:
             return
 
         try:
+            import yagmail
+
             # Initialize SMTP connection
             yag = yagmail.SMTP(
                 user=email_user,

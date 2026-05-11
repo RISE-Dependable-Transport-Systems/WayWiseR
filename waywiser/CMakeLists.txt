@@ -52,7 +52,6 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
-ament_environment_hooks(00_load_dotenv.bash)
 ament_environment_hooks(discovery/scripts/fastdds_client_setup.bash)
 ament_environment_hooks(discovery/scripts/zenoh_client_setup.bash)
 ament_export_include_directories(include)
