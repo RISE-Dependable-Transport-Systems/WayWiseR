@@ -10,8 +10,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_C_STANDARD 23)
 
+include(ExternalProject)
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
@@ -39,6 +42,32 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
+
+set(PX4_MSGS_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/px4_msgs")
+
+if(EXISTS "${PX4_MSGS_SOURCE_DIR}/package.xml")
+  ExternalProject_Add(px4_msgs_vendor
+    SOURCE_DIR "${PX4_MSGS_SOURCE_DIR}"
+    BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/px4_msgs_vendor"
+    INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
+    UPDATE_COMMAND ""
+    TEST_COMMAND ""
+    CMAKE_ARGS
+      -DBUILD_TESTING=OFF
+      -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
+      -DPython3_EXECUTABLE=${Python3_EXECUTABLE}
+  )
+else()
+  message(FATAL_ERROR
+    "Vendored px4_msgs submodule is missing. Run "
+    "'git submodule update --init --recursive waywiser_core/external/px4_msgs'."
+  )
+endif()
+
+# Instead of using find_package(px4_msgs), we manually specify the include directories
+# since the external project builds it during the make phase, not configure phase.
+include_directories(${CMAKE_INSTALL_PREFIX}/include/px4_msgs/px4_msgs/msg)
+include_directories(${CMAKE_INSTALL_PREFIX}/include/px4_msgs)
 
 include_directories(include WayWise/)
 
@@ -116,6 +145,10 @@ set(WAYWISE_CAR_SOURCES
   WayWise/sensors/tof/tofsensor.h
 )
 
+set(WAYWISE_COPTER_SOURCES
+  WayWise/vehicles/copterstate.cpp
+)
+
 set(WAYWISE_TRUCK_SOURCES
   WayWise/vehicles/truckstate.cpp
   WayWise/vehicles/trailerstate.cpp
@@ -169,6 +202,20 @@ add_executable(
   ${COMMON_WAYWISE_AP_SOURCES}
 )
 
+add_executable(
+  waywiser_copter_node
+  cpp_src/waywiser_copter_node.cpp
+  cpp_src/waywiser_copter_node_core.cpp
+  cpp_src/waywiser_core_utils.cpp
+  cpp_src/copter_autopilot_component.cpp
+  cpp_src/copter_interface_component.cpp
+  cpp_src/qobject_node.cpp
+  ${COMMON_WAYWISE_SOURCES}
+  ${WAYWISE_LOCALIZATION_SOURCES}
+  ${WAYWISE_COPTER_SOURCES}
+  ${COMMON_WAYWISE_AP_SOURCES}
+)
+
 add_executable(navsatfix_extended_wrapper_node
   cpp_src/navsatfix_extended_wrapper_node.cpp
   cpp_src/waywiser_core_utils.cpp
@@ -197,6 +244,15 @@ set(TRUCK_LIBRARIES
   ${CAR_LIBRARIES}
 )
 
+set(COPTER_LIBRARIES
+  ${CAR_LIBRARIES}
+  ${CMAKE_INSTALL_PREFIX}/lib/libpx4_msgs__rosidl_typesupport_cpp.so
+  ${CMAKE_INSTALL_PREFIX}/lib/libpx4_msgs__rosidl_typesupport_c.so
+  ${CMAKE_INSTALL_PREFIX}/lib/libpx4_msgs__rosidl_typesupport_introspection_cpp.so
+  ${CMAKE_INSTALL_PREFIX}/lib/libpx4_msgs__rosidl_typesupport_introspection_c.so
+  ${CMAKE_INSTALL_PREFIX}/lib/libpx4_msgs__rosidl_generator_c.so
+)
+
 set(NAVSATFIX_EXTENDED_WRAPPER_LIBRARIES
   Qt5::Core
   ${cpp_typesupport_target}
@@ -205,6 +261,7 @@ set(NAVSATFIX_EXTENDED_WRAPPER_LIBRARIES
 target_link_libraries(waywiser_localization_node ${LOCALIZATION_LIBRARIES})
 target_link_libraries(waywiser_car_node ${CAR_LIBRARIES})
 target_link_libraries(waywiser_truck_node ${TRUCK_LIBRARIES})
+target_link_libraries(waywiser_copter_node ${COPTER_LIBRARIES})
 target_link_libraries(navsatfix_extended_wrapper_node ${NAVSATFIX_EXTENDED_WRAPPER_LIBRARIES})
 
 function(add_qt_includes target)
@@ -218,6 +275,7 @@ endfunction()
 add_qt_includes(waywiser_localization_node)
 add_qt_includes(waywiser_car_node)
 add_qt_includes(waywiser_truck_node)
+add_qt_includes(waywiser_copter_node)
 add_qt_includes(navsatfix_extended_wrapper_node)
 
 set(LOCALIZATION_DEPENDENCIES
@@ -252,6 +310,10 @@ set(TRUCK_DEPENDENCIES
   ${CAR_DEPENDENCIES}
 )
 
+set(COPTER_DEPENDENCIES
+  ${CAR_DEPENDENCIES}
+)
+
 set(NAVSATFIX_EXTENDED_WRAPPER_DEPENDENCIES
   rclcpp
   sensor_msgs
@@ -266,6 +328,8 @@ set(NAVSATFIX_EXTENDED_WRAPPER_DEPENDENCIES
 ament_target_dependencies(waywiser_localization_node ${LOCALIZATION_DEPENDENCIES})
 ament_target_dependencies(waywiser_car_node ${CAR_DEPENDENCIES})
 ament_target_dependencies(waywiser_truck_node ${TRUCK_DEPENDENCIES})
+ament_target_dependencies(waywiser_copter_node ${COPTER_DEPENDENCIES})
+add_dependencies(waywiser_copter_node px4_msgs_vendor)
 ament_target_dependencies(navsatfix_extended_wrapper_node ${NAVSATFIX_EXTENDED_WRAPPER_DEPENDENCIES})
 
 install(
@@ -276,6 +340,7 @@ install(
 install(TARGETS waywiser_localization_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS waywiser_car_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS waywiser_truck_node DESTINATION lib/${PROJECT_NAME})
+install(TARGETS waywiser_copter_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS navsatfix_extended_wrapper_node DESTINATION lib/${PROJECT_NAME}
 )
 

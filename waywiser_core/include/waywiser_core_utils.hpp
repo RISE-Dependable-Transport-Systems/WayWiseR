@@ -88,6 +88,12 @@ private:
 class CoreUtils
 {
 public:
+  static std::string waywiseObjectTypeToString(WAYWISE_OBJECT_TYPE object_type);
+
+  static std::string declare_read_only_waywise_object_type_param(
+    rclcpp::Node * node, const QSharedPointer<ObjectState> & object_state,
+    const std::string & param_name = "waywise_object_type");
+
   static void update_pospoint_from_pose(
     QSharedPointer<ObjectState> objectState,
     const xyz_t pose_frame_to_reference_frame_offset,

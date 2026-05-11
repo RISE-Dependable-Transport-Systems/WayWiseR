@@ -72,6 +72,8 @@ void WaywiserCar::initialize_node(
 
 void WaywiserCar::setup_parameters()
 {
+  CoreUtils::declare_read_only_waywise_object_type_param(this, mCarState);
+
   // ROS parameters
   frame_prefix_ = declare_parameter("frame_prefix", "");
   urdf_file_ = declare_parameter("urdf_file", "");
