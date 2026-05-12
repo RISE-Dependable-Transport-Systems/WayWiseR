@@ -1182,7 +1182,9 @@ class TwistKeyboardUI(QMainWindow):
                     else:
                         self.node.start_auto_lift_off()
                 else:
-                    self.node.get_logger().warn('Auto lift-off/landing is only available for quadcopters.')
+                    self.node.get_logger().warn(
+                        'Auto lift-off/landing is only available for quadcopters.'
+                    )
             else:
                 self.node.update_speed(angular_delta=-self.node.angular_speed_increment)
 
@@ -1320,7 +1322,9 @@ class TwistKeyboardUI(QMainWindow):
             time_str, time_color = 'never', self.gray_color
         else:
             state_text = msg.state_str.upper()
-            time_str, time_color = self._get_time_ago_and_color(self.node.last_quadcopter_state['stamp'])
+            time_str, time_color = self._get_time_ago_and_color(
+                self.node.last_quadcopter_state['stamp']
+            )
 
         self.copter_state_label.setText(state_text)
         self.copter_state_time_label.setText(f'Last updated: {time_str}')
