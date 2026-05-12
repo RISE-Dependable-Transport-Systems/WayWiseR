@@ -26,12 +26,31 @@ REPO_DIR="$SCRIPT_DIR"
 WAYWISER_WS="${WAYWISER_WS:-$(cd "$REPO_DIR/../.." && pwd)}"
 ENV_FILE="$REPO_DIR/.env"
 ENV_EXAMPLE="$REPO_DIR/.env.example"
+VENV_DIR="${WAYWISER_VENV_PATH:-$WAYWISER_WS/.venv}"
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 header() { echo; echo "===> $*"; echo; }
 die()    { echo "ERROR: $*" >&2; exit 1; }
 info()   { echo "  $*"; }
 warn()   { echo "  WARNING: $*" >&2; }
+
+ensure_env_file() {
+    if [[ ! -f "$ENV_FILE" ]]; then
+        cp "$ENV_EXAMPLE" "$ENV_FILE"
+        info "Created .env from .env.example."
+    fi
+}
+
+apply_env_overrides() {
+    ensure_env_file
+    if [[ -n "${WAYWISER_SKIPPED_PACKAGES+x}" ]]; then
+        if [[ -n "${WAYWISER_SKIPPED_PACKAGES}" ]]; then
+            env_set WAYWISER_SKIPPED_PACKAGES "\"${WAYWISER_SKIPPED_PACKAGES}\""
+        else
+            env_set WAYWISER_SKIPPED_PACKAGES ""
+        fi
+    fi
+}
 
 # Read a single key from an env file, stripping quotes.
 env_get() { grep -m1 "^${1}=" "${2:-$ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d '"'"'" || true; }
@@ -57,7 +76,7 @@ source_ros() {
 
 # Activate venv + ROS (used by sim package functions).
 activate_env() {
-    local venv="$WAYWISER_WS/.venv"
+    local venv="$VENV_DIR"
     [[ -f "$venv/bin/activate" ]] \
         || die "Python venv not found at $venv — run 'make setup' first."
     set +u
@@ -90,6 +109,12 @@ remove_from_skip() {
 # Return the Python extras needed for the selected workspace packages.
 python_extras_for_selected_packages() {
     local skipped="$1"
+
+    if [[ -n "${WAYWISER_PYTHON_EXTRAS:-}" ]]; then
+        printf '[%s]' "$WAYWISER_PYTHON_EXTRAS"
+        return 0
+    fi
+
     local -a extras=("build")
 
     [[ " $skipped " == *" waywiser_carla "* ]] || extras+=("waywiser_carla")
@@ -115,6 +140,14 @@ python_extras_for_selected_packages() {
         joined+="${joined:+,}${extra}"
     done
     printf '[%s]' "$joined"
+}
+
+ensure_workspace_venv_link() {
+    local workspace_venv="$WAYWISER_WS/.venv"
+    if [[ "$VENV_DIR" != "$workspace_venv" ]]; then
+        rm -rf "$workspace_venv"
+        ln -sfn "$VENV_DIR" "$workspace_venv"
+    fi
 }
 usage() {
     cat <<EOF
@@ -767,18 +800,24 @@ setup_venv() {
     [[ -f "$REPO_DIR/.python-version" ]] || die ".python-version not found in $REPO_DIR"
     local py_ver; py_ver=$(cat "$REPO_DIR/.python-version")
     local skipped=""
+    ensure_env_file
     [[ -f "$ENV_FILE" ]] && skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
     local extras
     extras=$(python_extras_for_selected_packages "$skipped")
     
     cd "$WAYWISER_WS"
-    uv venv --python "$py_ver" --clear
+    if [[ "${WAYWISER_REUSE_VENV:-}" == "true" && -x "$VENV_DIR/bin/python" ]]; then
+        info "Reusing Python venv at $VENV_DIR"
+    else
+        uv venv --python "$py_ver" --clear "$VENV_DIR"
+    fi
+    ensure_workspace_venv_link
     # shellcheck disable=SC1091
-    source .venv/bin/activate
-    export PYTHONPATH="$WAYWISER_WS/.venv/lib/python${py_ver}/site-packages:${PYTHONPATH:-}"
+    source "$VENV_DIR/bin/activate"
+    export PYTHONPATH="$VENV_DIR/lib/python${py_ver}/site-packages:${PYTHONPATH:-}"
     info "Installing Python extras: $extras"
     uv pip install -e "src/WayWiseR${extras}"
-    info "Python $py_ver venv ready at $WAYWISER_WS/.venv"
+    info "Python $py_ver venv ready at $VENV_DIR"
 }
 
 # ── step 5: ROS dependencies ─────────────────────────────────────────────────
@@ -788,8 +827,9 @@ install_ros_deps() {
     cd "$WAYWISER_WS"
 
     # shellcheck disable=SC1091
-    [[ -f .venv/bin/activate ]] && source .venv/bin/activate
+    [[ -f "$VENV_DIR/bin/activate" ]] && source "$VENV_DIR/bin/activate"
     source_ros /opt/ros/humble/setup.bash
+    ensure_env_file
     set -a; source "$ENV_FILE"; set +a
 
     local skipped="${WAYWISER_SKIPPED_PACKAGES:-}"
@@ -813,6 +853,14 @@ install_ros_deps() {
     # carla_msgs: built from carla-ros-bridge submodule
     local skip_keys="px4_msgs carla_msgs"
 
+    if command -v apt-get &>/dev/null; then
+        if [[ "$(id -u)" -eq 0 ]]; then
+            apt-get update
+        else
+            sudo apt-get update
+        fi
+    fi
+
     # shellcheck disable=SC2086
     rosdep install --from-paths $paths ${extra_paths:+$extra_paths} \
         --ignore-src --rosdistro "$ROS_DISTRO" \
@@ -827,17 +875,25 @@ build_workspace() {
     cd "$WAYWISER_WS"
 
     # shellcheck disable=SC1091
-    [[ -f .venv/bin/activate ]] && source .venv/bin/activate
+    [[ -f "$VENV_DIR/bin/activate" ]] && source "$VENV_DIR/bin/activate"
     source_ros /opt/ros/humble/setup.bash
+    ensure_env_file
     set -a; source "$ENV_FILE"; set +a
 
     local skipped="${WAYWISER_SKIPPED_PACKAGES:-}"
     local -a base_paths=("$WAYWISER_WS/src")
     local -a extra_args=()
+    local -a cmake_args=()
 
     if [[ " $skipped " != *" waywiser_carla "* ]]; then
         base_paths+=("$REPO_DIR/waywiser_carla/external/carla-ros-bridge")
         extra_args+=(--allow-overriding waywiser waywiser_description)
+    fi
+
+    if [[ -n "${WAYWISER_CMAKE_ARGS:-}" ]]; then
+        # shellcheck disable=SC2206
+        cmake_args=($WAYWISER_CMAKE_ARGS)
+        extra_args+=(--cmake-args "${cmake_args[@]}")
     fi
 
     if [[ -n "$skipped" ]]; then
@@ -857,7 +913,7 @@ build_workspace() {
 # ── step 7: optional activate hook ───────────────────────────────────────────
 
 setup_activate_hook() {
-    local venv_activate="$WAYWISER_WS/.venv/bin/activate"
+    local venv_activate="$VENV_DIR/bin/activate"
     [[ -f "$venv_activate" ]] || return 0
     
     if grep -q "WayWiseR Environment Setup" "$venv_activate" 2>/dev/null; then
@@ -871,13 +927,13 @@ setup_activate_hook() {
 # WayWiseR Environment Setup
 set -a; source "\$WAYWISER_WS/src/WayWiseR/.env"; set +a
 set +u; source /opt/ros/humble/setup.bash; set -u
-export PYTHONPATH=\$WAYWISER_WS/.venv/lib/python${py_ver}/site-packages:\${PYTHONPATH:-}
+export PYTHONPATH=$VENV_DIR/lib/python${py_ver}/site-packages:\${PYTHONPATH:-}
 if [ -f "\$WAYWISER_WS/install/setup.bash" ]; then
     set +u; source "\$WAYWISER_WS/install/setup.bash"; set -u
 fi
 EOT
     info "Activate hook added."
-    info "From now on, 'source $WAYWISER_WS/.venv/bin/activate' sets up everything."
+    info "From now on, 'source $VENV_DIR/bin/activate' sets up everything."
 }
 
 # ── simulation pre/post setup ─────────────────────────────────────────────────
@@ -885,6 +941,7 @@ EOT
 # Run before install_ros_deps and build: initialise submodules and install
 # external Python requirements for sim packages that are selected to build.
 presim_setup() {
+    ensure_env_file
     local skipped
     skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
 
@@ -911,20 +968,24 @@ presim_setup() {
 
     if [[ " $skipped " != *" waywiser_agrarsense "* ]]; then
         header "Pre-setup: waywiser_agrarsense"
-        if ! command -v docker &>/dev/null; then
-            prompt_yn "Install Docker via curl | sh?" true \
-                || die "Docker is required for waywiser_agrarsense. Install it manually then retry."
-            curl -fsSL https://get.docker.com | sh
-        fi
-        if ! docker info &>/dev/null 2>&1; then
-            prompt_yn "Configure Docker rootless mode (disables system docker.service)?" true \
-                || die "Docker rootless mode is required for waywiser_agrarsense. Configure it manually then retry."
-            sudo systemctl disable --now docker.service docker.socket 2>/dev/null || true
-            dockerd-rootless-setuptool.sh install
-        fi
-        local docker_script="$REPO_DIR/waywiser_agrarsense/ros_bridge/build_docker_container.sh"
-        if [[ -f "$docker_script" ]]; then
-            bash "$docker_script"
+        if [[ "${CI:-}" == "true" ]]; then
+            info "CI environment detected — skipping local Docker bootstrap for waywiser_agrarsense."
+        else
+            if ! command -v docker &>/dev/null; then
+                prompt_yn "Install Docker via curl | sh?" true \
+                    || die "Docker is required for waywiser_agrarsense. Install it manually then retry."
+                curl -fsSL https://get.docker.com | sh
+            fi
+            if ! docker info &>/dev/null 2>&1; then
+                prompt_yn "Configure Docker rootless mode (disables system docker.service)?" true \
+                    || die "Docker rootless mode is required for waywiser_agrarsense. Configure it manually then retry."
+                sudo systemctl disable --now docker.service docker.socket 2>/dev/null || true
+                dockerd-rootless-setuptool.sh install
+            fi
+            local docker_script="$REPO_DIR/waywiser_agrarsense/ros_bridge/build_docker_container.sh"
+            if [[ -f "$docker_script" ]]; then
+                bash "$docker_script"
+            fi
         fi
     fi
 
@@ -995,9 +1056,11 @@ main() {
     fi
 
     if [[ "$OPT_BUILD_ONLY" == true ]]; then
+        apply_env_overrides
         build_workspace
         setup_activate_hook
     elif [[ "$OPT_SETUP_ONLY" == true ]]; then
+        apply_env_overrides
         if [[ "$OPT_SKIP_PREREQS" != true ]]; then
             check_prerequisites
         fi
@@ -1021,6 +1084,7 @@ main() {
         return 0
     else
         configure_env || { echo; info "Configuration cancelled."; exit 0; }
+        apply_env_overrides
         if [[ "$OPT_SKIP_PREREQS" != true ]]; then
             check_prerequisites
         fi
