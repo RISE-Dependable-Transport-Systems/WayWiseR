@@ -73,16 +73,14 @@ rebuild:
 	@WAYWISER_WS=$(WAYWISER_WS) bash $(BOOTSTRAP) --build-only $(ARGS)
 
 test:
-	@cd $(WAYWISER_WS) && \
-	  . /opt/ros/humble/setup.sh && \
-	  { . install/setup.bash 2>/dev/null || true; } && \
-	  skipped="$${WAYWISER_SKIPPED_PACKAGES:-$$(grep '^WAYWISER_SKIPPED_PACKAGES=' .env 2>/dev/null | sed 's/^WAYWISER_SKIPPED_PACKAGES=//;s/"//g')}"; \
-	  if [ -n "$$skipped" ]; then \
-	    colcon test --base-paths src/WayWiseR/ --packages-skip $$skipped; \
-	  else \
-	    colcon test --base-paths src/WayWiseR/; \
-	  fi; \
-	  colcon test-result --verbose
+	$(eval SKIPPED := $(shell grep '^WAYWISER_SKIPPED_PACKAGES=' $(WAYWISER_WS)/.env 2>/dev/null | sed 's/^WAYWISER_SKIPPED_PACKAGES=//;s/"//g'))
+	$(eval SKIPPED := $(or $(WAYWISER_SKIPPED_PACKAGES),$(SKIPPED)))
+	@if [ -n "$(SKIPPED)" ]; then \
+	  colcon test --base-paths $(WAYWISER_WS)/src/WayWiseR/ --packages-skip $(SKIPPED); \
+	else \
+	  colcon test --base-paths $(WAYWISER_WS)/src/WayWiseR/; \
+	fi
+	@colcon test-result --verbose || true
 
 clean:
 	@echo "Removing build/, install/, log/ ..."
