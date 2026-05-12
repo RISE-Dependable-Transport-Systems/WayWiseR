@@ -48,11 +48,11 @@ with suppress_stderr():
     from tf_transformations import euler_from_quaternion
 
 
-from waywiser_core.msg import (
+from waywiser_core.msg import (  # noqa: E402
     BatteryState,
     NavSatFixExtended,
     QuadcopterState,
-)  # noqa: E402
+)
 from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS, RosUtils  # noqa: E402
 from waywiser_twist_safety.msg import EmergencyStopState  # noqa: E402
 
@@ -293,8 +293,8 @@ class TwistKeyboard(Node):
                                 self.auto_lift_off_enabled = qc_vals[2].bool_value
                         else:
                             self.get_logger().warn(
-                                f'Received {len(qc_vals)} quadcopter params instead of at least 3 from '
-                                f"'{self.control_vehicle_node_fqn}'"
+                                f'Received {len(qc_vals)} quadcopter params instead of '
+                                f"at least 3 from '{self.control_vehicle_node_fqn}'"
                             )
 
                 # Create subscribers
@@ -304,8 +304,8 @@ class TwistKeyboard(Node):
                 self._create_publishers()
 
                 self.get_logger().info(
-                    f"Updated topics from '{self.control_vehicle_node_fqn}' "
-                    f"(waywise_object_type={self.waywise_object_type})"
+                    f"Updated topics from '{self.control_vehicle_node_fqn}' "  # noqa: Q000
+                    f"(waywise_object_type={self.waywise_object_type})"  # noqa: Q000
                 )
 
                 # We don't reset the joy_watchdog_timer here; we wait for the first /joy message
@@ -325,7 +325,9 @@ class TwistKeyboard(Node):
         return RosUtils.prefix_topic_with_namespace(topic, self.vehicle_namespace)
 
     def bridge_node_fqn(self):
-        return RosUtils.prefix_topic_with_namespace('px4_zenoh_offboard_bridge', self.vehicle_namespace)
+        return RosUtils.prefix_topic_with_namespace(
+            'px4_zenoh_offboard_bridge', self.vehicle_namespace
+        )
 
     def set_remote_node_parameter(self, node_fqn, name, value):
         """Set a single parameter on a remote node."""
@@ -343,13 +345,21 @@ class TwistKeyboard(Node):
         param_msg = ParameterMsg()
         param_msg.name = name
         if isinstance(value, bool):
-            param_msg.value = ParameterValue(type=ParameterType.PARAMETER_BOOL, bool_value=value)
+            param_msg.value = ParameterValue(
+                type=ParameterType.PARAMETER_BOOL, bool_value=value
+            )
         elif isinstance(value, int):
-            param_msg.value = ParameterValue(type=ParameterType.PARAMETER_INTEGER, integer_value=value)
+            param_msg.value = ParameterValue(
+                type=ParameterType.PARAMETER_INTEGER, integer_value=value
+            )
         elif isinstance(value, float):
-            param_msg.value = ParameterValue(type=ParameterType.PARAMETER_DOUBLE, double_value=value)
+            param_msg.value = ParameterValue(
+                type=ParameterType.PARAMETER_DOUBLE, double_value=value
+            )
         elif isinstance(value, str):
-            param_msg.value = ParameterValue(type=ParameterType.PARAMETER_STRING, string_value=value)
+            param_msg.value = ParameterValue(
+                type=ParameterType.PARAMETER_STRING, string_value=value
+            )
         request.parameters.append(param_msg)
 
         future = client.call_async(request)
@@ -386,7 +396,9 @@ class TwistKeyboard(Node):
             self.auto_lift_off_enabled,
         )
         if not self.auto_lift_off_enabled:
-            self.set_remote_node_parameter(self.control_vehicle_node_fqn, 'auto_lift_off', False)
+            self.set_remote_node_parameter(
+                self.control_vehicle_node_fqn, 'auto_lift_off', False
+            )
 
     def start_auto_lift_off(self):
         """Request automatic lift-off from the vehicle node."""
@@ -394,20 +406,26 @@ class TwistKeyboard(Node):
             self.get_logger().warn('Auto lift-off is only available for quadcopters.')
             return
         if not self.auto_lift_off_enabled:
-            self.get_logger().warn('Auto lift-off is disabled. Enable the Auto lift off option first.')
+            self.get_logger().warn(
+                'Auto lift-off is disabled. Enable the Auto lift off option first.'
+            )
             return
 
         if self.auto_landing_active:
             self.set_auto_landing_active(False)
 
         self.auto_lift_off_active = True
-        self.set_remote_node_parameter(self.control_vehicle_node_fqn, 'auto_lift_off', True)
+        self.set_remote_node_parameter(
+            self.control_vehicle_node_fqn, 'auto_lift_off', True
+        )
         self.get_logger().info('Auto lift-off requested.')
 
     def set_auto_arm_enabled(self, enabled):
         """Update auto arm behavior on the vehicle node."""
         self.auto_arm_enabled = bool(enabled)
-        self.set_remote_node_parameter(self.control_vehicle_node_fqn, 'auto_arm', self.auto_arm_enabled)
+        self.set_remote_node_parameter(
+            self.control_vehicle_node_fqn, 'auto_arm', self.auto_arm_enabled
+        )
 
     def set_auto_landing_active(self, active):
         """Update auto landing behavior on the vehicle node."""
@@ -688,12 +706,16 @@ class TwistKeyboard(Node):
                     twist.linear.x -= self.linear_speed
                 if Qt.Key.Key_A in self.keys_pressed:
                     if abs(twist.linear.x) > 0.01:
-                        twist.angular.z += self.angular_speed if twist.linear.x > 0 else -self.angular_speed
+                        twist.angular.z += (
+                            self.angular_speed if twist.linear.x > 0 else -self.angular_speed
+                        )
                     else:
                         twist.angular.z += self.angular_speed
                 if Qt.Key.Key_D in self.keys_pressed:
                     if abs(twist.linear.x) > 0.01:
-                        twist.angular.z -= self.angular_speed if twist.linear.x > 0 else +self.angular_speed
+                        twist.angular.z -= (
+                            self.angular_speed if twist.linear.x > 0 else +self.angular_speed
+                        )
                     else:
                         twist.angular.z -= self.angular_speed
                 if self.waywise_object_type == 'quadcopter':
@@ -737,7 +759,9 @@ class TwistKeyboard(Node):
             # Check if PX4 is ready for takeoff before requesting arm
             state_msg = self.last_quadcopter_state.get('msg')
             if not state_msg or state_msg.state_code != QuadcopterState.READY_TO_ARM:
-                self.get_logger().warn('Ignoring arm request: PX4 is not ready for offboard arming.')
+                self.get_logger().warn(
+                    'Ignoring arm request: PX4 is not ready for offboard arming.'
+                )
                 return
         else:
             # Check if PX4 is in air before requesting disarm

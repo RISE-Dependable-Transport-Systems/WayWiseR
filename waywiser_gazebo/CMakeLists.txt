@@ -139,6 +139,11 @@ if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
+
+  # Suppress xmllint: the external/ submodules contain thousands of XML files
+  # (PX4-Autopilot CycloneDDS configs, JSBSim models, etc.) that do not
+  # conform to ROS XML conventions and should never be linted.
+  set(ament_cmake_xmllint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 
