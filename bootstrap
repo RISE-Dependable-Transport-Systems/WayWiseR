@@ -120,6 +120,17 @@ activate_env() {
     fi
 }
 
+# Return 0 (true) if an NVIDIA GPU is accessible on this machine.
+has_nvidia_gpu() {
+    if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null 2>&1; then
+        return 0
+    fi
+    if ls /dev/nvidia0 &>/dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+
 # Remove $1 from WAYWISER_SKIPPED_PACKAGES in .env (idempotent).
 remove_from_skip() {
     local pkg="$1"
@@ -154,11 +165,17 @@ python_extras_for_selected_packages() {
     if [[ " $skipped " != *" waywiser_perception "* ]]; then
         extras+=("waywiser_perception")
         # Add the architecture-specific perception extra so pip resolves the
-        # correct torch/tensorrt/numpy variants in a single install pass.
+        # correct torch/numpy variants in a single install pass.
         if [[ "$(uname -m)" == "aarch64" ]]; then
             extras+=("waywiser_perception_jetson")
         else
             extras+=("waywiser_perception_x86")
+        fi
+        # Install TensorRT only when an NVIDIA GPU is present.
+        if has_nvidia_gpu; then
+            extras+=("waywiser_perception_tensorrt")
+        else
+            info "No NVIDIA GPU detected — skipping tensorrt." >&2
         fi
     fi
     [[ " $skipped " == *" waywiser_teleop "* ]] || extras+=("waywiser_teleop")
@@ -885,6 +902,17 @@ install_ros_deps() {
     # carla_msgs: built from carla-ros-bridge submodule
     local skip_keys="px4_msgs carla_msgs"
 
+    # Check first — skip apt-get update and sudo if everything is already installed.
+    local check_rc=0
+    # shellcheck disable=SC2086
+    rosdep check --from-paths $paths ${extra_paths:+$extra_paths} \
+        --ignore-src --rosdistro "$ROS_DISTRO" \
+        --skip-keys "$skip_keys" 2>/dev/null || check_rc=$?
+    if [[ $check_rc -eq 0 ]]; then
+        info "All required rosdeps already installed — skipping."
+        return 0
+    fi
+
     if command -v apt-get &>/dev/null; then
         if [[ "$(id -u)" -eq 0 ]]; then
             apt-get update
@@ -896,7 +924,7 @@ install_ros_deps() {
     # shellcheck disable=SC2086
     rosdep install --from-paths $paths ${extra_paths:+$extra_paths} \
         --ignore-src --rosdistro "$ROS_DISTRO" \
-        --skip-keys "$skip_keys" -r -y
+        --skip-keys "$skip_keys" -r ${OPT_YES:+-y}
     info "Dependencies installed."
 }
 

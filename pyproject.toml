@@ -43,7 +43,6 @@ waywiser_perception_jetson = [
     # https://forums.developer.nvidia.com/t/pytorch-for-jetson/
     # pycuda is installed by the bootstrap script after the apt deps are present.
     "numpy>=1.23.5,<2",
-    "tensorrt==10.0.1",
 ]
 waywiser_perception_x86 = [
     # x86_64 — all packages available from PyPI.
@@ -52,6 +51,9 @@ waywiser_perception_x86 = [
     "numpy<2",
     "torch",
     "torchvision",
+]
+waywiser_perception_tensorrt = [
+    # Installed only when an NVIDIA GPU is detected (selected by the bootstrap script).
     "tensorrt==10.0.1",
 ]
 waywiser_teleop = [
