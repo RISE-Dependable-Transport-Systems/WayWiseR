@@ -12,10 +12,11 @@ from cv_bridge import CvBridge
 from geometry_msgs.msg import Quaternion
 import numpy as np
 import rclpy
-from rclpy.executors import MultiThreadedExecutor
+from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import CameraInfo, Image
+import torch
 from ultralytics.engine.results import Results
 from ultralytics.models.yolo.model import YOLO
 from ultralytics.trackers import BOTSORT, BYTETracker
@@ -60,6 +61,12 @@ class YoloNode(Node):
             self.get_parameter('confidence_threshold').get_parameter_value().double_value
         )
         self.device = self.get_parameter('device').get_parameter_value().string_value
+        if self.device != 'cpu' and not torch.cuda.is_available():
+            self.get_logger().warning(
+                f"CUDA device '{self.device}' requested, but PyTorch cannot access CUDA. "
+                "Falling back to device 'cpu'."
+            )
+            self.device = 'cpu'
         self.publish_annotated_image = (
             self.get_parameter('publish_annotated_image').get_parameter_value().bool_value
         )
@@ -493,7 +500,7 @@ class CameraIntrinsics:
 def main(args=None):
     rclpy.init(args=args)
     yolo_node = YoloNode()
-    executor = MultiThreadedExecutor(num_threads=1)
+    executor = SingleThreadedExecutor()
     executor.add_node(yolo_node)
 
     try:

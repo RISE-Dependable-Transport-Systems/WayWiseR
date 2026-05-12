@@ -1,8 +1,10 @@
 import os
+from pathlib import Path
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction
+from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -47,7 +49,39 @@ def yolov8_launch(context):
     if not yolo_parameters:
         return []
 
-    yolo_parameters['model_file_path'] = os.path.expanduser(yolo_parameters['model_file_path'])
+    model_file_path = os.path.expandvars(os.path.expanduser(yolo_parameters['model_file_path']))
+    yolo_parameters['model_file_path'] = model_file_path
+
+    model_path = Path(model_file_path)
+    if is_local_model_path(model_file_path) and not model_path.exists():
+        if model_path.suffix == '.engine':
+            pytorch_model_path = model_path.with_suffix('.pt')
+
+            if pytorch_model_path.exists():
+                yolo_parameters['model_file_path'] = str(pytorch_model_path)
+                get_logger('launch.user').warning(
+                    f"YOLO TensorRT engine file '{model_file_path}' does not exist. "
+                    f"Falling back to PyTorch model '{pytorch_model_path}'."
+                )
+            else:
+                return [
+                    LogInfo(
+                        msg=(
+                            f"YOLO model file '{model_file_path}' does not exist, and fallback "
+                            f"'{pytorch_model_path}' does not exist. Skipping yolo_node."
+                        )
+                    )
+                ]
+        else:
+            return [
+                LogInfo(
+                    msg=(
+                        f"YOLO model file '{model_file_path}' does not exist. "
+                        'Skipping yolo_node.'
+                    )
+                )
+            ]
+
     if yolo_parameters['use_tracker']:
         tracker_config_filepath = os.path.expanduser(yolo_parameters['tracker_config_filepath'])
 
@@ -80,6 +114,14 @@ def yolov8_launch(context):
     )
 
     return [yolo_node]
+
+
+def is_local_model_path(model_file_path):
+    return (
+        Path(model_file_path).is_absolute()
+        or os.sep in model_file_path
+        or (os.altsep is not None and os.altsep in model_file_path)
+    )
 
 
 def yaml_to_dict(path_to_yaml):
