@@ -35,7 +35,7 @@ find_package(waywiser_twist_safety REQUIRED)
 # Qt5
 find_package(
   Qt5
-  COMPONENTS Core SerialPort Network
+  COMPONENTS Core SerialPort Network Widgets
   REQUIRED)
 find_package(MAVSDK REQUIRED)
 set(CMAKE_AUTOMOC ON)
@@ -234,6 +234,7 @@ set(CAR_LIBRARIES
   Qt5::Core
   Qt5::SerialPort
   Qt5::Network
+  Qt5::Widgets
   urdf::urdf
   MAVSDK::mavsdk
   Boost::regex
@@ -269,6 +270,7 @@ function(add_qt_includes target)
     ${Qt5Core_INCLUDE_DIRS}
     ${Qt5SerialPort_INCLUDE_DIRS}
     ${Qt5Network_INCLUDE_DIRS}
+    ${Qt5Widgets_INCLUDE_DIRS}
   )
 endfunction()
 

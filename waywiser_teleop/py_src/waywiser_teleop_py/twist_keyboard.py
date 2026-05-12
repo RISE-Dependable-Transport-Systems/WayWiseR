@@ -305,7 +305,7 @@ class TwistKeyboard(Node):
 
                 self.get_logger().info(
                     f"Updated topics from '{self.control_vehicle_node_fqn}' "  # noqa: Q000
-                    f"(waywise_object_type={self.waywise_object_type})"  # noqa: Q000
+                    f'(waywise_object_type={self.waywise_object_type})'  # noqa: Q000
                 )
 
                 # We don't reset the joy_watchdog_timer here; we wait for the first /joy message
@@ -345,9 +345,7 @@ class TwistKeyboard(Node):
         param_msg = ParameterMsg()
         param_msg.name = name
         if isinstance(value, bool):
-            param_msg.value = ParameterValue(
-                type=ParameterType.PARAMETER_BOOL, bool_value=value
-            )
+            param_msg.value = ParameterValue(type=ParameterType.PARAMETER_BOOL, bool_value=value)
         elif isinstance(value, int):
             param_msg.value = ParameterValue(
                 type=ParameterType.PARAMETER_INTEGER, integer_value=value
@@ -396,9 +394,7 @@ class TwistKeyboard(Node):
             self.auto_lift_off_enabled,
         )
         if not self.auto_lift_off_enabled:
-            self.set_remote_node_parameter(
-                self.control_vehicle_node_fqn, 'auto_lift_off', False
-            )
+            self.set_remote_node_parameter(self.control_vehicle_node_fqn, 'auto_lift_off', False)
 
     def start_auto_lift_off(self):
         """Request automatic lift-off from the vehicle node."""
@@ -415,9 +411,7 @@ class TwistKeyboard(Node):
             self.set_auto_landing_active(False)
 
         self.auto_lift_off_active = True
-        self.set_remote_node_parameter(
-            self.control_vehicle_node_fqn, 'auto_lift_off', True
-        )
+        self.set_remote_node_parameter(self.control_vehicle_node_fqn, 'auto_lift_off', True)
         self.get_logger().info('Auto lift-off requested.')
 
     def set_auto_arm_enabled(self, enabled):
@@ -539,8 +533,8 @@ class TwistKeyboard(Node):
         self.last_quadcopter_state['stamp'] = self.get_clock().now()
 
         # Sync auto landing state from vehicle node
-        self.auto_landing_active = (msg.state_code == QuadcopterState.LANDING)
-        self.auto_lift_off_active = (msg.state_code == QuadcopterState.AUTO_LIFTING_OFF)
+        self.auto_landing_active = msg.state_code == QuadcopterState.LANDING
+        self.auto_lift_off_active = msg.state_code == QuadcopterState.AUTO_LIFTING_OFF
 
     def nav_sat_fix_extended_callback(self, msg):
         """Handle extended GPS/FIX messages."""
@@ -693,9 +687,7 @@ class TwistKeyboard(Node):
         # Check for actuation keys
         actuation_keys = {Qt.Key.Key_W, Qt.Key.Key_X, Qt.Key.Key_A, Qt.Key.Key_D, Qt.Key.Key_S}
         if self.waywise_object_type == 'quadcopter':
-            actuation_keys.update(
-                {Qt.Key.Key_Q, Qt.Key.Key_E, Qt.Key.Key_R, Qt.Key.Key_F}
-            )
+            actuation_keys.update({Qt.Key.Key_Q, Qt.Key.Key_E, Qt.Key.Key_R, Qt.Key.Key_F})
         is_actuation_requested_now = bool(self.keys_pressed & actuation_keys)
 
         if is_actuation_requested_now:
