@@ -11,6 +11,9 @@ find_package(ament_cmake REQUIRED)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_package(xacro REQUIRED)
 
+# Set to OFF in CI to skip PX4 SITL and ros_gz_harmonic builds (pass -DWAYWISER_BUILD_SIMULATION=OFF).
+option(WAYWISER_BUILD_SIMULATION "Build simulation dependencies (PX4 SITL, ros_gz_harmonic)" ON)
+
 find_program(BASH_EXECUTABLE bash REQUIRED)
 find_program(COLCON_EXECUTABLE colcon)
 find_program(GIT_EXECUTABLE git REQUIRED)
@@ -36,7 +39,7 @@ else()
   set(PX4_PYTHONPATH "${PYTHON3_USER_SITE}")
 endif()
 
-if(EXISTS "${ROS_GZ_HARMONIC_DIR}/ros_gz_bridge/package.xml")
+if(WAYWISER_BUILD_SIMULATION AND EXISTS "${ROS_GZ_HARMONIC_DIR}/ros_gz_bridge/package.xml")
   if(COLCON_EXECUTABLE)
     add_custom_target(
       waywiser_gazebo_ros_gz_harmonic ALL
@@ -48,16 +51,16 @@ if(EXISTS "${ROS_GZ_HARMONIC_DIR}/ros_gz_bridge/package.xml")
         GZ_MSGS_DIR=/usr/lib/x86_64-linux-gnu/cmake/gz-msgs10
         GZ_SENSORS_DIR=/usr/lib/x86_64-linux-gnu/cmake/gz-sensors8
         ${COLCON_EXECUTABLE}
-          --log-base ${ROS_GZ_HARMONIC_BUILD_DIR}/log
-          build
-          --merge-install
-          --symlink-install
-          --base-paths ${ROS_GZ_HARMONIC_DIR}
-          --build-base ${ROS_GZ_HARMONIC_BUILD_DIR}/build
-          --install-base ${ROS_GZ_HARMONIC_INSTALL_DIR}
-          --packages-up-to ros_gz_bridge
-          --allow-overriding ros_gz_bridge
-          --cmake-args -DBUILD_TESTING=OFF
+      --log-base ${ROS_GZ_HARMONIC_BUILD_DIR}/log
+      build
+      --merge-install
+      --symlink-install
+      --base-paths ${ROS_GZ_HARMONIC_DIR}
+      --build-base ${ROS_GZ_HARMONIC_BUILD_DIR}/build
+      --install-base ${ROS_GZ_HARMONIC_INSTALL_DIR}
+      --packages-up-to ros_gz_bridge
+      --allow-overriding ros_gz_bridge
+      --cmake-args -DBUILD_TESTING=OFF
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       USES_TERMINAL
       COMMENT "Building optional Gazebo Harmonic ros_gz_bridge workspace for PX4 SITL"
@@ -77,7 +80,7 @@ else()
   )
 endif()
 
-if(EXISTS "${PX4_AUTOPILOT_DIR}/Makefile")
+if(WAYWISER_BUILD_SIMULATION AND EXISTS "${PX4_AUTOPILOT_DIR}/Makefile")
   if(NOT EXISTS "${PX4_GZ_MODELS_DIR}")
     message(
       FATAL_ERROR
@@ -122,7 +125,7 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
-if(EXISTS "${PX4_AUTOPILOT_DIR}")
+if(WAYWISER_BUILD_SIMULATION AND EXISTS "${PX4_AUTOPILOT_DIR}")
   install(
     DIRECTORY external/PX4-Autopilot
     DESTINATION share/${PROJECT_NAME}/external

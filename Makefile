@@ -28,7 +28,7 @@ WAYWISER_WS    ?= $(abspath $(dir $(MAKEFILE_REAL))/../..)
 BOOTSTRAP      := $(dir $(MAKEFILE_REAL))bootstrap
 ARGS           ?=
 
-.PHONY: help all configure setup build rebuild clean
+.PHONY: help all configure setup build rebuild test clean
 .DEFAULT_GOAL := help
 
 help:
@@ -42,6 +42,9 @@ help:
 	@echo "  make setup           — install prereqs + venv + rosdep"
 	@echo "  make build           — colcon build"
 	@echo "  make rebuild         — remove build/, install/, log/ then colcon build"
+	@echo ""
+	@echo "Testing:"
+	@echo "  make test            — colcon test (WayWiseR packages only) + show results"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean           — remove build/, install/, log/ and .venv/"
@@ -68,6 +71,18 @@ rebuild:
 	@echo "Removing build/, install/, log/ ..."
 	@rm -rf $(WAYWISER_WS)/build $(WAYWISER_WS)/install $(WAYWISER_WS)/log
 	@WAYWISER_WS=$(WAYWISER_WS) bash $(BOOTSTRAP) --build-only $(ARGS)
+
+test:
+	@cd $(WAYWISER_WS) && \
+	  . /opt/ros/humble/setup.sh && \
+	  { . install/setup.bash 2>/dev/null || true; } && \
+	  skipped="$${WAYWISER_SKIPPED_PACKAGES:-$$(grep '^WAYWISER_SKIPPED_PACKAGES=' .env 2>/dev/null | sed 's/^WAYWISER_SKIPPED_PACKAGES=//;s/"//g')}"; \
+	  if [ -n "$$skipped" ]; then \
+	    colcon test --base-paths src/WayWiseR/ --packages-skip $$skipped; \
+	  else \
+	    colcon test --base-paths src/WayWiseR/; \
+	  fi; \
+	  colcon test-result --verbose
 
 clean:
 	@echo "Removing build/, install/, log/ ..."
