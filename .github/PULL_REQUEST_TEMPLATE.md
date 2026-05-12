@@ -3,8 +3,7 @@
 Before creating this PR, ensure you have completed the following by filling in the checkboxes with 'x':
 
 - [ ] Followed the [Developer Guide](https://github.com/das-rise/WayWiseR/blob/humble/.github/DEVELOPER_GUIDE.md) and coding standards
-- [ ] Run all tests: `colcon test --base-paths src/WayWiseR/ --packages-skip $WAYWISER_SKIPPED_PACKAGES`
-- [ ] Verified test results: `colcon test-result --verbose`
+- [ ] Run all tests and verify test results with `make test`
 
 ---
 
