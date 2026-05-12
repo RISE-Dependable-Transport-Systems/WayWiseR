@@ -36,7 +36,8 @@ def shutdown_on_process_error(event, _context):
         return []
 
     action = getattr(event, 'action', None)
-    action_name = getattr(action, 'name', None) or getattr(action, '__class__', type(action)).__name__
+    action_class = getattr(action, '__class__', type(action))
+    action_name = getattr(action, 'name', None) or action_class.__name__
     reason = f"Shutting down launch because '{action_name}' exited with code {returncode}."
 
     return [

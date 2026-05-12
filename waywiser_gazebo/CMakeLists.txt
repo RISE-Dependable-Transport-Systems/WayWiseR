@@ -137,6 +137,12 @@ endif()
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
+  set(AMENT_LINT_AUTO_EXCLUDE
+    ament_cmake_flake8
+    ament_cmake_lint_cmake
+    ament_cmake_pep257
+    ament_cmake_uncrustify
+  )
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
 
@@ -145,6 +151,22 @@ if(BUILD_TESTING)
   # conform to ROS XML conventions and should never be linted.
   set(ament_cmake_xmllint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
+
+  find_package(ament_cmake_flake8 REQUIRED)
+  find_package(ament_cmake_lint_cmake REQUIRED)
+  find_package(ament_cmake_pep257 REQUIRED)
+
+  ament_flake8(
+    launch/gazebo.launch.py
+    launch/px4_sitl.launch.py
+    launch/spawn.launch.py
+  )
+  ament_pep257(
+    launch/gazebo.launch.py
+    launch/px4_sitl.launch.py
+    launch/spawn.launch.py
+  )
+  ament_lint_cmake(CMakeLists.txt)
 endif()
 
 ament_package()

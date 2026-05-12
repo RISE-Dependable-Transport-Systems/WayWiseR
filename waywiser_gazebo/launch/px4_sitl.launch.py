@@ -450,7 +450,8 @@ def validate_gazebo_compatibility(px4_binary: Path, px4_dir: Path, bridge_instal
     if px4_requires_harmonic and bridge_is_fortress:
         raise RuntimeError(
             f'Gazebo ABI mismatch: PX4 requires Harmonic (MIN_GZ_VERSION={px4_min_gz_version}, '
-            f'links {px4_transport}), but ros_gz_bridge links {bridge_transport} (Fortress/Ignition). '
+            f'links {px4_transport}), but ros_gz_bridge links {bridge_transport} '
+            '(Fortress/Ignition). '
             'Fix: run `make setup` to build the ros_gz_harmonic submodule.'
         )
 
@@ -728,7 +729,7 @@ def create_sdf_without_multicopter_velocity_control(sdf_path):
 
 
 def create_sdf_with_px4_sim_sensors(sdf_path):
-    """Inject PX4-compatible IMU, barometer, magnetometer, GPS and lidar sensors into a model SDF."""
+    """Inject PX4-compatible sensors into a model SDF."""
     tree = ET.parse(sdf_path)
     root = tree.getroot()
     model = root.find('.//model')

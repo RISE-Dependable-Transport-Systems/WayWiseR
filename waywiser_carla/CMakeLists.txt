@@ -76,9 +76,40 @@ install(
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
+  set(AMENT_LINT_AUTO_EXCLUDE
+    ament_cmake_flake8
+    ament_cmake_lint_cmake
+    ament_cmake_pep257
+    ament_cmake_uncrustify
+  )
+  set(ament_cmake_xmllint_FOUND TRUE)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
+
+  find_package(ament_cmake_flake8 REQUIRED)
+  find_package(ament_cmake_lint_cmake REQUIRED)
+  find_package(ament_cmake_pep257 REQUIRED)
+  find_package(ament_cmake_uncrustify REQUIRED)
+
+  file(GLOB_RECURSE WAYWISER_CARLA_PYTHON_FILES
+    "launch/*.py"
+    "py_src/*.py"
+  )
+  file(GLOB_RECURSE WAYWISER_CARLA_CPP_FILES
+    "cpp_src/*.cpp"
+    "cpp_src/*.h"
+    "cpp_src/*.hpp"
+  )
+
+  if(WAYWISER_CARLA_PYTHON_FILES)
+    ament_flake8(${WAYWISER_CARLA_PYTHON_FILES})
+    ament_pep257(${WAYWISER_CARLA_PYTHON_FILES})
+  endif()
+  ament_lint_cmake(CMakeLists.txt)
+  if(WAYWISER_CARLA_CPP_FILES)
+    ament_uncrustify(${WAYWISER_CARLA_CPP_FILES})
+  endif()
 endif()
 
 ament_package()

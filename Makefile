@@ -87,6 +87,7 @@ test:
 	@cd $(WAYWISER_WS) && bash -c '\
 	  . /opt/ros/humble/setup.bash; \
 	  . install/setup.bash 2>/dev/null || true; \
+	  colcon test-result --delete-yes >/dev/null 2>&1 || true; \
 	  colcon test --packages-select $(PKG_LIST); \
 	  colcon test-result --verbose'
 

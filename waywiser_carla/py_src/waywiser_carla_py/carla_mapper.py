@@ -129,7 +129,8 @@ class CarlaMapper(object):
             self.height_in_pixels = math.ceil(self.height / self.min_meters_per_pixel)
 
             self.logger.info(
-                f'Loaded cached map from {full_path} with ENU ref: Lat={self.earth_ref_lat}, Lon={self.earth_ref_lon}'
+                f'Loaded cached map from {full_path} with ENU ref: '
+                f'Lat={self.earth_ref_lat}, Lon={self.earth_ref_lon}'
             )
 
             if self.width <= 0 or self.height <= 0:
@@ -151,13 +152,15 @@ class CarlaMapper(object):
                 self.earth_ref_lat = carla_georef.latitude
                 self.earth_ref_lon = carla_georef.longitude
                 self.logger.info(
-                    f'Using ENU reference from carla map: Lat={carla_georef.latitude}, Lon={carla_georef.longitude}'
+                    'Using ENU reference from carla map: '
+                    f'Lat={carla_georef.latitude}, Lon={carla_georef.longitude}'
                 )
             else:
                 self.earth_ref_lat = enuref[0]
                 self.earth_ref_lon = enuref[1]
                 self.logger.info(
-                    f'Using ENU reference from params: Lat={self.earth_ref_lat}, Lon={self.earth_ref_lon}'
+                    f'Using ENU reference from params: Lat={self.earth_ref_lat}, '
+                    f'Lon={self.earth_ref_lon}'
                 )
 
             carla_map_name = carla_map.name.split('/')[-1]
@@ -229,7 +232,8 @@ class CarlaMapper(object):
             self.height = max_y - min_y
             if self.width <= 0 or self.height <= 0:
                 raise ValueError(
-                    f'World bounds produce non-positive image size: width={self.width}, height={self.height}. '
+                    'World bounds produce non-positive image size: '
+                    f'width={self.width}, height={self.height}. '
                     f'world_bounds={self.world_bounds}'
                 )
             self.world_offset = (min_x, min_y)
@@ -239,9 +243,7 @@ class CarlaMapper(object):
             self.logger.info('Resetting the weather to ClearNoon to capture aerial images.')
             clear_noon_weather = carla.WeatherParameters.ClearNoon
             carla_world.set_weather(clear_noon_weather)
-            carla_topology = self._call_with_timeout_retry(
-                'map.get_topology', carla_map.get_topology
-            )
+            self._call_with_timeout_retry('map.get_topology', carla_map.get_topology)
 
             self.map_image = Image.new(
                 'RGBA',
@@ -260,7 +262,10 @@ class CarlaMapper(object):
             metadata = PngInfo()
             metadata.add_text(
                 'world_bounds',
-                f'{self.world_bounds[0]}, {self.world_bounds[1]}, {self.world_bounds[2]}, {self.world_bounds[3]}',
+                (
+                    f'{self.world_bounds[0]}, {self.world_bounds[1]}, '
+                    f'{self.world_bounds[2]}, {self.world_bounds[3]}'
+                ),
             )
             metadata.add_text('ref_lat', str(self.earth_ref_lat))
             metadata.add_text('ref_lon', str(self.earth_ref_lon))
@@ -312,7 +317,9 @@ class CarlaMapper(object):
         return self.client.get_world()
 
     def capture_aerial_view(self, carla_world, progress_callback=None):
-        """Capture aerial view of the map area.
+        """
+        Capture aerial view of the map area.
+
         progress_callback: function(count, total, partial_image)
         """
         self.aerial_fetch_cancelled = False
@@ -524,7 +531,8 @@ class CarlaMapper(object):
                     location, carla.Rotation(pitch=-90.0, yaw=-90.0, roll=0.0)
                 )
                 logger.info(
-                    f'Capturing image {index + 1}/{num_camera_spawn_locations} at {transform.location}'
+                    f'Capturing image {index + 1}/{num_camera_spawn_locations} '
+                    f'at {transform.location}'
                 )
 
                 rgb_camera.set_transform(transform)

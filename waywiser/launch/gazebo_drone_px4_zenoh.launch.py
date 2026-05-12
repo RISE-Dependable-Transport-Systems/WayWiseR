@@ -366,9 +366,6 @@ def drone_state_publisher_launch(context):
     config_data = yaml_to_dict(drone_config)
     rsp_params = config_data['/**']['ros__parameters']
     rsp_node = get_robot_state_publisher_node(context, rsp_params, use_sim_time, frame_prefix)
-    # The get_robot_state_publisher_node function updates rsp_params['urdf_file'] in-place
-    # with the scaled URDF string. We can reuse this for the vehicle node.
-    urdf_string = rsp_params['urdf_file']
 
     return [
         GroupAction(

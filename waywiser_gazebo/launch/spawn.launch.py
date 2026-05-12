@@ -252,9 +252,6 @@ def create_sdf_spawn_actions(
         # Override only provided values, fallback to 0 for missing ones in the override list
         for i in range(min(len(pose_vals), 6)):
             spawn_pose[i] = pose_vals[i]
-        if add_px4_sim_sensors:
-            spawn_pose[3] = '0'
-            spawn_pose[4] = '0'
     else:
         try:
             tree = ET.parse(sdf_path)

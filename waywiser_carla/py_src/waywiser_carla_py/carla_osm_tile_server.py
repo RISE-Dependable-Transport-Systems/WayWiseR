@@ -83,7 +83,9 @@ class CarlaOsmTileServer(Node):
             self.get_parameter('carla_world_origin_offset_y').get_parameter_value().double_value
         )
         self.carla_bev_view_camera_resolution = (
-            self.get_parameter('carla_bev_view_camera_resolution').get_parameter_value().integer_value
+            self.get_parameter(
+                'carla_bev_view_camera_resolution'
+            ).get_parameter_value().integer_value
         )
         self.carla_bev_view_camera_fov = (
             self.get_parameter('carla_bev_view_camera_fov').get_parameter_value().double_value
