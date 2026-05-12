@@ -72,6 +72,38 @@ source_ros() {
     # shellcheck disable=SC1090
     source "$f"
     set -u
+    prune_missing_prefix_paths
+}
+
+# Drop stale overlay prefixes left behind by a previously sourced install space.
+# This avoids noisy colcon warnings after build/, install/, or selected packages
+# have been cleaned since the user's shell was last sourced.
+prune_missing_prefix_paths() {
+    local var value IFS entry new_value
+    local -a prefix_vars=(
+        AMENT_PREFIX_PATH
+        CMAKE_PREFIX_PATH
+        COLCON_PREFIX_PATH
+    )
+
+    for var in "${prefix_vars[@]}"; do
+        value="${!var:-}"
+        [[ -n "$value" ]] || continue
+
+        new_value=""
+        IFS=':'
+        for entry in $value; do
+            [[ -z "$entry" || -e "$entry" ]] || continue
+            new_value+="${new_value:+:}$entry"
+        done
+        unset IFS
+
+        if [[ -n "$new_value" ]]; then
+            export "$var=$new_value"
+        else
+            unset "$var"
+        fi
+    done
 }
 
 # Activate venv + ROS (used by sim package functions).
