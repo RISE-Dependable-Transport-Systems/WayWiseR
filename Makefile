@@ -28,6 +28,14 @@ WAYWISER_WS    ?= $(abspath $(dir $(MAKEFILE_REAL))/../..)
 BOOTSTRAP      := $(dir $(MAKEFILE_REAL))bootstrap
 ARGS           ?=
 
+# First-party packages — mirrors build.yaml package-name; used by 'make test'
+# to avoid descending into submodules (PX4-Autopilot, ros_gz_harmonic, etc.).
+WAYWISER_PACKAGES := \
+  waywiser waywiser_agrarsense waywiser_carla waywiser_core \
+  waywiser_description waywiser_gazebo waywiser_hwbringup waywiser_nav2 \
+  waywiser_perception waywiser_rviz2 waywiser_slam waywiser_teleop \
+  waywiser_test_runner waywiser_twist_safety
+
 .PHONY: help all configure setup build rebuild test clean
 .DEFAULT_GOAL := help
 
@@ -75,12 +83,12 @@ rebuild:
 test:
 	$(eval SKIPPED := $(shell grep '^WAYWISER_SKIPPED_PACKAGES=' $(WAYWISER_WS)/.env 2>/dev/null | sed 's/^WAYWISER_SKIPPED_PACKAGES=//;s/"//g'))
 	$(eval SKIPPED := $(or $(WAYWISER_SKIPPED_PACKAGES),$(SKIPPED)))
-	@if [ -n "$(SKIPPED)" ]; then \
-	  colcon test --base-paths $(WAYWISER_WS)/src/WayWiseR/ --packages-skip $(SKIPPED); \
-	else \
-	  colcon test --base-paths $(WAYWISER_WS)/src/WayWiseR/; \
-	fi
-	@colcon test-result --verbose || true
+	$(eval PKG_LIST := $(filter-out $(SKIPPED),$(WAYWISER_PACKAGES)))
+	@cd $(WAYWISER_WS) && bash -c '\
+	  . /opt/ros/humble/setup.bash; \
+	  . install/setup.bash 2>/dev/null || true; \
+	  colcon test --packages-select $(PKG_LIST); \
+	  colcon test-result --verbose'
 
 clean:
 	@echo "Removing build/, install/, log/ ..."
