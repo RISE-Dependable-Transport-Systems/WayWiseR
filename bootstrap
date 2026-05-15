@@ -76,13 +76,16 @@ source_ros() {
 }
 
 ensure_ros2_environment() {
-    if [[ -n "${ROS_DISTRO:-}" ]]; then
+    local ros_distro="${ROS_DISTRO:-humble}"
+    local ros_prefix="/opt/ros/$ros_distro"
+
+    if [[ -n "${ROS_DISTRO:-}" && ":${AMENT_PREFIX_PATH:-}:" == *":$ros_prefix:"* ]]; then
         prune_missing_prefix_paths
         info "Using sourced ROS2 environment: $ROS_DISTRO"
         return 0
     fi
 
-    local default_setup="/opt/ros/humble/setup.bash"
+    local default_setup="$ros_prefix/setup.bash"
     if [[ -f "$default_setup" ]]; then
         source_ros "$default_setup"
         info "Sourced ROS2 environment from $default_setup"
@@ -91,7 +94,7 @@ ensure_ros2_environment() {
 
     die "ROS2 is not sourced and $default_setup does not exist.
 Please source your ROS2 environment before running make, for example:
-  source /opt/ros/humble/setup.bash"
+  source $default_setup"
 }
 
 # Drop stale overlay prefixes left behind by a previously sourced install space.
