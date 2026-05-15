@@ -109,8 +109,7 @@ To run tests, build the workspace and then do:
 
 ```bash
 cd $WAYWISER_WS
-colcon test --base-paths src/WayWiseR/ --packages-skip $WAYWISER_SKIPPED_PACKAGES
-colcon test-result --verbose
+make test
 ```
 
 ## Local CI Pipeline (Docker & act)
@@ -128,14 +127,14 @@ Before running the pipeline for the first time or after changing the CI environm
 
 ```bash
 # Build the CI image
-cd $WAYWISER_WS/src/WayWiseR
-docker build -t ghcr.io/das-rise/waywiser/ci-image:humble -f .github/workflows/Dockerfile.ci .
+docker build -t ghcr.io/das-rise/waywiser/ci-image:humble \
+  -f $WAYWISER_WS/src/WayWiseR/.github/workflows/Dockerfile.ci \
+  $WAYWISER_WS/src/WayWiseR
 ```
 
 Then, run the build and test job using `act`. The `--pull=false` flag ensures `act` uses your local image:
 
 ```bash
 # Run the CI pipeline locally
-cd $WAYWISER_WS/src/WayWiseR
-act -j build-and-test --pull=false -P ubuntu-22.04=ghcr.io/das-rise/waywiser/ci-image:humble
+act -j build-and-test --pull=false -P ubuntu-22.04=ghcr.io/das-rise/waywiser/ci-image:humble -C $WAYWISER_WS/src/WayWiseR
 ```
