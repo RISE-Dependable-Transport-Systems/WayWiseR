@@ -11,7 +11,7 @@ find_package(ament_cmake REQUIRED)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_package(xacro REQUIRED)
 
-# Set to OFF in CI to skip PX4 SITL and ros_gz_harmonic builds (pass -DWAYWISER_BUILD_SIMULATION=OFF).
+# Set to OFF to skip optional PX4 SITL and ros_gz_harmonic builds.
 option(WAYWISER_BUILD_SIMULATION "Build simulation dependencies (PX4 SITL, ros_gz_harmonic)" ON)
 
 find_program(BASH_EXECUTABLE bash REQUIRED)
@@ -19,6 +19,18 @@ find_program(COLCON_EXECUTABLE colcon)
 find_program(GIT_EXECUTABLE git REQUIRED)
 find_program(MAKE_EXECUTABLE make REQUIRED)
 set(PX4_ZENOH_PATCH_FILE "${CMAKE_CURRENT_SOURCE_DIR}/external/px4_zenoh_humble_compat.patch")
+
+set(COLCON_ALLOW_OVERRIDING_ARGS "")
+if(COLCON_EXECUTABLE)
+  execute_process(
+    COMMAND ${COLCON_EXECUTABLE} build --help
+    OUTPUT_VARIABLE COLCON_BUILD_HELP
+    ERROR_QUIET
+  )
+  if(COLCON_BUILD_HELP MATCHES "--allow-overriding")
+    set(COLCON_ALLOW_OVERRIDING_ARGS --allow-overriding ros_gz_bridge)
+  endif()
+endif()
 
 set(PX4_AUTOPILOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/PX4-Autopilot")
 set(PX4_GZ_MODELS_DIR "${PX4_AUTOPILOT_DIR}/Tools/simulation/gz/models")
@@ -59,7 +71,7 @@ if(WAYWISER_BUILD_SIMULATION AND EXISTS "${ROS_GZ_HARMONIC_DIR}/ros_gz_bridge/pa
       --build-base ${ROS_GZ_HARMONIC_BUILD_DIR}/build
       --install-base ${ROS_GZ_HARMONIC_INSTALL_DIR}
       --packages-up-to ros_gz_bridge
-      --allow-overriding ros_gz_bridge
+      ${COLCON_ALLOW_OVERRIDING_ARGS}
       --cmake-args -DBUILD_TESTING=OFF
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       USES_TERMINAL
@@ -112,11 +124,16 @@ if(WAYWISER_BUILD_SIMULATION AND EXISTS "${PX4_AUTOPILOT_DIR}/Makefile")
   if(TARGET waywiser_gazebo_ros_gz_harmonic)
     add_dependencies(waywiser_gazebo_px4_sitl waywiser_gazebo_ros_gz_harmonic)
   endif()
-else()
+elseif(WAYWISER_BUILD_SIMULATION)
   message(
     WARNING
     "PX4-Autopilot submodule not found at ${PX4_AUTOPILOT_DIR}. "
     "Launch files that depend on PX4 SITL will not work until the submodule is initialized."
+  )
+else()
+  message(
+    STATUS
+    "WAYWISER_BUILD_SIMULATION is OFF. Skipping optional PX4 SITL build."
   )
 endif()
 
