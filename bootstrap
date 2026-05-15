@@ -7,10 +7,10 @@
 #   --prereqs-only   Only install system prerequisites, then exit
 #   --setup-only     Install prereqs + venv + rosdep, then exit (no build)
 #   --skip-prereqs   Skip system prerequisites (assume already installed)
-#   --skip-ros       Skip ROS2 Humble check/install
 #   --skip-mavsdk    Skip MAVSDK check/install
 #   --configure      (Re-)configure .env only, then exit
-#   --build-only     Skip prerequisites; only run rosdep + colcon build
+#   --build-only     Skip setup; only run colcon build
+#   --post-build-only  Run post-build setup hooks, then exit
 #   -y, --yes, --quiet  Non-interactive: accept all defaults
 #   -h, --help       Show this help and exit
 #
@@ -63,16 +63,35 @@ env_set() {
         printf '%s=%s\n' "$key" "$val" >> "$ENV_FILE"
     fi
 }
-# Source ROS setup files with nounset suspended
-# variables (e.g. AMENT_TRACE_SETUP_FILES) that may not be exported yet.
+# Source ROS setup files with nounset suspended because ROS setup may reference
+# variables (e.g. AMENT_TRACE_SETUP_FILES) that are not exported yet.
 source_ros() {
     local f="$1"
-    [[ -f "$f" ]] || die "ROS setup not found: $f — install ROS2 Humble first."
+    [[ -f "$f" ]] || die "ROS setup not found: $f"
     set +u
     # shellcheck disable=SC1090
     source "$f"
     set -u
     prune_missing_prefix_paths
+}
+
+ensure_ros2_environment() {
+    if [[ -n "${ROS_DISTRO:-}" ]]; then
+        prune_missing_prefix_paths
+        info "Using sourced ROS2 environment: $ROS_DISTRO"
+        return 0
+    fi
+
+    local default_setup="/opt/ros/humble/setup.bash"
+    if [[ -f "$default_setup" ]]; then
+        source_ros "$default_setup"
+        info "Sourced ROS2 environment from $default_setup"
+        return 0
+    fi
+
+    die "ROS2 is not sourced and $default_setup does not exist.
+Please source your ROS2 environment before running make, for example:
+  source /opt/ros/humble/setup.bash"
 }
 
 # Drop stale overlay prefixes left behind by a previously sourced install space.
@@ -115,9 +134,7 @@ activate_env() {
     # shellcheck disable=SC1090
     source "$venv/bin/activate"
     set -u
-    if [[ -z "${ROS_DISTRO:-}" ]]; then
-        source_ros /opt/ros/humble/setup.bash
-    fi
+    ensure_ros2_environment
 }
 
 # Return 0 (true) if an NVIDIA GPU is accessible on this machine.
@@ -205,10 +222,10 @@ Usage: $(basename "$0") [options]
 Core workspace setup:
   --prereqs-only   Only install system prerequisites, then exit
   --skip-prereqs   Skip system prerequisites (assume already installed)
-  --skip-ros       Skip ROS2 Humble check/install
   --skip-mavsdk    Skip MAVSDK check/install
   --configure      (Re-)configure .env only, then exit
-  --build-only     Skip prerequisites; only run rosdep + colcon build
+  --build-only     Skip setup; only run colcon build
+  --post-build-only  Run post-build setup hooks, then exit
   -y, --yes, --quiet  Non-interactive: accept all defaults
   -h, --help       Show this help and exit
 
@@ -225,10 +242,10 @@ OPT_PREREQS_ONLY=false
 OPT_SETUP_ONLY=false
 MAVSDK_MANUAL_INSTALL=false
 OPT_SKIP_PREREQS=false
-OPT_SKIP_ROS=false
 OPT_SKIP_MAVSDK=false
 OPT_CONFIGURE_ONLY=false
 OPT_BUILD_ONLY=false
+OPT_POST_BUILD_ONLY=false
 OPT_YES=false
 
 
@@ -237,10 +254,10 @@ while [[ $# -gt 0 ]]; do
             --prereqs-only)  OPT_PREREQS_ONLY=true ;;
             --setup-only)    OPT_SETUP_ONLY=true ;;
             --skip-prereqs)  OPT_SKIP_PREREQS=true ;;
-            --skip-ros)      OPT_SKIP_ROS=true ;;
             --skip-mavsdk)   OPT_SKIP_MAVSDK=true ;;
             --configure)     OPT_CONFIGURE_ONLY=true ;;
             --build-only)    OPT_BUILD_ONLY=true ;;
+            --post-build-only) OPT_POST_BUILD_ONLY=true ;;
             -y|--yes|--quiet) OPT_YES=true ;;
             -h|--help)       usage; exit 0 ;;
             *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
@@ -446,27 +463,9 @@ Check packages to BUILD (uncheck to skip).
         info "uv installed: $(uv --version)"
     }
     
-    install_ros2() {
-        if [[ -f "/opt/ros/humble/setup.bash" ]]; then
-            info "ROS2 Humble already installed."
-            return 0
-        fi
-        header "Installing ROS2 Humble"
-        prompt_yn "Install ROS2 Humble via apt (modifies /etc/apt/sources.list.d/)?" true \
-            || die "ROS2 Humble is required. Install it manually then re-run with --skip-ros."
-        sudo apt-get update -qq && sudo apt-get install ${OPT_YES:+-y} locales
-        sudo locale-gen en_US en_US.UTF-8
-        sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
-        sudo add-apt-repository -y universe
-        sudo apt-get update -qq && sudo apt-get install ${OPT_YES:+-y} curl
-        sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
-        -o /usr/share/keyrings/ros-archive-keyring.gpg
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
-        http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo "$UBUNTU_CODENAME") main" \
-        | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
-        sudo apt-get update -qq
-        sudo apt-get install ${OPT_YES:+-y} ros-humble-desktop ros-dev-tools
-        info "ROS2 Humble installed."
+    setup_ros2_environment() {
+        header "Checking ROS2 environment"
+        ensure_ros2_environment
     }
     
     install_mavsdk() {
@@ -505,9 +504,7 @@ init_rosdep() {
 check_prerequisites() {
     install_apt_deps
     install_uv
-    if [[ "$OPT_SKIP_ROS" != true ]]; then
-        install_ros2
-    fi
+    setup_ros2_environment
     if [[ "$OPT_SKIP_MAVSDK" != true ]]; then
         install_mavsdk
     fi
@@ -691,7 +688,7 @@ configure_env() {
         echo "${v:-${2:-}}"
     }
 
-    # ── 1. Package selection ──────────────────────────────────────────────
+    # ── Package selection ─────────────────────────────────────────────────
     local cur_skipped; cur_skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
     if ! grep -q "^WAYWISER_SKIPPED_PACKAGES=" "$ENV_FILE" 2>/dev/null; then
         cur_skipped=$(env_get WAYWISER_SKIPPED_PACKAGES "$ENV_EXAMPLE")
@@ -700,7 +697,7 @@ configure_env() {
     local new_skipped
     package_checklist new_skipped "$cur_skipped" || return 1
 
-    # ── 2. ROS2 Core Settings (one form page) ────────────────────────────
+    # ── Settings form ─────────────────────────────────────────────────────
     local cur_domain_id cur_rmw cur_log_stdout cur_log_buffered cur_py_unbuf cur_colorized
     cur_domain_id=$(_cfg_get ROS_DOMAIN_ID 0)
     cur_rmw=$(_cfg_get RMW_IMPLEMENTATION rmw_zenoh_cpp)
@@ -709,46 +706,11 @@ configure_env() {
     cur_py_unbuf=$(_cfg_get PYTHONUNBUFFERED 1)
     cur_colorized=$(_cfg_get RCUTILS_COLORIZED_OUTPUT 1)
 
-    local ros_vals=()
-    wt_form ros_vals "ROS2 Core Settings" \
-        "RMW: rmw_zenoh_cpp or rmw_fastrtps_cpp. Booleans: 1=yes, 0=no." \
-        "ROS_DOMAIN_ID (0-232)"                  "$cur_domain_id" \
-        "RMW_IMPLEMENTATION"                     "$cur_rmw" \
-        "RCUTILS_LOGGING_USE_STDOUT (1/0)"       "$cur_log_stdout" \
-        "RCUTILS_LOGGING_BUFFERED_STREAM (1/0)"  "$cur_log_buffered" \
-        "PYTHONUNBUFFERED (1/0)"                 "$cur_py_unbuf" \
-        "RCUTILS_COLORIZED_OUTPUT (1/0)"         "$cur_colorized" \
-        || return 1
-    local new_domain_id="${ros_vals[0]}"
-    local new_rmw="${ros_vals[1]}"
-    local new_log_stdout="${ros_vals[2]}"
-    local new_log_buffered="${ros_vals[3]}"
-    local new_py_unbuf="${ros_vals[4]}"
-    local new_colorized="${ros_vals[5]}"
-
-    # ── 3. Middleware-specific settings (one form page) ───────────────────
     local cur_fdd_disc cur_fdd_srv_ip cur_fdd_cli_ip cur_fdd_super
     cur_fdd_disc=$(_cfg_get FASTDDS_USE_DISCOVERY_SERVER 0)
     cur_fdd_srv_ip=$(_cfg_get FASTDDS_REMOTE_DISCOVERY_SERVER_IP "")
     cur_fdd_cli_ip=$(_cfg_get FASTDDS_REMOTE_DISCOVERY_CLIENT_IP "")
     cur_fdd_super=$(_cfg_get FASTDDS_SUPER_CLIENT 0)
-    local new_fdd_disc="$cur_fdd_disc" new_fdd_srv_ip="$cur_fdd_srv_ip"
-    local new_fdd_cli_ip="$cur_fdd_cli_ip" new_fdd_super="$cur_fdd_super"
-
-    if [[ "$new_rmw" == "rmw_fastrtps_cpp" ]]; then
-        local fdd_vals=()
-        wt_form fdd_vals "FastDDS Settings" \
-            "Booleans: 1=yes, 0=no. Leave IP fields blank if unused." \
-            "FASTDDS_USE_DISCOVERY_SERVER (1/0)"       "$cur_fdd_disc" \
-            "FASTDDS_REMOTE_DISCOVERY_SERVER_IP"        "$cur_fdd_srv_ip" \
-            "FASTDDS_REMOTE_DISCOVERY_CLIENT_IP"        "$cur_fdd_cli_ip" \
-            "FASTDDS_SUPER_CLIENT (1/0)"                "$cur_fdd_super" \
-            || return 1
-        new_fdd_disc="${fdd_vals[0]}"
-        new_fdd_srv_ip="${fdd_vals[1]}"
-        new_fdd_cli_ip="${fdd_vals[2]}"
-        new_fdd_super="${fdd_vals[3]}"
-    fi
 
     local cur_z_router cur_z_rip cur_z_rport cur_z_attempts cur_z_cfg cur_z_override
     cur_z_router=$(_cfg_get ZENOH_USE_LOCAL_ROUTER 1)
@@ -757,29 +719,7 @@ configure_env() {
     cur_z_attempts=$(_cfg_get ZENOH_ROUTER_CHECK_ATTEMPTS "-1")
     cur_z_cfg=$(_cfg_get ZENOH_SESSION_CONFIG_URI "")
     cur_z_override=$(_cfg_get ZENOH_CONFIG_OVERRIDE "")
-    local new_z_router="$cur_z_router" new_z_rip="$cur_z_rip" new_z_rport="$cur_z_rport"
-    local new_z_attempts="$cur_z_attempts" new_z_cfg="$cur_z_cfg" new_z_override="$cur_z_override"
 
-    if [[ "$new_rmw" == "rmw_zenoh_cpp" ]]; then
-        local z_vals=()
-        wt_form z_vals "Zenoh Settings" \
-            "Booleans: 1=yes, 0=no. Leave optional fields blank if unused." \
-            "ZENOH_USE_LOCAL_ROUTER (1/0)"         "$cur_z_router" \
-            "ZENOH_REMOTE_ROUTER_IP"               "$cur_z_rip" \
-            "ZENOH_REMOTE_ROUTER_PORT"             "$cur_z_rport" \
-            "ZENOH_ROUTER_CHECK_ATTEMPTS"          "$cur_z_attempts" \
-            "ZENOH_SESSION_CONFIG_URI"             "$cur_z_cfg" \
-            "ZENOH_CONFIG_OVERRIDE"                "$cur_z_override" \
-            || return 1
-        new_z_router="${z_vals[0]}"
-        new_z_rip="${z_vals[1]}"
-        new_z_rport="${z_vals[2]}"
-        new_z_attempts="${z_vals[3]}"
-        new_z_cfg="${z_vals[4]}"
-        new_z_override="${z_vals[5]}"
-    fi
-
-    # ── 4. Email settings (form + separate passwordbox) ───────────────────
     local cur_email_user cur_email_pass cur_email_recip cur_smtp_server cur_smtp_port
     cur_email_user=$(_cfg_get EMAIL_USER "")
     cur_email_pass=$(env_get EMAIL_PASSWORD)
@@ -787,20 +727,53 @@ configure_env() {
     cur_smtp_server=$(_cfg_get SMTP_SERVER smtp.gmail.com)
     cur_smtp_port=$(_cfg_get SMTP_PORT 465)
 
-    local email_vals=()
-    wt_form email_vals "Email Settings" \
-        "Leave fields blank to disable email notifications." \
-        "EMAIL_USER"      "$cur_email_user" \
-        "EMAIL_RECIPIENT" "$cur_email_recip" \
-        "SMTP_SERVER"     "$cur_smtp_server" \
-        "SMTP_PORT"       "$cur_smtp_port" \
-        "EMAIL_PASSWORD"  "$cur_email_pass" \
+    local cfg_vals=()
+    wt_form cfg_vals "WayWiseR Configuration" \
+        "Edit all settings in one form. Booleans use 1=yes, 0=no." \
+        "ROS_DOMAIN_ID (0-232)"                  "$cur_domain_id" \
+        "RMW_IMPLEMENTATION"                     "$cur_rmw" \
+        "RCUTILS_LOGGING_USE_STDOUT (1/0)"       "$cur_log_stdout" \
+        "RCUTILS_LOGGING_BUFFERED_STREAM (1/0)"  "$cur_log_buffered" \
+        "PYTHONUNBUFFERED (1/0)"                 "$cur_py_unbuf" \
+        "RCUTILS_COLORIZED_OUTPUT (1/0)"         "$cur_colorized" \
+        "FASTDDS_USE_DISCOVERY_SERVER (1/0)"     "$cur_fdd_disc" \
+        "FASTDDS_REMOTE_DISCOVERY_SERVER_IP"     "$cur_fdd_srv_ip" \
+        "FASTDDS_REMOTE_DISCOVERY_CLIENT_IP"     "$cur_fdd_cli_ip" \
+        "FASTDDS_SUPER_CLIENT (1/0)"             "$cur_fdd_super" \
+        "ZENOH_USE_LOCAL_ROUTER (1/0)"           "$cur_z_router" \
+        "ZENOH_REMOTE_ROUTER_IP"                 "$cur_z_rip" \
+        "ZENOH_REMOTE_ROUTER_PORT"               "$cur_z_rport" \
+        "ZENOH_ROUTER_CHECK_ATTEMPTS"            "$cur_z_attempts" \
+        "ZENOH_SESSION_CONFIG_URI"               "$cur_z_cfg" \
+        "ZENOH_CONFIG_OVERRIDE"                  "$cur_z_override" \
+        "EMAIL_USER"                             "$cur_email_user" \
+        "EMAIL_PASSWORD"                         "$cur_email_pass" \
+        "EMAIL_RECIPIENT"                        "$cur_email_recip" \
+        "SMTP_SERVER"                            "$cur_smtp_server" \
+        "SMTP_PORT"                              "$cur_smtp_port" \
         || return 1
-    local new_email_user="${email_vals[0]}"
-    local new_email_recip="${email_vals[1]}"
-    local new_smtp_server="${email_vals[2]}"
-    local new_smtp_port="${email_vals[3]}"
-    local new_email_pass="${email_vals[4]}"
+
+    local new_domain_id="${cfg_vals[0]}"
+    local new_rmw="${cfg_vals[1]}"
+    local new_log_stdout="${cfg_vals[2]}"
+    local new_log_buffered="${cfg_vals[3]}"
+    local new_py_unbuf="${cfg_vals[4]}"
+    local new_colorized="${cfg_vals[5]}"
+    local new_fdd_disc="${cfg_vals[6]}"
+    local new_fdd_srv_ip="${cfg_vals[7]}"
+    local new_fdd_cli_ip="${cfg_vals[8]}"
+    local new_fdd_super="${cfg_vals[9]}"
+    local new_z_router="${cfg_vals[10]}"
+    local new_z_rip="${cfg_vals[11]}"
+    local new_z_rport="${cfg_vals[12]}"
+    local new_z_attempts="${cfg_vals[13]}"
+    local new_z_cfg="${cfg_vals[14]}"
+    local new_z_override="${cfg_vals[15]}"
+    local new_email_user="${cfg_vals[16]}"
+    local new_email_pass="${cfg_vals[17]}"
+    local new_email_recip="${cfg_vals[18]}"
+    local new_smtp_server="${cfg_vals[19]}"
+    local new_smtp_port="${cfg_vals[20]}"
     [[ -z "$new_email_pass" ]] && new_email_pass="$cur_email_pass"
 
     # ── Write all settings to .env ────────────────────────────────────────
@@ -877,7 +850,7 @@ install_ros_deps() {
 
     # shellcheck disable=SC1091
     [[ -f "$VENV_DIR/bin/activate" ]] && source "$VENV_DIR/bin/activate"
-    source_ros /opt/ros/humble/setup.bash
+    ensure_ros2_environment
     ensure_env_file
     set -a; source "$ENV_FILE"; set +a
 
@@ -936,7 +909,7 @@ build_workspace() {
 
     # shellcheck disable=SC1091
     [[ -f "$VENV_DIR/bin/activate" ]] && source "$VENV_DIR/bin/activate"
-    source_ros /opt/ros/humble/setup.bash
+    ensure_ros2_environment
     ensure_env_file
     set -a; source "$ENV_FILE"; set +a
 
@@ -944,6 +917,12 @@ build_workspace() {
     local -a base_paths=("$WAYWISER_WS/src")
     local -a extra_args=()
     local -a cmake_args=()
+    local notification_extension="colcon_core.event_handler.desktop_notification"
+    local colcon_extension_blocklist="${COLCON_EXTENSION_BLOCKLIST:-}"
+
+    if [[ ":$colcon_extension_blocklist:" != *":$notification_extension:"* ]]; then
+        colcon_extension_blocklist+="${colcon_extension_blocklist:+:}$notification_extension"
+    fi
 
     if [[ " $skipped " != *" waywiser_carla "* ]]; then
         base_paths+=("$REPO_DIR/waywiser_carla/external/carla-ros-bridge")
@@ -958,12 +937,14 @@ build_workspace() {
 
     if [[ -n "$skipped" ]]; then
         # shellcheck disable=SC2086
-        colcon build --symlink-install \
+        COLCON_EXTENSION_BLOCKLIST="$colcon_extension_blocklist" \
+            colcon build --symlink-install \
             --base-paths "${base_paths[@]}" \
             "${extra_args[@]}" \
             --packages-skip $skipped
     else
-        colcon build --symlink-install \
+        COLCON_EXTENSION_BLOCKLIST="$colcon_extension_blocklist" \
+            colcon build --symlink-install \
             --base-paths "${base_paths[@]}" \
             "${extra_args[@]}"
     fi
@@ -986,7 +967,13 @@ setup_activate_hook() {
 
 # WayWiseR Environment Setup
 set -a; source "\$WAYWISER_WS/src/WayWiseR/.env"; set +a
-set +u; source /opt/ros/humble/setup.bash; set -u
+if [ -z "\${ROS_DISTRO:-}" ]; then
+    if [ -f /opt/ros/humble/setup.bash ]; then
+        set +u; source /opt/ros/humble/setup.bash; set -u
+    else
+        echo "WARNING: ROS2 is not sourced. Source your ROS2 environment before using this workspace." >&2
+    fi
+fi
 export PYTHONPATH=$VENV_DIR/lib/python${py_ver}/site-packages:\${PYTHONPATH:-}
 if [ -f "\$WAYWISER_WS/install/setup.bash" ]; then
     set +u; source "\$WAYWISER_WS/install/setup.bash"; set -u
@@ -1024,29 +1011,6 @@ presim_setup() {
         git -C "$REPO_DIR" submodule update --init --recursive \
             waywiser_gazebo/external/PX4-Autopilot \
             waywiser_gazebo/external/ros_gz_harmonic
-    fi
-
-    if [[ " $skipped " != *" waywiser_agrarsense "* ]]; then
-        header "Pre-setup: waywiser_agrarsense"
-        if [[ "${CI:-}" == "true" ]]; then
-            info "CI environment detected — skipping local Docker bootstrap for waywiser_agrarsense."
-        else
-            if ! command -v docker &>/dev/null; then
-                prompt_yn "Install Docker via curl | sh?" true \
-                    || die "Docker is required for waywiser_agrarsense. Install it manually then retry."
-                curl -fsSL https://get.docker.com | sh
-            fi
-            if ! docker info &>/dev/null 2>&1; then
-                prompt_yn "Configure Docker rootless mode (disables system docker.service)?" true \
-                    || die "Docker rootless mode is required for waywiser_agrarsense. Configure it manually then retry."
-                sudo systemctl disable --now docker.service docker.socket 2>/dev/null || true
-                dockerd-rootless-setuptool.sh install
-            fi
-            local docker_script="$REPO_DIR/waywiser_agrarsense/ros_bridge/build_docker_container.sh"
-            if [[ -f "$docker_script" ]]; then
-                bash "$docker_script"
-            fi
-        fi
     fi
 
     if [[ " $skipped " != *" waywiser_perception "* ]]; then
@@ -1105,6 +1069,44 @@ presim_setup() {
     fi
 }
 
+agrarsense_post_build() {
+    ensure_env_file
+    local skipped
+    skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
+    [[ " $skipped " != *" waywiser_agrarsense "* ]] || return 0
+
+    header "Post-build: waywiser_agrarsense"
+    if [[ "${CI:-}" == "true" ]]; then
+        info "CI environment detected — skipping local Docker setup for waywiser_agrarsense."
+        return 0
+    fi
+
+    if ! command -v docker &>/dev/null; then
+        warn "Docker is not installed; skipping waywiser_agrarsense Docker setup."
+        warn "Install and configure Docker, then run: make post-build"
+        return 0
+    fi
+
+    if ! docker info &>/dev/null 2>&1; then
+        warn "Docker is installed but not usable by this user; skipping waywiser_agrarsense Docker setup."
+        warn "Start Docker or configure permissions/rootless Docker, then run: make post-build"
+        return 0
+    fi
+
+    local docker_script="$REPO_DIR/waywiser_agrarsense/ros_bridge/build_docker_container.sh"
+    if [[ ! -f "$docker_script" ]]; then
+        warn "Agrarsense Docker build script not found: $docker_script"
+        return 0
+    fi
+
+    bash "$docker_script"
+}
+
+run_post_build() {
+    header "Running post-build setup"
+    agrarsense_post_build
+}
+
 # ── main ─────────────────────────────────────────────────────────────────────────
 
 main() {
@@ -1115,7 +1117,11 @@ main() {
         return 0
     fi
 
-    if [[ "$OPT_BUILD_ONLY" == true ]]; then
+    if [[ "$OPT_POST_BUILD_ONLY" == true ]]; then
+        apply_env_overrides
+        run_post_build
+        return 0
+    elif [[ "$OPT_BUILD_ONLY" == true ]]; then
         apply_env_overrides
         build_workspace
         setup_activate_hook
@@ -1161,6 +1167,7 @@ main() {
             exit 0
         fi
         build_workspace
+        run_post_build
         setup_activate_hook
     fi
     

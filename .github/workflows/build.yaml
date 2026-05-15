@@ -40,7 +40,7 @@ jobs:
             ${{ runner.os }}-ccache-humble-
 
       - name: Setup Workspace
-        run: make setup ARGS="--quiet --skip-prereqs --skip-ros --skip-mavsdk"
+        run: make setup ARGS="--quiet --skip-prereqs --skip-mavsdk"
 
       - name: Build Workspace
         run: make build

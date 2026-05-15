@@ -1,20 +1,20 @@
 # WayWiseR Makefile
 #
 # Complete installation:
-#   make all                     — configure + setup + build
+#   make all                     — configure + setup + build + post-build
 #
 # Step-by-step:
 #   make configure               — (re-)configure .env interactively
 #   make setup                   — install prereqs + venv + rosdep
 #   make build                   — colcon build only
-#   make rebuild                 — remove build/, install/, log/ then colcon build
+#   make post-build              — run post-build setup hooks only
+#   make rebuild                 — remove build/, install/, log/ then build
 #
 # Cleanup:
 #   make clean                   — remove build/, install/, log/ and .venv/
 #   make clean ARGS=--skip-venv  — remove build/, install/, log/ (keep .venv)
 #
 # Options (via ARGS):
-#   make all ARGS="--skip-ros"       — skip ROS2 installation
 #   make all ARGS="--skip-mavsdk"    — skip MAVSDK installation
 #   make all ARGS="--quiet"          — non-interactive
 #
@@ -36,20 +36,21 @@ WAYWISER_PACKAGES := \
   waywiser_perception waywiser_rviz2 waywiser_slam waywiser_teleop \
   waywiser_test_runner waywiser_twist_safety
 
-.PHONY: help all configure setup build rebuild test clean
+.PHONY: help all configure setup build post-build rebuild test clean
 .DEFAULT_GOAL := help
 
 help:
 	@echo "Workspace: $(WAYWISER_WS)"
 	@echo ""
 	@echo "Complete installation:"
-	@echo "  make all             — configure + setup + build"
+	@echo "  make all             — configure + setup + build + post-build"
 	@echo ""
 	@echo "Step-by-step installation:"
 	@echo "  make configure       — (re-)configure .env interactively"
 	@echo "  make setup           — install prereqs + venv + rosdep"
-	@echo "  make build           — colcon build"
-	@echo "  make rebuild         — remove build/, install/, log/ then colcon build"
+	@echo "  make build           — colcon build only"
+	@echo "  make post-build      — run post-build setup hooks only"
+	@echo "  make rebuild         — remove build/, install/, log/ then build"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test            — colcon test (WayWiseR packages only) + show results"
@@ -58,7 +59,6 @@ help:
 	@echo "  make clean           — remove build/, install/, log/ and .venv/"
 	@echo ""
 	@echo "Options (pass via ARGS):"
-	@echo "  make all ARGS='--skip-ros'		— skip ROS2 installation"
 	@echo "  make all ARGS='--skip-mavsdk'		— skip MAVSDK installation"
 	@echo "  make all ARGS='--quiet'   		— non-interactive"
 	@echo "  make clean ARGS='--skip-venv'  	— skip removing .venv/"
@@ -74,6 +74,9 @@ setup:
 
 build:
 	@WAYWISER_WS=$(WAYWISER_WS) bash $(BOOTSTRAP) --build-only $(ARGS)
+
+post-build:
+	@WAYWISER_WS=$(WAYWISER_WS) bash $(BOOTSTRAP) --post-build-only $(ARGS)
 
 rebuild:
 	@echo "Removing build/, install/, log/ ..."

@@ -52,7 +52,7 @@ RUN uv venv --python "$(cat .python-version)" "$WAYWISER_CI_VENV" \
     && uv pip install -e ".[build,waywiser_test_runner]"
 
 RUN if make -qp 2>/dev/null | grep -q '^setup:'; then \
-        CI=true WAYWISER_SKIPPED_PACKAGES="" make setup ARGS="--quiet --skip-prereqs --skip-ros --skip-mavsdk"; \
+        CI=true WAYWISER_SKIPPED_PACKAGES="" make setup ARGS="--quiet --skip-prereqs --skip-mavsdk"; \
     else \
         apt-get update \
         && rosdep install --from-paths /tmp/ws/src -i -y --rosdistro humble \
