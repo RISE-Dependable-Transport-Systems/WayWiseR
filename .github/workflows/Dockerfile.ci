@@ -1,8 +1,15 @@
-# Use the official ROS Humble Desktop image as the base.
-FROM osrf/ros:humble-desktop
+ARG ROS_DISTRO=humble
+ARG WAYWISER_REF=humble
+
+# Use the official ROS Desktop image for the selected ROS distribution.
+FROM osrf/ros:${ROS_DISTRO}-desktop
+
+ARG ROS_DISTRO
+ARG WAYWISER_REF
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PATH=/root/.local/bin:${PATH}
+ENV ROS_DISTRO=${ROS_DISTRO}
 ENV WAYWISER_CI_VENV=/opt/waywiser-ci-venv
 
 RUN apt-get update && apt-get install -y \
@@ -38,12 +45,12 @@ ENV CCACHE_DIR=/root/.ccache
 RUN ccache -M 2G
 
 RUN rosdep init || true
-RUN rosdep update --rosdistro humble
+RUN rosdep update --rosdistro "$ROS_DISTRO"
 
 # Warm the image using the same Makefile/bootstrap path that GitHub Actions runs.
 RUN mkdir -p /tmp/ws/src
 WORKDIR /tmp/ws/src
-RUN git clone --branch humble --recursive https://github.com/das-rise/WayWiseR.git
+RUN git clone --branch "$WAYWISER_REF" --recursive https://github.com/das-rise/WayWiseR.git
 
 WORKDIR /tmp/ws/src/WayWiseR
 COPY pyproject.toml uv.lock .python-version README.md ./
@@ -55,7 +62,7 @@ RUN if make -qp 2>/dev/null | grep -q '^setup:'; then \
         CI=true WAYWISER_SKIPPED_PACKAGES="" make setup ARGS="--quiet --skip-prereqs --skip-mavsdk"; \
     else \
         apt-get update \
-        && rosdep install --from-paths /tmp/ws/src -i -y --rosdistro humble \
+        && rosdep install --from-paths /tmp/ws/src -i -y --rosdistro "$ROS_DISTRO" \
             --skip-keys "px4_msgs carla_msgs carla_spawn_objects carla_ros_bridge" \
         && rm -rf /var/lib/apt/lists/*; \
     fi
