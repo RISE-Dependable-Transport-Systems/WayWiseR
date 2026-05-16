@@ -173,7 +173,12 @@ def launch_setup(context):
         'SIM_GZ_EC_MAX3': '1000',
         'SIM_GZ_EC_MAX4': '1000',
     }
-    refresh_px4_zenoh_runtime_config(px4_build_dir, px4_rootfs_dir, px4_sys_autostart, px4_param_overrides)
+    refresh_px4_zenoh_runtime_config(
+        px4_build_dir,
+        px4_rootfs_dir,
+        px4_sys_autostart,
+        px4_param_overrides,
+    )
 
     px4_env = {
         'PX4_GZ_WORLDS': str(world_path.parent),
