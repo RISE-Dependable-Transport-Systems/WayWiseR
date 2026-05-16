@@ -89,6 +89,10 @@ test:
 	$(eval TEST_SELECTION := $(or $(WAYWISER_TEST_PACKAGES),$(WAYWISER_BUILD_PACKAGES),$(WAYWISER_PACKAGES)))
 	$(eval PKG_LIST := $(filter-out $(SKIPPED),$(TEST_SELECTION)))
 	@cd $(WAYWISER_WS) && bash -c '\
+	  venv_site=$$(find .venv/lib -maxdepth 2 -type d -name site-packages 2>/dev/null | head -n 1); \
+	  if [ -n "$$venv_site" ] && [ -n "$$PYTHONPATH" ]; then \
+	    export PYTHONPATH=$$(printf "%s" "$$PYTHONPATH" | tr ":" "\n" | grep -vx "$$(pwd)/$$venv_site" | grep -vx "$$venv_site" | paste -sd: -); \
+	  fi; \
 	  . /opt/ros/humble/setup.bash; \
 	  if [ -n "$$WAYWISER_UNDERLAY_SETUP" ] && [ -f "$$WAYWISER_UNDERLAY_SETUP" ]; then . "$$WAYWISER_UNDERLAY_SETUP"; fi; \
 	  . install/setup.bash 2>/dev/null || true; \
