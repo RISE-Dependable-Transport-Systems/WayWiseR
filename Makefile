@@ -86,9 +86,11 @@ rebuild:
 test:
 	$(eval SKIPPED := $(shell grep '^WAYWISER_SKIPPED_PACKAGES=' $(WAYWISER_WS)/.env 2>/dev/null | sed 's/^WAYWISER_SKIPPED_PACKAGES=//;s/"//g'))
 	$(eval SKIPPED := $(or $(WAYWISER_SKIPPED_PACKAGES),$(SKIPPED)))
-	$(eval PKG_LIST := $(filter-out $(SKIPPED),$(WAYWISER_PACKAGES)))
+	$(eval TEST_SELECTION := $(or $(WAYWISER_TEST_PACKAGES),$(WAYWISER_BUILD_PACKAGES),$(WAYWISER_PACKAGES)))
+	$(eval PKG_LIST := $(filter-out $(SKIPPED),$(TEST_SELECTION)))
 	@cd $(WAYWISER_WS) && bash -c '\
 	  . /opt/ros/humble/setup.bash; \
+	  if [ -n "$$WAYWISER_UNDERLAY_SETUP" ] && [ -f "$$WAYWISER_UNDERLAY_SETUP" ]; then . "$$WAYWISER_UNDERLAY_SETUP"; fi; \
 	  . install/setup.bash 2>/dev/null || true; \
 	  colcon test-result --delete-yes >/dev/null 2>&1 || true; \
 	  colcon test --packages-select $(PKG_LIST); \

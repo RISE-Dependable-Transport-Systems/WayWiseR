@@ -33,6 +33,13 @@ header() { echo; echo "===> $*"; echo; }
 die()    { echo "ERROR: $*" >&2; exit 1; }
 info()   { echo "  $*"; }
 warn()   { echo "  WARNING: $*" >&2; }
+as_root() {
+    if [[ "$(id -u)" -eq 0 ]]; then
+        "$@"
+    else
+        sudo "$@"
+    fi
+}
 
 ensure_env_file() {
     if [[ ! -f "$ENV_FILE" ]]; then
@@ -75,6 +82,19 @@ source_ros() {
     prune_missing_prefix_paths
 }
 
+source_underlay() {
+    local setup_file="${WAYWISER_UNDERLAY_SETUP:-}"
+    [[ -n "$setup_file" ]] || return 0
+    [[ -f "$setup_file" ]] || die "Underlay setup not found: $setup_file"
+
+    set +u
+    # shellcheck disable=SC1090
+    source "$setup_file"
+    set -u
+    prune_missing_prefix_paths
+    info "Sourced underlay: $setup_file"
+}
+
 ensure_ros2_environment() {
     local ros_distro="${ROS_DISTRO:-humble}"
     local ros_prefix="/opt/ros/$ros_distro"
@@ -95,6 +115,10 @@ ensure_ros2_environment() {
     die "ROS2 is not sourced and $default_setup does not exist.
 Please source your ROS2 environment before running make, for example:
   source $default_setup"
+}
+
+colcon_supports_allow_overriding() {
+    colcon build --help 2>/dev/null | grep -q -- "--allow-overriding"
 }
 
 # Drop stale overlay prefixes left behind by a previously sourced install space.
@@ -423,6 +447,7 @@ Check packages to BUILD (uncheck to skip).
         header "Installing system apt dependencies"
         local -a _apt_packages=(
             ccache
+            gnupg
             libunwind-dev
             libqt5serialport5-dev
             git
@@ -445,9 +470,55 @@ Check packages to BUILD (uncheck to skip).
         info "Packages to install: ${_missing[*]}"
         prompt_yn "Install missing apt packages (sudo apt-get install)?" true \
             || { info "Skipping apt dependencies."; return 0; }
-        sudo apt-get update -qq
-        sudo apt-get install ${OPT_YES:+-y} "${_missing[@]}"
+        as_root apt-get update -qq
+        as_root apt-get install ${OPT_YES:+-y} "${_missing[@]}"
         info "apt packages installed."
+    }
+
+    install_gazebo_harmonic_deps() {
+        ensure_env_file
+        local skipped
+        skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
+        [[ " $skipped " != *" waywiser_gazebo "* ]] || return 0
+
+        header "Installing Gazebo Harmonic dependencies"
+        local keyring="/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg"
+        local sources_list="/etc/apt/sources.list.d/gazebo-stable.list"
+
+        if [[ ! -f "$keyring" || ! -f "$sources_list" ]]; then
+            prompt_yn "Add OSRF Gazebo apt repository?" true \
+                || { info "Skipping Gazebo Harmonic dependencies."; return 0; }
+            as_root curl -fsSL https://packages.osrfoundation.org/gazebo.gpg \
+                -o "$keyring"
+            local ubuntu_codename
+            ubuntu_codename=$(. /etc/os-release && echo "$UBUNTU_CODENAME")
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=$keyring] http://packages.osrfoundation.org/gazebo/ubuntu-stable $ubuntu_codename main" \
+                | as_root tee "$sources_list" > /dev/null
+        fi
+
+        local -a _gazebo_packages=(
+            libgz-math7-dev
+            libgz-msgs10-dev
+            libgz-sensors8-dev
+            libgz-sim8-dev
+            libgz-transport13-dev
+        )
+        local -a _missing=()
+        local _pkg
+        for _pkg in "${_gazebo_packages[@]}"; do
+            dpkg -s "$_pkg" &>/dev/null || _missing+=("$_pkg")
+        done
+        if [[ ${#_missing[@]} -eq 0 ]]; then
+            info "Gazebo Harmonic dependencies already installed — skipping."
+            return 0
+        fi
+
+        info "Packages to install: ${_missing[*]}"
+        prompt_yn "Install missing Gazebo Harmonic packages?" true \
+            || { info "Skipping Gazebo Harmonic dependencies."; return 0; }
+        as_root apt-get update -qq
+        as_root apt-get install ${OPT_YES:+-y} "${_missing[@]}"
+        info "Gazebo Harmonic dependencies installed."
     }
     
     install_uv() {
@@ -488,11 +559,11 @@ Check packages to BUILD (uncheck to skip).
             return 0
         fi
         local tmp_deb; tmp_deb=$(mktemp --suffix=.deb)
-        prompt_yn "Install MAVSDK 2.x via sudo dpkg -i (downloads ~10 MB)?" true \
+        prompt_yn "Install MAVSDK 2.x via dpkg -i (downloads ~10 MB)?" true \
             || { info "Skipping MAVSDK install."; MAVSDK_MANUAL_INSTALL=true; return 0; }
         info "Downloading: $MAVSDK_AMD64_URL"
         curl -LsSf "$MAVSDK_AMD64_URL" -o "$tmp_deb"
-        sudo dpkg -i "$tmp_deb"
+        as_root dpkg -i "$tmp_deb"
         rm -f "$tmp_deb"
         info "MAVSDK installed."
     }
@@ -506,6 +577,7 @@ init_rosdep() {
 
 check_prerequisites() {
     install_apt_deps
+    install_gazebo_harmonic_deps
     install_uv
     setup_ros2_environment
     if [[ "$OPT_SKIP_MAVSDK" != true ]]; then
@@ -829,7 +901,7 @@ setup_venv() {
     [[ -f "$ENV_FILE" ]] && skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
     local extras
     extras=$(python_extras_for_selected_packages "$skipped")
-    
+
     cd "$WAYWISER_WS"
     if [[ "${WAYWISER_REUSE_VENV:-}" == "true" && -x "$VENV_DIR/bin/python" ]]; then
         info "Reusing Python venv at $VENV_DIR"
@@ -913,13 +985,17 @@ build_workspace() {
     # shellcheck disable=SC1091
     [[ -f "$VENV_DIR/bin/activate" ]] && source "$VENV_DIR/bin/activate"
     ensure_ros2_environment
+    source_underlay
     ensure_env_file
     set -a; source "$ENV_FILE"; set +a
 
     local skipped="${WAYWISER_SKIPPED_PACKAGES:-}"
+    local selected="${WAYWISER_BUILD_PACKAGES:-}"
     local -a base_paths=("$WAYWISER_WS/src")
     local -a extra_args=()
+    local -a allow_overriding=()
     local -a cmake_args=()
+    local -a package_args=()
     local notification_extension="colcon_core.event_handler.desktop_notification"
     local colcon_extension_blocklist="${COLCON_EXTENSION_BLOCKLIST:-}"
 
@@ -929,7 +1005,7 @@ build_workspace() {
 
     if [[ " $skipped " != *" waywiser_carla "* ]]; then
         base_paths+=("$REPO_DIR/waywiser_carla/external/carla-ros-bridge")
-        extra_args+=(--allow-overriding waywiser waywiser_description)
+        allow_overriding+=(waywiser waywiser_description)
     fi
 
     if [[ -n "${WAYWISER_CMAKE_ARGS:-}" ]]; then
@@ -938,18 +1014,37 @@ build_workspace() {
         extra_args+=(--cmake-args "${cmake_args[@]}")
     fi
 
+    # In quiet/CI mode suppress per-package stderr spam from successful builds;
+    if [[ "$OPT_YES" == true || "${CI:-}" == "true" ]]; then
+        extra_args+=(--event-handlers console_direct-)
+    fi
+
+    if [[ -n "$selected" ]]; then
+        # shellcheck disable=SC2206
+        package_args=(--packages-select $selected)
+        # shellcheck disable=SC2206
+        allow_overriding+=($selected)
+        info "Building selected packages: $selected"
+    fi
+
+    if [[ ${#allow_overriding[@]} -gt 0 ]] && colcon_supports_allow_overriding; then
+        extra_args+=(--allow-overriding "${allow_overriding[@]}")
+    fi
+
     if [[ -n "$skipped" ]]; then
         # shellcheck disable=SC2086
         COLCON_EXTENSION_BLOCKLIST="$colcon_extension_blocklist" \
             colcon build --symlink-install \
             --base-paths "${base_paths[@]}" \
             "${extra_args[@]}" \
+            "${package_args[@]}" \
             --packages-skip $skipped
     else
         COLCON_EXTENSION_BLOCKLIST="$colcon_extension_blocklist" \
             colcon build --symlink-install \
             --base-paths "${base_paths[@]}" \
-            "${extra_args[@]}"
+            "${extra_args[@]}" \
+            "${package_args[@]}"
     fi
     info "Workspace build complete."
 }
@@ -1014,6 +1109,13 @@ presim_setup() {
         git -C "$REPO_DIR" submodule update --init --recursive \
             waywiser_gazebo/external/PX4-Autopilot \
             waywiser_gazebo/external/ros_gz_harmonic
+        local px4_reqs="$REPO_DIR/waywiser_gazebo/external/PX4-Autopilot/Tools/setup/requirements.txt"
+        if [[ -f "$px4_reqs" ]]; then
+            info "Installing PX4 Python requirements for uORB generation..."
+            activate_env
+            cd "$WAYWISER_WS"
+            uv pip install -r "$px4_reqs"
+        fi
     fi
 
     if [[ " $skipped " != *" waywiser_perception "* ]]; then
@@ -1152,8 +1254,8 @@ main() {
         echo; info "Prerequisites installed. Run 'make setup' to continue."
         return 0
     else
-        configure_env || { echo; info "Configuration cancelled."; exit 0; }
         apply_env_overrides
+        configure_env || { echo; info "Configuration cancelled."; exit 0; }
         if [[ "$OPT_SKIP_PREREQS" != true ]]; then
             check_prerequisites
         fi

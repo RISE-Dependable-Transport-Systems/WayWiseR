@@ -12,14 +12,17 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-22.04
-    container: ghcr.io/das-rise/waywiser/ci-image:humble
+    container:
+      image: ghcr.io/das-rise/waywiser/ci-image:humble
+      options: --user root
     env:
       CI: "true"
-      CCACHE_DIR: /root/.ccache
+      CCACHE_DIR: /opt/ccache
       WAYWISER_SKIPPED_PACKAGES: ""
       WAYWISER_PYTHON_EXTRAS: "build,waywiser_test_runner"
       WAYWISER_VENV_PATH: /opt/waywiser-ci-venv
       WAYWISER_REUSE_VENV: "true"
+      WAYWISER_UNDERLAY_SETUP: /home/waywiser/workspaces/waywiser_ws/install/setup.bash
       WAYWISER_CMAKE_ARGS: >-
         --no-warn-unused-cli
         -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
@@ -30,17 +33,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
 
       - name: Cache ccache
         uses: actions/cache@v4
         with:
-          path: /root/.ccache
+          path: /opt/ccache
           key: ${{ runner.os }}-ccache-humble-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-ccache-humble-
 
+      - name: Clean PX4 in-source build artifacts
+        run: rm -rf "$GITHUB_WORKSPACE/waywiser_gazebo/external/PX4-Autopilot/build"
+
       - name: Setup Workspace
-        run: make setup ARGS="--quiet --skip-prereqs --skip-mavsdk"
+        run: make setup ARGS="--quiet"
 
       - name: Build Workspace
         run: make build

@@ -34,6 +34,23 @@ index b9e9e5bd49..53448aa01b 100644
      add_subdirectory(moving_platform_controller)
      add_subdirectory(generic_motor)
      add_subdirectory(buoyancy)
+diff --git a/msg/CMakeLists.txt b/msg/CMakeLists.txt
+index 04444aeb89..45d87fc983 100644
+--- a/msg/CMakeLists.txt
++++ b/msg/CMakeLists.txt
+@@ -431,6 +431,12 @@ if(CONFIG_LIB_CDRSTREAM)
+ 	set(idl_out_path ${idl_include_path}/px4/msg)
+ 	set(idl_rihs01_out_path ${idl_include_path}/px4)
+ 	set(idl_uorb_path ${PX4_BINARY_DIR}/msg/px4/msg)
++	set(idl_uorb_px4_msgs_alias ${PX4_BINARY_DIR}/msg/px4_msgs)
++
++	if(NOT EXISTS ${idl_uorb_px4_msgs_alias})
++		file(MAKE_DIRECTORY ${PX4_BINARY_DIR}/msg)
++		file(CREATE_LINK ${PX4_BINARY_DIR}/msg/px4 ${idl_uorb_px4_msgs_alias} SYMBOLIC)
++	endif()
+ 
+ 	# Make sure that CycloneDDS has been checkout out
+ 	execute_process(COMMAND git submodule sync src/lib/cdrstream/cyclonedds
 diff --git a/src/modules/zenoh/CMakeLists.txt b/src/modules/zenoh/CMakeLists.txt
 index 5854b0fd88..b2553750cf 100644
 --- a/src/modules/zenoh/CMakeLists.txt
@@ -64,6 +81,61 @@ index 5854b0fd88..b2553750cf 100644
  			${CMAKE_CURRENT_LIST_DIR}
  			${PX4_BINARY_DIR}/src/modules/zenoh/
  		COMPILE_FLAGS
+diff --git a/Tools/zenoh/templates/zenoh/uorb_pubsub_factory.hpp.em b/Tools/zenoh/templates/zenoh/uorb_pubsub_factory.hpp.em
+--- a/Tools/zenoh/templates/zenoh/uorb_pubsub_factory.hpp.em
++++ b/Tools/zenoh/templates/zenoh/uorb_pubsub_factory.hpp.em
+@@ -69,6 +69,9 @@
+ #include <uORB/topics/uORBTopics.hpp>
+ @[for idx, topic_name in enumerate(full_base_names)]@
+ #include <px4/msg/@(topic_name).h>
++@[end for]
++@[for idx, topic_name in enumerate(datatypes)]@
++#include <uORB/topics/@(topic_name).h>
+ @[end for]
+ 
+ @[for idx, topic_name in enumerate(datatypes)]@
+diff --git a/src/lib/cdrstream/msg2idl.py b/src/lib/cdrstream/msg2idl.py
+index 2b02739907..dbb90a1b76 100644
+--- a/src/lib/cdrstream/msg2idl.py
++++ b/src/lib/cdrstream/msg2idl.py
+@@ -39,6 +39,32 @@ import sys
+ 
+ from rosidl_adapter.msg import convert_msg_to_idl
+ 
++
++def strip_comment_verbatim_annotations(idl_file):
++    lines = idl_file.read_text().splitlines(keepends=True)
++    stripped_lines = []
++    index = 0
++
++    while index < len(lines):
++        line = lines[index]
++
++        if line.lstrip().startswith('@verbatim') and 'language="comment"' in line:
++            if line.rstrip().endswith(')'):
++                index += 1
++                continue
++
++            index += 1
++            while index < len(lines) and not lines[index].rstrip().endswith(')'):
++                index += 1
++            index += 1
++            continue
++
++        stripped_lines.append(line)
++        index += 1
++
++    idl_file.write_text(''.join(stripped_lines))
++
++
+ if __name__ == '__main__':
+     parser = argparse.ArgumentParser(
+         description=f'Convert px4 .msg files to .idl')
+@@ -55,3 +81,4 @@ if __name__ == '__main__':
+             package_dir, 'px4_msgs',
+             interface_file.absolute().relative_to(package_dir),
+             interface_file.parent)
++        strip_comment_verbatim_annotations(interface_file.with_suffix('.idl'))
 diff --git a/src/modules/zenoh/Kconfig.topics b/src/modules/zenoh/Kconfig.topics
 index b16a0c41fa..7a8278eaef 100644
 --- a/src/modules/zenoh/Kconfig.topics
