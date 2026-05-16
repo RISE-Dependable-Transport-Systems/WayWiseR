@@ -8,50 +8,29 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_package(xacro REQUIRED)
-
-# Set to OFF to skip optional PX4 SITL and ros_gz_harmonic builds.
-option(WAYWISER_BUILD_SIMULATION "Build simulation dependencies (PX4 SITL, ros_gz_harmonic)" ON)
-
-find_program(BASH_EXECUTABLE bash REQUIRED)
 find_program(COLCON_EXECUTABLE colcon)
-find_program(GIT_EXECUTABLE git REQUIRED)
-find_program(MAKE_EXECUTABLE make REQUIRED)
-set(PX4_ZENOH_PATCH_FILE "${CMAKE_CURRENT_SOURCE_DIR}/external/px4_zenoh_humble_compat.patch")
 
 set(COLCON_ALLOW_OVERRIDING_ARGS "")
+
 if(COLCON_EXECUTABLE)
   execute_process(
     COMMAND ${COLCON_EXECUTABLE} build --help
     OUTPUT_VARIABLE COLCON_BUILD_HELP
     ERROR_QUIET
   )
+
   if(COLCON_BUILD_HELP MATCHES "--allow-overriding")
     set(COLCON_ALLOW_OVERRIDING_ARGS --allow-overriding ros_gz_bridge)
   endif()
 endif()
 
-set(PX4_AUTOPILOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/PX4-Autopilot")
-set(PX4_GZ_MODELS_DIR "${PX4_AUTOPILOT_DIR}/Tools/simulation/gz/models")
 set(ROS_GZ_HARMONIC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/ros_gz_harmonic")
 set(ROS_GZ_HARMONIC_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/ros_gz_harmonic")
-set(PX4_PATCHED_BUILD_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/build_px4_sitl_with_patch.sh")
 get_filename_component(WAYWISER_INSTALL_ROOT "${CMAKE_INSTALL_PREFIX}" DIRECTORY)
 set(ROS_GZ_HARMONIC_INSTALL_DIR "${WAYWISER_INSTALL_ROOT}/ros_gz_harmonic")
-execute_process(
-  COMMAND ${Python3_EXECUTABLE} -c "import site; print(site.getusersitepackages())"
-  OUTPUT_VARIABLE PYTHON3_USER_SITE
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
 
-if(DEFINED ENV{PYTHONPATH} AND NOT "$ENV{PYTHONPATH}" STREQUAL "")
-  set(PX4_PYTHONPATH "${PYTHON3_USER_SITE}:$ENV{PYTHONPATH}")
-else()
-  set(PX4_PYTHONPATH "${PYTHON3_USER_SITE}")
-endif()
-
-if(WAYWISER_BUILD_SIMULATION AND EXISTS "${ROS_GZ_HARMONIC_DIR}/ros_gz_bridge/package.xml")
+if(EXISTS "${ROS_GZ_HARMONIC_DIR}/ros_gz_bridge/package.xml")
   if(COLCON_EXECUTABLE)
     add_custom_target(
       waywiser_gazebo_ros_gz_harmonic ALL
@@ -92,65 +71,10 @@ else()
   )
 endif()
 
-if(WAYWISER_BUILD_SIMULATION AND EXISTS "${PX4_AUTOPILOT_DIR}/Makefile")
-  if(NOT EXISTS "${PX4_GZ_MODELS_DIR}")
-    message(
-      FATAL_ERROR
-      "PX4 Gazebo models are missing. Run "
-      "'git -C ${PX4_AUTOPILOT_DIR} submodule update --init --recursive Tools/simulation/gz' "
-      "and rebuild."
-    )
-  endif()
-
-  configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build_px4_sitl_with_patch.sh.in
-    ${PX4_PATCHED_BUILD_SCRIPT}
-    @ONLY
-  )
-
-  add_custom_target(
-    waywiser_gazebo_px4_sitl ALL
-    COMMAND ${CMAKE_COMMAND} -E env
-      PYTHONPATH=${PX4_PYTHONPATH}
-      PX4_GZ_STANDALONE=1
-      HEADLESS=1
-      MAKEFLAGS=$ENV{MAKEFLAGS}
-      ${BASH_EXECUTABLE} ${PX4_PATCHED_BUILD_SCRIPT}
-    WORKING_DIRECTORY ${PX4_AUTOPILOT_DIR}
-    USES_TERMINAL
-    COMMENT "Building PX4 SITL Zenoh target for waywiser_gazebo"
-  )
-
-  if(TARGET waywiser_gazebo_ros_gz_harmonic)
-    add_dependencies(waywiser_gazebo_px4_sitl waywiser_gazebo_ros_gz_harmonic)
-  endif()
-elseif(WAYWISER_BUILD_SIMULATION)
-  message(
-    WARNING
-    "PX4-Autopilot submodule not found at ${PX4_AUTOPILOT_DIR}. "
-    "Launch files that depend on PX4 SITL will not work until the submodule is initialized."
-  )
-else()
-  message(
-    STATUS
-    "WAYWISER_BUILD_SIMULATION is OFF. Skipping optional PX4 SITL build."
-  )
-endif()
-
 install(
   DIRECTORY launch config worlds
   DESTINATION share/${PROJECT_NAME}
 )
-
-if(WAYWISER_BUILD_SIMULATION AND EXISTS "${PX4_AUTOPILOT_DIR}")
-  install(
-    DIRECTORY external/PX4-Autopilot
-    DESTINATION share/${PROJECT_NAME}/external
-    USE_SOURCE_PERMISSIONS
-    PATTERN ".git" EXCLUDE
-    PATTERN "__pycache__" EXCLUDE
-  )
-endif()
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -163,9 +87,8 @@ if(BUILD_TESTING)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
 
-  # Suppress xmllint: the external/ submodules contain thousands of XML files
-  # (PX4-Autopilot CycloneDDS configs, JSBSim models, etc.) that do not
-  # conform to ROS XML conventions and should never be linted.
+  # Suppress xmllint: external simulation dependencies contain XML files that
+  # do not conform to ROS XML conventions and should never be linted.
   set(ament_cmake_xmllint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 

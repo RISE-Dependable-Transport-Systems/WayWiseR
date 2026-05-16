@@ -138,7 +138,42 @@ def launch_setup(context):
 
     validate_gazebo_compatibility(px4_binary, px4_dir, bridge_install_prefix)
 
-    refresh_px4_zenoh_runtime_config(px4_rootfs_dir, px4_sys_autostart)
+    px4_param_overrides = {
+        # This launch is intended to run headless with Zenoh offboard control, so
+        # PX4 must be allowed to arm without a QGroundControl/MAVLink GCS heartbeat.
+        'NAV_DLL_ACT': '0',
+        'COM_DLL_EXCEPT': '4',
+        'COM_RCL_EXCEPT': '4',
+        'COM_ARM_WO_GPS': '1',
+        # Waywiser spawns and owns the Gazebo model. The model is not a stock PX4
+        # airframe with ESC telemetry or a simulated power module, so disable the
+        # checks that would otherwise trigger termination immediately after arming.
+        'COM_ARM_CHK_ESCS': '0',
+        'FD_ESCS_EN': '0',
+        'SYS_FAILURE_EN': '0',
+        'CBRK_FLIGHTTERM': '121212',
+        'CBRK_SUPPLY_CHK': '894281',
+        'COM_DISARM_PRFLT': '-1',
+        'COM_DISARM_LAND': '-1',
+        'COM_LOW_BAT_ACT': '0',
+        # PX4's Gazebo bridge drives the model through the SIM_GZ_EC output
+        # group. Keep these explicit so a persisted parameter cache from a
+        # non-Gazebo airframe cannot leave the simulated motors unassigned.
+        'SIM_GZ_EN': '1',
+        'SIM_GZ_EC_FUNC1': '101',
+        'SIM_GZ_EC_FUNC2': '102',
+        'SIM_GZ_EC_FUNC3': '103',
+        'SIM_GZ_EC_FUNC4': '104',
+        'SIM_GZ_EC_MIN1': '150',
+        'SIM_GZ_EC_MIN2': '150',
+        'SIM_GZ_EC_MIN3': '150',
+        'SIM_GZ_EC_MIN4': '150',
+        'SIM_GZ_EC_MAX1': '1000',
+        'SIM_GZ_EC_MAX2': '1000',
+        'SIM_GZ_EC_MAX3': '1000',
+        'SIM_GZ_EC_MAX4': '1000',
+    }
+    refresh_px4_zenoh_runtime_config(px4_build_dir, px4_rootfs_dir, px4_sys_autostart, px4_param_overrides)
 
     px4_env = {
         'PX4_GZ_WORLDS': str(world_path.parent),
@@ -152,40 +187,8 @@ def launch_setup(context):
         'PX4_GZ_STANDALONE': '1',
         'PX4_PARAM_ZENOH_ENABLE': '1',
         'PX4_PARAM_ZENOH_DOMAIN_ID': os.environ.get('ROS_DOMAIN_ID', '0'),
-        # This launch is intended to run headless with Zenoh offboard control, so
-        # PX4 must be allowed to arm without a QGroundControl/MAVLink GCS heartbeat.
-        'PX4_PARAM_NAV_DLL_ACT': '0',
-        'PX4_PARAM_COM_DLL_EXCEPT': '4',
-        'PX4_PARAM_COM_RCL_EXCEPT': '4',
-        'PX4_PARAM_COM_ARM_WO_GPS': '1',
-        # Waywiser spawns and owns the Gazebo model. The model is not a stock PX4
-        # airframe with ESC telemetry or a simulated power module, so disable the
-        # checks that would otherwise trigger termination immediately after arming.
-        'PX4_PARAM_COM_ARM_CHK_ESCS': '0',
-        'PX4_PARAM_FD_ESCS_EN': '0',
-        'PX4_PARAM_SYS_FAILURE_EN': '0',
-        'PX4_PARAM_CBRK_FLIGHTTERM': '121212',
-        'PX4_PARAM_CBRK_SUPPLY_CHK': '894281',
-        'PX4_PARAM_COM_DISARM_PRFLT': '-1',
-        'PX4_PARAM_COM_DISARM_LAND': '-1',
-        'PX4_PARAM_COM_LOW_BAT_ACT': '0',
-        # PX4's Gazebo bridge drives the model through the SIM_GZ_EC output
-        # group. Keep these explicit so a persisted parameter cache from a
-        # non-Gazebo airframe cannot leave the simulated motors unassigned.
-        'PX4_PARAM_SIM_GZ_EN': '1',
-        'PX4_PARAM_SIM_GZ_EC_FUNC1': '101',
-        'PX4_PARAM_SIM_GZ_EC_FUNC2': '102',
-        'PX4_PARAM_SIM_GZ_EC_FUNC3': '103',
-        'PX4_PARAM_SIM_GZ_EC_FUNC4': '104',
-        'PX4_PARAM_SIM_GZ_EC_MIN1': '150',
-        'PX4_PARAM_SIM_GZ_EC_MIN2': '150',
-        'PX4_PARAM_SIM_GZ_EC_MIN3': '150',
-        'PX4_PARAM_SIM_GZ_EC_MIN4': '150',
-        'PX4_PARAM_SIM_GZ_EC_MAX1': '1000',
-        'PX4_PARAM_SIM_GZ_EC_MAX2': '1000',
-        'PX4_PARAM_SIM_GZ_EC_MAX3': '1000',
-        'PX4_PARAM_SIM_GZ_EC_MAX4': '1000',
     }
+    px4_env.update({f'PX4_PARAM_{name}': value for name, value in px4_param_overrides.items()})
 
     # Waywiser owns model spawning; PX4 attaches to that existing Gazebo model.
     px4_env['PX4_GZ_MODEL_NAME'] = drone_name
@@ -270,32 +273,46 @@ def launch_setup(context):
     return actions
 
 
-def refresh_px4_zenoh_runtime_config(px4_rootfs_dir: Path, px4_sys_autostart: str):
+def refresh_px4_zenoh_runtime_config(
+    px4_build_dir: Path,
+    px4_rootfs_dir: Path,
+    px4_sys_autostart: str,
+    px4_param_overrides,
+):
     zenoh_dir = px4_rootfs_dir / 'zenoh'
     for csv_name in ('pub.csv', 'sub.csv'):
         csv_path = zenoh_dir / csv_name
         if csv_path.is_file():
             csv_path.unlink()
 
-    # PX4 processes PX4_PARAM_* env vars (via `param set`) BEFORE the airframe startup
-    # script runs. The airframe script for SYS_AUTOSTART 4001 (gz_x500) contains
-    # `param set-default NAV_DLL_ACT 2`, which calls user_config.refresh() and resets
-    # the value back to 2 even after the env var set it to 0. The rcS script sources
-    # `$autostart_file.post` immediately after the airframe script, giving us a reliable
-    # hook to re-apply overrides. Write such a .post file for the selected airframe so
-    # that NAV_DLL_ACT=0 (no GCS required) is always enforced for headless SITL runs.
-    airframes_dir = px4_rootfs_dir / 'etc' / 'init.d-posix' / 'airframes'
-    if airframes_dir.is_dir():
-        # Find the airframe file matching SYS_AUTOSTART (files are named <id>_<model>)
-        matching = list(airframes_dir.glob(f'{px4_sys_autostart}_*'))
-        if matching:
-            post_file = Path(str(matching[0]) + '.post')
-            post_file.write_text(
-                '# Auto-generated by px4_sitl.launch.py — do not edit manually.\n'
-                '# Re-apply headless SITL parameter overrides after the airframe script,\n'
-                '# which may use param set-default to raise NAV_DLL_ACT above 0.\n'
-                'param set NAV_DLL_ACT 0\n'
+    # PX4 processes PX4_PARAM_* env vars before the airframe startup script runs.
+    # Airframe scripts can then override them with `param set-default`. The rcS
+    # script sources `$autostart_file.post` immediately after the airframe script,
+    # so write a .post file for the selected airframe and re-apply our headless
+    # Zenoh/SITL overrides there as well.
+    airframe_dirs = [
+        px4_build_dir / 'etc' / 'init.d-posix' / 'airframes',
+        px4_rootfs_dir / 'etc' / 'init.d-posix' / 'airframes',
+    ]
+    for airframes_dir in airframe_dirs:
+        if not airframes_dir.is_dir():
+            continue
+        matching = [
+            candidate
+            for candidate in airframes_dir.glob(f'{px4_sys_autostart}_*')
+            if candidate.is_file() and '.' not in candidate.name
+        ]
+        if not matching:
+            continue
+        post_file = Path(str(matching[0]) + '.post')
+        post_file.write_text(
+            '# Auto-generated by px4_sitl.launch.py - do not edit manually.\n'
+            '# Re-apply headless Zenoh SITL parameter overrides after the airframe script.\n'
+            + ''.join(
+                f'param set {name} {value}\n'
+                for name, value in sorted(px4_param_overrides.items())
             )
+        )
 
 
 def get_vendored_harmonic_bridge_install_prefix():
@@ -344,8 +361,9 @@ def find_waywiser_install_dir(start_path: Path):
 
 def find_waywiser_source_dir(start_path: Path):
     for parent in [start_path, *start_path.parents]:
-        candidate = parent / 'waywiser_gazebo' / 'external' / 'ros_gz_harmonic'
-        if candidate.is_dir():
+        px4_source_dir = parent / 'waywiser_core' / 'external' / 'PX4-Autopilot'
+        ros_gz_source_dir = parent / 'waywiser_gazebo' / 'external' / 'ros_gz_harmonic'
+        if px4_source_dir.is_dir() or ros_gz_source_dir.is_dir():
             return parent
     return None
 
@@ -359,14 +377,25 @@ def resolve_px4_dir(gazebo_dir: Path):
             Path(waywiser_ws)
             / 'src'
             / 'WayWiseR'
-            / 'waywiser_gazebo'
+            / 'waywiser_core'
             / 'external'
             / 'PX4-Autopilot'
         )
 
     source_dir = find_waywiser_source_dir(gazebo_dir)
     if source_dir:
-        candidates.append(source_dir / 'waywiser_gazebo' / 'external' / 'PX4-Autopilot')
+        candidates.append(source_dir / 'waywiser_core' / 'external' / 'PX4-Autopilot')
+
+    install_dir = find_waywiser_install_dir(gazebo_dir)
+    if install_dir:
+        candidates.append(
+            install_dir
+            / 'waywiser_core'
+            / 'share'
+            / 'waywiser_core'
+            / 'external'
+            / 'PX4-Autopilot'
+        )
 
     candidates.append(gazebo_dir / 'external' / 'PX4-Autopilot')
 
@@ -383,6 +412,9 @@ def resolve_px4_dir(gazebo_dir: Path):
     for candidate in deduped_candidates:
         if candidate.is_dir():
             return candidate
+
+    if deduped_candidates:
+        return deduped_candidates[0]
 
     return (gazebo_dir / 'external' / 'PX4-Autopilot').resolve()
 

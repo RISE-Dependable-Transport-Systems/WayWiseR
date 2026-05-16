@@ -9,6 +9,17 @@ kconfig_topics_path="src/modules/zenoh/Kconfig.topics"
 zenoh_pico_path="src/modules/zenoh/zenoh-pico"
 kconfig_topics_was_clean=0
 zenoh_pico_was_clean=0
+px4_build_dir="$repo/build/px4_sitl_zenoh"
+px4_cache_file="$px4_build_dir/CMakeCache.txt"
+
+if [ -f "$px4_cache_file" ]; then
+  cached_home="$(sed -n 's/^CMAKE_HOME_DIRECTORY:INTERNAL=//p' "$px4_cache_file" | head -n 1)"
+  cached_build_dir="$(sed -n 's/^CMAKE_CACHEFILE_DIR:INTERNAL=//p' "$px4_cache_file" | head -n 1)"
+  if [ "$cached_home" != "$repo" ] || [ "$cached_build_dir" != "$px4_build_dir" ]; then
+    echo "Removing stale PX4 CMake cache from $px4_build_dir"
+    rm -rf -- "$px4_build_dir"
+  fi
+fi
 
 if [ -z "$("@GIT_EXECUTABLE@" -C "$repo" status --porcelain -- "$kconfig_topics_path")" ]; then
   kconfig_topics_was_clean=1
