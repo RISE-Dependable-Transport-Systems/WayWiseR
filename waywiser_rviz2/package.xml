@@ -11,7 +11,7 @@
   <license>GPLv3</license>
 
   <url type="website">https://wiki.ros.org/rviz</url>
-  <url type="website">https://github.com/ros2/rviz/tree/humble</url>
+  <url type="website">https://github.com/ros2/rviz/tree/jazzy</url>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

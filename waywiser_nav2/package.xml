@@ -10,7 +10,7 @@
 
   <license>GPLv3</license>
 
-  <url type="website">https://github.com/ros-planning/navigation2/tree/humble</url>
+  <url type="website">https://github.com/ros-planning/navigation2/tree/jazzy</url>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

@@ -3,7 +3,7 @@ name: Build and Push CI Images
 on:
   push:
     branches:
-      - humble
+      - experimental/jazzy
     paths:
       - ".github/workflows/Dockerfile.ci.amd64"
       - ".github/workflows/Dockerfile.ci.arm64"
@@ -20,7 +20,7 @@ on:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -65,7 +65,7 @@ jobs:
         with:
           images: ${{ matrix.image }}
           tags: |
-            type=raw,value=humble
+            type=raw,value=jazzy
 
       - name: Build and push ${{ matrix.arch }} Docker image
         uses: docker/build-push-action@v5

@@ -1,3 +1,9 @@
+> **Note:** `waywiser_carla` is **not supported on the Jazzy branch** (Ubuntu 24.04).
+> The `carla-ros-bridge` is built on top of `setup.py`-based packages (`rqt_carla_control`, `ros_compatibility`, etc.) that are incompatible with the colcon + Python 3.12 environment used by ROS 2 Jazzy.
+> As a result, `waywiser_carla` is permanently excluded from the build in this branch and cannot be selected via `make configure`.
+>
+> For CARLA support, use the **[humble branch](https://github.com/das-rise/WayWiseR/tree/humble)** (Ubuntu 22.04 / ROS 2 Humble / Python 3.10).
+
 ## CARLA simulator setup
 
 - Install [CARLA **0.9.15**](https://github.com/carla-simulator/carla/releases/tag/0.9.15) simulator, if not already done.

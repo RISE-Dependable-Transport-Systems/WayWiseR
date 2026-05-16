@@ -3,17 +3,18 @@ name: Build Packages
 on:
   pull_request:
     branches:
-      - humble
+      - experimental/jazzy
   push:
     branches:
-      - humble
+      - experimental/jazzy
+
   workflow_dispatch:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/das-rise/waywiser/ci-image-amd64:humble
+      image: ghcr.io/das-rise/waywiser/ci-image-amd64:jazzy
       options: --user root
     env:
       CI: "true"
@@ -60,9 +61,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /opt/ccache
-          key: ${{ runner.os }}-ccache-humble-${{ github.sha }}
+          key: ${{ runner.os }}-ccache-jazzy-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-ccache-humble-
+            ${{ runner.os }}-ccache-jazzy-
 
       - name: Setup Workspace
         working-directory: ${{ env.WAYWISER_WORKING_DIRECTORY }}

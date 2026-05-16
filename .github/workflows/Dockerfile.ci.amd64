@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
-ARG ROS_DISTRO=humble
-ARG WAYWISER_REF=humble
+ARG ROS_DISTRO=jazzy
+ARG WAYWISER_REF=experimental/jazzy
 ARG WAYWISER_SKIPPED_PACKAGES=""
 ARG ACT_COMPAT=false
 
@@ -54,21 +54,9 @@ RUN mkdir -p /opt/ccache && chmod 777 /opt/ccache
 
 # Build a reusable WayWiseR underlay so CI and local act runs can build the
 # checked-out workspace as a thin overlay.
-RUN --mount=type=bind,source=.,target=/tmp/WayWiseR-local,readonly \
-    mkdir -p "$WAYWISER_UNDERLAY_WS/src" \
-    && git clone --branch "$WAYWISER_REF" https://github.com/das-rise/WayWiseR.git /tmp/WayWiseR-remote \
-    && if [[ -f /tmp/WayWiseR-remote/Makefile ]]; then \
-        mkdir -p "$WAYWISER_UNDERLAY_WS/src/WayWiseR"; \
-        shopt -s dotglob; \
-        mv /tmp/WayWiseR-remote/* "$WAYWISER_UNDERLAY_WS/src/WayWiseR"/; \
-        shopt -u dotglob; \
-        rm -rf /tmp/WayWiseR-remote; \
-    else \
-        rm -rf /tmp/WayWiseR-remote; \
-        mkdir -p "$WAYWISER_UNDERLAY_WS/src/WayWiseR"; \
-        cp -a /tmp/WayWiseR-local/. "$WAYWISER_UNDERLAY_WS/src/WayWiseR/"; \
-    fi \
-    && if [[ ! -e "$WAYWISER_UNDERLAY_WS/Makefile" ]]; then \
+RUN mkdir -p "$WAYWISER_UNDERLAY_WS/src"
+RUN git clone --branch "$WAYWISER_REF" https://github.com/das-rise/WayWiseR.git "$WAYWISER_UNDERLAY_WS/src/WayWiseR" \
+    && if [[ -f "$WAYWISER_UNDERLAY_WS/src/WayWiseR/Makefile" ]]; then \
         ln -s "$WAYWISER_UNDERLAY_WS/src/WayWiseR/Makefile" "$WAYWISER_UNDERLAY_WS/Makefile"; \
     fi
 

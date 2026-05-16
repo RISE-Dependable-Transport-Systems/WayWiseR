@@ -11,7 +11,7 @@
   <license>GPLv3</license>
 
   <url type="website">http://wiki.ros.org/urdf/XML/link</url>
-  <url type="website">http://docs.ros.org/en/humble/Tutorials/Intermediate/URDF/URDF-Main.html</url>
+  <url type="website">http://docs.ros.org/en/jazzy/Tutorials/Intermediate/URDF/URDF-Main.html</url>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

@@ -146,7 +146,7 @@ source_underlay() {
 }
 
 ensure_ros2_environment() {
-    local ros_distro="${ROS_DISTRO:-humble}"
+    local ros_distro="${ROS_DISTRO:-jazzy}"
     local ros_prefix="/opt/ros/$ros_distro"
 
     if [[ -n "${ROS_DISTRO:-}" && ":${AMENT_PREFIX_PATH:-}:" == *":$ros_prefix:"* ]]; then
@@ -168,7 +168,7 @@ Please source your ROS2 environment before running make, for example:
 }
 
 colcon_supports_allow_overriding() {
-    colcon build --help 2>/dev/null | grep -q -- "--allow-overriding"
+    run_without_venv_pythonpath colcon build --help 2>/dev/null | grep -q -- "--allow-overriding"
 }
 
 # Drop stale overlay prefixes left behind by a previously sourced install space.
@@ -224,7 +224,7 @@ run_without_venv_pythonpath() {
 }
 
 run_rosdep() {
-    run_without_venv_pythonpath rosdep "$@"
+    run_without_venv_pythonpath /usr/bin/python3 -m rosdep2 "$@"
 }
 
 # Activate venv + ROS (used by sim package functions).
@@ -396,6 +396,8 @@ package_checklist() {
 
     # Packages that are always built — excluded from the checklist entirely.
     local -r LOCKED="waywiser waywiser_core waywiser_description waywiser_twist_safety"
+    # Packages that are always skipped — excluded from the checklist entirely.
+    local -r ALWAYS_SKIP="waywiser_carla"
 
     # Enumerate packages from package.xml files in the repo (skip external/ and .git/)
     local all_pkgs=()
@@ -406,10 +408,12 @@ package_checklist() {
         -exec grep -m1 '<name>' {} \; \
         | sed 's|.*<name>||;s|</name>.*||' | sort)
 
-    # Only show non-locked packages in the UI.
+    # Only show non-locked and non-always-skipped packages in the UI.
     local pkgs=()
     for p in "${all_pkgs[@]}"; do
-        [[ " $LOCKED " == *" $p "* ]] || pkgs+=("$p")
+        [[ " $LOCKED " == *" $p "* ]] && continue
+        [[ " $ALWAYS_SKIP " == *" $p "* ]] && continue
+        pkgs+=("$p")
     done
 
     if [[ ${#pkgs[@]} -eq 0 ]]; then
@@ -479,6 +483,8 @@ Check packages to BUILD (uncheck to skip).
         for pkg in "${pkgs[@]}"; do
             [[ " $selected " == *" $pkg "* ]] || new_skip+=("$pkg")
         done
+        # Always include the permanently-skipped packages.
+        for pkg in $ALWAYS_SKIP; do new_skip+=("$pkg"); done
         _pc_ref="${new_skip[*]:-}"
     else
         # Fallback: y/n per package
@@ -498,6 +504,8 @@ Check packages to BUILD (uncheck to skip).
             [[ -n "$rdeps" ]] && hint=" [needed by: ${rdeps% }]"
             prompt_yn "  Build $pkg?$hint" "$def" || _skip+=("$pkg")
         done
+        # Always include the permanently-skipped packages.
+        for pkg in $ALWAYS_SKIP; do _skip+=("$pkg"); done
         _pc_ref="${_skip[*]:-}"
     fi
 }
@@ -646,7 +654,7 @@ Check packages to BUILD (uncheck to skip).
             return 0
         fi
 
-        # Default amd64 release package for Ubuntu 22.04; other arches require a
+        # Default amd64 release package for Ubuntu 24.04; other arches require a
         # local build or an explicit MAVSDK_DEB_URL/MAVSDK_DEB_PATH.
         local MAVSDK_AMD64_URL="https://github.com/mavlink/MAVSDK/releases/download/v${mavsdk_release_version}/libmavsdk-dev_${mavsdk_release_version}_ubuntu22.04_amd64.deb"
         if [[ "$arch" != "amd64" ]]; then
@@ -666,7 +674,7 @@ Check packages to BUILD (uncheck to skip).
 
 init_rosdep() {
     if [[ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]]; then
-        as_root rosdep init
+        as_root /usr/bin/python3 -m rosdep2 init
     fi
     local waywiser_rosdep_source="/etc/ros/rosdep/sources.list.d/50-waywiser.list"
     local waywiser_rosdep_yaml="$REPO_DIR/waywiser/rosdep/waywiser.yaml"
@@ -678,7 +686,7 @@ init_rosdep() {
             info "Registered WayWiseR rosdep rules: $waywiser_rosdep_yaml"
         fi
     fi
-    run_rosdep update --rosdistro "${ROS_DISTRO:-humble}"
+    run_rosdep update --rosdistro "${ROS_DISTRO:-jazzy}"
 }
 
 check_prerequisites() {
@@ -1045,14 +1053,14 @@ build_workspace() {
     if [[ -n "$skipped" ]]; then
         # shellcheck disable=SC2086
         COLCON_EXTENSION_BLOCKLIST="$colcon_extension_blocklist" \
-            colcon build --symlink-install \
+            run_without_venv_pythonpath colcon build --symlink-install \
             --base-paths "${base_paths[@]}" \
             "${extra_args[@]}" \
             "${package_args[@]}" \
             --packages-skip $skipped
     else
         COLCON_EXTENSION_BLOCKLIST="$colcon_extension_blocklist" \
-            colcon build --symlink-install \
+            run_without_venv_pythonpath colcon build --symlink-install \
             --base-paths "${base_paths[@]}" \
             "${extra_args[@]}" \
             "${package_args[@]}"
@@ -1082,8 +1090,8 @@ elif [ -f /etc/waywiser/waywiser.env ]; then
     set -a; source /etc/waywiser/waywiser.env; set +a
 fi
 if [ -z "\${ROS_DISTRO:-}" ]; then
-    if [ -f /opt/ros/humble/setup.bash ]; then
-        set +u; source /opt/ros/humble/setup.bash; set -u
+    if [ -f /opt/ros/jazzy/setup.bash ]; then
+        set +u; source /opt/ros/jazzy/setup.bash; set -u
     else
         echo "WARNING: ROS2 is not sourced. Source your ROS2 environment before using this workspace." >&2
     fi

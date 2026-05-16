@@ -23,14 +23,14 @@ WayWiseR is divided into modular ROS2 packages:
 
 ---
 
-## Installation (Ubuntu 22.04)
+## Installation (Ubuntu 24.04)
 
 1. **Clone the repository:**
 
    ```bash
    export WAYWISER_WS=~/waywiser_ws   # update to your desired path
    mkdir -p $WAYWISER_WS/src
-   git clone git@github.com:das-rise/WayWiseR.git $WAYWISER_WS/src/WayWiseR
+   git clone -b experimental/jazzy git@github.com:das-rise/WayWiseR.git $WAYWISER_WS/src/WayWiseR
    ln -s $WAYWISER_WS/src/WayWiseR/Makefile $WAYWISER_WS/Makefile
    ```
 

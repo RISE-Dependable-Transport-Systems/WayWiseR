@@ -34,8 +34,8 @@ def generate_launch_description():
     use_sim_time_la = DeclareLaunchArgument(
         'use_sim_time', default_value='True', description='Use simulation/Gazebo clock'
     )
-    ign_gazebo_resource_paths_la = DeclareLaunchArgument(
-        'ign_gazebo_resource_paths',
+    gz_sim_resource_paths_la = DeclareLaunchArgument(
+        'gz_sim_resource_paths',
         default_value='',
         description='Paths to additional model resources as a list',
     )
@@ -61,8 +61,8 @@ def generate_launch_description():
 
     # create launch description
     ld = LaunchDescription()
-    ld.add_action(ign_gazebo_resource_paths_la)
-    ld.add_action(OpaqueFunction(function=set_ign_resources_path))
+    ld.add_action(gz_sim_resource_paths_la)
+    ld.add_action(OpaqueFunction(function=set_gz_sim_resources_path))
 
     # declare launch args
     ld.add_action(use_sim_time_la)
@@ -79,31 +79,29 @@ def generate_launch_description():
     return ld
 
 
-def set_ign_resources_path(context):
-    # Fetch IGN_GAZEBO_RESOURCE_PATH environment variable
-    ign_resources_path = set(str(os.environ.get('IGN_GAZEBO_RESOURCE_PATH', '')).split(':'))
-    ign_resources_path = {x for x in ign_resources_path if x}
+def set_gz_sim_resources_path(context):
+    # Fetch GZ_SIM_RESOURCE_PATH environment variable
+    gz_sim_resources_path = set(str(os.environ.get('GZ_SIM_RESOURCE_PATH', '')).split(':'))
+    gz_sim_resources_path = {x for x in gz_sim_resources_path if x}
 
-    # Default waywiser-related list of paths to Ignition Gazebo resources
-    default_ign_resources_path = [
+    # Default waywiser-related list of paths to Gazebo resources
+    default_gz_sim_resources_path = [
         os.path.join(get_package_share_directory('waywiser_description'), 'sdf'),
         str(Path(get_package_share_directory('waywiser_description')).parent.absolute()),
     ]
-    ign_resources_path.update(set(default_ign_resources_path))
+    gz_sim_resources_path.update(set(default_gz_sim_resources_path))
 
-    input_ign_gazebo_resource_paths = LaunchConfiguration('ign_gazebo_resource_paths').perform(
-        context
-    )
-    if input_ign_gazebo_resource_paths != '':
-        input_ign_gazebo_resource_paths = ast.literal_eval(input_ign_gazebo_resource_paths)
-        if isinstance(input_ign_gazebo_resource_paths, list):
-            ign_resources_path.update(set(input_ign_gazebo_resource_paths))
+    input_gz_sim_resource_paths = LaunchConfiguration('gz_sim_resource_paths').perform(context)
+    if input_gz_sim_resource_paths != '':
+        input_gz_sim_resource_paths = ast.literal_eval(input_gz_sim_resource_paths)
+        if isinstance(input_gz_sim_resource_paths, list):
+            gz_sim_resources_path.update(set(input_gz_sim_resource_paths))
 
-    # print('ign_resources_path:{}', ign_resources_path)
-    ign_resources_path_set_action = SetEnvironmentVariable(
-        'IGN_GAZEBO_RESOURCE_PATH', ':'.join(ign_resources_path)
+    # print('gz_sim_resources_path:{}', gz_sim_resources_path)
+    gz_sim_resources_path_set_action = SetEnvironmentVariable(
+        'GZ_SIM_RESOURCE_PATH', ':'.join(gz_sim_resources_path)
     )
-    return [ign_resources_path_set_action]
+    return [gz_sim_resources_path_set_action]
 
 
 def create_bridge_node(context):

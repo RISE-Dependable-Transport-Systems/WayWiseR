@@ -25,7 +25,7 @@
       <visualize>0</visualize>
       <update_rate>30</update_rate>
       <topic>sensors/camera</topic>
-      <!-- <ignition_frame_id>depth_camera_link</ignition_frame_id> -->
+      <!-- <gz_frame_id>depth_camera_link</gz_frame_id> -->
       <!-- A bug in depth_camera sensor does not allow setting frame_id for point clouds:
       https://github.com/gazebosim/gz-sensors/pull/350 -->
       <!-- It defaults to "robot/base_link/depth_camera" and can be handled either using a static

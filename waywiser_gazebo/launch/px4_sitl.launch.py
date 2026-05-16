@@ -95,9 +95,7 @@ def launch_setup(context):
     drone_name = LaunchConfiguration('drone_name').perform(context)
     px4_sys_autostart = LaunchConfiguration('px4_sys_autostart').perform(context)
     px4_start_delay = float(LaunchConfiguration('px4_start_delay').perform(context))
-    bridge_install_prefix = get_vendored_harmonic_bridge_install_prefix()
-    use_sim_time = LaunchConfiguration('use_sim_time')
-    use_sim_time_value = LaunchConfiguration('use_sim_time').perform(context)
+    use_sim_time = launch_config_as_bool(context, 'use_sim_time')
     gz_world_name = read_world_name(world_path)
     gazebo_world_path = (
         create_harmonic_compatible_sdf(world_path) if is_ignition_sdf(world_path) else world_path
@@ -136,7 +134,7 @@ def launch_setup(context):
             'PX4 SITL Zenoh artifacts are generated.'
         )
 
-    validate_gazebo_compatibility(px4_binary, px4_assets_dir, bridge_install_prefix)
+    validate_gazebo_compatibility(px4_binary, px4_assets_dir)
 
     px4_param_overrides = {
         # This launch is intended to run headless with Zenoh offboard control, so
@@ -206,14 +204,12 @@ def launch_setup(context):
     )
     default_bridge_node = create_bridge_action(
         default_bridge_config,
-        use_sim_time_value,
-        bridge_install_prefix,
+        use_sim_time,
     )
 
     model_bridge_node = create_bridge_action(
         model_bridge_config,
-        use_sim_time_value,
-        bridge_install_prefix,
+        use_sim_time,
     )
 
     map_frame_transform = Node(
@@ -371,45 +367,6 @@ def px4_runtime_source_marker(px4_build_dir: Path):
     return '|'.join(marker_parts)
 
 
-def get_vendored_harmonic_bridge_install_prefix():
-    candidates = []
-
-    gazebo_dir = Path(get_package_share_directory('waywiser_gazebo')).resolve()
-    candidates.append(gazebo_dir.parent.parent / 'ros_gz_harmonic')
-
-    install_dir = find_waywiser_install_dir(gazebo_dir)
-    if install_dir:
-        candidates.append(install_dir / 'ros_gz_harmonic')
-
-    candidates.append(gazebo_dir / 'external' / 'ros_gz_harmonic' / 'install')
-
-    source_dir = find_waywiser_source_dir(gazebo_dir)
-    if source_dir:
-        candidates.append(
-            source_dir / 'waywiser_gazebo' / 'external' / 'ros_gz_harmonic' / 'install'
-        )
-
-    waywiser_ws = os.environ.get('WAYWISER_WS')
-    if waywiser_ws:
-        candidates.append(Path(waywiser_ws) / 'install' / 'ros_gz_harmonic')
-        candidates.append(
-            Path(waywiser_ws)
-            / 'src'
-            / 'WayWiseR'
-            / 'waywiser_gazebo'
-            / 'external'
-            / 'ros_gz_harmonic'
-            / 'install'
-        )
-
-    for bridge_prefix in candidates:
-        bridge_executable = bridge_prefix / 'lib' / 'ros_gz_bridge' / 'parameter_bridge'
-        if bridge_executable.is_file():
-            return str(bridge_prefix)
-
-    return ''
-
-
 def find_waywiser_install_dir(start_path: Path):
     for parent in [start_path, *start_path.parents]:
         if (parent / 'waywiser_gazebo' / 'share' / 'waywiser_gazebo').is_dir():
@@ -437,11 +394,7 @@ def resolve_px4_paths(gazebo_dir: Path):
     install_dir = find_waywiser_install_dir(gazebo_dir)
     if install_dir:
         installed_px4_sitl = (
-            install_dir
-            / 'waywiser_gazebo'
-            / 'share'
-            / 'waywiser_gazebo'
-            / 'px4_sitl_zenoh'
+            install_dir / 'waywiser_gazebo' / 'share' / 'waywiser_gazebo' / 'px4_sitl_zenoh'
         )
         build_candidates.append(installed_px4_sitl)
         asset_candidates.append(installed_px4_sitl)
@@ -481,8 +434,7 @@ def resolve_px4_paths(gazebo_dir: Path):
             / 'px4_sitl_zenoh'
         )
         asset_candidates.append(
-            waywiser_ws_path / 'src' / 'WayWiseR' / 'waywiser_core'
-            / 'external' / 'PX4-Autopilot'
+            waywiser_ws_path / 'src' / 'WayWiseR' / 'waywiser_core' / 'external' / 'PX4-Autopilot'
         )
 
     deduped_build_candidates = []
@@ -529,73 +481,37 @@ def resolve_px4_paths(gazebo_dir: Path):
     return px4_build_dir, px4_assets_dir
 
 
-def create_bridge_action(config_file, use_sim_time, bridge_install_prefix=''):
-    bridge_binary = resolve_bridge_executable(bridge_install_prefix)
-
-    if not bridge_binary:
-        return Node(
-            package='ros_gz_bridge',
-            executable='parameter_bridge',
-            output='screen',
-            arguments=[
-                '--ros-args',
-                '-p',
-                ['config_file:=', config_file],
-            ],
-            parameters=[{'use_sim_time': use_sim_time}],
-        )
-
-    bridge_env = {}
-    if bridge_install_prefix:
-        bridge_env = {
-            'LD_LIBRARY_PATH': prepend_env_path(
-                os.environ.get('LD_LIBRARY_PATH', ''), str(Path(bridge_install_prefix) / 'lib')
-            ),
-            'AMENT_PREFIX_PATH': prepend_env_path(
-                os.environ.get('AMENT_PREFIX_PATH', ''), bridge_install_prefix
-            ),
-        }
-
-    return ExecuteProcess(
-        cmd=[
-            str(bridge_binary),
+def create_bridge_action(config_file, use_sim_time):
+    return Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        output='screen',
+        arguments=[
             '--ros-args',
             '-p',
-            f'config_file:={config_file}',
-            '-p',
-            f'use_sim_time:={use_sim_time}',
+            ['config_file:=', config_file],
         ],
-        additional_env=bridge_env,
-        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
     )
 
 
-def prepend_env_path(current_value, new_value):
-    if not new_value:
-        return current_value
-    entries = [new_value]
-    entries.extend([entry for entry in current_value.split(':') if entry and entry != new_value])
-    return ':'.join(entries)
+def launch_config_as_bool(context, name):
+    value = LaunchConfiguration(name).perform(context).strip().lower()
+    return value in ['true', '1', 'yes', 'on']
 
 
-def validate_gazebo_compatibility(px4_binary: Path, px4_dir: Path, bridge_install_prefix=''):
+def validate_gazebo_compatibility(px4_binary: Path, px4_dir: Path):
     px4_min_gz_version = read_px4_min_gz_version(px4_dir)
     px4_transport = detect_linked_gazebo_transport(px4_binary)
-    bridge_transport = detect_ros_gz_bridge_transport(bridge_install_prefix)
 
-    if not px4_min_gz_version or not px4_transport or not bridge_transport:
+    if not px4_min_gz_version or not px4_transport:
         return
 
-    px4_requires_harmonic = major_version(px4_min_gz_version) >= 8
-    bridge_is_fortress = bridge_transport.startswith('ignition-transport')
-
-    if px4_requires_harmonic and bridge_is_fortress:
+    if not px4_transport.startswith('gz-transport'):
         raise RuntimeError(
-            f'Gazebo ABI mismatch: PX4 requires Harmonic (MIN_GZ_VERSION={px4_min_gz_version}, '
-            f'links {px4_transport}), but ros_gz_bridge links {bridge_transport} '
-            '(Fortress/Ignition). '
-            'Fix: rebuild and reinstall ros-humble-waywiser-gazebo so the bundled '
-            'ros_gz_harmonic bridge is installed, or run `make setup` in a source workspace.'
+            f'Gazebo ABI mismatch: PX4 requires Harmonic (MIN_GZ_VERSION={px4_min_gz_version}), '
+            f'but links {px4_transport} (expected gz-transport). '
+            'Rebuild PX4 against Gazebo Harmonic.'
         )
 
 
@@ -693,8 +609,8 @@ def read_px4_min_gz_version(px4_dir: Path):
     return match.group(1) if match else ''
 
 
-def detect_linked_gazebo_transport(binary: Path, library_prefix=''):
-    output = run_ldd(binary, library_prefix)
+def detect_linked_gazebo_transport(binary: Path):
+    output = run_ldd(binary)
     if 'libgz-transport' in output:
         match = re.search(r'lib(gz-transport\d*)\.so', output)
         return match.group(1) if match else 'gz-transport'
@@ -704,39 +620,12 @@ def detect_linked_gazebo_transport(binary: Path, library_prefix=''):
     return ''
 
 
-def detect_ros_gz_bridge_transport(bridge_install_prefix=''):
-    bridge_binary = resolve_bridge_executable(bridge_install_prefix)
-    if not bridge_binary:
-        bridge_executable = shutil.which('parameter_bridge')
-        bridge_binary = (
-            Path(bridge_executable)
-            if bridge_executable
-            else Path('/opt/ros/humble/lib/ros_gz_bridge/parameter_bridge')
-        )
-    if not bridge_binary.is_file():
-        return ''
-    return detect_linked_gazebo_transport(bridge_binary, bridge_install_prefix)
-
-
-def resolve_bridge_executable(bridge_install_prefix=''):
-    if bridge_install_prefix:
-        return Path(bridge_install_prefix) / 'lib' / 'ros_gz_bridge' / 'parameter_bridge'
-    return None
-
-
-def run_ldd(binary: Path, library_prefix=''):
-    env = os.environ.copy()
-    if library_prefix:
-        env['LD_LIBRARY_PATH'] = prepend_env_path(
-            env.get('LD_LIBRARY_PATH', ''), str(Path(library_prefix) / 'lib')
-        )
-
+def run_ldd(binary: Path):
     try:
         return subprocess.check_output(
             ['ldd', str(binary)],
             text=True,
             stderr=subprocess.STDOUT,
-            env=env,
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
         return ''

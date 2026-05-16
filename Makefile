@@ -107,7 +107,7 @@ test:
 	  if [ -n "$$venv_site" ] && [ -n "$$PYTHONPATH" ]; then \
 	    export PYTHONPATH=$$(printf "%s" "$$PYTHONPATH" | tr ":" "\n" | grep -vx "$$(pwd)/$$venv_site" | grep -vx "$$venv_site" | paste -sd: -); \
 	  fi; \
-	  . /opt/ros/humble/setup.bash; \
+	  . /opt/ros/jazzy/setup.bash; \
 	  if [ -n "$$WAYWISER_UNDERLAY_SETUP" ] && [ -f "$$WAYWISER_UNDERLAY_SETUP" ]; then . "$$WAYWISER_UNDERLAY_SETUP"; fi; \
 	  . install/setup.bash 2>/dev/null || true; \
 	  colcon test-result --delete-yes >/dev/null 2>&1 || true; \

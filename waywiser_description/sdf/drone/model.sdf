@@ -668,8 +668,7 @@
     </joint>
     <!-- FOR UPDATED ignition::gazebo::systems::MulticopterMotorModel with
     https://github.com/gazebosim/gz-sim/pull/1689 or equivalent -->
-    <plugin filename="ignition-gazebo-multicopter-motor-model-system"
-      name="ignition::gazebo::systems::MulticopterMotorModel">
+    <plugin filename="ignition-gazebo-multicopter-motor-model-system" name="ignition::gazebo::systems::MulticopterMotorModel">
       <jointName>drone/rotor_0_joint</jointName>
       <linkName>rotor_0</linkName>
       <turningDirection>ccw</turningDirection>
@@ -685,8 +684,7 @@
       <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
       <motorType>velocity</motorType>
     </plugin>
-    <plugin filename="ignition-gazebo-multicopter-motor-model-system"
-      name="ignition::gazebo::systems::MulticopterMotorModel">
+    <plugin filename="ignition-gazebo-multicopter-motor-model-system" name="ignition::gazebo::systems::MulticopterMotorModel">
       <jointName>drone/rotor_1_joint</jointName>
       <linkName>rotor_1</linkName>
       <turningDirection>ccw</turningDirection>
@@ -702,8 +700,7 @@
       <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
       <motorType>velocity</motorType>
     </plugin>
-    <plugin filename="ignition-gazebo-multicopter-motor-model-system"
-      name="ignition::gazebo::systems::MulticopterMotorModel">
+    <plugin filename="ignition-gazebo-multicopter-motor-model-system" name="ignition::gazebo::systems::MulticopterMotorModel">
       <jointName>drone/rotor_2_joint</jointName>
       <linkName>rotor_2</linkName>
       <turningDirection>cw</turningDirection>
@@ -719,8 +716,7 @@
       <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
       <motorType>velocity</motorType>
     </plugin>
-    <plugin filename="ignition-gazebo-multicopter-motor-model-system"
-      name="ignition::gazebo::systems::MulticopterMotorModel">
+    <plugin filename="ignition-gazebo-multicopter-motor-model-system" name="ignition::gazebo::systems::MulticopterMotorModel">
       <jointName>drone/rotor_3_joint</jointName>
       <linkName>rotor_3</linkName>
       <turningDirection>cw</turningDirection>
@@ -736,9 +732,7 @@
       <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
       <motorType>velocity</motorType>
     </plugin>
-    <plugin
-      filename="ignition-gazebo-multicopter-control-system"
-      name="ignition::gazebo::systems::MulticopterVelocityControl">
+    <plugin filename="ignition-gazebo-multicopter-control-system" name="ignition::gazebo::systems::MulticopterVelocityControl">
       <robotNamespace>drone</robotNamespace>
       <commandSubTopic>cmd_vel</commandSubTopic>
       <enableSubTopic>enable</enableSubTopic>
@@ -776,8 +770,7 @@
         </rotor>
       </rotorConfiguration>
     </plugin>
-    <plugin filename="ignition-gazebo-joint-state-publisher-system"
-      name="ignition::gazebo::systems::JointStatePublisher">
+    <plugin filename="ignition-gazebo-joint-state-publisher-system" name="ignition::gazebo::systems::JointStatePublisher">
       <joint_name>drone/rotor_0_joint</joint_name>
       <joint_name>drone/rotor_1_joint</joint_name>
       <joint_name>drone/rotor_2_joint</joint_name>
@@ -786,9 +779,7 @@
       <joint_name>drone/lidar_sensor_joint</joint_name>
       <topic>/drone/joint_states</topic>
     </plugin>
-    <plugin
-      filename="ignition-gazebo-pose-publisher-system"
-      name="ignition::gazebo::systems::PosePublisher">
+    <plugin filename="ignition-gazebo-pose-publisher-system" name="ignition::gazebo::systems::PosePublisher">
       <publish_link_pose>false</publish_link_pose>
       <publish_collision_pose>false</publish_collision_pose>
       <publish_visual_pose>false</publish_visual_pose>
@@ -798,9 +789,7 @@
       <publish_nested_model_pose>true</publish_nested_model_pose>
       <update_frequency>50</update_frequency>
     </plugin>
-    <plugin
-      filename="ignition-gazebo-odometry-publisher-system"
-      name="ignition::gazebo::systems::OdometryPublisher">
+    <plugin filename="ignition-gazebo-odometry-publisher-system" name="ignition::gazebo::systems::OdometryPublisher">
       <dimensions>3</dimensions>
       <odom_frame>drone/odom</odom_frame>
       <robot_base_frame>drone/base_link</robot_base_frame>

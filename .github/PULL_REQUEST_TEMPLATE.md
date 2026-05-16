@@ -2,7 +2,7 @@
 
 Before creating this PR, ensure you have completed the following by filling in the checkboxes with 'x':
 
-- [ ] Followed the [Developer Guide](https://github.com/das-rise/WayWiseR/blob/humble/.github/DEVELOPER_GUIDE.md) and coding standards
+- [ ] Followed the [Developer Guide](https://github.com/das-rise/WayWiseR/blob/experimental/jazzy/.github/DEVELOPER_GUIDE.md) and coding standards
 - [ ] Run all tests and verify test results with `make test`
 
 ---

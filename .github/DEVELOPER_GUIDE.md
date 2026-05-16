@@ -129,7 +129,7 @@ Before running the pipeline for the first time or after changing the CI environm
 # Build the amd64 CI image
 docker buildx build --platform linux/amd64 --load \
   --build-arg ACT_COMPAT=true \
-  -t ghcr.io/das-rise/waywiser/ci-image-amd64:humble \
+  -t ghcr.io/das-rise/waywiser/ci-image-amd64:jazzy \
   -f $WAYWISER_WS/src/WayWiseR/.github/workflows/Dockerfile.ci.amd64 \
   $WAYWISER_WS/src/WayWiseR
 
@@ -137,7 +137,7 @@ docker buildx build --platform linux/amd64 --load \
 docker run --privileged --rm tonistiigi/binfmt --install arm64
 docker buildx build --platform linux/arm64 --load \
   --build-arg ACT_COMPAT=true \
-  -t ghcr.io/das-rise/waywiser/ci-image-arm64:humble \
+  -t ghcr.io/das-rise/waywiser/ci-image-arm64:jazzy \
   -f $WAYWISER_WS/src/WayWiseR/.github/workflows/Dockerfile.ci.arm64 \
   $WAYWISER_WS/src/WayWiseR
 ```
@@ -146,7 +146,7 @@ Then, run the build and test job using `act`. The `--pull=false` flag ensures `a
 
 ```bash
 # Run the CI pipeline locally for amd64
-act -P ubuntu-22.04=ghcr.io/das-rise/waywiser/ci-image-amd64:humble \
+act -P ubuntu-24.04=ghcr.io/das-rise/waywiser/ci-image-amd64:jazzy \
   --pull=false \
   -C $WAYWISER_WS/src/WayWiseR \
   --env WAYWISER_CHECKOUT_PATH=. \
@@ -154,7 +154,7 @@ act -P ubuntu-22.04=ghcr.io/das-rise/waywiser/ci-image-amd64:humble \
   -j build-and-test
 
 # Run the CI pipeline locally for arm64
-act -P ubuntu-22.04=ghcr.io/das-rise/waywiser/ci-image-arm64:humble \
+act -P ubuntu-24.04=ghcr.io/das-rise/waywiser/ci-image-arm64:jazzy \
   --pull=false \
   -C $WAYWISER_WS/src/WayWiseR \
   --env WAYWISER_CHECKOUT_PATH=. \
@@ -208,14 +208,14 @@ ros2 run waywiser initialize
 
 The initializer updates `/etc/waywiser/waywiser.env`, reads the installed
 `pyproject.toml`, detects installed
-`ros-humble-waywiser-*` packages, and selects the matching extras automatically.
+`ros-jazzy-waywiser-*` packages, and selects the matching extras automatically.
 Use `--print-extras` to preview the selection:
 
 ```bash
 ros2 run waywiser initialize --print-extras
 ```
 
-Also, installing `ros-humble-waywiser` creates `/etc/waywiser/waywiser.env` on first install from the bundled `waywiser.env.example`. It is a dpkg **conffile**, so package upgrades never overwrite edits you have made.
+Also, installing `ros-jazzy-waywiser` creates `/etc/waywiser/waywiser.env` on first install from the bundled `waywiser.env.example`. It is a dpkg **conffile**, so package upgrades never overwrite edits you have made.
 
 You can still run either step separately:
 

@@ -60,7 +60,7 @@
     <material>Gazebo/Black</material>
     <sensor name='lidar_link' type='gpu_lidar'>
       <topic>${frame_prefix}scan_lidar</topic>
-      <ignition_frame_id>${frame_prefix}lidar_link</ignition_frame_id>
+      <gz_frame_id>${frame_prefix}lidar_link</gz_frame_id>
       <pose relative_to="${frame_prefix}lidar_link">0 0 0 0 0 0</pose>
       <always_on>1</always_on>
       <visualize>0</visualize>

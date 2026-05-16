@@ -31,7 +31,7 @@
             <update_rate>10</update_rate>
             <visualize>0</visualize>
             <topic>${frame_prefix}gps/navsat</topic>
-            <ignition_frame_id>${frame_prefix}gps_link</ignition_frame_id>
+            <gz_frame_id>${frame_prefix}gps_link</gz_frame_id>
             <pose relative_to='${frame_prefix}gps_link'>0 0 0 0 0 0</pose>
             <navsat>
                 <position_sensing>

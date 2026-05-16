@@ -29,6 +29,7 @@
   <depend>teleop_twist_joy</depend>
   <depend>twist_mux</depend>
   <depend>rclpy</depend>
+  <depend>tf_transformations</depend>
   <depend>waywiser_twist_safety</depend>
   <depend>waywiser_core</depend>
   <exec_depend>python3-pyqt5</exec_depend>
