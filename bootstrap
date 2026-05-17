@@ -920,7 +920,7 @@ setup_venv() {
     source "$VENV_DIR/bin/activate"
     export PYTHONPATH="$VENV_DIR/lib/python${py_ver}/site-packages:${PYTHONPATH:-}"
     info "Installing Python extras: $extras"
-    uv pip install -e "src/WayWiseR${extras}"
+    uv pip install -e "$REPO_DIR${extras}"
     info "Python $py_ver venv ready at $VENV_DIR"
 }
 
@@ -1117,7 +1117,7 @@ presim_setup() {
         activate_env
         cd "$WAYWISER_WS"
         info "Installing carla Python requirements..."
-        uv pip install -r src/WayWiseR/waywiser_carla/external/carla-ros-bridge/requirements.txt
+        uv pip install -r "$REPO_DIR/waywiser_carla/external/carla-ros-bridge/requirements.txt"
         info "Installing CARLA Python API..."
         uv pip install carla==0.9.15
     fi

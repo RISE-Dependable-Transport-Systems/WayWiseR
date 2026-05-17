@@ -27,11 +27,15 @@ jobs:
         --no-warn-unused-cli
         -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         -DCMAKE_C_COMPILER_LAUNCHER=ccache
+    defaults:
+      run:
+        working-directory: src/WayWiseR
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          path: src/WayWiseR
           submodules: recursive
           fetch-depth: 0
 
@@ -44,7 +48,8 @@ jobs:
             ${{ runner.os }}-ccache-humble-
 
       - name: Clean PX4 in-source build artifacts
-        run: rm -rf "$GITHUB_WORKSPACE/waywiser_core/external/PX4-Autopilot/build"
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/src/WayWiseR/waywiser_core/external/PX4-Autopilot/build"
 
       - name: Setup Workspace
         run: make setup ARGS="--quiet"
