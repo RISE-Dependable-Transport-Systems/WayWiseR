@@ -41,6 +41,18 @@ as_root() {
     fi
 }
 
+ensure_git_safe_directory() {
+    command -v git &>/dev/null || return 0
+
+    if [[ "${CI:-}" == "true" ]]; then
+        git config --global --add safe.directory '*' || \
+            warn "Unable to mark Git directories as safe for CI."
+    elif [[ "$(id -u)" -eq 0 ]]; then
+        git config --global --add safe.directory "$REPO_DIR" || \
+            warn "Unable to mark $REPO_DIR as a safe Git directory."
+    fi
+}
+
 ensure_env_file() {
     if [[ ! -f "$ENV_FILE" ]]; then
         cp "$ENV_EXAMPLE" "$ENV_FILE"
@@ -1214,6 +1226,8 @@ run_post_build() {
 # ── main ─────────────────────────────────────────────────────────────────────────
 
 main() {
+    ensure_git_safe_directory
+
     # ── core workspace setup ───────────────────────────────────────────────
     if [[ "$OPT_CONFIGURE_ONLY" == true ]]; then
         configure_env || { echo; info "Configuration cancelled."; exit 0; }

@@ -44,7 +44,7 @@ jobs:
             ${{ runner.os }}-ccache-humble-
 
       - name: Clean PX4 in-source build artifacts
-        run: rm -rf "$GITHUB_WORKSPACE/waywiser_gazebo/external/PX4-Autopilot/build"
+        run: rm -rf "$GITHUB_WORKSPACE/waywiser_core/external/PX4-Autopilot/build"
 
       - name: Setup Workspace
         run: make setup ARGS="--quiet"
