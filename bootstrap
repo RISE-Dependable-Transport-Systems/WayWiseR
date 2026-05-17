@@ -97,7 +97,13 @@ source_ros() {
 source_underlay() {
     local setup_file="${WAYWISER_UNDERLAY_SETUP:-}"
     [[ -n "$setup_file" ]] || return 0
-    [[ -f "$setup_file" ]] || die "Underlay setup not found: $setup_file"
+    if [[ ! -f "$setup_file" ]]; then
+        if [[ "${CI:-}" == "true" ]]; then
+            warn "Underlay setup not found, continuing without it: $setup_file"
+            return 0
+        fi
+        die "Underlay setup not found: $setup_file"
+    fi
 
     set +u
     # shellcheck disable=SC1090
