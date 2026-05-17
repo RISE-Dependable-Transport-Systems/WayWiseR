@@ -75,12 +75,11 @@ std::string format_px4_preflight_summary(
 bool px4_ready_for_arm_command(
   bool ready_for_takeoff, bool ready_for_offboard, bool ready_to_arm)
 {
-  (void)ready_to_arm;
   (void)ready_for_offboard;
-  // Only require AUTO_TAKEOFF readiness (matching original Python node behavior).
-  // OFFBOARD readiness depends on receiving the offboard_control_mode signal, which
-  // may not be valid yet at startup even though we are streaming it.
-  return ready_for_takeoff;
+  // Accept either AUTO_TAKEOFF readiness or the direct arming readiness bit.
+  // Some PX4 builds/sims can lag or omit AUTO_TAKEOFF capability flags while
+  // still reporting a valid ready_to_arm state via ActuatorArmed.
+  return ready_for_takeoff || ready_to_arm;
 }
 
 VehicleInterfaceType parse_vehicle_interface_type(const std::string & value)

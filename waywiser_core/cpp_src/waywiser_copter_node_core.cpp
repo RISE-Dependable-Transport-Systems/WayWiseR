@@ -162,7 +162,7 @@ void WaywiserCopter::setup_publishers()
   if (mCopterInterfaceComponent->getVehicleInterfaceType() == VehicleInterfaceType::EXT_SIMULATED) {
     px4_vehicle_command_pub_ = create_publisher<px4_msgs::msg::VehicleCommand>(
       "/fmu/in/vehicle_command", 10);
-    auto offboard_qos = rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().transient_local();
+    auto offboard_qos = rclcpp::QoS(rclcpp::KeepLast(7)).reliable().durability_volatile();
     offboard_control_mode_pub_ = create_publisher<px4_msgs::msg::OffboardControlMode>(
       "/fmu/in/offboard_control_mode", offboard_qos);
     trajectory_setpoint_pub_ = create_publisher<px4_msgs::msg::TrajectorySetpoint>(
@@ -192,8 +192,8 @@ void WaywiserCopter::setup_subscribers()
         arm_command_topic_, 10, std::bind(&WaywiserCopter::arm_command_callback, this, _1));
     }
 
-    auto px4_qos = rclcpp::QoS(rclcpp::KeepLast(1))
-      .best_effort()
+    auto px4_qos = rclcpp::QoS(rclcpp::KeepLast(7))
+      .reliable()
       .durability_volatile();
     px4_actuator_armed_sub_ = create_subscription<px4_msgs::msg::ActuatorArmed>(
       "/fmu/out/actuator_armed", px4_qos,
@@ -464,6 +464,7 @@ void WaywiserCopter::px4_vehicle_status_callback(
 {
   armed_ = (msg->arming_state == px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED);
   px4_nav_state_ = msg->nav_state;
+  ready_to_arm_ = msg->pre_flight_checks_pass;
   refresh_in_flight_status();
   publish_quadcopter_state();
 }

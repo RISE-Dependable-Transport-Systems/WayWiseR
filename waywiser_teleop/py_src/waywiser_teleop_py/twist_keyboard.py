@@ -324,11 +324,6 @@ class TwistKeyboard(Node):
             return ''
         return RosUtils.prefix_topic_with_namespace(topic, self.vehicle_namespace)
 
-    def bridge_node_fqn(self):
-        return RosUtils.prefix_topic_with_namespace(
-            'px4_zenoh_offboard_bridge', self.vehicle_namespace
-        )
-
     def set_remote_node_parameter(self, node_fqn, name, value):
         """Set a single parameter on a remote node."""
         if not node_fqn:
@@ -365,18 +360,12 @@ class TwistKeyboard(Node):
         self.destroy_client(client)
 
     def set_hover_hold_enabled(self, enabled):
-        """Update hover hold behavior on the PX4 offboard bridge and vehicle node."""
+        """Update hover hold behavior on the vehicle node."""
         self.hold_position_on_idle_enabled = bool(enabled)
 
         if self.waywise_object_type != 'quadcopter':
             return
 
-        # Update bridge node
-        self.set_remote_node_parameter(
-            self.bridge_node_fqn(), 'hold_position_on_idle', self.hold_position_on_idle_enabled
-        )
-
-        # Update vehicle node
         self.set_remote_node_parameter(
             self.control_vehicle_node_fqn,
             'hold_position_on_idle',

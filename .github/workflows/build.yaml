@@ -39,7 +39,21 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      - name: Prep for local act
+        if: ${{ env.ACT == 'true' }}
+        run: |
+          # Use a local git repo to avoid "reference is not a tree" since act doesn't copy .git reliably
+          git init
+          git config user.email "act@local"
+          git config user.name "act"
+          git checkout -B ${{ github.ref_name }}
+          git add .
+          git commit -m "Local build for act" --allow-empty
+          mkdir -p /tmp/fake_github/${{ github.repository_owner }}
+          ln -sf $(pwd) /tmp/fake_github/${{ github.repository }}.git
+
       - name: Cache ccache
+        if: ${{ env.ACT != 'true' }}
         uses: actions/cache@v4
         with:
           path: /opt/ccache

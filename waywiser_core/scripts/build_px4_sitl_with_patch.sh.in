@@ -60,6 +60,7 @@ if "@GIT_EXECUTABLE@" -C "$repo" apply --reverse --check "$patch_file" >/dev/nul
 elif "@GIT_EXECUTABLE@" -C "$repo" apply --check "$patch_file" >/dev/null 2>&1; then
   "@GIT_EXECUTABLE@" -C "$repo" apply "$patch_file"
   applied_now=1
+  rm -rf "$repo/build/px4_sitl_zenoh/uORB/idl"
 else
   echo "Unable to apply $patch_file cleanly to $repo." >&2
   "@GIT_EXECUTABLE@" -C "$repo" status --short >&2 || true
