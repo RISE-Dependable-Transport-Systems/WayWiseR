@@ -134,6 +134,13 @@ docker build -t ghcr.io/das-rise/waywiser/ci-image:humble \
 
 Then, run the build and test job using `act`. The `--pull=false` flag ensures `act` uses your local image:
 
+> [!NOTE]
+> If you are using **rootless Docker**, you may need to specify the `DOCKER_HOST` environment variable so `act` can find the local Docker socket:
+>
+> ```bash
+> export DOCKER_HOST=$(docker context inspect rootless --format '{{.Endpoints.docker.Host}}')
+> ```
+
 ```bash
 # Run the CI pipeline locally
 act -j build-and-test --pull=false -P ubuntu-22.04=ghcr.io/das-rise/waywiser/ci-image:humble -C $WAYWISER_WS/src/WayWiseR
