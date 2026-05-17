@@ -13,7 +13,7 @@ jobs:
   build-and-test:
     runs-on: ubuntu-22.04
     container:
-      image: ghcr.io/das-rise/waywiser/ci-image:humble
+      image: ghcr.io/das-rise/waywiser/ci-image-amd64:humble
       options: --user root
     env:
       CI: "true"

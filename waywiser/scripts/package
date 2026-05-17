@@ -1,0 +1,689 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_dir="$(cd "$script_dir/../.." && pwd)"
+mode="${WAYWISER_PACKAGE_MODE:-host}"
+arch="${1:-amd64}"
+ros_distro="${ROS_DISTRO:-humble}"
+workspace="${WAYWISER_WS:-$(cd "$repo_dir/../.." && pwd)}"
+out_dir="${WAYWISER_DEB_OUT:-$workspace/deb_dist}"
+default_amd64_image="ghcr.io/das-rise/waywiser/ci-image-amd64:humble"
+default_arm64_image="ghcr.io/das-rise/waywiser/ci-image-arm64:humble"
+
+info() { echo "  $*" >&2; }
+die() { echo "ERROR: $*" >&2; exit 1; }
+
+ensure_arm64_binfmt() {
+    local image="$1"
+
+    if docker run --rm --platform linux/arm64 --entrypoint /bin/bash "$image" \
+        -lc 'uname -m' \
+        >/dev/null 2>&1; then
+        return 0
+    fi
+
+    info "Installing Docker binfmt handler for arm64..."
+    if ! docker run --privileged --rm tonistiigi/binfmt --install arm64 >/dev/null; then
+        die "Docker cannot execute arm64 containers. Run: docker run --privileged --rm tonistiigi/binfmt --install arm64"
+    fi
+
+    docker run --rm --platform linux/arm64 --entrypoint /bin/bash "$image" \
+        -lc 'uname -m' \
+        >/dev/null 2>&1 \
+        && return 0
+
+    die "Docker still cannot execute arm64 containers after binfmt setup. If you are using rootless Docker, switch to the rootful Docker daemon or restart Docker, then run: docker run --privileged --rm tonistiigi/binfmt --install arm64"
+}
+
+stage_mavsdk_deb() {
+    local deb_arch="$1"
+    local mavsdk_stage_root="${WAYWISER_DEB_STAGE:-$workspace/deb_stage}"
+    local arch_out_dir="$mavsdk_stage_root/$deb_arch"
+    local arch_var="MAVSDK_${deb_arch^^}_DEB_URL"
+    arch_var="${arch_var//-/_}"
+    local mavsdk_release_version="${MAVSDK_VERSION_DEFAULT:-2.14.1}"
+    local source_path="${MAVSDK_DEB_PATH:-}"
+    local source_url="${MAVSDK_DEB_URL:-${!arch_var:-}}"
+    local staged_path=""
+    local mavsdk_build_script
+
+    if [[ -z "$source_url" ]]; then
+        case "$deb_arch" in
+            amd64)
+                source_url="https://github.com/mavlink/MAVSDK/releases/download/v${mavsdk_release_version}/libmavsdk-dev_${mavsdk_release_version}_ubuntu22.04_amd64.deb"
+                ;;
+            arm64)
+                source_url="https://github.com/mavlink/MAVSDK/releases/download/v${mavsdk_release_version}/libmavsdk-dev_${mavsdk_release_version}_debian11_arm64.deb"
+                ;;
+        esac
+    fi
+
+    mkdir -p "$arch_out_dir"
+    touch "$mavsdk_stage_root/COLCON_IGNORE" "$arch_out_dir/COLCON_IGNORE"
+
+    if [[ -n "$source_path" ]]; then
+        source_path="$(realpath "$source_path")"
+        [[ -f "$source_path" ]] || die "MAVSDK_DEB_PATH not found: $source_path"
+        staged_path="$arch_out_dir/$(basename "$source_path")"
+        if [[ "$source_path" != "$staged_path" ]]; then
+            cp -a "$source_path" "$staged_path"
+        fi
+        printf '%s\n' "$staged_path"
+        return 0
+    fi
+
+    if [[ -n "$source_url" ]]; then
+        staged_path="$arch_out_dir/$(basename "${source_url%%\?*}")"
+        [[ "$staged_path" == *.deb ]] || staged_path="$arch_out_dir/libmavsdk-dev_${deb_arch}.deb"
+        if [[ ! -f "$staged_path" ]]; then
+            info "Downloading MAVSDK deb for $deb_arch into $staged_path..."
+            curl -LsSf "$source_url" -o "$staged_path"
+        fi
+        printf '%s\n' "$staged_path"
+        return 0
+    fi
+
+    if [[ "${WAYWISER_BUILD_MAVSDK_DEB:-false}" != "true" ]]; then
+        return 1
+    fi
+
+    mavsdk_build_script="$repo_dir/waywiser/scripts/build_mavsdk_deb.sh"
+    [[ -x "$mavsdk_build_script" ]] || return 1
+
+    info "Building MAVSDK deb for $deb_arch from the WayWiser MAVSDK build script..."
+    MAVSDK_DEB_OUT="$arch_out_dir" "$mavsdk_build_script" "$deb_arch" | tail -n 1
+}
+
+install_missing_deb_packages() {
+    local -a missing=()
+    local package
+
+    for package in "$@"; do
+        dpkg -s "$package" >/dev/null 2>&1 || missing+=("$package")
+    done
+
+    if [[ ${#missing[@]} -eq 0 ]]; then
+        info "Debian packaging prerequisites already installed."
+        return 0
+    fi
+
+    info "Installing Debian packaging prerequisites: ${missing[*]}"
+    apt-get update
+    apt-get install -y --no-install-recommends "${missing[@]}"
+}
+
+colcon_supports_allow_overriding() {
+    colcon build --help 2>/dev/null | grep -q -- "--allow-overriding"
+}
+
+debianize_ros_name() {
+    printf 'ros-%s-%s' "$ros_distro" "${1//_/-}"
+}
+
+xml_value() {
+    local tag="$1" xml="$2"
+    sed -n "s|.*<$tag[^>]*>\\(.*\\)</$tag>.*|\\1|p" "$xml" | head -n 1
+}
+
+xml_deps() {
+    local xml="$1"
+    sed -En 's#.*<(depend|exec_depend|build_export_depend)[^>]*>([^<]+)</[^>]+>.*#\2#p' "$xml" \
+        | sort -u
+}
+
+is_waywiser_release_package() {
+    case "$1" in
+        carla_ackermann_control|\
+        carla_ackermann_msgs|\
+        carla_ad_agent|\
+        carla_common|\
+        carla_manual_control|\
+        carla_msgs|\
+        carla_ros_bridge|\
+        carla_ros_scenario_runner|\
+        carla_ros_scenario_runner_types|\
+        carla_spawn_objects|\
+        carla_twist_to_control|\
+        carla_walker_agent|\
+        carla_waypoint_publisher|\
+        carla_waypoint_types|\
+        ros_compatibility|\
+        rqt_carla_control|\
+        waywiser|\
+        waywiser_agrarsense|\
+        waywiser_carla|\
+        waywiser_core|\
+        waywiser_description|\
+        waywiser_gazebo|\
+        waywiser_hwbringup|\
+        waywiser_nav2|\
+        waywiser_perception|\
+        waywiser_rviz2|\
+        waywiser_slam|\
+        waywiser_teleop|\
+        waywiser_test_runner|\
+        waywiser_twist_safety)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+append_unique_packages() {
+    local current="$1"
+    shift
+    local package
+
+    for package in "$@"; do
+        if [[ " $current " != *" $package "* ]]; then
+            current+="${current:+ }$package"
+        fi
+    done
+
+    printf '%s\n' "$current"
+}
+
+run_host() {
+    local requested_arch="${1:-amd64}"
+    local platform
+    local relative_repo_dir
+    local container_repo_dir
+    local host_uid
+    local host_gid
+
+    arch="$requested_arch"
+    case "$arch" in
+        amd64)
+            platform="linux/amd64"
+            image="${WAYWISER_DEB_IMAGE:-${WAYWISER_DEB_AMD64_IMAGE:-$default_amd64_image}}"
+            ;;
+        arm64|aarch64)
+            platform="linux/arm64"
+            arch="arm64"
+            image="${WAYWISER_DEB_IMAGE:-${WAYWISER_DEB_ARM64_IMAGE:-$default_arm64_image}}"
+            ;;
+        *) echo "Usage: $0 [amd64|arm64]..." >&2; exit 2 ;;
+    esac
+
+    mkdir -p "$out_dir"
+    touch "$out_dir/COLCON_IGNORE"
+    relative_repo_dir="$(realpath --relative-to="$workspace" "$repo_dir")"
+    container_repo_dir="$workspace/$relative_repo_dir"
+    host_uid="$(id -u)"
+    host_gid="$(id -g)"
+
+    MAVSDK_DEB_PATH="$(stage_mavsdk_deb "$arch" | tail -n 1 || true)"
+    export MAVSDK_DEB_PATH
+
+    docker_mavsdk_args=()
+    docker_mavsdk_env=()
+    if [[ -n "${MAVSDK_DEB_PATH:-}" ]]; then
+        mavsdk_deb_abs="$(realpath "$MAVSDK_DEB_PATH")"
+        [[ -f "$mavsdk_deb_abs" ]] || die "MAVSDK_DEB_PATH not found: $MAVSDK_DEB_PATH"
+        docker_mavsdk_args+=(-v "$(dirname "$mavsdk_deb_abs")":/mavsdk:ro)
+        docker_mavsdk_env+=(-e "MAVSDK_DEB_PATH=/mavsdk/$(basename "$mavsdk_deb_abs")")
+    fi
+
+    if [[ "$platform" == "linux/arm64" ]]; then
+        info "Building arm64 under QEMU."
+        ensure_arm64_binfmt "$image"
+    fi
+
+    docker run --rm \
+        --platform "$platform" \
+        --user root \
+        -e CI=true \
+        -e WAYWISER_PACKAGE_MODE=container \
+        -e ROS_DISTRO="$ros_distro" \
+        -e WAYWISER_DEB_VERSION="${WAYWISER_DEB_VERSION:-}" \
+        -e WAYWISER_DEB_UBUNTU_LABEL="${WAYWISER_DEB_UBUNTU_LABEL:-}" \
+        -e WAYWISER_DEB_MAINTAINER="${WAYWISER_DEB_MAINTAINER:-}" \
+        -e WAYWISER_SKIPPED_PACKAGES="${WAYWISER_SKIPPED_PACKAGES:-}" \
+        -e WAYWISER_CMAKE_ARGS="${WAYWISER_CMAKE_ARGS:-}" \
+        -e WAYWISER_NATIVE_PACKAGE_BUILD=false \
+        -e WAYWISER_HOST_UID="$host_uid" \
+        -e WAYWISER_HOST_GID="$host_gid" \
+        -e MAVSDK_DEB_URL="${MAVSDK_DEB_URL:-}" \
+        -e MAVSDK_AMD64_DEB_URL="${MAVSDK_AMD64_DEB_URL:-}" \
+        -e MAVSDK_ARM64_DEB_URL="${MAVSDK_ARM64_DEB_URL:-}" \
+        "${docker_mavsdk_env[@]}" \
+        -v "$workspace":"$workspace" \
+        "${docker_mavsdk_args[@]}" \
+        -w "$container_repo_dir" \
+        "$image" \
+        bash ./waywiser/scripts/package "$arch"
+}
+
+find_package_xml() {
+    local package="$1"
+    colcon list --base-paths "${base_paths[@]}" --packages-select "$package" --paths-only 2>/dev/null \
+        | head -n 1 \
+        | xargs -r -I{} printf '%s/package.xml\n' "{}"
+}
+
+package_depends() {
+    local package="$1" xml="$2" deb_arch="$3"
+    local deps=()
+    local dep deb
+
+    deps+=("ros-$ros_distro-ros-base")
+    if [[ "$package" != "waywiser" ]]; then
+        deps+=("$(debianize_ros_name waywiser)")
+    fi
+    while IFS= read -r dep; do
+        [[ -n "$dep" ]] || continue
+        case "$dep" in
+            dynamic_reconfigure|message_runtime|rosbag_storage|rospy|rviz|tf)
+                continue
+                ;;
+            python-transforms3d-pip)
+                deb="python3-transforms3d"
+                ;;
+            dialog)
+                deb="dialog"
+                ;;
+            python3-pyqt5)
+                deb="python3-pyqt5"
+                ;;
+            python3-pyqt5.qtmultimedia)
+                deb="python3-pyqt5.qtmultimedia"
+                ;;
+            px4_msgs)
+                [[ "$package" == "waywiser_core" ]] && continue
+                deb="$(debianize_ros_name "$dep")"
+                ;;
+            waywiser*|carla_*|ros_compatibility|rqt_carla_control)
+                deb="$(debianize_ros_name "$dep")"
+                ;;
+            boost)
+                deb="libboost-regex-dev"
+                ;;
+            qtbase5-dev)
+                deps+=("libqt5core5a" "libqt5network5" "libqt5widgets5")
+                continue
+                ;;
+            xsltproc)
+                deb="xsltproc"
+                ;;
+            *)
+                deb="$(debianize_ros_name "$dep")"
+                ;;
+        esac
+        deps+=("$deb")
+    done < <(xml_deps "$xml")
+
+    if [[ "$package" == "waywiser_core" ]]; then
+        deps+=("libqt5serialport5")
+        if [[ "$deb_arch" != "amd64" || "${WAYWISER_PACKAGE_BUNDLE_MAVSDK_AMD64:-true}" != "true" ]]; then
+            deps+=("libmavsdk-dev")
+        fi
+    fi
+    if [[ "$package" == "waywiser_gazebo" ]]; then
+        deps+=(
+            "gz-harmonic"
+            "libgz-math7"
+            "libgz-msgs10"
+            "libgz-sensors8"
+            "libgz-sim8"
+            "libgz-transport13"
+        )
+    fi
+    printf '%s\n' "${deps[@]}" | sort -u | paste -sd, - | sed 's/,/, /g'
+}
+
+copy_mavsdk_runtime_payload() {
+    local stage="$1"
+    local ros_lib_dir="$stage/opt/ros/$ros_distro/lib"
+    local path
+    local copied=0
+
+    mkdir -p "$ros_lib_dir"
+    while IFS= read -r path; do
+        [[ -n "$path" && -e "$path" ]] || continue
+        case "$path" in
+            /usr/lib/libmavsdk*.so*|/usr/lib/*/libmavsdk*.so*)
+                cp -a "$path" "$ros_lib_dir/"
+                copied=1
+                ;;
+        esac
+    done < <(dpkg -L libmavsdk-dev)
+
+    [[ "$copied" == "1" ]] || die "No MAVSDK runtime libraries found in libmavsdk-dev."
+}
+
+prune_waywiser_gazebo_px4_payload() {
+    local stage="$1"
+    local px4_dir="$stage/opt/ros/$ros_distro/share/waywiser_gazebo/px4_sitl_zenoh"
+
+    [[ -d "$px4_dir" ]] || return 0
+
+    rm -rf \
+        "$px4_dir/CMakeFiles" \
+        "$px4_dir/mavlink" \
+        "$px4_dir/msg" \
+        "$px4_dir/OpticalFlow" \
+        "$px4_dir/platforms" \
+        "$px4_dir/src" \
+        "$px4_dir/uORB"
+
+    find "$px4_dir" -type d \( -name node_modules -o -name __pycache__ \) -prune -exec rm -rf {} +
+}
+
+bundle_waywiser_gazebo_harmonic_bridge() {
+    local stage="$1"
+    local harmonic_install="$install_tmp/ros_gz_harmonic"
+    local harmonic_stage="$stage/opt/ros/$ros_distro/ros_gz_harmonic"
+
+    [[ -d "$harmonic_install" ]] || return 0
+
+    rm -rf "$harmonic_stage"
+    mkdir -p "$(dirname "$harmonic_stage")"
+    cp -aL "$harmonic_install" "$harmonic_stage"
+}
+
+restore_host_ownership() {
+    local host_uid="${WAYWISER_HOST_UID:-}"
+    local host_gid="${WAYWISER_HOST_GID:-}"
+    [[ -n "$host_uid" && -n "$host_gid" ]] || return 0
+
+    chown -R "$host_uid:$host_gid" \
+        "$workspace/build"* \
+        "$workspace/install"* \
+        "$workspace/log"* \
+        "$workspace/.venv" \
+        "$workspace/log" \
+        "$workspace/deb_dist" \
+        "$workspace/deb_install" \
+        "$workspace/deb_stage" \
+        2>/dev/null || true
+}
+
+ensure_ros_multiarch_library_links() {
+    local multiarch
+    local ros_lib_dir="/opt/ros/$ros_distro/lib"
+    local ros_multiarch_lib_dir
+    local lib
+    local target
+
+    multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || true)"
+    [[ -n "$multiarch" ]] || return 0
+
+    ros_multiarch_lib_dir="$ros_lib_dir/$multiarch"
+    [[ -d "$ros_multiarch_lib_dir" ]] || return 0
+
+    shopt -s nullglob
+    for lib in "$ros_multiarch_lib_dir"/*.so "$ros_multiarch_lib_dir"/*.so.*; do
+        target="$ros_lib_dir/$(basename "$lib")"
+        [[ -e "$target" ]] || ln -s "$lib" "$target"
+    done
+    shopt -u nullglob
+}
+
+write_local_deb_installer() {
+    local arch_out_dir="$1"
+    local installer="$arch_out_dir/install-waywiser-debs.bash"
+
+    install -m 0755 "$repo_dir/waywiser/scripts/install_waywiser_debs.bash" "$installer"
+    chmod 0755 "$installer"
+}
+
+run_container() {
+    local install_tmp_root="${WAYWISER_DEB_INSTALL_TMP:-$workspace/deb_install}"
+    local stage_root="${WAYWISER_DEB_STAGE:-$workspace/deb_stage}"
+    local log_base
+    local install_tmp
+    local stage_dir
+    local maintainer="${WAYWISER_DEB_MAINTAINER:-Ramana Avula <r2avula@gmail.com>}"
+    local version="${WAYWISER_DEB_VERSION:-}"
+    local ubuntu_label="${WAYWISER_DEB_UBUNTU_LABEL:-ubuntu22-04}"
+    local skipped_packages="${WAYWISER_SKIPPED_PACKAGES:-}"
+    local deb_arch
+    local package_env_file
+    local host_uid="${WAYWISER_HOST_UID:-}"
+    local host_gid="${WAYWISER_HOST_GID:-}"
+
+    if [[ -z "$version" ]]; then
+        version="$(grep -m1 '^version = ' "$repo_dir/pyproject.toml" | sed 's/version = //;s/"//g')"
+        git_sha="$(git -C "$repo_dir" rev-parse --short HEAD 2>/dev/null || true)"
+        [[ -n "$git_sha" ]] && version="${version}+git${git_sha}"
+    fi
+
+    [[ "$(id -u)" -eq 0 ]] || die "Container package mode must run as root."
+
+    deb_arch="$(dpkg --print-architecture)"
+    log_base="${WAYWISER_LOG_BASE:-$workspace/log-$deb_arch}"
+    install_tmp="$install_tmp_root/$deb_arch"
+    stage_dir="$stage_root/$deb_arch/package_stage"
+    if [[ "$deb_arch" != "amd64" ]]; then
+        skipped_packages="$(append_unique_packages "$skipped_packages" \
+            waywiser_agrarsense \
+            waywiser_carla \
+            waywiser_gazebo \
+            waywiser_rviz2 \
+            waywiser_teleop)"
+        info "Skipping QEMU-heavy packages for $deb_arch: waywiser_agrarsense waywiser_carla waywiser_gazebo waywiser_rviz2 waywiser_teleop"
+    fi
+
+    package_env_file="$(mktemp)"
+    WAYWISER_PACKAGE_ENV_FILE_TO_CLEAN="$package_env_file"
+    trap 'rm -f "${WAYWISER_PACKAGE_ENV_FILE_TO_CLEAN:-}"; restore_host_ownership' EXIT
+    if [[ -f "$repo_dir/.env" ]]; then
+        cp "$repo_dir/.env" "$package_env_file"
+    elif [[ -f "$repo_dir/.env.example" ]]; then
+        cp "$repo_dir/.env.example" "$package_env_file"
+    fi
+    bash -n "$package_env_file" || die "Package env file has invalid shell syntax: $package_env_file"
+
+    export DEBIAN_FRONTEND=noninteractive
+    export CI=true
+    export WAYWISER_WS="$workspace"
+    export WAYWISER_ENV_FILE="$package_env_file"
+    export WAYWISER_VENV_PATH="${WAYWISER_PACKAGE_VENV_PATH:-$stage_root/$deb_arch/venv}"
+    export WAYWISER_NO_WORKSPACE_VENV_LINK=true
+    export WAYWISER_SKIPPED_PACKAGES="$skipped_packages"
+    export WAYWISER_PYTHON_EXTRAS="${WAYWISER_PYTHON_EXTRAS:-build,waywiser_test_runner}"
+
+    cd "$repo_dir"
+
+    install_missing_deb_packages \
+        ca-certificates \
+        curl \
+        dpkg-dev \
+        fakeroot \
+        git \
+        gnupg \
+        lsb-release \
+        python3-colcon-common-extensions \
+        python3-pip \
+        python3-rosdep \
+        sudo
+
+    info "Running WayWiseR setup for $ros_distro..."
+    bash "$repo_dir/waywiser/scripts/bootstrap" --setup-only --quiet
+    ensure_ros_multiarch_library_links
+
+    dpkg -s libmavsdk-dev >/dev/null 2>&1 || die \
+        "libmavsdk-dev is required. For arm64 builds, pass MAVSDK_DEB_URL or MAVSDK_DEB_PATH."
+
+    rm -rf "$install_tmp" "$stage_dir"
+    mkdir -p "$install_tmp" "$stage_dir"
+    touch "$install_tmp_root/COLCON_IGNORE" "$stage_root/COLCON_IGNORE"
+
+    set +u
+    source "/opt/ros/$ros_distro/setup.bash"
+    source "$WAYWISER_VENV_PATH/bin/activate"
+    set -u
+
+    base_paths=("$workspace/src")
+    allow_overriding=()
+    if [[ " $skipped_packages " != *" waywiser_carla "* ]]; then
+        base_paths+=("$repo_dir/waywiser_carla/external/carla-ros-bridge")
+        allow_overriding+=(waywiser waywiser_description)
+    fi
+
+    cmake_args=(-DCMAKE_BUILD_TYPE=Release)
+    if [[ -n "${WAYWISER_CMAKE_ARGS:-}" ]]; then
+        # shellcheck disable=SC2206
+        extra_cmake_args=($WAYWISER_CMAKE_ARGS)
+        cmake_args+=("${extra_cmake_args[@]}")
+    fi
+
+    info "Building workspace for package staging..."
+    if [[ "${WAYWISER_NATIVE_PACKAGE_BUILD:-false}" == "true" ]]; then
+        build_base="${WAYWISER_BUILD_BASE:-$workspace/build}"
+        install_base="${WAYWISER_INSTALL_BASE:-$workspace/install}"
+    else
+        build_base="${WAYWISER_BUILD_BASE:-$workspace/build-$deb_arch}"
+        install_base="${WAYWISER_INSTALL_BASE:-$workspace/install-$deb_arch}"
+    fi
+
+    colcon_args=(
+        --base-paths "${base_paths[@]}"
+        --build-base "$build_base"
+        --install-base "$install_base"
+        --event-handlers console_direct- console_stderr-
+    )
+    if [[ "${WAYWISER_PACKAGE_FORCE_CONFIGURE:-true}" == "true" ]]; then
+        colcon_args+=(--cmake-force-configure)
+    fi
+    if [[ ${#allow_overriding[@]} -gt 0 ]] && colcon_supports_allow_overriding; then
+        colcon_args+=(--allow-overriding "${allow_overriding[@]}")
+    fi
+    if [[ -n "$skipped_packages" ]]; then
+        # shellcheck disable=SC2206
+        skipped_package_args=($skipped_packages)
+        colcon_args+=(--packages-skip "${skipped_package_args[@]}")
+    fi
+    colcon_args+=(--cmake-args "${cmake_args[@]}")
+
+    cd "$workspace"
+    colcon --log-base "$log_base" build "${colcon_args[@]}"
+    cd "$repo_dir"
+
+    rm -rf "$install_tmp"
+    mkdir -p "$install_tmp"
+    cp -aL "$install_base"/. "$install_tmp"/
+
+    arch_out_dir="$out_dir/$deb_arch"
+    rm -rf "$arch_out_dir"
+    mkdir -p "$arch_out_dir"
+
+    info "Building one Debian package per colcon package into $arch_out_dir..."
+    for package_install_dir in "$install_tmp"/*; do
+        [[ -d "$package_install_dir" ]] || continue
+        package="$(basename "$package_install_dir")"
+        if ! is_waywiser_release_package "$package"; then
+            continue
+        fi
+        package_xml="$(find_package_xml "$package")"
+        if [[ -z "$package_xml" || ! -f "$package_xml" ]]; then
+            info "Skipping $package: package.xml not found."
+            continue
+        fi
+
+        package_stage="$stage_dir/$package"
+        rm -rf "$package_stage"
+        mkdir -p "$package_stage/opt/ros/$ros_distro" "$package_stage/DEBIAN"
+
+        for path in "$package_install_dir"/*; do
+            name="$(basename "$path")"
+            case "$name" in
+                bin|include|lib|share)
+                    cp -aL "$path" "$package_stage/opt/ros/$ros_distro/"
+                    ;;
+            esac
+        done
+        if [[ "$package" == "waywiser_gazebo" ]]; then
+            prune_waywiser_gazebo_px4_payload "$package_stage"
+            bundle_waywiser_gazebo_harmonic_bridge "$package_stage"
+        fi
+
+        if [[ ! -d "$package_stage/opt/ros/$ros_distro/share/$package" ]]; then
+            info "Skipping $package: no installed share/$package payload."
+            continue
+        fi
+
+        deb_name="$(debianize_ros_name "$package")"
+        package_version="${WAYWISER_DEB_VERSION:-$(xml_value version "$package_xml")}"
+        if [[ "$package_version" == "0.0.0" && -n "$version" ]]; then
+            package_version="$version"
+        fi
+        description="$(xml_value description "$package_xml")"
+        [[ -n "$description" ]] || description="$package"
+        if [[ "$package" == "waywiser_core" \
+            && "$deb_arch" == "amd64" \
+            && "${WAYWISER_PACKAGE_BUNDLE_MAVSDK_AMD64:-true}" == "true" ]]; then
+            info "Bundling MAVSDK runtime libraries into $deb_name for amd64."
+            copy_mavsdk_runtime_payload "$package_stage"
+        fi
+
+        installed_size="$(du -sk "$package_stage/opt" | awk '{print $1}')"
+        depends="$(package_depends "$package" "$package_xml" "$deb_arch")"
+
+        cat > "$package_stage/DEBIAN/control" <<EOF
+Package: $deb_name
+Version: $package_version
+Section: misc
+Priority: optional
+Architecture: $deb_arch
+Maintainer: $maintainer
+Installed-Size: $installed_size
+Depends: $depends
+Description: $description
+ WayWiseR ROS 2 package built as part of the WayWiseR binary release.
+EOF
+
+        # For the waywiser base package, ship /etc/waywiser/waywiser.env as a
+        # conffile so users can persist runtime config (DDS, Zenoh, email, etc.)
+        # across package upgrades. dpkg requires conffiles to exist in the
+        # package payload, so the default env file is staged from the example.
+        if [[ "$package" == "waywiser" ]]; then
+            local env_example="$package_stage/opt/ros/$ros_distro/share/waywiser/waywiser.env.example"
+            if [[ -f "$env_example" ]]; then
+                mkdir -p "$package_stage/etc/waywiser"
+                cp "$env_example" "$package_stage/etc/waywiser/waywiser.env.example"
+                cp "$env_example" "$package_stage/etc/waywiser/waywiser.env"
+                printf '/etc/waywiser/waywiser.env\n' \
+                    > "$package_stage/DEBIAN/conffiles"
+                cat > "$package_stage/DEBIAN/postinst" <<'POSTINST'
+#!/bin/sh
+set -e
+if [ ! -f /etc/waywiser/waywiser.env ]; then
+    mkdir -p /etc/waywiser
+    cp /etc/waywiser/waywiser.env.example /etc/waywiser/waywiser.env
+    echo "WayWiseR: created /etc/waywiser/waywiser.env." >&2
+    echo "WayWiseR: configure it with: ros2 run waywiser configure_env" >&2
+fi
+#DEBHELPER#
+POSTINST
+                chmod 0755 "$package_stage/DEBIAN/postinst"
+            fi
+        fi
+
+        deb_path="$arch_out_dir/${deb_name}_${package_version}_${ubuntu_label}.deb"
+        info "Building $deb_path..."
+        fakeroot dpkg-deb -Zgzip -z1 --build "$package_stage" "$deb_path"
+    done
+
+    write_local_deb_installer "$arch_out_dir"
+    info "Created packages in $arch_out_dir"
+
+    restore_host_ownership
+}
+
+case "$mode" in
+    host)
+        if [[ "$#" -eq 0 ]]; then
+            run_host amd64
+        else
+            for arch in "$@"; do
+                run_host "$arch"
+            done
+        fi
+        ;;
+    container) run_container ;;
+    *) die "Unknown WAYWISER_PACKAGE_MODE: $mode" ;;
+esac

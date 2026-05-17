@@ -126,22 +126,102 @@ To verify changes in an environment identical to the GitHub Actions runner, you 
 Before running the pipeline for the first time or after changing the CI environment, build the custom CI image locally:
 
 ```bash
-# Build the CI image
-docker build -t ghcr.io/das-rise/waywiser/ci-image:humble \
-  -f $WAYWISER_WS/src/WayWiseR/.github/workflows/Dockerfile.ci \
+# Build the amd64 CI image
+docker buildx build --platform linux/amd64 --load \
+  --build-arg ACT_COMPAT=true \
+  -t ghcr.io/das-rise/waywiser/ci-image-amd64:humble \
+  -f $WAYWISER_WS/src/WayWiseR/.github/workflows/Dockerfile.ci.amd64 \
+  $WAYWISER_WS/src/WayWiseR
+
+# Build the arm64 CI image used by make package-arm64
+docker run --privileged --rm tonistiigi/binfmt --install arm64
+docker buildx build --platform linux/arm64 --load \
+  --build-arg ACT_COMPAT=true \
+  -t ghcr.io/das-rise/waywiser/ci-image-arm64:humble \
+  -f $WAYWISER_WS/src/WayWiseR/.github/workflows/Dockerfile.ci.arm64 \
   $WAYWISER_WS/src/WayWiseR
 ```
 
 Then, run the build and test job using `act`. The `--pull=false` flag ensures `act` uses your local image:
 
-> [!NOTE]
-> If you are using **rootless Docker**, you may need to specify the `DOCKER_HOST` environment variable so `act` can find the local Docker socket:
->
-> ```bash
-> export DOCKER_HOST=$(docker context inspect rootless --format '{{.Endpoints.docker.Host}}')
-> ```
+```bash
+# Run the CI pipeline locally for amd64
+act -P ubuntu-22.04=ghcr.io/das-rise/waywiser/ci-image-amd64:humble \
+  --pull=false \
+  -C $WAYWISER_WS/src/WayWiseR \
+  -j build-and-test
+
+# Run the CI pipeline locally for arm64
+act -P ubuntu-22.04=ghcr.io/das-rise/waywiser/ci-image-arm64:humble \
+  --pull=false \
+  -C $WAYWISER_WS/src/WayWiseR \
+  -j build-and-test
+```
+
+## Building Debian Packages
+
+Build amd64 packages:
 
 ```bash
-# Run the CI pipeline locally
-act -j build-and-test --pull=false -P ubuntu-22.04=ghcr.io/das-rise/waywiser/ci-image:humble -C $WAYWISER_WS/src/WayWiseR
+make package
+```
+
+Build arm64 packages for Jetson or Raspberry Pi from an amd64 host:
+
+```bash
+make package ARGS=arm64
+```
+
+Build multiple architectures:
+
+```bash
+make package ARGS="amd64 arm64"
+```
+
+Packages are written to architecture-specific directories:
+
+```text
+$WAYWISER_WS/deb_dist/amd64/
+$WAYWISER_WS/deb_dist/arm64/
+```
+
+Install packages from a local release directory with the generated helper:
+
+```bash
+cd $WAYWISER_WS/deb_dist/amd64/
+./install-waywiser-debs.bash
+```
+
+### Runtime Configuration (deb install)
+
+After installing the Debian packages on a target machine, configure runtime
+settings and create a local virtual environment for pip-only WayWiseR
+dependencies:
+
+```bash
+ros2 run waywiser initialize
+```
+
+The initializer updates `/etc/waywiser/waywiser.env`, reads the installed
+`pyproject.toml`, detects installed
+`ros-humble-waywiser-*` packages, and selects the matching extras automatically.
+Use `--print-extras` to preview the selection:
+
+```bash
+ros2 run waywiser initialize --print-extras
+```
+
+Also, installing `ros-humble-waywiser` creates `/etc/waywiser/waywiser.env` on first install from the bundled `waywiser.env.example`. It is a dpkg **conffile**, so package upgrades never overwrite edits you have made.
+
+You can still run either step separately:
+
+```bash
+ros2 run waywiser configure_env
+ros2 run waywiser setup_venv
+```
+
+After configuring, re-source the ROS setup file so the WayWiseR environment hook loads the updated settings:
+
+```bash
+source /opt/ros/humble/setup.bash
 ```

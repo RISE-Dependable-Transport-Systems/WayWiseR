@@ -1,6 +1,7 @@
 ARG ROS_DISTRO=humble
 ARG WAYWISER_REF=humble
 ARG WAYWISER_SKIPPED_PACKAGES=""
+ARG ACT_COMPAT=false
 
 # Use the official ROS Desktop image for the selected ROS distribution.
 FROM osrf/ros:${ROS_DISTRO}-desktop
@@ -10,6 +11,7 @@ SHELL ["/bin/bash", "-c"]
 ARG ROS_DISTRO
 ARG WAYWISER_REF
 ARG WAYWISER_SKIPPED_PACKAGES
+ARG ACT_COMPAT
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV ROS_DISTRO=${ROS_DISTRO}
@@ -31,6 +33,15 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get update && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
+# act copies workflow runtime files into /var/run/act. Local image builds can
+# opt into this compatibility path without changing the GitHub Actions image.
+RUN if [[ "$ACT_COMPAT" == "true" ]] && [[ -L /var/run ]]; then \
+        rm /var/run; \
+    fi \
+    && if [[ "$ACT_COMPAT" == "true" ]]; then \
+        mkdir -p /var/run/act; \
+    fi
+
 RUN useradd --create-home --shell /bin/bash "$WAYWISER_USER" \
     && mkdir -p /home/waywiser/workspaces \
     && chown -R "$WAYWISER_USER:$WAYWISER_USER" /home/waywiser/workspaces
@@ -45,7 +56,9 @@ RUN git clone --branch "$WAYWISER_REF" --recursive https://github.com/das-rise/W
 
 WORKDIR $WAYWISER_UNDERLAY_WS
 
-RUN if [[ -f Makefile && -f bootstrap ]] && grep -q 'base_paths+=.*carla-ros-bridge' bootstrap; then \
+RUN BOOTSTRAP_PATH=""; \
+    if [[ -f waywiser/scripts/bootstrap ]]; then BOOTSTRAP_PATH=waywiser/scripts/bootstrap; elif [[ -f bootstrap ]]; then BOOTSTRAP_PATH=bootstrap; fi; \
+    if [[ -f Makefile && -n "$BOOTSTRAP_PATH" ]] && grep -q 'base_paths+=.*carla-ros-bridge' "$BOOTSTRAP_PATH"; then \
         echo "Using WayWiseR Makefile/bootstrap flow from $WAYWISER_REF."; \
         CI=true WAYWISER_WS="$WAYWISER_UNDERLAY_WS" \
             make setup ARGS="--quiet"; \
@@ -56,6 +69,8 @@ RUN if [[ -f Makefile && -f bootstrap ]] && grep -q 'base_paths+=.*carla-ros-bri
             build-essential \
             ccache \
             cmake \
+            dpkg-dev \
+            fakeroot \
             gnupg \
             libqt5serialport5-dev \
             libunwind-dev \
@@ -108,7 +123,9 @@ USER $WAYWISER_USER
 # Colcon fallback only: create the venv and install Python dependencies as
 # waywiser so ownership is correct from the start. uv was installed system-wide
 # (/usr/local/bin) during setup so it is accessible to this user.
-RUN if ! ([[ -f Makefile && -f bootstrap ]] && grep -q 'base_paths+=.*carla-ros-bridge' bootstrap); then \
+RUN BOOTSTRAP_PATH=""; \
+    if [[ -f waywiser/scripts/bootstrap ]]; then BOOTSTRAP_PATH=waywiser/scripts/bootstrap; elif [[ -f bootstrap ]]; then BOOTSTRAP_PATH=bootstrap; fi; \
+    if ! ([[ -f Makefile && -n "$BOOTSTRAP_PATH" ]] && grep -q 'base_paths+=.*carla-ros-bridge' "$BOOTSTRAP_PATH"); then \
     uv venv --python "$(cat $WAYWISER_UNDERLAY_WS/src/WayWiseR/.python-version)" "$WAYWISER_VENV_PATH" \
     && . "$WAYWISER_VENV_PATH/bin/activate" \
     && if grep -q '^\[project.optional-dependencies\]' $WAYWISER_UNDERLAY_WS/src/WayWiseR/pyproject.toml \
@@ -121,7 +138,9 @@ RUN if ! ([[ -f Makefile && -f bootstrap ]] && grep -q 'base_paths+=.*carla-ros-
     && uv pip install -r $WAYWISER_UNDERLAY_WS/src/WayWiseR/waywiser_carla/external/carla-ros-bridge/requirements.txt; \
 fi
 
-RUN if [[ -f Makefile && -f bootstrap ]] && grep -q 'base_paths+=.*carla-ros-bridge' bootstrap; then \
+RUN BOOTSTRAP_PATH=""; \
+    if [[ -f waywiser/scripts/bootstrap ]]; then BOOTSTRAP_PATH=waywiser/scripts/bootstrap; elif [[ -f bootstrap ]]; then BOOTSTRAP_PATH=bootstrap; fi; \
+    if [[ -f Makefile && -n "$BOOTSTRAP_PATH" ]] && grep -q 'base_paths+=.*carla-ros-bridge' "$BOOTSTRAP_PATH"; then \
         echo "Building underlay with WayWiseR Makefile/bootstrap flow from $WAYWISER_REF."; \
         CI=true WAYWISER_WS="$WAYWISER_UNDERLAY_WS" WAYWISER_UNDERLAY_SETUP="" \
             make build ARGS="--quiet"; \

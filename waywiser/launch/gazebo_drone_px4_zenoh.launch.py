@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+from pathlib import Path
 import socket
 import tempfile
 
@@ -384,6 +385,21 @@ def yaml_to_dict(path_to_yaml):
         return yaml.load(f, Loader=yaml.SafeLoader)
 
 
+def resolve_resource_path(path, base_dir):
+    path = str(path)
+    if path.startswith('package://'):
+        package_path = path[len('package://'):]
+        package_name, _, relative_path = package_path.partition('/')
+        if not package_name or not relative_path:
+            raise RuntimeError(f'Invalid package resource URI: {path}')
+        return str(Path(get_package_share_directory(package_name)) / relative_path)
+
+    candidate = Path(path)
+    if candidate.is_absolute() or candidate.exists():
+        return str(candidate)
+    return str(base_dir / candidate)
+
+
 def drone_gazebo_spawn_launch(context):
     waywiser_gazebo_dir = get_package_share_directory('waywiser_gazebo')
 
@@ -394,6 +410,7 @@ def drone_gazebo_spawn_launch(context):
     spec.loader.exec_module(px4_sitl)
 
     config_path = LaunchConfiguration('drone_spawn_config_file').perform(context)
+    config_dir = Path(config_path).resolve().parent
     with open(config_path) as f:
         config = json.load(f)
 
@@ -401,7 +418,7 @@ def drone_gazebo_spawn_launch(context):
     for model in config.get('sdf_models', []):
         path = model.get('path')
         if path:
-            sdf_path = path
+            sdf_path = resolve_resource_path(path, config_dir)
             sdf_path = px4_sitl.create_sdf_without_multicopter_velocity_control(sdf_path)
             sdf_path = px4_sitl.create_sdf_with_px4_sim_sensors(sdf_path)
             sdf_path = px4_sitl.create_sdf_with_px4_motor_joint_names(sdf_path)

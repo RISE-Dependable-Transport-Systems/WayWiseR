@@ -24,6 +24,8 @@
   <depend>tf2_geometry_msgs</depend>
   <depend>nav2_msgs</depend>
   <depend>qtbase5-dev</depend>
+  <build_depend>libqt5-serialport-dev</build_depend>
+  <build_depend>libunwind-dev</build_depend>
   <depend>boost</depend>
   <depend>urdf</depend>
   <depend>px4_msgs</depend>

@@ -20,10 +20,44 @@ build = [
     "jinja2>=3.1.6",
     "kconfiglib>=14.1.0",
     "lark>=1.3.1",
-    "setuptools>=80.9.0",
+    "setuptools==58.2.0",
+]
+px4 = [
+    "argcomplete",
+    "cerberus",
+    "coverage",
+    "future",
+    "jsonschema",
+    "lxml",
+    "matplotlib>=3.0",
+    "nunavut>=1.1.0",
+    "packaging",
+    "pandas>=0.21",
+    "pkgconfig",
+    "pycryptodome",
+    "pygments",
+    "pymavlink",
+    "pyros-genmsg",
+    "pyserial",
+    "pyulog>=0.5.0",
+    "requests",
+    "six>=1.12.0",
+    "sympy>=1.10.1",
+    "toml>=0.9",
+    "wheel>=0.31.1",
 ]
 waywiser_carla = [
+    "autopep8",
+    "carla==0.9.15",
+    "cmake_format==0.6.11",
+    "networkx",
     "numpy<2",
+    "pep8",
+    "pexpect",
+    "pygame",
+    "pylint",
+    "rosinstall-generator==0.1.22",
+    "simple-pid",
     "transforms3d>=0.4.2",
 ]
 waywiser_hwbringup = [
@@ -45,9 +79,15 @@ waywiser_perception_jetson = [
     "numpy>=1.23.5,<2",
 ]
 waywiser_perception_x86 = [
-    # x86_64 — all packages available from PyPI.
+    # x86_64 — CPU-only base. No NVIDIA/CUDA packages.
     # pycuda is installed conditionally by the bootstrap script when a CUDA
     # toolkit is detected.
+    "numpy<2",
+]
+waywiser_perception_x86_cuda = [
+    # x86_64 — additional packages that require a CUDA-capable NVIDIA GPU.
+    # Selected automatically by the bootstrap script when an NVIDIA GPU is
+    # detected; skip this extra on CPU-only machines.
     "numpy<2",
     "torch",
     "torchvision",
@@ -71,6 +111,7 @@ email = [
 all = [
     "waywiser[build]",
     "waywiser[email]",
+    "waywiser[px4]",
     "waywiser[waywiser_carla]",
     "waywiser[waywiser_hwbringup]",
     "waywiser[waywiser_perception]",

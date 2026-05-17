@@ -20,10 +20,22 @@ WayWiseR supports two ROS 2 middleware (RMW) implementations. Set `RMW_IMPLEMENT
 
 ## Zenoh Middleware Setup
 
+Start a Zenoh router with:
+
+```bash
+ros2 run waywiser zenoh_router
+```
+
 Please refer to the [Zenoh Setup Guide](discovery/docs/ZENOH_SETUP.md) for detailed configuration, routing, and security encryption options.
 
 ---
 
 ## FastDDS Discovery Server and Client Setup
+
+Start a FastDDS discovery server with:
+
+```bash
+ros2 run waywiser fastdds_server
+```
 
 Please refer to the [FastDDS Setup Guide](discovery/docs/FASTDDS_SETUP.md) for detailed instructions on configuring multi-machine environments in FastDDS.

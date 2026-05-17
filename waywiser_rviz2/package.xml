@@ -15,9 +15,11 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <exec_depend>ament_index_python</exec_depend>
   <depend>rviz2</depend>
 
   <exec_depend>octomap_rviz_plugins</exec_depend>
+  <exec_depend>waywiser</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

@@ -38,12 +38,16 @@ server_setup() {
 # Function to get full file path
 get_full_file_path() {
     local file_path=$1
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
     if [ ! -f "$file_path" ]; then
-        if [[ -n "$WAYWISER_WS" ]]; then
+        if [[ -f "$script_dir/../config/$file_path" ]]; then
+            file_path="$script_dir/../config/$file_path"
+        elif [[ -n "$WAYWISER_WS" && -f "$WAYWISER_WS/src/WayWiseR/waywiser/discovery/config/$file_path" ]]; then
             file_path="$WAYWISER_WS/src/WayWiseR/waywiser/discovery/config/$file_path"
         else
-            echo "Error: Unable to find file $file_path (WAYWISER_WS not set)"
+            echo "Error: Unable to find file $file_path"
             return 1
         fi
     fi

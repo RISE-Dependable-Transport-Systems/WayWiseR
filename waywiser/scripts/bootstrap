@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # bootstrap — WayWiseR workspace bootstrap: first-time setup and simulation packages.
 #
-# Usage: ./bootstrap [options]
+# Usage: make all ARGS="<options>"
 #
 # Options:
 #   --prereqs-only   Only install system prerequisites, then exit
@@ -22,10 +22,20 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$SCRIPT_DIR"
+REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WAYWISER_WS="${WAYWISER_WS:-$(cd "$REPO_DIR/../.." && pwd)}"
-ENV_FILE="$REPO_DIR/.env"
-ENV_EXAMPLE="$REPO_DIR/.env.example"
+# ENV_FILE resolution order:
+#   1. WAYWISER_ENV_FILE env var (explicit override)
+#   2. <repo>/.env  (source install, the normal case)
+#   3. /etc/waywiser/waywiser.env  (deb install conffile)
+if [[ -n "${WAYWISER_ENV_FILE:-}" ]]; then
+    ENV_FILE="$WAYWISER_ENV_FILE"
+elif [[ -f "$REPO_DIR/.env" ]]; then
+    ENV_FILE="$REPO_DIR/.env"
+else
+    ENV_FILE="/etc/waywiser/waywiser.env"
+fi
+ENV_EXAMPLE="${WAYWISER_ENV_FILE_EXAMPLE:-$REPO_DIR/.env.example}"
 VENV_DIR="${WAYWISER_VENV_PATH:-$WAYWISER_WS/.venv}"
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -33,6 +43,10 @@ header() { echo; echo "===> $*"; echo; }
 die()    { echo "ERROR: $*" >&2; exit 1; }
 info()   { echo "  $*"; }
 warn()   { echo "  WARNING: $*" >&2; }
+yes_args() {
+    [[ "$OPT_YES" == true ]] && printf '%s\n' "$@"
+    return 0
+}
 as_root() {
     if [[ "$(id -u)" -eq 0 ]]; then
         "$@"
@@ -55,8 +69,17 @@ ensure_git_safe_directory() {
 
 ensure_env_file() {
     if [[ ! -f "$ENV_FILE" ]]; then
-        cp "$ENV_EXAMPLE" "$ENV_FILE"
-        info "Created .env from .env.example."
+        local env_dir
+        env_dir="$(dirname "$ENV_FILE")"
+        mkdir -p "$env_dir" 2>/dev/null || as_root mkdir -p "$env_dir"
+        if cp "$ENV_EXAMPLE" "$ENV_FILE" 2>/dev/null; then
+            :
+        elif [[ -w "$env_dir" ]]; then
+            cp "$ENV_EXAMPLE" "$ENV_FILE"
+        else
+            as_root cp "$ENV_EXAMPLE" "$ENV_FILE"
+        fi
+        info "Created $ENV_FILE from $ENV_EXAMPLE."
     fi
 }
 
@@ -76,10 +99,19 @@ env_get() { grep -m1 "^${1}=" "${2:-$ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr 
 # Write/update a key in ENV_FILE; appends if the key is absent.
 env_set() {
     local key="$1" val="$2"
+    ensure_env_file
     if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
-        sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"
+        if [[ -w "$ENV_FILE" ]]; then
+            sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"
+        else
+            as_root sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"
+        fi
     else
-        printf '%s=%s\n' "$key" "$val" >> "$ENV_FILE"
+        if [[ -w "$ENV_FILE" ]]; then
+            printf '%s=%s\n' "$key" "$val" >> "$ENV_FILE"
+        else
+            printf '%s=%s\n' "$key" "$val" | as_root tee -a "$ENV_FILE" > /dev/null
+        fi
     fi
 }
 # Source ROS setup files with nounset suspended because ROS setup may reference
@@ -193,6 +225,19 @@ has_nvidia_gpu() {
     return 1
 }
 
+# Return 0 (true) when the current machine looks like an NVIDIA Jetson.
+is_jetson() {
+    [[ -f /etc/nv_tegra_release ]] && return 0
+    dpkg -s nvidia-l4t-core &>/dev/null && return 0
+
+    if [[ -r /proc/device-tree/model ]] \
+        && tr -d '\0' < /proc/device-tree/model 2>/dev/null | grep -qi 'nvidia.*jetson'; then
+        return 0
+    fi
+
+    return 1
+}
+
 # Remove $1 from WAYWISER_SKIPPED_PACKAGES in .env (idempotent).
 remove_from_skip() {
     local pkg="$1"
@@ -211,55 +256,28 @@ remove_from_skip() {
     info "Updated .env: removed '$pkg' from WAYWISER_SKIPPED_PACKAGES"
 }
 
-# Return the Python extras needed for the selected workspace packages.
-python_extras_for_selected_packages() {
-    local skipped="$1"
-
-    if [[ -n "${WAYWISER_PYTHON_EXTRAS:-}" ]]; then
-        printf '[%s]' "$WAYWISER_PYTHON_EXTRAS"
+ensure_workspace_venv_link() {
+    if [[ "${WAYWISER_NO_WORKSPACE_VENV_LINK:-}" == "true" ]]; then
         return 0
     fi
 
-    local -a extras=("build")
-
-    [[ " $skipped " == *" waywiser_carla "* ]] || extras+=("waywiser_carla")
-    [[ " $skipped " == *" waywiser_hwbringup "* ]] || extras+=("waywiser_hwbringup")
-    if [[ " $skipped " != *" waywiser_perception "* ]]; then
-        extras+=("waywiser_perception")
-        # Add the architecture-specific perception extra so pip resolves the
-        # correct torch/numpy variants in a single install pass.
-        if [[ "$(uname -m)" == "aarch64" ]]; then
-            extras+=("waywiser_perception_jetson")
-        else
-            extras+=("waywiser_perception_x86")
-        fi
-        # Install TensorRT only when an NVIDIA GPU is present.
-        if has_nvidia_gpu; then
-            extras+=("waywiser_perception_tensorrt")
-        else
-            info "No NVIDIA GPU detected — skipping tensorrt." >&2
-        fi
-    fi
-    [[ " $skipped " == *" waywiser_teleop "* ]] || extras+=("waywiser_teleop")
-    if [[ " $skipped " != *" waywiser_test_runner "* ]]; then
-        extras+=("waywiser_test_runner" "email")
-    fi
-
-    local joined=""
-    local extra
-    for extra in "${extras[@]}"; do
-        joined+="${joined:+,}${extra}"
-    done
-    printf '[%s]' "$joined"
-}
-
-ensure_workspace_venv_link() {
     local workspace_venv="$WAYWISER_WS/.venv"
     if [[ "$VENV_DIR" != "$workspace_venv" ]]; then
         rm -rf "$workspace_venv"
         ln -sfn "$VENV_DIR" "$workspace_venv"
     fi
 }
+
+prepare_venv_path() {
+    if [[ -L "$VENV_DIR" ]]; then
+        if [[ "${WAYWISER_REUSE_VENV:-}" == "true" && -x "$VENV_DIR/bin/python" ]]; then
+            return 0
+        fi
+        info "Removing stale venv symlink at $VENV_DIR"
+        rm "$VENV_DIR"
+    fi
+}
+
 usage() {
     cat <<EOF
 Usage: $(basename "$0") [options]
@@ -466,14 +484,11 @@ Check packages to BUILD (uncheck to skip).
         local -a _apt_packages=(
             ccache
             gnupg
-            libunwind-dev
-            libqt5serialport5-dev
             git
             build-essential
             cmake
             python3-colcon-common-extensions
             curl
-            dialog
             software-properties-common
         )
         local -a _missing=()
@@ -489,12 +504,12 @@ Check packages to BUILD (uncheck to skip).
         prompt_yn "Install missing apt packages (sudo apt-get install)?" true \
             || { info "Skipping apt dependencies."; return 0; }
         as_root apt-get update -qq
-        as_root apt-get install ${OPT_YES:+-y} "${_missing[@]}"
+        as_root apt-get install $(yes_args -y) "${_missing[@]}"
         info "apt packages installed."
     }
 
     install_gazebo_harmonic_deps() {
-        header "Installing PX4/Gazebo Harmonic dependencies"
+        header "Configuring PX4/Gazebo Harmonic apt repository"
         local keyring="/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg"
         local sources_list="/etc/apt/sources.list.d/gazebo-stable.list"
 
@@ -507,31 +522,21 @@ Check packages to BUILD (uncheck to skip).
             ubuntu_codename=$(. /etc/os-release && echo "$UBUNTU_CODENAME")
             echo "deb [arch=$(dpkg --print-architecture) signed-by=$keyring] http://packages.osrfoundation.org/gazebo/ubuntu-stable $ubuntu_codename main" \
                 | as_root tee "$sources_list" > /dev/null
+            info "OSRF Gazebo apt repository added. rosdep will install Gazebo packages."
+        else
+            info "OSRF Gazebo apt repository already configured."
         fi
+    }
 
-        local -a _gazebo_packages=(
-            libgz-math7-dev
-            libgz-msgs10-dev
-            libgz-sensors8-dev
-            libgz-sim8-dev
-            libgz-transport13-dev
-        )
-        local -a _missing=()
-        local _pkg
-        for _pkg in "${_gazebo_packages[@]}"; do
-            dpkg -s "$_pkg" &>/dev/null || _missing+=("$_pkg")
-        done
-        if [[ ${#_missing[@]} -eq 0 ]]; then
-            info "PX4/Gazebo Harmonic dependencies already installed — skipping."
-            return 0
-        fi
+    should_install_gazebo_harmonic_deps() {
+        local arch skipped
 
-        info "Packages to install: ${_missing[*]}"
-        prompt_yn "Install missing Gazebo Harmonic packages?" true \
-            || { info "Skipping PX4/Gazebo Harmonic dependencies."; return 0; }
-        as_root apt-get update -qq
-        as_root apt-get install ${OPT_YES:+-y} "${_missing[@]}"
-        info "PX4/Gazebo Harmonic dependencies installed."
+        arch=$(dpkg --print-architecture 2>/dev/null || uname -m)
+        [[ "$arch" == "amd64" ]] || return 1
+
+        ensure_env_file
+        skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
+        [[ " $skipped " != *" waywiser_gazebo "* ]]
     }
     
     install_uv() {
@@ -564,11 +569,64 @@ Check packages to BUILD (uncheck to skip).
         fi
         header "Installing MAVSDK 2.x"
         local arch; arch=$(dpkg --print-architecture)
-        # Hardcoded amd64 URL for Ubuntu 22.04; other arches require manual install.
-        local MAVSDK_AMD64_URL="https://github.com/mavlink/MAVSDK/releases/download/v2.14.1/libmavsdk-dev_2.14.1_ubuntu22.04_amd64.deb"
+        local arch_var="MAVSDK_${arch^^}_DEB_URL"
+        arch_var="${arch_var//-/_}"
+        local mavsdk_release_version="${MAVSDK_VERSION_DEFAULT:-2.14.1}"
+        local mavsdk_deb_url="${MAVSDK_DEB_URL:-${!arch_var:-}}"
+        local mavsdk_deb_path="${MAVSDK_DEB_PATH:-}"
+
+        if [[ -z "$mavsdk_deb_url" ]]; then
+            case "$arch" in
+                amd64)
+                    mavsdk_deb_url="https://github.com/mavlink/MAVSDK/releases/download/v${mavsdk_release_version}/libmavsdk-dev_${mavsdk_release_version}_ubuntu22.04_amd64.deb"
+                    ;;
+                arm64)
+                    mavsdk_deb_url="https://github.com/mavlink/MAVSDK/releases/download/v${mavsdk_release_version}/libmavsdk-dev_${mavsdk_release_version}_debian11_arm64.deb"
+                    ;;
+            esac
+        fi
+
+        if [[ -n "$mavsdk_deb_path" ]]; then
+            [[ -f "$mavsdk_deb_path" ]] || die "MAVSDK_DEB_PATH does not exist: $mavsdk_deb_path"
+            info "Installing MAVSDK from local deb: $mavsdk_deb_path"
+            as_root dpkg -i "$mavsdk_deb_path"
+            info "MAVSDK installed."
+            return 0
+        fi
+
+        if [[ -n "$mavsdk_deb_url" ]]; then
+            local tmp_deb; tmp_deb=$(mktemp --suffix=.deb)
+            info "Downloading MAVSDK for $arch: $mavsdk_deb_url"
+            curl -LsSf "$mavsdk_deb_url" -o "$tmp_deb"
+            as_root dpkg -i "$tmp_deb"
+            rm -f "$tmp_deb"
+            info "MAVSDK installed."
+            return 0
+        fi
+
+        local mavsdk_build_script="$REPO_DIR/waywiser/scripts/build_mavsdk_deb.sh"
+        if [[ -x "$mavsdk_build_script" \
+            && "${WAYWISER_BUILD_MAVSDK_DEB:-false}" == "true" ]]; then
+            local built_deb
+            prompt_yn "Build and install MAVSDK deb for $arch from WayWise tools?" true \
+                || { info "Skipping MAVSDK build."; MAVSDK_MANUAL_INSTALL=true; return 0; }
+            built_deb="$(
+                MAVSDK_DEB_OUT="${WAYWISER_MAVSDK_DEB_OUT:-$WAYWISER_WS/deb_stage/$arch}" \
+                "$mavsdk_build_script" "$arch" | tail -n 1
+            )"
+            [[ -f "$built_deb" ]] || die "MAVSDK build did not produce a deb: $built_deb"
+            info "Installing MAVSDK from built deb: $built_deb"
+            as_root dpkg -i "$built_deb"
+            info "MAVSDK installed."
+            return 0
+        fi
+
+        # Default amd64 release package for Ubuntu 22.04; other arches require a
+        # local build or an explicit MAVSDK_DEB_URL/MAVSDK_DEB_PATH.
+        local MAVSDK_AMD64_URL="https://github.com/mavlink/MAVSDK/releases/download/v${mavsdk_release_version}/libmavsdk-dev_${mavsdk_release_version}_ubuntu22.04_amd64.deb"
         if [[ "$arch" != "amd64" ]]; then
             MAVSDK_MANUAL_INSTALL=true
-            warn "MAVSDK auto-install is only supported for amd64."
+            warn "MAVSDK auto-install is only supported for amd64 unless MAVSDK_DEB_URL or MAVSDK_DEB_PATH is set."
             return 0
         fi
         local tmp_deb; tmp_deb=$(mktemp --suffix=.deb)
@@ -585,12 +643,26 @@ init_rosdep() {
     if [[ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]]; then
         sudo rosdep init
     fi
+    local waywiser_rosdep_source="/etc/ros/rosdep/sources.list.d/50-waywiser.list"
+    local waywiser_rosdep_yaml="$REPO_DIR/waywiser/rosdep/waywiser.yaml"
+    if [[ -f "$waywiser_rosdep_yaml" ]]; then
+        local source_line="yaml file://$waywiser_rosdep_yaml"
+        if [[ ! -f "$waywiser_rosdep_source" ]] \
+            || ! grep -qxF "$source_line" "$waywiser_rosdep_source"; then
+            echo "$source_line" | as_root tee "$waywiser_rosdep_source" > /dev/null
+            info "Registered WayWiseR rosdep rules: $waywiser_rosdep_yaml"
+        fi
+    fi
     rosdep update --rosdistro "${ROS_DISTRO:-humble}"
 }
 
 check_prerequisites() {
     install_apt_deps
-    install_gazebo_harmonic_deps
+    if should_install_gazebo_harmonic_deps; then
+        install_gazebo_harmonic_deps
+    else
+        info "Skipping PX4/Gazebo Harmonic apt repository; waywiser_gazebo is not selected for this architecture."
+    fi
     install_uv
     setup_ros2_environment
     if [[ "$OPT_SKIP_MAVSDK" != true ]]; then
@@ -620,15 +692,18 @@ PX4_SITL_REQUIRED_SUBMODULES=(
 init_px4_submodules() {
     info "Initializing PX4-Autopilot submodule..."
     git -C "$REPO_DIR" submodule update --init "$PX4_SUBMODULE_PATH"
+}
 
+init_px4_sitl_submodules() {
     info "Initializing PX4 SITL/Zenoh submodules..."
+    init_px4_submodules
     git -C "$PX4_DIR" submodule update --init --recursive \
         "${PX4_SITL_REQUIRED_SUBMODULES[@]}"
 }
 
 init_submodules() {
     header "Initializing core git submodules"
-    git -C "$REPO_DIR" submodule update --init --recursive waywiser_core/WayWise
+    git -C "$REPO_DIR" submodule update --init waywiser_core/WayWise
     init_px4_submodules
     info "Core submodules initialized."
 }
@@ -664,8 +739,8 @@ wt_form() {
         for (( i=0; i<n; i++ )); do
             args+=("${_labels[$i]}" $(( i + 1 )) 1 "${_defaults[$i]}" $(( i + 1 )) "$field_x" "$field_len" 0)
         done
-        local r; r=$(dialog --title "$title" --form "$body" "$h" "$w" "$form_h" \
-            "${args[@]}" 3>&1 1>&2 2>&3); local _dlg_rc=$?; tput reset
+        local r; r=$(dialog --keep-tite --title "$title" --form "$body" "$h" "$w" "$form_h" \
+            "${args[@]}" 3>&1 1>&2 2>&3); local _dlg_rc=$?; tput cnorm 2>/dev/null || true
         if (( _dlg_rc != 0 )); then return 1; fi
         mapfile -t _wf_result <<< "$r"
         # dialog omits trailing empty fields; pad array to expected length.
@@ -768,163 +843,13 @@ wt_password() {
 }
 
 configure_env() {
-    header "Configuring .env"
+    local configure_script="$REPO_DIR/waywiser/scripts/configure_env.bash"
+    [[ -x "$configure_script" ]] || die "Configure script not found: $configure_script"
 
-    # dialog is required for the multi-field form pages.
-    if ! command -v dialog &>/dev/null; then
-        echo
-        info "'dialog' is required for interactive configuration but is not installed."
-        local _inst_answer
-        read -rp "  Install it now? [Y/n]: " _inst_answer
-        _inst_answer="${_inst_answer:-y}"
-        if [[ "${_inst_answer,,}" =~ ^y ]]; then
-            sudo apt-get install ${OPT_YES:+-y} dialog || die "Failed to install dialog."
-        else
-            info "Installation skipped. Run 'sudo apt-get install -y dialog' then retry."
-            return 1
-        fi
-    fi
-
-
-    if [[ -f "$ENV_FILE" ]]; then
-        info "Found existing .env — current values shown as defaults."
-    else
-        cp "$ENV_EXAMPLE" "$ENV_FILE"
-        info "Created .env from .env.example."
-    fi
-
-    # Read key from .env; fall back to .env.example; then to supplied default.
-    _cfg_get() {
-        local v; v=$(env_get "$1")
-        [[ -z "$v" ]] && v=$(env_get "$1" "$ENV_EXAMPLE")
-        echo "${v:-${2:-}}"
-    }
-
-    # ── Package selection ─────────────────────────────────────────────────
-    local cur_skipped; cur_skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
-    if ! grep -q "^WAYWISER_SKIPPED_PACKAGES=" "$ENV_FILE" 2>/dev/null; then
-        cur_skipped=$(env_get WAYWISER_SKIPPED_PACKAGES "$ENV_EXAMPLE")
-        cur_skipped="${cur_skipped:-waywiser_agrarsense waywiser_carla waywiser_gazebo}"
-    fi
-    local new_skipped
-    package_checklist new_skipped "$cur_skipped" || return 1
-
-    # ── Settings form ─────────────────────────────────────────────────────
-    local cur_domain_id cur_rmw cur_log_stdout cur_log_buffered cur_py_unbuf cur_colorized
-    cur_domain_id=$(_cfg_get ROS_DOMAIN_ID 0)
-    cur_rmw=$(_cfg_get RMW_IMPLEMENTATION rmw_zenoh_cpp)
-    cur_log_stdout=$(_cfg_get RCUTILS_LOGGING_USE_STDOUT 1)
-    cur_log_buffered=$(_cfg_get RCUTILS_LOGGING_BUFFERED_STREAM 1)
-    cur_py_unbuf=$(_cfg_get PYTHONUNBUFFERED 1)
-    cur_colorized=$(_cfg_get RCUTILS_COLORIZED_OUTPUT 1)
-
-    local cur_fdd_disc cur_fdd_srv_ip cur_fdd_cli_ip cur_fdd_super
-    cur_fdd_disc=$(_cfg_get FASTDDS_USE_DISCOVERY_SERVER 0)
-    cur_fdd_srv_ip=$(_cfg_get FASTDDS_REMOTE_DISCOVERY_SERVER_IP "")
-    cur_fdd_cli_ip=$(_cfg_get FASTDDS_REMOTE_DISCOVERY_CLIENT_IP "")
-    cur_fdd_super=$(_cfg_get FASTDDS_SUPER_CLIENT 0)
-
-    local cur_z_router cur_z_rip cur_z_rport cur_z_attempts cur_z_cfg cur_z_override
-    cur_z_router=$(_cfg_get ZENOH_USE_LOCAL_ROUTER 1)
-    cur_z_rip=$(_cfg_get ZENOH_REMOTE_ROUTER_IP "")
-    cur_z_rport=$(_cfg_get ZENOH_REMOTE_ROUTER_PORT 7447)
-    cur_z_attempts=$(_cfg_get ZENOH_ROUTER_CHECK_ATTEMPTS "-1")
-    cur_z_cfg=$(_cfg_get ZENOH_SESSION_CONFIG_URI "")
-    cur_z_override=$(_cfg_get ZENOH_CONFIG_OVERRIDE "")
-
-    local cur_email_user cur_email_pass cur_email_recip cur_smtp_server cur_smtp_port
-    cur_email_user=$(_cfg_get EMAIL_USER "")
-    cur_email_pass=$(env_get EMAIL_PASSWORD)
-    cur_email_recip=$(_cfg_get EMAIL_RECIPIENT "")
-    cur_smtp_server=$(_cfg_get SMTP_SERVER smtp.gmail.com)
-    cur_smtp_port=$(_cfg_get SMTP_PORT 465)
-
-    local cfg_vals=()
-    wt_form cfg_vals "WayWiseR Configuration" \
-        "Edit all settings in one form. Booleans use 1=yes, 0=no." \
-        "ROS_DOMAIN_ID (0-232)"                  "$cur_domain_id" \
-        "RMW_IMPLEMENTATION"                     "$cur_rmw" \
-        "RCUTILS_LOGGING_USE_STDOUT (1/0)"       "$cur_log_stdout" \
-        "RCUTILS_LOGGING_BUFFERED_STREAM (1/0)"  "$cur_log_buffered" \
-        "PYTHONUNBUFFERED (1/0)"                 "$cur_py_unbuf" \
-        "RCUTILS_COLORIZED_OUTPUT (1/0)"         "$cur_colorized" \
-        "FASTDDS_USE_DISCOVERY_SERVER (1/0)"     "$cur_fdd_disc" \
-        "FASTDDS_REMOTE_DISCOVERY_SERVER_IP"     "$cur_fdd_srv_ip" \
-        "FASTDDS_REMOTE_DISCOVERY_CLIENT_IP"     "$cur_fdd_cli_ip" \
-        "FASTDDS_SUPER_CLIENT (1/0)"             "$cur_fdd_super" \
-        "ZENOH_USE_LOCAL_ROUTER (1/0)"           "$cur_z_router" \
-        "ZENOH_REMOTE_ROUTER_IP"                 "$cur_z_rip" \
-        "ZENOH_REMOTE_ROUTER_PORT"               "$cur_z_rport" \
-        "ZENOH_ROUTER_CHECK_ATTEMPTS"            "$cur_z_attempts" \
-        "ZENOH_SESSION_CONFIG_URI"               "$cur_z_cfg" \
-        "ZENOH_CONFIG_OVERRIDE"                  "$cur_z_override" \
-        "EMAIL_USER"                             "$cur_email_user" \
-        "EMAIL_PASSWORD"                         "$cur_email_pass" \
-        "EMAIL_RECIPIENT"                        "$cur_email_recip" \
-        "SMTP_SERVER"                            "$cur_smtp_server" \
-        "SMTP_PORT"                              "$cur_smtp_port" \
-        || return 1
-
-    local new_domain_id="${cfg_vals[0]}"
-    local new_rmw="${cfg_vals[1]}"
-    local new_log_stdout="${cfg_vals[2]}"
-    local new_log_buffered="${cfg_vals[3]}"
-    local new_py_unbuf="${cfg_vals[4]}"
-    local new_colorized="${cfg_vals[5]}"
-    local new_fdd_disc="${cfg_vals[6]}"
-    local new_fdd_srv_ip="${cfg_vals[7]}"
-    local new_fdd_cli_ip="${cfg_vals[8]}"
-    local new_fdd_super="${cfg_vals[9]}"
-    local new_z_router="${cfg_vals[10]}"
-    local new_z_rip="${cfg_vals[11]}"
-    local new_z_rport="${cfg_vals[12]}"
-    local new_z_attempts="${cfg_vals[13]}"
-    local new_z_cfg="${cfg_vals[14]}"
-    local new_z_override="${cfg_vals[15]}"
-    local new_email_user="${cfg_vals[16]}"
-    local new_email_pass="${cfg_vals[17]}"
-    local new_email_recip="${cfg_vals[18]}"
-    local new_smtp_server="${cfg_vals[19]}"
-    local new_smtp_port="${cfg_vals[20]}"
-    [[ -z "$new_email_pass" ]] && new_email_pass="$cur_email_pass"
-
-    # ── Write all settings to .env ────────────────────────────────────────
-    if [[ -n "$new_skipped" ]]; then
-        env_set WAYWISER_SKIPPED_PACKAGES "\"$new_skipped\""
-    else
-        sed -i "s|^WAYWISER_SKIPPED_PACKAGES=.*|WAYWISER_SKIPPED_PACKAGES=|" "$ENV_FILE"
-    fi
-    env_set ROS_DOMAIN_ID                       "$new_domain_id"
-    env_set RMW_IMPLEMENTATION                  "$new_rmw"
-    env_set RCUTILS_LOGGING_USE_STDOUT          "$new_log_stdout"
-    env_set RCUTILS_LOGGING_BUFFERED_STREAM     "$new_log_buffered"
-    env_set PYTHONUNBUFFERED                    "$new_py_unbuf"
-    env_set RCUTILS_COLORIZED_OUTPUT            "$new_colorized"
-    env_set FASTDDS_USE_DISCOVERY_SERVER        "$new_fdd_disc"
-    env_set FASTDDS_REMOTE_DISCOVERY_SERVER_IP  "$new_fdd_srv_ip"
-    env_set FASTDDS_REMOTE_DISCOVERY_CLIENT_IP  "$new_fdd_cli_ip"
-    env_set FASTDDS_SUPER_CLIENT                "$new_fdd_super"
-    env_set ZENOH_USE_LOCAL_ROUTER              "$new_z_router"
-    env_set ZENOH_REMOTE_ROUTER_IP              "$new_z_rip"
-    env_set ZENOH_REMOTE_ROUTER_PORT            "$new_z_rport"
-    env_set ZENOH_ROUTER_CHECK_ATTEMPTS         "$new_z_attempts"
-    env_set ZENOH_SESSION_CONFIG_URI            "$new_z_cfg"
-    env_set ZENOH_CONFIG_OVERRIDE               "$new_z_override"
-    env_set EMAIL_USER                          "$new_email_user"
-    env_set EMAIL_PASSWORD                      "$new_email_pass"
-    env_set EMAIL_RECIPIENT                     "$new_email_recip"
-    env_set SMTP_SERVER                         "$new_smtp_server"
-    env_set SMTP_PORT                           "$new_smtp_port"
-
-    echo
-    info "Saved to $ENV_FILE"
-    info "  RMW_IMPLEMENTATION=$new_rmw"
-    info "  ROS_DOMAIN_ID=$new_domain_id"
-    if [[ -n "$new_skipped" ]]; then
-        info "  WAYWISER_SKIPPED_PACKAGES=\"$new_skipped\""
-    else
-        info "  WAYWISER_SKIPPED_PACKAGES= (all packages will be built)"
-    fi
+    WAYWISER_ENV_FILE="$ENV_FILE" \
+    WAYWISER_ENV_FILE_EXAMPLE="$ENV_EXAMPLE" \
+    WAYWISER_REPO_DIR="$REPO_DIR" \
+    bash "$configure_script" $(yes_args --quiet)
 }
 
 # ── step 4: Python virtual environment ───────────────────────────────────────
@@ -934,23 +859,35 @@ setup_venv() {
     [[ -f "$REPO_DIR/.python-version" ]] || die ".python-version not found in $REPO_DIR"
     local py_ver; py_ver=$(cat "$REPO_DIR/.python-version")
     local skipped=""
+    local setup_venv_script="$REPO_DIR/waywiser/scripts/setup_venv.bash"
+    local -a setup_args
+
+    [[ -x "$setup_venv_script" ]] || die "setup_venv script not found: $setup_venv_script"
     ensure_env_file
     [[ -f "$ENV_FILE" ]] && skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
-    local extras
-    extras=$(python_extras_for_selected_packages "$skipped")
 
     cd "$WAYWISER_WS"
-    if [[ "${WAYWISER_REUSE_VENV:-}" == "true" && -x "$VENV_DIR/bin/python" ]]; then
-        info "Reusing Python venv at $VENV_DIR"
-    else
-        uv venv --python "$py_ver" --clear "$VENV_DIR"
+    setup_args=(
+        --repo-dir "$REPO_DIR"
+        --venv "$VENV_DIR"
+        --skipped-packages "$skipped"
+        --python "$py_ver"
+        --editable
+        --quiet
+    )
+    if [[ "${WAYWISER_REUSE_VENV:-}" != "true" || ! -x "$VENV_DIR/bin/python" ]]; then
+        prepare_venv_path
+        setup_args+=(--clear)
     fi
+    WAYWISER_REPO_DIR="$REPO_DIR" \
+    WAYWISER_PYPROJECT="$REPO_DIR/pyproject.toml" \
+    WAYWISER_SKIPPED_PACKAGES="$skipped" \
+    WAYWISER_PYTHON_EXTRAS="${WAYWISER_PYTHON_EXTRAS:-}" \
+        bash "$setup_venv_script" "${setup_args[@]}"
     ensure_workspace_venv_link
     # shellcheck disable=SC1091
     source "$VENV_DIR/bin/activate"
     export PYTHONPATH="$VENV_DIR/lib/python${py_ver}/site-packages:${PYTHONPATH:-}"
-    info "Installing Python extras: $extras"
-    uv pip install -e "$REPO_DIR${extras}"
     info "Python $py_ver venv ready at $VENV_DIR"
 }
 
@@ -967,17 +904,18 @@ install_ros_deps() {
     set -a; source "$ENV_FILE"; set +a
 
     local skipped="${WAYWISER_SKIPPED_PACKAGES:-}"
-    local extra_paths=""
-    [[ " $skipped " != *" waywiser_carla "* ]] && \
-        extra_paths="src/WayWiseR/waywiser_carla/external/carla-ros-bridge"
+    local -a base_paths=("$WAYWISER_WS/src")
+    [[ " $skipped " != *" waywiser_carla "* ]] \
+        && base_paths+=("$REPO_DIR/waywiser_carla/external/carla-ros-bridge")
 
     local paths
     if [[ -n "$skipped" ]]; then
         local skip_pattern
         skip_pattern=$(echo "$skipped" | tr ' ' '|')
-        paths=$(colcon list --paths-only | grep -Evw "$skip_pattern" || true)
+        paths=$(colcon list --base-paths "${base_paths[@]}" --paths-only \
+            | grep -Evw "$skip_pattern" || true)
     else
-        paths=$(colcon list --paths-only)
+        paths=$(colcon list --base-paths "${base_paths[@]}" --paths-only)
     fi
 
     [[ -n "$paths" ]] || die "No packages found to install dependencies for."
@@ -990,7 +928,7 @@ install_ros_deps() {
     # Check first — skip apt-get update and sudo if everything is already installed.
     local check_rc=0
     # shellcheck disable=SC2086
-    rosdep check --from-paths $paths ${extra_paths:+$extra_paths} \
+    rosdep check --from-paths $paths \
         --ignore-src --rosdistro "$ROS_DISTRO" \
         --skip-keys "$skip_keys" 2>/dev/null || check_rc=$?
     if [[ $check_rc -eq 0 ]]; then
@@ -1007,9 +945,9 @@ install_ros_deps() {
     fi
 
     # shellcheck disable=SC2086
-    rosdep install --from-paths $paths ${extra_paths:+$extra_paths} \
+    rosdep install --from-paths $paths \
         --ignore-src --rosdistro "$ROS_DISTRO" \
-        --skip-keys "$skip_keys" -r ${OPT_YES:+-y}
+        --skip-keys "$skip_keys" -r $(yes_args -y)
     info "Dependencies installed."
 }
 
@@ -1032,6 +970,7 @@ build_workspace() {
     local -a extra_args=()
     local -a allow_overriding=()
     local -a cmake_args=()
+    local -a event_handlers=(console_stderr-)
     local -a package_args=()
     local notification_extension="colcon_core.event_handler.desktop_notification"
     local colcon_extension_blocklist="${COLCON_EXTENSION_BLOCKLIST:-}"
@@ -1051,10 +990,13 @@ build_workspace() {
         extra_args+=(--cmake-args "${cmake_args[@]}")
     fi
 
-    # In quiet/CI mode suppress per-package stderr spam from successful builds;
+    # In quiet/CI mode suppress per-package live output from successful builds.
     if [[ "$OPT_YES" == true || "${CI:-}" == "true" ]]; then
-        extra_args+=(--event-handlers console_direct-)
+        event_handlers+=(console_direct-)
     fi
+
+    # Suppress per-package stderr recap blocks from successful legacy packages.
+    extra_args+=(--event-handlers "${event_handlers[@]}")
 
     if [[ -n "$selected" ]]; then
         # shellcheck disable=SC2206
@@ -1101,7 +1043,12 @@ setup_activate_hook() {
     cat >> "$venv_activate" <<EOT
 
 # WayWiseR Environment Setup
-set -a; source "\$WAYWISER_WS/src/WayWiseR/.env"; set +a
+# Load runtime config: prefer repo .env, fall back to deb conffile.
+if [ -f "\$WAYWISER_WS/src/WayWiseR/.env" ]; then
+    set -a; source "\$WAYWISER_WS/src/WayWiseR/.env"; set +a
+elif [ -f /etc/waywiser/waywiser.env ]; then
+    set -a; source /etc/waywiser/waywiser.env; set +a
+fi
 if [ -z "\${ROS_DISTRO:-}" ]; then
     if [ -f /opt/ros/humble/setup.bash ]; then
         set +u; source /opt/ros/humble/setup.bash; set -u
@@ -1129,13 +1076,10 @@ presim_setup() {
 
     header "Pre-setup: waywiser_core PX4"
     init_px4_submodules
-    local px4_reqs="$PX4_DIR/Tools/setup/requirements.txt"
-    if [[ -f "$px4_reqs" ]]; then
-        info "Installing PX4 Python requirements for uORB generation and SITL build..."
-        activate_env
-        cd "$WAYWISER_WS"
-        uv pip install -r "$px4_reqs"
-    fi
+    info "Ensuring PX4 Python requirements from pyproject extra are installed..."
+    activate_env
+    cd "$WAYWISER_WS"
+    uv pip install -e "$REPO_DIR[px4]"
 
     if [[ " $skipped " != *" waywiser_carla "* ]]; then
         header "Pre-setup: waywiser_carla"
@@ -1144,10 +1088,8 @@ presim_setup() {
             waywiser_carla/external/carla-ros-bridge
         activate_env
         cd "$WAYWISER_WS"
-        info "Installing carla Python requirements..."
-        uv pip install -r "$REPO_DIR/waywiser_carla/external/carla-ros-bridge/requirements.txt"
-        info "Installing CARLA Python API..."
-        uv pip install carla==0.9.15
+        info "Ensuring CARLA Python requirements from pyproject extra are installed..."
+        uv pip install -e "$REPO_DIR[waywiser_carla]"
     fi
 
     if [[ " $skipped " != *" waywiser_gazebo "* ]]; then
@@ -1155,6 +1097,7 @@ presim_setup() {
         info "Initializing ros_gz_harmonic submodule..."
         git -C "$REPO_DIR" submodule update --init --recursive \
             waywiser_gazebo/external/ros_gz_harmonic
+        init_px4_sitl_submodules
     fi
 
     if [[ " $skipped " != *" waywiser_perception "* ]]; then
@@ -1162,15 +1105,15 @@ presim_setup() {
         local arch; arch=$(uname -m)
         activate_env
         cd "$WAYWISER_WS"
-        if [[ "$arch" == "aarch64" ]]; then
+        if is_jetson; then
             # ── Jetson (aarch64) ──────────────────────────────────────────
             # TensorRT, CUDA, and cuDNN come from JetPack; install the
             # supporting system libraries that pycuda and libnvinfer need.
-            info "Detected aarch64 (Jetson). Installing Jetson-specific apt packages..."
+            info "Detected NVIDIA Jetson. Installing Jetson-specific apt packages..."
             prompt_yn "Install Jetson perception apt dependencies (sudo apt-get install)?" true \
                 || { info "Skipping Jetson apt packages."; return 0; }
             sudo apt-get update -qq
-            sudo apt-get install ${OPT_YES:+-y} \
+            sudo apt-get install $(yes_args -y) \
                 python3-pip \
                 libopenblas-base \
                 libopenmpi-dev \
@@ -1188,6 +1131,8 @@ presim_setup() {
             warn "Follow the NVIDIA instructions at:"
             warn "  https://forums.developer.nvidia.com/t/pytorch-for-jetson/"
             warn "After installing torch/torchvision, re-run 'make build'."
+        elif [[ "$arch" == "aarch64" ]]; then
+            info "Detected aarch64 without Jetson markers — skipping Jetson-specific perception apt packages."
         else
             # ── x86_64 ────────────────────────────────────────────────────
             # torch and torchvision are already pulled in via the

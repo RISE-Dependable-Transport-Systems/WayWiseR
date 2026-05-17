@@ -22,16 +22,55 @@ ament_target_dependencies(${PROJECT_NAME} rclcpp)
 
 include_directories(include)
 
-file(GLOB DISCOVERY_SETUP_FILES "discovery/scripts/*.bash")
+install(
+  DIRECTORY discovery
+  DESTINATION share/${PROJECT_NAME}
+  USE_SOURCE_PERMISSIONS
+  PATTERN "__pycache__" EXCLUDE
+)
 
 install(
-  FILES ${DISCOVERY_SETUP_FILES}
-  DESTINATION "."
+  DIRECTORY environment
+  DESTINATION share/${PROJECT_NAME}
+  USE_SOURCE_PERMISSIONS
+)
+
+install(
+  DIRECTORY scripts
+  DESTINATION share/${PROJECT_NAME}
+  USE_SOURCE_PERMISSIONS
+  PATTERN "bootstrap" EXCLUDE
+  PATTERN "package" EXCLUDE
+)
+
+install(
+  PROGRAMS
+    scripts/configure_env
+    scripts/configure_env.bash
+    scripts/fastdds_server
+    scripts/initialize
+    scripts/initialize.bash
+    scripts/install_waywiser_debs.bash
+    scripts/setup_venv
+    scripts/setup_venv.bash
+    scripts/zenoh_router
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 install(
   DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  FILES ${CMAKE_CURRENT_SOURCE_DIR}/../pyproject.toml
+  DESTINATION share/${PROJECT_NAME}/python
+)
+
+install(
+  FILES ${CMAKE_CURRENT_SOURCE_DIR}/../.env.example
+  DESTINATION share/${PROJECT_NAME}
+  RENAME waywiser.env.example
 )
 
 install(TARGETS ${PROJECT_NAME}
@@ -52,6 +91,7 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+ament_environment_hooks(environment/waywiser_env.bash)
 ament_environment_hooks(discovery/scripts/fastdds_client_setup.bash)
 ament_environment_hooks(discovery/scripts/zenoh_client_setup.bash)
 ament_export_include_directories(include)

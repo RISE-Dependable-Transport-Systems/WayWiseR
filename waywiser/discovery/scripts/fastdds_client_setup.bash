@@ -3,6 +3,33 @@
 # Check if the script is being sourced
 [[ "${BASH_SOURCE[0]}" != "${0}" ]] && is_sourced=true || is_sourced=false
 
+source_waywiser_env_file() {
+    local env_file="${WAYWISER_ENV_FILE:-}"
+
+    if [[ -z "$env_file" ]]; then
+        if [[ -n "${WAYWISER_WS:-}" && -f "$WAYWISER_WS/src/WayWiseR/.env" ]]; then
+            env_file="$WAYWISER_WS/src/WayWiseR/.env"
+        elif [[ -f "$PWD/src/WayWiseR/.env" ]]; then
+            env_file="$PWD/src/WayWiseR/.env"
+        elif [[ -f /etc/waywiser/waywiser.env ]]; then
+            env_file="/etc/waywiser/waywiser.env"
+        fi
+    fi
+
+    [[ -n "$env_file" && -f "$env_file" ]] || return 0
+
+    set -a
+    # shellcheck disable=SC1090
+    source "$env_file"
+    set +a
+    export WAYWISER_ENV_FILE="$env_file"
+}
+
+if [[ "$is_sourced" == "true" ]]; then
+    source_waywiser_env_file
+fi
+unset -f source_waywiser_env_file
+
 # Skip FastDDS client setup if using a non-FastDDS middleware (e.g. rmw_zenoh_cpp)
 if [[ "$is_sourced" == "true" ]] && [[ -n "$RMW_IMPLEMENTATION" ]] && [[ "$RMW_IMPLEMENTATION" != "rmw_fastrtps_cpp" ]] && [[ "$RMW_IMPLEMENTATION" != "rmw_fastrtps_dynamic_cpp" ]]; then
     OPTIND=1
@@ -25,12 +52,16 @@ display_usage() {
 # Function to get full file path
 get_full_file_path() {
     local file_path=$1
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
     if [ ! -f "$file_path" ]; then
-        if [[ -n "$WAYWISER_WS" ]]; then
+        if [[ -f "$script_dir/../config/$file_path" ]]; then
+            file_path="$script_dir/../config/$file_path"
+        elif [[ -n "$WAYWISER_WS" && -f "$WAYWISER_WS/src/WayWiseR/waywiser/discovery/config/$file_path" ]]; then
             file_path="$WAYWISER_WS/src/WayWiseR/waywiser/discovery/config/$file_path"
         else
-            echo "Error: Unable to find file $file_path (WAYWISER_WS not set)"
+            echo "Error: Unable to find file $file_path"
             return 1
         fi
     fi

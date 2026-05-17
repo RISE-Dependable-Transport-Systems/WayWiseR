@@ -1,14 +1,14 @@
 {
     "topic_models": [
         {
-            "topic": "rover/robot_description",
-            "bridge_config": "./src/WayWiseR/waywiser_gazebo/config/rover_gazebo_bridges.yaml"
+            "topic": "/rover/robot_description",
+            "bridge_config": "package://waywiser_gazebo/config/rover_gazebo_bridges.yaml"
         }
     ],
     "sdf_models": [
         {
             "name": "standing_actor_1",
-            "path": "./src/WayWiseR/waywiser_description/sdf/actor_stand/model.sdf",
+            "path": "package://waywiser_description/sdf/actor_stand/model.sdf",
             "bridge_config": ""
         }
     ]

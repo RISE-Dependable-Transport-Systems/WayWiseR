@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -x "$script_dir/../discovery/scripts/fastdds_server_setup.bash" ]]; then
+    exec "$script_dir/../discovery/scripts/fastdds_server_setup.bash" "$@"
+fi
+
+prefix="$(cd "$script_dir/../.." && pwd)"
+exec "$prefix/share/waywiser/discovery/scripts/fastdds_server_setup.bash" "$@"

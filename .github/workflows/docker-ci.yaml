@@ -1,14 +1,15 @@
-name: Build and Push CI Image
+name: Build and Push CI Images
 
 on:
   push:
     branches:
       - humble
     paths:
-      - ".github/workflows/Dockerfile.ci"
+      - ".github/workflows/Dockerfile.ci.amd64"
+      - ".github/workflows/Dockerfile.ci.arm64"
       - ".github/workflows/docker-ci.yaml"
       - "Makefile"
-      - "bootstrap"
+      - "waywiser/scripts/bootstrap"
       - ".env.example"
       - ".python-version"
       - ".gitmodules"
@@ -19,7 +20,21 @@ on:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            image: ghcr.io/das-rise/waywiser/ci-image-amd64
+            dockerfile: ./.github/workflows/Dockerfile.ci.amd64
+            platform: linux/amd64
+            cache_scope: ci-image-amd64
+          - arch: arm64
+            image: ghcr.io/das-rise/waywiser/ci-image-arm64
+            dockerfile: ./.github/workflows/Dockerfile.ci.arm64
+            platform: linux/arm64
+            cache_scope: ci-image-arm64
     permissions:
       contents: read
       packages: write
@@ -29,6 +44,11 @@ jobs:
         uses: actions/checkout@v4
 
       # --- REQUIRED FOR GHA CACHING ---
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -39,23 +59,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Only ONE tag: humble
-      - name: Extract metadata
+      - name: Extract metadata for ${{ matrix.arch }}
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/das-rise/waywiser/ci-image
+          images: ${{ matrix.image }}
           tags: |
             type=raw,value=humble
 
-      - name: Build and push Docker image
+      - name: Build and push ${{ matrix.arch }} Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./.github/workflows/Dockerfile.ci
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Cache optimization
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.cache_scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.cache_scope }}

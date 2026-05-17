@@ -1,0 +1,16 @@
+dialog:
+  ubuntu:
+    '*': [dialog]
+
+python3-pyqt5.qtmultimedia:
+  ubuntu:
+    '*': [python3-pyqt5.qtmultimedia]
+
+gz-harmonic-dev:
+  ubuntu:
+    jammy:
+      - libgz-math7-dev
+      - libgz-msgs10-dev
+      - libgz-sensors8-dev
+      - libgz-sim8-dev
+      - libgz-transport13-dev

@@ -1,9 +1,9 @@
 {
     "sdf_models": [
         {
-            "path": "./src/WayWiseR/waywiser_description/sdf/drone/model.sdf",
+            "path": "package://waywiser_description/sdf/drone/model.sdf",
             "static": false,
-            "bridge_config": "./src/WayWiseR/waywiser_gazebo/config/drone_gazebo_bridges.yaml",
+            "bridge_config": "package://waywiser_gazebo/config/drone_gazebo_bridges.yaml",
             "pose": "8.0 -2.0 0.3 0 0.35 3.14159"
         }
     ],

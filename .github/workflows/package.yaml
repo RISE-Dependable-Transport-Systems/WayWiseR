@@ -1,0 +1,88 @@
+name: Build Debian Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Optional Debian package version override, for example 0.1.0-1"
+        required: false
+        type: string
+      ubuntu_label:
+        description: "Filename Ubuntu target label"
+        required: false
+        default: "ubuntu22-04"
+        type: string
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  package:
+    name: Package ${{ matrix.arch }}
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - amd64
+          - arm64
+    env:
+      WAYWISER_DEB_VERSION: ${{ inputs.version }}
+      WAYWISER_DEB_UBUNTU_LABEL: ${{ inputs.ubuntu_label || 'ubuntu22-04' }}
+
+    defaults:
+      run:
+        working-directory: src/WayWiseR
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: src/WayWiseR
+          submodules: false
+          fetch-depth: 0
+
+      - name: Set package version from tag
+        if: ${{ startsWith(github.ref, 'refs/tags/v') && env.WAYWISER_DEB_VERSION == '' }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "WAYWISER_DEB_VERSION=${version}" >> "$GITHUB_ENV"
+
+      - name: Set up QEMU for arm64
+        if: ${{ matrix.arch == 'arm64' }}
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build ${{ matrix.arch }} Debian packages
+        run: make package-${{ matrix.arch }}
+
+      - name: Upload ${{ matrix.arch }} packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: waywiser-debs-${{ matrix.arch }}
+          path: deb_dist/${{ matrix.arch }}/*.deb
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    needs: package
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: waywiser-debs-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*.deb

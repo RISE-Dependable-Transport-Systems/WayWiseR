@@ -91,7 +91,7 @@ def launch_setup(context):
     gazebo_dir = get_package_share_directory('waywiser_gazebo')
     world_path = Path(LaunchConfiguration('world').perform(context)).resolve()
     drone_config_path = Path(LaunchConfiguration('drone_config').perform(context)).resolve()
-    px4_dir = resolve_px4_dir(Path(gazebo_dir))
+    px4_build_dir, px4_assets_dir = resolve_px4_paths(Path(gazebo_dir))
     drone_name = LaunchConfiguration('drone_name').perform(context)
     px4_sys_autostart = LaunchConfiguration('px4_sys_autostart').perform(context)
     px4_start_delay = float(LaunchConfiguration('px4_start_delay').perform(context))
@@ -103,8 +103,8 @@ def launch_setup(context):
         create_harmonic_compatible_sdf(world_path) if is_ignition_sdf(world_path) else world_path
     )
 
-    px4_models_dir = px4_dir / 'Tools' / 'simulation' / 'gz' / 'models'
-    px4_worlds_dir = px4_dir / 'Tools' / 'simulation' / 'gz' / 'worlds'
+    px4_models_dir = px4_assets_dir / 'Tools' / 'simulation' / 'gz' / 'models'
+    px4_worlds_dir = px4_assets_dir / 'Tools' / 'simulation' / 'gz' / 'worlds'
     waywiser_description_dir = Path(get_package_share_directory('waywiser_description'))
 
     enuref = read_enuref(drone_config_path)
@@ -126,7 +126,7 @@ def launch_setup(context):
         if entry not in deduped_resource_entries:
             deduped_resource_entries.append(entry)
 
-    px4_build_dir = px4_dir / 'build' / 'px4_sitl_zenoh'
+    px4_build_dir = prepare_writable_px4_runtime_dir(px4_build_dir)
     px4_rootfs_dir = px4_build_dir / 'rootfs'
     px4_binary = px4_build_dir / 'bin' / 'px4'
 
@@ -136,7 +136,7 @@ def launch_setup(context):
             'PX4 SITL Zenoh artifacts are generated.'
         )
 
-    validate_gazebo_compatibility(px4_binary, px4_dir, bridge_install_prefix)
+    validate_gazebo_compatibility(px4_binary, px4_assets_dir, bridge_install_prefix)
 
     px4_param_overrides = {
         # This launch is intended to run headless with Zenoh offboard control, so
@@ -249,7 +249,7 @@ def launch_setup(context):
     )
 
     px4_sitl_process = ExecuteProcess(
-        cmd=[str(px4_binary)],
+        cmd=[str(px4_binary), str(px4_build_dir / 'etc')],
         cwd=str(px4_rootfs_dir),
         additional_env=px4_env,
         output='screen',
@@ -320,8 +320,74 @@ def refresh_px4_zenoh_runtime_config(
         )
 
 
+def prepare_writable_px4_runtime_dir(px4_build_dir: Path):
+    if is_writable_px4_runtime_dir(px4_build_dir):
+        return px4_build_dir
+
+    runtime_root = Path.home() / '.ros' / 'waywiser' / 'px4_sitl_zenoh'
+    runtime_dir = runtime_root / stable_runtime_dir_name(px4_build_dir)
+    marker_file = runtime_dir / '.waywiser_source_path'
+
+    source_marker = px4_runtime_source_marker(px4_build_dir)
+    if marker_file.is_file() and marker_file.read_text().strip() == source_marker:
+        if is_writable_px4_runtime_dir(runtime_dir):
+            return runtime_dir
+
+    if runtime_dir.exists():
+        shutil.rmtree(runtime_dir)
+    runtime_root.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(px4_build_dir, runtime_dir, symlinks=True)
+    marker_file.write_text(source_marker + '\n')
+    return runtime_dir
+
+
+def is_writable_px4_runtime_dir(px4_build_dir: Path):
+    airframes_dir = px4_build_dir / 'etc' / 'init.d-posix' / 'airframes'
+    rootfs_dir = px4_build_dir / 'rootfs'
+    return (
+        os.access(px4_build_dir, os.R_OK | os.X_OK)
+        and os.access(airframes_dir, os.W_OK)
+        and os.access(rootfs_dir, os.W_OK)
+    )
+
+
+def stable_runtime_dir_name(path: Path):
+    sanitized = re.sub(r'[^A-Za-z0-9_.-]+', '_', str(path.resolve())).strip('_')
+    return sanitized[-120:] or 'default'
+
+
+def px4_runtime_source_marker(px4_build_dir: Path):
+    marker_paths = [
+        px4_build_dir / 'bin' / 'px4',
+        px4_build_dir / 'etc' / 'init.d-posix' / 'rcS',
+    ]
+    marker_parts = [str(px4_build_dir.resolve())]
+    for marker_path in marker_paths:
+        try:
+            stat = marker_path.stat()
+            marker_parts.append(f'{marker_path.name}:{stat.st_mtime_ns}:{stat.st_size}')
+        except OSError:
+            marker_parts.append(f'{marker_path.name}:missing')
+    return '|'.join(marker_parts)
+
+
 def get_vendored_harmonic_bridge_install_prefix():
     candidates = []
+
+    gazebo_dir = Path(get_package_share_directory('waywiser_gazebo')).resolve()
+    candidates.append(gazebo_dir.parent.parent / 'ros_gz_harmonic')
+
+    install_dir = find_waywiser_install_dir(gazebo_dir)
+    if install_dir:
+        candidates.append(install_dir / 'ros_gz_harmonic')
+
+    candidates.append(gazebo_dir / 'external' / 'ros_gz_harmonic' / 'install')
+
+    source_dir = find_waywiser_source_dir(gazebo_dir)
+    if source_dir:
+        candidates.append(
+            source_dir / 'waywiser_gazebo' / 'external' / 'ros_gz_harmonic' / 'install'
+        )
 
     waywiser_ws = os.environ.get('WAYWISER_WS')
     if waywiser_ws:
@@ -334,19 +400,6 @@ def get_vendored_harmonic_bridge_install_prefix():
             / 'external'
             / 'ros_gz_harmonic'
             / 'install'
-        )
-
-    gazebo_dir = Path(get_package_share_directory('waywiser_gazebo')).resolve()
-    install_dir = find_waywiser_install_dir(gazebo_dir)
-    if install_dir:
-        candidates.append(install_dir / 'ros_gz_harmonic')
-
-    candidates.append(gazebo_dir / 'external' / 'ros_gz_harmonic' / 'install')
-
-    source_dir = find_waywiser_source_dir(gazebo_dir)
-    if source_dir:
-        candidates.append(
-            source_dir / 'waywiser_gazebo' / 'external' / 'ros_gz_harmonic' / 'install'
         )
 
     for bridge_prefix in candidates:
@@ -373,27 +426,27 @@ def find_waywiser_source_dir(start_path: Path):
     return None
 
 
-def resolve_px4_dir(gazebo_dir: Path):
-    candidates = []
+def resolve_px4_paths(gazebo_dir: Path):
+    build_candidates = []
+    asset_candidates = []
 
-    waywiser_ws = os.environ.get('WAYWISER_WS')
-    if waywiser_ws:
-        candidates.append(
-            Path(waywiser_ws)
-            / 'src'
-            / 'WayWiseR'
-            / 'waywiser_core'
-            / 'external'
-            / 'PX4-Autopilot'
-        )
-
-    source_dir = find_waywiser_source_dir(gazebo_dir)
-    if source_dir:
-        candidates.append(source_dir / 'waywiser_core' / 'external' / 'PX4-Autopilot')
+    merged_installed_px4_sitl = gazebo_dir / 'px4_sitl_zenoh'
+    build_candidates.append(merged_installed_px4_sitl)
+    asset_candidates.append(merged_installed_px4_sitl)
 
     install_dir = find_waywiser_install_dir(gazebo_dir)
     if install_dir:
-        candidates.append(
+        installed_px4_sitl = (
+            install_dir
+            / 'waywiser_gazebo'
+            / 'share'
+            / 'waywiser_gazebo'
+            / 'px4_sitl_zenoh'
+        )
+        build_candidates.append(installed_px4_sitl)
+        asset_candidates.append(installed_px4_sitl)
+
+        legacy_installed_px4 = (
             install_dir
             / 'waywiser_core'
             / 'share'
@@ -401,27 +454,79 @@ def resolve_px4_dir(gazebo_dir: Path):
             / 'external'
             / 'PX4-Autopilot'
         )
+        build_candidates.append(legacy_installed_px4 / 'build' / 'px4_sitl_zenoh')
+        asset_candidates.append(legacy_installed_px4)
 
-    candidates.append(gazebo_dir / 'external' / 'PX4-Autopilot')
+    source_dir = find_waywiser_source_dir(gazebo_dir)
+    if source_dir:
+        build_candidates.append(
+            source_dir.parent.parent
+            / 'build'
+            / 'waywiser_gazebo'
+            / 'share'
+            / 'waywiser_gazebo'
+            / 'px4_sitl_zenoh'
+        )
+        asset_candidates.append(source_dir / 'waywiser_core' / 'external' / 'PX4-Autopilot')
 
-    deduped_candidates = []
-    for candidate in candidates:
+    waywiser_ws = os.environ.get('WAYWISER_WS')
+    if waywiser_ws:
+        waywiser_ws_path = Path(waywiser_ws)
+        build_candidates.append(
+            waywiser_ws_path
+            / 'build'
+            / 'waywiser_gazebo'
+            / 'share'
+            / 'waywiser_gazebo'
+            / 'px4_sitl_zenoh'
+        )
+        asset_candidates.append(
+            waywiser_ws_path / 'src' / 'WayWiseR' / 'waywiser_core'
+            / 'external' / 'PX4-Autopilot'
+        )
+
+    deduped_build_candidates = []
+    for candidate in build_candidates:
         resolved = candidate.resolve()
-        if resolved not in deduped_candidates:
-            deduped_candidates.append(resolved)
+        if resolved not in deduped_build_candidates:
+            deduped_build_candidates.append(resolved)
 
-    for candidate in deduped_candidates:
-        if (candidate / 'build' / 'px4_sitl_zenoh' / 'bin' / 'px4').is_file():
-            return candidate
+    deduped_asset_candidates = []
+    for candidate in asset_candidates:
+        resolved = candidate.resolve()
+        if resolved not in deduped_asset_candidates:
+            deduped_asset_candidates.append(resolved)
 
-    for candidate in deduped_candidates:
-        if candidate.is_dir():
-            return candidate
+    px4_build_dir = None
+    for candidate in deduped_build_candidates:
+        if (candidate / 'bin' / 'px4').is_file():
+            px4_build_dir = candidate
+            break
 
-    if deduped_candidates:
-        return deduped_candidates[0]
+    if px4_build_dir is None:
+        for candidate in deduped_build_candidates:
+            if candidate.is_dir():
+                px4_build_dir = candidate
+                break
 
-    return (gazebo_dir / 'external' / 'PX4-Autopilot').resolve()
+    px4_assets_dir = None
+    for candidate in deduped_asset_candidates:
+        if (candidate / 'Tools' / 'simulation' / 'gz' / 'models').is_dir():
+            px4_assets_dir = candidate
+            break
+
+    if px4_assets_dir is None:
+        for candidate in deduped_asset_candidates:
+            if candidate.is_dir():
+                px4_assets_dir = candidate
+                break
+
+    if px4_build_dir is None and deduped_build_candidates:
+        px4_build_dir = deduped_build_candidates[0]
+    if px4_assets_dir is None and deduped_asset_candidates:
+        px4_assets_dir = deduped_asset_candidates[0]
+
+    return px4_build_dir, px4_assets_dir
 
 
 def create_bridge_action(config_file, use_sim_time, bridge_install_prefix=''):
@@ -489,7 +594,8 @@ def validate_gazebo_compatibility(px4_binary: Path, px4_dir: Path, bridge_instal
             f'Gazebo ABI mismatch: PX4 requires Harmonic (MIN_GZ_VERSION={px4_min_gz_version}, '
             f'links {px4_transport}), but ros_gz_bridge links {bridge_transport} '
             '(Fortress/Ignition). '
-            'Fix: run `make setup` to build the ros_gz_harmonic submodule.'
+            'Fix: rebuild and reinstall ros-humble-waywiser-gazebo so the bundled '
+            'ros_gz_harmonic bridge is installed, or run `make setup` in a source workspace.'
         )
 
 

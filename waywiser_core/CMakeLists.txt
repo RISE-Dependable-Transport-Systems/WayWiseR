@@ -38,9 +38,6 @@ find_package(
   COMPONENTS Core SerialPort Network Widgets
   REQUIRED)
 find_package(MAVSDK REQUIRED)
-find_program(BASH_EXECUTABLE bash REQUIRED)
-find_program(GIT_EXECUTABLE git REQUIRED)
-find_program(MAKE_EXECUTABLE make REQUIRED)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
@@ -49,21 +46,6 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(PX4_AUTOPILOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/PX4-Autopilot")
 set(PX4_MSGS_SOURCE_DIR "${PX4_AUTOPILOT_DIR}/msg")
 set(PX4_MSGS_VENDOR_TEMPLATE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/px4_msgs_vendor")
-set(PX4_ZENOH_PATCH_FILE "${CMAKE_CURRENT_SOURCE_DIR}/external/px4_zenoh.patch")
-set(PX4_GZ_MODELS_DIR "${PX4_AUTOPILOT_DIR}/Tools/simulation/gz/models")
-set(PX4_PATCHED_BUILD_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/build_px4_sitl_with_patch.sh")
-
-execute_process(
-  COMMAND ${Python3_EXECUTABLE} -c "import site; print(site.getusersitepackages())"
-  OUTPUT_VARIABLE PYTHON3_USER_SITE
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-if(DEFINED ENV{PYTHONPATH} AND NOT "$ENV{PYTHONPATH}" STREQUAL "")
-  set(PX4_PYTHONPATH "${PYTHON3_USER_SITE}:$ENV{PYTHONPATH}")
-else()
-  set(PX4_PYTHONPATH "${PYTHON3_USER_SITE}")
-endif()
 
 if(EXISTS "${PX4_MSGS_SOURCE_DIR}/CMakeLists.txt")
   ExternalProject_Add(px4_msgs_vendor
@@ -82,42 +64,6 @@ else()
   message(FATAL_ERROR
     "PX4-Autopilot submodule is missing at ${PX4_AUTOPILOT_DIR}. Run "
     "'make setup' to initialize the required PX4 checkout."
-  )
-endif()
-
-if(EXISTS "${PX4_AUTOPILOT_DIR}/Makefile")
-  if(NOT EXISTS "${PX4_GZ_MODELS_DIR}")
-    message(
-      FATAL_ERROR
-      "PX4 Gazebo models are missing. Run "
-      "'git -C ${PX4_AUTOPILOT_DIR} submodule update --init --recursive Tools/simulation/gz' "
-      "and rebuild."
-    )
-  endif()
-
-  configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build_px4_sitl_with_patch.sh.in
-    ${PX4_PATCHED_BUILD_SCRIPT}
-    @ONLY
-  )
-
-  add_custom_target(
-    waywiser_core_px4_sitl ALL
-    COMMAND ${CMAKE_COMMAND} -E env
-      PYTHONPATH=${PX4_PYTHONPATH}
-      PX4_GZ_STANDALONE=1
-      HEADLESS=1
-      MAKEFLAGS=$ENV{MAKEFLAGS}
-      ${BASH_EXECUTABLE} ${PX4_PATCHED_BUILD_SCRIPT}
-    WORKING_DIRECTORY ${PX4_AUTOPILOT_DIR}
-    USES_TERMINAL
-    COMMENT "Building PX4 SITL Zenoh target for waywiser_core"
-  )
-else()
-  message(
-    WARNING
-    "PX4-Autopilot submodule not found at ${PX4_AUTOPILOT_DIR}. "
-    "Launch files that depend on PX4 SITL will not work until the submodule is initialized."
   )
 endif()
 
@@ -389,7 +335,10 @@ ament_target_dependencies(waywiser_car_node ${CAR_DEPENDENCIES})
 ament_target_dependencies(waywiser_truck_node ${TRUCK_DEPENDENCIES})
 ament_target_dependencies(waywiser_copter_node ${COPTER_DEPENDENCIES})
 add_dependencies(waywiser_copter_node px4_msgs_vendor)
-ament_target_dependencies(navsatfix_extended_wrapper_node ${NAVSATFIX_EXTENDED_WRAPPER_DEPENDENCIES})
+ament_target_dependencies(
+  navsatfix_extended_wrapper_node
+  ${NAVSATFIX_EXTENDED_WRAPPER_DEPENDENCIES}
+)
 
 install(
   DIRECTORY launch
@@ -404,16 +353,6 @@ install(TARGETS navsatfix_extended_wrapper_node DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
-
-if(EXISTS "${PX4_AUTOPILOT_DIR}")
-  install(
-    DIRECTORY ${PX4_AUTOPILOT_DIR}
-    DESTINATION share/${PROJECT_NAME}/external
-    USE_SOURCE_PERMISSIONS
-    PATTERN ".git" EXCLUDE
-    PATTERN "__pycache__" EXCLUDE
-  )
-endif()
 
 ament_export_dependencies(rosidl_default_runtime urdf)
 ament_export_include_directories(include)

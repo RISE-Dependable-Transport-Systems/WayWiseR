@@ -124,6 +124,7 @@ def spawn_from_json(
 ):
     actions = []
     model_index = 0
+    config_dir = Path(config_file).resolve().parent
     try:
         with open(config_file, 'r') as f:
             config = json.load(f)
@@ -134,10 +135,14 @@ def spawn_from_json(
                 actions.append(
                     make_timed_model_actions(
                         create_sdf_spawn_actions(
-                            path,
+                            resolve_resource_path(path, config_dir),
                             world_name,
                             use_sim_time,
-                            model.get('bridge_config') if start_gazebo_bridge else None,
+                            resolve_optional_resource_path(
+                                model.get('bridge_config'), config_dir
+                            )
+                            if start_gazebo_bridge
+                            else None,
                             model.get('pose'),
                             model.get('name'),
                             model.get('static'),
@@ -159,7 +164,11 @@ def spawn_from_json(
                             topic,
                             world_name,
                             use_sim_time,
-                            model.get('bridge_config') if start_gazebo_bridge else None,
+                            resolve_optional_resource_path(
+                                model.get('bridge_config'), config_dir
+                            )
+                            if start_gazebo_bridge
+                            else None,
                             model.get('pose'),
                             model.get('name'),
                         ),
@@ -216,6 +225,27 @@ def spawn_from_json(
         return None
 
     return actions if actions else None
+
+
+def resolve_optional_resource_path(path, base_dir):
+    if not path:
+        return None
+    return resolve_resource_path(path, base_dir)
+
+
+def resolve_resource_path(path, base_dir):
+    path = str(path)
+    if path.startswith('package://'):
+        package_path = path[len('package://'):]
+        package_name, _, relative_path = package_path.partition('/')
+        if not package_name or not relative_path:
+            raise RuntimeError(f'Invalid package resource URI: {path}')
+        return str(Path(get_package_share_directory(package_name)) / relative_path)
+
+    candidate = Path(path)
+    if candidate.is_absolute() or candidate.exists():
+        return str(candidate)
+    return str(base_dir / candidate)
 
 
 def make_timed_model_actions(actions, spawn_start_delay, spawn_interval, model_index):
