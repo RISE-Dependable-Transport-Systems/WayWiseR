@@ -15,6 +15,15 @@ px4_cache_file="$px4_build_dir/CMakeCache.txt"
 cc_executable="${CC:-$(command -v gcc || true)}"
 cxx_executable="${CXX:-$(command -v g++ || true)}"
 cmake_args="${CMAKE_ARGS:-}"
+python_executable="${PYTHON_EXECUTABLE:-${Python3_EXECUTABLE:-}}"
+
+if [ -z "$python_executable" ]; then
+  if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/python" ]; then
+    python_executable="$VIRTUAL_ENV/bin/python"
+  else
+    python_executable="$(command -v python3 || true)"
+  fi
+fi
 
 is_git_worktree() {
   [ -e "$1/.git" ]
@@ -56,13 +65,28 @@ if [ -z "$cc_executable" ] || [ -z "$cxx_executable" ]; then
   exit 1
 fi
 
+if [ -z "$python_executable" ] || [ ! -x "$python_executable" ]; then
+  echo "Unable to find a Python interpreter for PX4 SITL build." >&2
+  exit 1
+fi
+
 export CC="$cc_executable"
 export CXX="$cxx_executable"
 export CMAKE_ARGS="$cmake_args \
   -DCMAKE_C_COMPILER=$cc_executable \
-  -DCMAKE_CXX_COMPILER=$cxx_executable"
+  -DCMAKE_CXX_COMPILER=$cxx_executable \
+  -DPython3_EXECUTABLE=$python_executable \
+  -DPYTHON_EXECUTABLE=$python_executable"
+
+if [ -z "${CCACHE_DIR:-}" ]; then
+  export CCACHE_DIR="$px4_build_dir/.ccache"
+fi
+
+python_site_packages="$("$python_executable" -c 'import site; print(site.getsitepackages()[0])')"
+export PYTHONPATH="$python_site_packages${PYTHONPATH:+:$PYTHONPATH}"
 
 mkdir -p "$(dirname "$px4_build_dir")" "$(dirname "$px4_artifact_dir")"
+mkdir -p "$CCACHE_DIR"
 repair_px4_build_ownership "$px4_build_dir"
 
 if [ -f "$px4_cache_file" ]; then
