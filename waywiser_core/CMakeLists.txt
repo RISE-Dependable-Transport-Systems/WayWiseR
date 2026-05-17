@@ -81,7 +81,7 @@ if(EXISTS "${PX4_MSGS_SOURCE_DIR}/CMakeLists.txt")
 else()
   message(FATAL_ERROR
     "PX4-Autopilot submodule is missing at ${PX4_AUTOPILOT_DIR}. Run "
-    "'git submodule update --init --recursive waywiser_core/external/PX4-Autopilot'."
+    "'make setup' to initialize the required PX4 checkout."
   )
 endif()
 

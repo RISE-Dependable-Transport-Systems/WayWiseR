@@ -601,11 +601,35 @@ check_prerequisites() {
 
 # ── step 2: core git submodules ───────────────────────────────────────────────
 
+PX4_SUBMODULE_PATH="waywiser_core/external/PX4-Autopilot"
+PX4_DIR="$REPO_DIR/$PX4_SUBMODULE_PATH"
+PX4_SITL_REQUIRED_SUBMODULES=(
+    Tools/simulation/gz
+    src/drivers/gps/devices
+    src/lib/cdrstream/cyclonedds
+    src/lib/cdrstream/rosidl
+    src/lib/crypto/libtomcrypt
+    src/lib/crypto/libtommath
+    src/lib/crypto/monocypher
+    src/lib/events/libevents
+    src/lib/heatshrink/heatshrink
+    src/modules/mavlink/mavlink
+    src/modules/zenoh/zenoh-pico
+)
+
+init_px4_submodules() {
+    info "Initializing PX4-Autopilot submodule..."
+    git -C "$REPO_DIR" submodule update --init "$PX4_SUBMODULE_PATH"
+
+    info "Initializing PX4 SITL/Zenoh submodules..."
+    git -C "$PX4_DIR" submodule update --init --recursive \
+        "${PX4_SITL_REQUIRED_SUBMODULES[@]}"
+}
+
 init_submodules() {
     header "Initializing core git submodules"
-    git -C "$REPO_DIR" submodule update --init --recursive \
-    waywiser_core/WayWise \
-    waywiser_core/external/PX4-Autopilot
+    git -C "$REPO_DIR" submodule update --init --recursive waywiser_core/WayWise
+    init_px4_submodules
     info "Core submodules initialized."
 }
 
@@ -1104,10 +1128,8 @@ presim_setup() {
     skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
 
     header "Pre-setup: waywiser_core PX4"
-    info "Initializing PX4-Autopilot submodule..."
-    git -C "$REPO_DIR" submodule update --init --recursive \
-        waywiser_core/external/PX4-Autopilot
-    local px4_reqs="$REPO_DIR/waywiser_core/external/PX4-Autopilot/Tools/setup/requirements.txt"
+    init_px4_submodules
+    local px4_reqs="$PX4_DIR/Tools/setup/requirements.txt"
     if [[ -f "$px4_reqs" ]]; then
         info "Installing PX4 Python requirements for uORB generation and SITL build..."
         activate_env
