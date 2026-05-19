@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.4
 ARG ROS_DISTRO=jazzy
 ARG WAYWISER_REF=experimental/jazzy
-ARG WAYWISER_SKIPPED_PACKAGES=""
+ARG WAYWISER_SKIPPED_PACKAGES="waywiser_carla"
 ARG ACT_COMPAT=false
 
 # Use the official ROS Desktop image for the selected ROS distribution.

@@ -231,9 +231,15 @@ package_checklist() {
     local -n _pc_ref="$1"
     local cur_skip="$2"
     local -r locked="waywiser waywiser_core waywiser_description waywiser_twist_safety"
+    local -r always_skip="waywiser_carla"
+    local enforced_skip="$cur_skip"
+
+    for pkg in $always_skip; do
+        [[ " $enforced_skip " == *" $pkg "* ]] || enforced_skip="${enforced_skip:+$enforced_skip }$pkg"
+    done
 
     if [[ -z "$REPO_DIR" || ! -d "$REPO_DIR" ]]; then
-        _pc_ref="$cur_skip"
+        _pc_ref="$enforced_skip"
         return 0
     fi
 
@@ -247,11 +253,13 @@ package_checklist() {
 
     local pkgs=()
     for pkg in "${all_pkgs[@]}"; do
-        [[ " $locked " == *" $pkg "* ]] || pkgs+=("$pkg")
+        [[ " $locked " == *" $pkg "* ]] && continue
+        [[ " $always_skip " == *" $pkg "* ]] && continue
+        pkgs+=("$pkg")
     done
 
     if [[ ${#pkgs[@]} -eq 0 || "$OPT_YES" == true ]]; then
-        _pc_ref="$cur_skip"
+        _pc_ref="$enforced_skip"
         return 0
     fi
 
@@ -303,6 +311,9 @@ Check packages to BUILD (uncheck to skip).
         for pkg in "${pkgs[@]}"; do
             [[ " $selected " == *" $pkg "* ]] || new_skip+=("$pkg")
         done
+        for pkg in $always_skip; do
+            [[ " ${new_skip[*]} " == *" $pkg "* ]] || new_skip+=("$pkg")
+        done
         _pc_ref="${new_skip[*]:-}"
     else
         local new_skip=()
@@ -317,6 +328,9 @@ Check packages to BUILD (uncheck to skip).
             [[ " $cur_skip " == *" $pkg "* ]] && def=false
             [[ -n "$rdeps" ]] && hint=" [needed by: ${rdeps% }]"
             prompt_yn "Build $pkg?$hint" "$def" || new_skip+=("$pkg")
+        done
+        for pkg in $always_skip; do
+            [[ " ${new_skip[*]} " == *" $pkg "* ]] || new_skip+=("$pkg")
         done
         _pc_ref="${new_skip[*]:-}"
     fi
