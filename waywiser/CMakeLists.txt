@@ -30,12 +30,6 @@ install(
 )
 
 install(
-  DIRECTORY environment
-  DESTINATION share/${PROJECT_NAME}
-  USE_SOURCE_PERMISSIONS
-)
-
-install(
   DIRECTORY scripts
   DESTINATION share/${PROJECT_NAME}
   USE_SOURCE_PERMISSIONS
@@ -91,7 +85,7 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
-ament_environment_hooks(environment/waywiser_env.bash)
+ament_environment_hooks(scripts/waywiser_env.bash)
 ament_environment_hooks(discovery/scripts/fastdds_client_setup.bash)
 ament_environment_hooks(discovery/scripts/zenoh_client_setup.bash)
 ament_export_include_directories(include)
