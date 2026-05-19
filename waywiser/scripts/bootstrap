@@ -202,6 +202,31 @@ prune_missing_prefix_paths() {
     done
 }
 
+sanitized_pythonpath() {
+    local venv_site=""
+    local cleaned_pythonpath="${PYTHONPATH:-}"
+
+    if [[ -x "$VENV_DIR/bin/python" ]]; then
+        venv_site="$("$VENV_DIR/bin/python" -c 'import site; print(site.getsitepackages()[0])' 2>/dev/null || true)"
+    fi
+
+    if [[ -n "$venv_site" && -n "$cleaned_pythonpath" ]]; then
+        cleaned_pythonpath="$(printf '%s' "$cleaned_pythonpath" | tr ':' '\n' | grep -vx "$venv_site" | paste -sd: -)"
+    fi
+
+    printf '%s\n' "$cleaned_pythonpath"
+}
+
+run_without_venv_pythonpath() {
+    local cleaned_pythonpath
+    cleaned_pythonpath="$(sanitized_pythonpath)"
+    PYTHONPATH="$cleaned_pythonpath" "$@"
+}
+
+run_rosdep() {
+    run_without_venv_pythonpath rosdep "$@"
+}
+
 # Activate venv + ROS (used by sim package functions).
 activate_env() {
     local venv="$VENV_DIR"
@@ -653,7 +678,7 @@ init_rosdep() {
             info "Registered WayWiseR rosdep rules: $waywiser_rosdep_yaml"
         fi
     fi
-    rosdep update --rosdistro "${ROS_DISTRO:-humble}"
+    run_rosdep update --rosdistro "${ROS_DISTRO:-humble}"
 }
 
 check_prerequisites() {
@@ -912,10 +937,10 @@ install_ros_deps() {
     if [[ -n "$skipped" ]]; then
         local skip_pattern
         skip_pattern=$(echo "$skipped" | tr ' ' '|')
-        paths=$(colcon list --base-paths "${base_paths[@]}" --paths-only \
+        paths=$(run_without_venv_pythonpath colcon list --base-paths "${base_paths[@]}" --paths-only \
             | grep -Evw "$skip_pattern" || true)
     else
-        paths=$(colcon list --base-paths "${base_paths[@]}" --paths-only)
+        paths=$(run_without_venv_pythonpath colcon list --base-paths "${base_paths[@]}" --paths-only)
     fi
 
     [[ -n "$paths" ]] || die "No packages found to install dependencies for."
@@ -928,7 +953,7 @@ install_ros_deps() {
     # Check first — skip apt-get update and sudo if everything is already installed.
     local check_rc=0
     # shellcheck disable=SC2086
-    rosdep check --from-paths $paths \
+    run_rosdep check --from-paths $paths \
         --ignore-src --rosdistro "$ROS_DISTRO" \
         --skip-keys "$skip_keys" 2>/dev/null || check_rc=$?
     if [[ $check_rc -eq 0 ]]; then
@@ -945,7 +970,7 @@ install_ros_deps() {
     fi
 
     # shellcheck disable=SC2086
-    rosdep install --from-paths $paths \
+    run_rosdep install --from-paths $paths \
         --ignore-src --rosdistro "$ROS_DISTRO" \
         --skip-keys "$skip_keys" -r $(yes_args -y)
     info "Dependencies installed."

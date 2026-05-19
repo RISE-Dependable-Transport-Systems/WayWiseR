@@ -9,6 +9,7 @@ repo_dir="${WAYWISER_REPO_DIR:-}"
 skipped_packages="${WAYWISER_SKIPPED_PACKAGES:-}"
 explicit_extras="${WAYWISER_PYTHON_EXTRAS:-}"
 python_version="${WAYWISER_PYTHON_VERSION:-}"
+torch_cpu_index="${WAYWISER_TORCH_CPU_INDEX_URL:-https://download.pytorch.org/whl/cpu}"
 OPT_YES=false
 print_only=false
 editable=false
@@ -41,6 +42,7 @@ Environment overrides:
   WAYWISER_SKIPPED_PACKAGES
   WAYWISER_PYTHON_EXTRAS
   WAYWISER_PYTHON_VERSION
+    WAYWISER_TORCH_CPU_INDEX_URL
 EOF
 }
 
@@ -229,7 +231,7 @@ source_extras() {
             if has_nvidia_gpu; then
                 extras="$(append_unique "$extras" waywiser_perception_x86_cuda waywiser_perception_tensorrt)"
             else
-                info "No NVIDIA GPU detected; skipping torch/torchvision CUDA wheels and tensorrt." >&2
+                info "No NVIDIA GPU detected; skipping CUDA-specific perception extras and using CPU-only torch/torchvision." >&2
             fi
         fi
     fi
@@ -275,6 +277,25 @@ deb_extras() {
     fi
 
     printf '%s\n' "$extras"
+}
+
+needs_cpu_only_torch() {
+    [[ "$(uname -m)" == "x86_64" ]] || return 1
+    [[ " $extras " == *" waywiser_perception "* ]] || return 1
+    [[ " $extras " == *" waywiser_perception_x86_cuda "* ]] && return 1
+    [[ " $extras " == *" waywiser_perception_tensorrt "* ]] && return 1
+    has_nvidia_gpu && return 1
+    return 0
+}
+
+install_cpu_only_torch() {
+    needs_cpu_only_torch || return 0
+
+    info "Preinstalling CPU-only torch/torchvision from $torch_cpu_index"
+    uv pip install \
+        --python "$venv_dir/bin/python" \
+        --default-index "$torch_cpu_index" \
+        torch torchvision
 }
 
 pyproject="$(find_pyproject || true)"
@@ -339,6 +360,7 @@ if [[ -d "$venv_dir" && "$clear_venv" != true ]]; then
     venv_args+=(--allow-existing)
 fi
 uv "${venv_args[@]}" "$venv_dir"
+install_cpu_only_torch
 
 if [[ "$editable" == true ]]; then
     extras_csv="${extras// /,}"
