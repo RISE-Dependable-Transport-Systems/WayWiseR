@@ -431,12 +431,19 @@ configure_env() {
         info "  source /opt/ros/${ros_distro}/setup.bash"
     else
         local workspace_hint="${WAYWISER_WS:-}"
+        local venv_activate=""
         if [[ -z "$workspace_hint" && -n "$REPO_DIR" ]]; then
             workspace_hint="$(cd "$REPO_DIR/../.." 2>/dev/null && pwd || true)"
         fi
         if [[ -n "$workspace_hint" ]]; then
+            venv_activate="$workspace_hint/.venv/bin/activate"
+        fi
+        if [[ -n "$venv_activate" && -f "$venv_activate" ]]; then
             info "To apply changes in this shell, run:"
-            info "  source $workspace_hint/.venv/bin/activate"
+            info "  source $venv_activate"
+        elif [[ -f "$ENV_FILE" ]]; then
+            info "To apply changes in this shell right now, run:"
+            info "  set -a; source $ENV_FILE; set +a"
         else
             info "To apply changes in this shell, re-source your WayWiseR workspace environment."
         fi
