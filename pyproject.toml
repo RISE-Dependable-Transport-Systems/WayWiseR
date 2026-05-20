@@ -98,7 +98,7 @@ waywiser_perception_tensorrt = [
 ]
 waywiser_teleop = [
     "numpy<2",
-    "pyqt5>=5.15.11",
+    "pyqt5>=5.15.11; platform_machine != 'aarch64'",
 ]
 waywiser_test_runner = [
     "numpy<2",

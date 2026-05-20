@@ -243,6 +243,10 @@ run_host() {
         -e WAYWISER_DEB_MAINTAINER="${WAYWISER_DEB_MAINTAINER:-}" \
         -e WAYWISER_SKIPPED_PACKAGES="${WAYWISER_SKIPPED_PACKAGES:-}" \
         -e WAYWISER_CMAKE_ARGS="${WAYWISER_CMAKE_ARGS:-}" \
+        -e WAYWISER_COLCON_PARALLEL_WORKERS="${WAYWISER_COLCON_PARALLEL_WORKERS:-}" \
+        -e WAYWISER_PACKAGE_CLEAN="${WAYWISER_PACKAGE_CLEAN:-}" \
+        -e CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-}" \
+        -e MAKEFLAGS="${MAKEFLAGS:-}" \
         -e WAYWISER_NATIVE_PACKAGE_BUILD=false \
         -e WAYWISER_HOST_UID="$host_uid" \
         -e WAYWISER_HOST_GID="$host_gid" \
@@ -281,6 +285,9 @@ package_depends() {
                 ;;
             python-transforms3d-pip)
                 deb="python3-transforms3d"
+                ;;
+            python3-*)
+                deb="$dep"
                 ;;
             dialog)
                 deb="dialog"
@@ -463,8 +470,8 @@ run_container() {
             waywiser_carla \
             waywiser_gazebo \
             waywiser_rviz2 \
-            waywiser_teleop)"
-        info "Skipping QEMU-heavy packages for $deb_arch: waywiser_agrarsense waywiser_carla waywiser_gazebo waywiser_rviz2 waywiser_teleop"
+            waywiser_teleop )"
+        info "Skipping simulation, rviz2, and teleop packages for $deb_arch: waywiser_agrarsense waywiser_carla waywiser_gazebo waywiser_rviz2 waywiser_teleop"
     fi
 
     package_env_file="$(mktemp)"
@@ -524,7 +531,12 @@ run_container() {
         allow_overriding+=(waywiser waywiser_description)
     fi
 
-    cmake_args=(-DCMAKE_BUILD_TYPE=Release)
+    cmake_args=(
+        -U_lib
+        "-U*_LIBRARY"
+        "-U*_LIBRARIES"
+        -DCMAKE_BUILD_TYPE=Release
+    )
     if [[ -n "${WAYWISER_CMAKE_ARGS:-}" ]]; then
         # shellcheck disable=SC2206
         extra_cmake_args=($WAYWISER_CMAKE_ARGS)
@@ -538,6 +550,9 @@ run_container() {
     else
         build_base="${WAYWISER_BUILD_BASE:-$workspace/build-$deb_arch}"
         install_base="${WAYWISER_INSTALL_BASE:-$workspace/install-$deb_arch}"
+        if [[ "${WAYWISER_PACKAGE_CLEAN:-true}" == "true" ]]; then
+            rm -rf "$build_base" "$install_base" "$log_base"
+        fi
     fi
 
     colcon_args=(
@@ -546,6 +561,9 @@ run_container() {
         --install-base "$install_base"
         --event-handlers console_direct- console_stderr-
     )
+    if [[ -n "${WAYWISER_COLCON_PARALLEL_WORKERS:-}" ]]; then
+        colcon_args+=(--parallel-workers "$WAYWISER_COLCON_PARALLEL_WORKERS")
+    fi
     if [[ "${WAYWISER_PACKAGE_FORCE_CONFIGURE:-true}" == "true" ]]; then
         colcon_args+=(--cmake-force-configure)
     fi
@@ -557,10 +575,9 @@ run_container() {
         skipped_package_args=($skipped_packages)
         colcon_args+=(--packages-skip "${skipped_package_args[@]}")
     fi
-    colcon_args+=(--cmake-args "${cmake_args[@]}")
 
     cd "$workspace"
-    colcon --log-base "$log_base" build "${colcon_args[@]}"
+    colcon --log-base "$log_base" build "${colcon_args[@]}" --cmake-args "${cmake_args[@]}"
     cd "$repo_dir"
 
     rm -rf "$install_tmp"

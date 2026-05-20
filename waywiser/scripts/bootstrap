@@ -666,7 +666,7 @@ Check packages to BUILD (uncheck to skip).
 
 init_rosdep() {
     if [[ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]]; then
-        sudo rosdep init
+        as_root rosdep init
     fi
     local waywiser_rosdep_source="/etc/ros/rosdep/sources.list.d/50-waywiser.list"
     local waywiser_rosdep_yaml="$REPO_DIR/waywiser/rosdep/waywiser.yaml"
@@ -952,16 +952,18 @@ install_ros_deps() {
 
     # Check first — skip apt-get update and sudo if everything is already installed.
     local check_rc=0
+    local check_output
     # shellcheck disable=SC2086
-    run_rosdep check --from-paths $paths \
+    check_output=$(run_rosdep check --from-paths $paths \
         --ignore-src --rosdistro "$ROS_DISTRO" \
-        --skip-keys "$skip_keys" 2>/dev/null || check_rc=$?
+        --skip-keys "$skip_keys" 2>&1) || check_rc=$?
     if [[ $check_rc -eq 0 ]]; then
         info "All required rosdeps already installed — skipping."
         return 0
     fi
 
-    if command -v apt-get &>/dev/null; then
+    if command -v apt-get &>/dev/null \
+        && grep -Eq '(^|[[:space:]])apt[[:space:]]' <<< "$check_output"; then
         if [[ "$(id -u)" -eq 0 ]]; then
             apt-get update
         else
@@ -994,7 +996,11 @@ build_workspace() {
     local -a base_paths=("$WAYWISER_WS/src")
     local -a extra_args=()
     local -a allow_overriding=()
-    local -a cmake_args=()
+    local -a cmake_args=(
+        -U_lib
+        "-U*_LIBRARY"
+        "-U*_LIBRARIES"
+    )
     local -a event_handlers=(console_stderr-)
     local -a package_args=()
     local notification_extension="colcon_core.event_handler.desktop_notification"
@@ -1011,9 +1017,10 @@ build_workspace() {
 
     if [[ -n "${WAYWISER_CMAKE_ARGS:-}" ]]; then
         # shellcheck disable=SC2206
-        cmake_args=($WAYWISER_CMAKE_ARGS)
-        extra_args+=(--cmake-args "${cmake_args[@]}")
+        local -a extra_cmake_args=($WAYWISER_CMAKE_ARGS)
+        cmake_args+=("${extra_cmake_args[@]}")
     fi
+    extra_args+=(--cmake-args "${cmake_args[@]}")
 
     # In quiet/CI mode suppress per-package live output from successful builds.
     if [[ "$OPT_YES" == true || "${CI:-}" == "true" ]]; then

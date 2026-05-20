@@ -157,8 +157,13 @@ install_activate_hook() {
     local marker_begin="# >>> WayWiseR Environment Setup >>>"
     local marker_end="# <<< WayWiseR Environment Setup <<<"
     local hook_workspace="${WAYWISER_WS:-}"
+    local source_workspace_install=true
 
     [[ -f "$activate_file" ]] || return 0
+
+    if [[ "${WAYWISER_NO_WORKSPACE_VENV_LINK:-}" == "true" ]]; then
+        source_workspace_install=false
+    fi
 
     if [[ -z "$hook_workspace" && -n "$repo_dir" ]]; then
         hook_workspace="$(cd "$repo_dir/../.." && pwd)"
@@ -196,7 +201,7 @@ if [ -n "\${VIRTUAL_ENV:-}" ]; then
     fi
     unset _waywiser_venv_site
 fi
-if [ -n "\${WAYWISER_WS:-}" ] && [ -f "\$WAYWISER_WS/install/setup.bash" ]; then
+if ${source_workspace_install} && [ -n "\${WAYWISER_WS:-}" ] && [ -f "\$WAYWISER_WS/install/setup.bash" ]; then
     set +u; source "\$WAYWISER_WS/install/setup.bash"; set -u
 fi
 $marker_end

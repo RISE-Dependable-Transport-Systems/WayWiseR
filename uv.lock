@@ -3196,7 +3196,7 @@ requires-dist = [
     { name = "pylint", marker = "extra == 'waywiser-carla'" },
     { name = "pymap3d", marker = "extra == 'waywiser-test-runner'", specifier = ">=3.2.0" },
     { name = "pymavlink", marker = "extra == 'px4'" },
-    { name = "pyqt5", marker = "extra == 'waywiser-teleop'", specifier = ">=5.15.11" },
+    { name = "pyqt5", marker = "extra == 'waywiser-teleop' and platform_machine != 'aarch64'", specifier = ">=5.15.11" },
     { name = "pyros-genmsg", marker = "extra == 'px4'" },
     { name = "pyserial", marker = "extra == 'px4'" },
     { name = "pyserial", marker = "extra == 'waywiser-hwbringup'", specifier = ">=3.5" },

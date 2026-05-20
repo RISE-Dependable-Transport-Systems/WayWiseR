@@ -166,7 +166,7 @@ Build amd64 packages:
 make package
 ```
 
-Build arm64 packages for Jetson or Raspberry Pi from an amd64 host:
+Build arm64 packages (without simulation, rviz, and teleop packages) for Jetson or Raspberry Pi from an amd64 host:
 
 ```bash
 make package ARGS=arm64

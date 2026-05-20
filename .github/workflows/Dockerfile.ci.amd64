@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 ARG ROS_DISTRO=humble
 ARG WAYWISER_REF=humble
 ARG WAYWISER_SKIPPED_PACKAGES=""
@@ -17,6 +18,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV ROS_DISTRO=${ROS_DISTRO}
 ENV WAYWISER_VENV_PATH=/opt/waywiser-ci-venv
 ENV WAYWISER_REUSE_VENV=true
+ENV WAYWISER_CMAKE_ARGS="-U_lib -U*_LIBRARY -U*_LIBRARIES"
 ENV WAYWISER_SKIPPED_PACKAGES=${WAYWISER_SKIPPED_PACKAGES}
 ENV WAYWISER_USER=waywiser
 ENV WAYWISER_UNDERLAY_WS=/home/waywiser/workspaces/waywiser_ws
@@ -51,118 +53,90 @@ RUN mkdir -p /opt/ccache && chmod 777 /opt/ccache
 
 # Build a reusable WayWiseR underlay so CI and local act runs can build the
 # checked-out workspace as a thin overlay.
-RUN mkdir -p "$WAYWISER_UNDERLAY_WS/src"
-RUN git clone --branch "$WAYWISER_REF" --recursive https://github.com/das-rise/WayWiseR.git $WAYWISER_UNDERLAY_WS/src/WayWiseR
+RUN --mount=type=bind,source=.,target=/tmp/WayWiseR-local,readonly \
+    mkdir -p "$WAYWISER_UNDERLAY_WS/src" \
+    && git clone --branch "$WAYWISER_REF" https://github.com/das-rise/WayWiseR.git /tmp/WayWiseR-remote \
+    && if [[ -f /tmp/WayWiseR-remote/Makefile ]]; then \
+        mkdir -p "$WAYWISER_UNDERLAY_WS/src/WayWiseR"; \
+        shopt -s dotglob; \
+        mv /tmp/WayWiseR-remote/* "$WAYWISER_UNDERLAY_WS/src/WayWiseR"/; \
+        shopt -u dotglob; \
+        rm -rf /tmp/WayWiseR-remote; \
+    else \
+        rm -rf /tmp/WayWiseR-remote; \
+        mkdir -p "$WAYWISER_UNDERLAY_WS/src/WayWiseR"; \
+        cp -a /tmp/WayWiseR-local/. "$WAYWISER_UNDERLAY_WS/src/WayWiseR/"; \
+    fi \
+    && if [[ ! -e "$WAYWISER_UNDERLAY_WS/Makefile" ]]; then \
+        ln -s "$WAYWISER_UNDERLAY_WS/src/WayWiseR/Makefile" "$WAYWISER_UNDERLAY_WS/Makefile"; \
+    fi
 
 WORKDIR $WAYWISER_UNDERLAY_WS
 
 RUN BOOTSTRAP_PATH=""; \
-    if [[ -f waywiser/scripts/bootstrap ]]; then BOOTSTRAP_PATH=waywiser/scripts/bootstrap; elif [[ -f bootstrap ]]; then BOOTSTRAP_PATH=bootstrap; fi; \
-    if [[ -f Makefile && -n "$BOOTSTRAP_PATH" ]] && grep -q 'base_paths+=.*carla-ros-bridge' "$BOOTSTRAP_PATH"; then \
-        echo "Using WayWiseR Makefile/bootstrap flow from $WAYWISER_REF."; \
-        CI=true WAYWISER_WS="$WAYWISER_UNDERLAY_WS" \
-            make setup ARGS="--quiet"; \
-    else \
-        echo "Using conventional colcon fallback for $WAYWISER_REF."; \
-        apt-get update \
-        && apt-get install -y \
-            build-essential \
-            ccache \
-            cmake \
-            dpkg-dev \
-            fakeroot \
-            gnupg \
-            libqt5serialport5-dev \
-            libunwind-dev \
-            python3-colcon-common-extensions \
-            python3-colcon-coveragepy-result \
-            python3-colcon-lcov-result \
-            python3-pip \
-            software-properties-common \
-            wget \
-        && rm -rf /var/lib/apt/lists/* \
-        && curl -fsSL https://packages.osrfoundation.org/gazebo.gpg \
-            -o /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
-        && . /etc/os-release \
-        && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable ${UBUNTU_CODENAME} main" \
-            > /etc/apt/sources.list.d/gazebo-stable.list \
-        && apt-get update \
-        && apt-get install -y \
-            libgz-math7-dev \
-            libgz-msgs10-dev \
-            libgz-sensors8-dev \
-            libgz-sim8-dev \
-            libgz-transport13-dev \
-        && rm -rf /var/lib/apt/lists/* \
-        && curl -LsSf https://astral.sh/uv/install.sh | UV_INSTALL_DIR=/usr/local/bin sh \
-        && wget https://github.com/mavlink/MAVSDK/releases/download/v2.14.1/libmavsdk-dev_2.14.1_ubuntu22.04_amd64.deb \
-        && dpkg --install libmavsdk-dev_2.14.1_ubuntu22.04_amd64.deb \
-        && rm libmavsdk-dev_2.14.1_ubuntu22.04_amd64.deb \
-        && ccache -M 2G \
-        && (rosdep init || true) \
-        && rosdep update --rosdistro "$ROS_DISTRO" \
-        && git clone --recurse-submodules https://github.com/das-rise/carla-ros-bridge.git $WAYWISER_UNDERLAY_WS/src/WayWiseR/waywiser_carla/external/carla-ros-bridge \
-        && apt-get update \
-        && rosdep install --from-paths "$WAYWISER_UNDERLAY_WS/src" "$WAYWISER_UNDERLAY_WS/src/WayWiseR/waywiser_carla/external/carla-ros-bridge" -i -y --rosdistro "$ROS_DISTRO" \
-            --skip-keys "carla_msgs carla_spawn_objects carla_ros_bridge" \
-        && rm -rf /var/lib/apt/lists/*; \
+    if [[ -f waywiser/scripts/bootstrap ]]; then BOOTSTRAP_PATH=waywiser/scripts/bootstrap; elif [[ -f src/WayWiseR/waywiser/scripts/bootstrap ]]; then BOOTSTRAP_PATH=src/WayWiseR/waywiser/scripts/bootstrap; elif [[ -f bootstrap ]]; then BOOTSTRAP_PATH=bootstrap; fi; \
+    [[ -f Makefile && -n "$BOOTSTRAP_PATH" ]] || { echo "WayWiseR Makefile/bootstrap not found in $PWD" >&2; exit 1; }; \
+    echo "Using WayWiseR Makefile/bootstrap flow from $WAYWISER_REF." \
+    && CI=true WAYWISER_WS="$WAYWISER_UNDERLAY_WS" \
+        make setup ARGS="--quiet"
+
+# Workspace root and build outputs need write access. Leave the venv root-owned:
+# recursively chowning site-packages is slow and can exhaust Docker overlay space.
+# We do chown the venv activate script so setup_activate_hook can append to it.
+#
+# The bootstrap .env fallback is /etc/waywiser/waywiser.env (system path, root-
+# owned) when src/WayWiseR/.env does not exist. Copy it to the canonical repo
+# location so the non-root build user can write to it without sudo.
+RUN mkdir -p "$WAYWISER_UNDERLAY_WS/build" "$WAYWISER_UNDERLAY_WS/install" "$WAYWISER_UNDERLAY_WS/log" \
+    && chown "$WAYWISER_USER:$WAYWISER_USER" \
+        "$WAYWISER_UNDERLAY_WS" \
+        "$WAYWISER_UNDERLAY_WS/build" \
+        "$WAYWISER_UNDERLAY_WS/install" \
+    && chown -R "$WAYWISER_USER:$WAYWISER_USER" "$WAYWISER_UNDERLAY_WS/src/WayWiseR" \
+    && chown -R "$WAYWISER_USER:$WAYWISER_USER" "$WAYWISER_UNDERLAY_WS/log" \
+    && if [[ ! -f "$WAYWISER_UNDERLAY_WS/src/WayWiseR/.env" ]]; then \
+        if [[ -f /etc/waywiser/waywiser.env ]]; then \
+            cp /etc/waywiser/waywiser.env "$WAYWISER_UNDERLAY_WS/src/WayWiseR/.env"; \
+        else \
+            cp "$WAYWISER_UNDERLAY_WS/src/WayWiseR/.env.example" "$WAYWISER_UNDERLAY_WS/src/WayWiseR/.env"; \
+        fi; \
+    fi \
+    && chown "$WAYWISER_USER:$WAYWISER_USER" "$WAYWISER_UNDERLAY_WS/src/WayWiseR/.env" \
+    && if [[ -f "$WAYWISER_VENV_PATH/bin/activate" ]]; then \
+        chown "$WAYWISER_USER:$WAYWISER_USER" "$WAYWISER_VENV_PATH/bin/activate"; \
     fi
 
-# Workspace root: waywiser needs write access to create build/, install/, log/.
-# Venv: only chown if make setup already created it (Makefile path).
-RUN chown "$WAYWISER_USER:$WAYWISER_USER" "$WAYWISER_UNDERLAY_WS" \
-    && if [[ -d "$WAYWISER_VENV_PATH" ]]; then \
-        chown -R "$WAYWISER_USER:$WAYWISER_USER" "$WAYWISER_VENV_PATH"; \
-    else \
-        mkdir -p "$WAYWISER_VENV_PATH" \
-        && chown "$WAYWISER_USER:$WAYWISER_USER" "$WAYWISER_VENV_PATH"; \
-    fi
+RUN mv /usr/bin/colcon /usr/bin/colcon.real \
+    && printf '%s\n' \
+        '#!/usr/bin/env bash' \
+        'set -euo pipefail' \
+        'if [[ "${1:-}" == "build" ]]; then' \
+        '    for arg in "$@"; do' \
+        '        [[ "$arg" == "--help" || "$arg" == "-h" ]] && exec /usr/bin/colcon.real "$@"' \
+        '    done' \
+        '    exec /usr/bin/colcon.real "$@" --cmake-args -U_lib "-U*_LIBRARY" "-U*_LIBRARIES"' \
+        'fi' \
+        'exec /usr/bin/colcon.real "$@"' \
+        > /usr/bin/colcon \
+    && chmod 0755 /usr/bin/colcon
 
 USER $WAYWISER_USER
 
-# Colcon fallback only: create the venv and install Python dependencies as
-# waywiser so ownership is correct from the start. uv was installed system-wide
-# (/usr/local/bin) during setup so it is accessible to this user.
 RUN BOOTSTRAP_PATH=""; \
-    if [[ -f waywiser/scripts/bootstrap ]]; then BOOTSTRAP_PATH=waywiser/scripts/bootstrap; elif [[ -f bootstrap ]]; then BOOTSTRAP_PATH=bootstrap; fi; \
-    if ! ([[ -f Makefile && -n "$BOOTSTRAP_PATH" ]] && grep -q 'base_paths+=.*carla-ros-bridge' "$BOOTSTRAP_PATH"); then \
-    uv venv --python "$(cat $WAYWISER_UNDERLAY_WS/src/WayWiseR/.python-version)" "$WAYWISER_VENV_PATH" \
-    && . "$WAYWISER_VENV_PATH/bin/activate" \
-    && if grep -q '^\[project.optional-dependencies\]' $WAYWISER_UNDERLAY_WS/src/WayWiseR/pyproject.toml \
-        && grep -q '^all = \[' $WAYWISER_UNDERLAY_WS/src/WayWiseR/pyproject.toml; then \
-            uv pip install -e "$WAYWISER_UNDERLAY_WS/src/WayWiseR[all]"; \
-        else \
-            uv pip install -e "$WAYWISER_UNDERLAY_WS/src/WayWiseR"; \
-        fi \
-    && . "$WAYWISER_VENV_PATH/bin/activate" \
-    && uv pip install -r $WAYWISER_UNDERLAY_WS/src/WayWiseR/waywiser_carla/external/carla-ros-bridge/requirements.txt; \
-fi
+    if [[ -f waywiser/scripts/bootstrap ]]; then BOOTSTRAP_PATH=waywiser/scripts/bootstrap; elif [[ -f src/WayWiseR/waywiser/scripts/bootstrap ]]; then BOOTSTRAP_PATH=src/WayWiseR/waywiser/scripts/bootstrap; elif [[ -f bootstrap ]]; then BOOTSTRAP_PATH=bootstrap; fi; \
+    [[ -f Makefile && -n "$BOOTSTRAP_PATH" ]] || { echo "WayWiseR Makefile/bootstrap not found in $PWD" >&2; exit 1; }; \
+    echo "Building underlay with WayWiseR Makefile/bootstrap flow from $WAYWISER_REF." \
+    && CI=true WAYWISER_WS="$WAYWISER_UNDERLAY_WS" WAYWISER_UNDERLAY_SETUP="" \
+        make build ARGS="--quiet"
 
-RUN BOOTSTRAP_PATH=""; \
-    if [[ -f waywiser/scripts/bootstrap ]]; then BOOTSTRAP_PATH=waywiser/scripts/bootstrap; elif [[ -f bootstrap ]]; then BOOTSTRAP_PATH=bootstrap; fi; \
-    if [[ -f Makefile && -n "$BOOTSTRAP_PATH" ]] && grep -q 'base_paths+=.*carla-ros-bridge' "$BOOTSTRAP_PATH"; then \
-        echo "Building underlay with WayWiseR Makefile/bootstrap flow from $WAYWISER_REF."; \
-        CI=true WAYWISER_WS="$WAYWISER_UNDERLAY_WS" WAYWISER_UNDERLAY_SETUP="" \
-            make build ARGS="--quiet"; \
-    else \
-        echo "Building underlay with colcon for $WAYWISER_REF."; \
-        . "/opt/ros/$ROS_DISTRO/setup.bash" \
-        && . "$WAYWISER_VENV_PATH/bin/activate" \
-        && cd "$WAYWISER_UNDERLAY_WS" \
-        && colcon build --symlink-install \
-            --base-paths "$WAYWISER_UNDERLAY_WS/src" "$WAYWISER_UNDERLAY_WS/src/WayWiseR/waywiser_carla/external/carla-ros-bridge" \
-            --cmake-args --no-warn-unused-cli \
-                -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-                -DCMAKE_C_COMPILER_LAUNCHER=ccache; \
-    fi
-
-RUN if [[ -f "$WAYWISER_UNDERLAY_WS/.venv/bin/activate" ]]; then \
+RUN if [[ -f "$WAYWISER_UNDERLAY_WS/.venv/bin/activate" ]] \
+        && ! grep -q "WayWiseR Environment Setup" "$WAYWISER_UNDERLAY_WS/.venv/bin/activate" 2>/dev/null; then \
         { echo ''; \
           echo '# WayWiseR Environment Setup'; \
-          echo 'source /opt/ros/humble/setup.bash'; \
+          echo "source /opt/ros/${ROS_DISTRO}/setup.bash"; \
           echo "export WAYWISER_WS=$WAYWISER_UNDERLAY_WS"; \
           echo "export WAYWISER_SKIPPED_PACKAGES=''"; \
-          echo "export PYTHONPATH=$WAYWISER_UNDERLAY_WS/.venv/lib/python3.10/site-packages:\$PYTHONPATH"; \
+          echo "export PYTHONPATH=$WAYWISER_VENV_PATH/lib/python\$(python3 --version 2>&1 | awk '{print \$2}' | cut -d. -f1,2)/site-packages:\$PYTHONPATH"; \
           echo ''; \
           echo "if [ -f \"$WAYWISER_UNDERLAY_WS/install/setup.bash\" ]; then"; \
           echo "  source \"$WAYWISER_UNDERLAY_WS/install/setup.bash\""; \

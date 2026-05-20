@@ -32,12 +32,6 @@ with suppress_stderr():
     from geometry_msgs.msg import PoseStamped, Twist
     from nav_msgs.msg import Odometry
     import numpy as np
-    from PyQt5.QtCore import Qt, QTimer, QUrl
-    from PyQt5.QtMultimedia import QAudio, QAudioDeviceInfo, QSoundEffect
-
-with suppress_stderr():
-    from PyQt5.QtWidgets import QApplication, QDialog, QMainWindow
-    from PyQt5.uic import loadUi
     from rcl_interfaces.msg import Parameter as ParameterMsg
     from rcl_interfaces.msg import ParameterType, ParameterValue
     from rcl_interfaces.srv import GetParameters, SetParameters
@@ -46,6 +40,38 @@ with suppress_stderr():
     from sensor_msgs.msg import Joy
     from std_msgs.msg import Bool
     from tf_transformations import euler_from_quaternion
+
+try:
+    with suppress_stderr():
+        from PyQt5.QtCore import Qt, QTimer, QUrl
+        from PyQt5.QtMultimedia import QAudio, QAudioDeviceInfo, QSoundEffect
+        from PyQt5.QtWidgets import QApplication, QDialog, QMainWindow
+        from PyQt5.uic import loadUi
+    _PYQT5_AVAILABLE = True
+except ImportError:
+    _PYQT5_AVAILABLE = False
+
+    # Stub base classes so that class definitions below do not raise NameError
+    # at import time.  Instantiating them will raise RuntimeError at runtime.
+    class _QtStub:
+        """Placeholder for Qt classes when PyQt5 is not installed."""
+
+        def __init_subclass__(cls, **kwargs):
+            super().__init_subclass__(**kwargs)
+
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError('PyQt5 is not installed. Install python3-pyqt5 to use this class.')
+
+    QDialog = _QtStub  # type: ignore[misc,assignment]
+    QMainWindow = _QtStub  # type: ignore[misc,assignment]
+    Qt = None
+    QTimer = _QtStub  # type: ignore[misc,assignment]
+    QUrl = None
+    QAudio = None
+    QAudioDeviceInfo = None
+    QSoundEffect = _QtStub  # type: ignore[misc,assignment]
+    QApplication = _QtStub  # type: ignore[misc,assignment]
+    loadUi = None
 
 
 from waywiser_core.msg import (  # noqa: E402
@@ -56,9 +82,12 @@ from waywiser_core.msg import (  # noqa: E402
 from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS, RosUtils  # noqa: E402
 from waywiser_twist_safety.msg import EmergencyStopState  # noqa: E402
 
-UI_BASE_PATH = os.path.join(
-    get_package_share_directory('waywiser_teleop'), 'user_interface', 'twist_keyboard'
-)
+if _PYQT5_AVAILABLE:
+    UI_BASE_PATH = os.path.join(
+        get_package_share_directory('waywiser_teleop'), 'user_interface', 'twist_keyboard'
+    )
+else:
+    UI_BASE_PATH = None
 
 
 class TwistKeyboard(Node):
@@ -1685,6 +1714,13 @@ def check_pulseaudio():
 
 
 def main():
+    if not _PYQT5_AVAILABLE:
+        print(
+            'ERROR: PyQt5 is not installed. twist_keyboard requires PyQt5 (python3-pyqt5) to run.',
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     # Install signal handler to close Qt app on Ctrl+C
     import signal
 

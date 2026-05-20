@@ -354,8 +354,9 @@ configure_env() {
     local cfg_vals=()
     wt_form cfg_vals "WayWiseR Runtime Configuration" \
         "Edit settings. Booleans use 1=yes, 0=no. DDS middleware options: fastdds or zenoh." \
-        "ROS_DOMAIN_ID (0-232)"                  "$(cfg_get ROS_DOMAIN_ID 0)" \
+        "WAYWISER_VENV_PATH (empty = use default)"            "$(cfg_get WAYWISER_VENV_PATH "")" \
         "DDS middleware (fastdds|zenoh)"         "$dds_default" \
+        "ROS_DOMAIN_ID (0-232)"                  "$(cfg_get ROS_DOMAIN_ID 0)" \
         "RCUTILS_LOGGING_USE_STDOUT (1/0)"                    "$(cfg_get RCUTILS_LOGGING_USE_STDOUT 1)" \
         "RCUTILS_LOGGING_BUFFERED_STREAM (1/0)"               "$(cfg_get RCUTILS_LOGGING_BUFFERED_STREAM 1)" \
         "PYTHONUNBUFFERED (1/0)"                              "$(cfg_get PYTHONUNBUFFERED 1)" \
@@ -393,32 +394,33 @@ configure_env() {
     else
         env_set WAYWISER_SKIPPED_PACKAGES ""
     fi
-    env_set ROS_DOMAIN_ID                       "${cfg_vals[0]}"
+    env_set WAYWISER_VENV_PATH                  "${cfg_vals[0]}"
+    env_set ROS_DOMAIN_ID                       "${cfg_vals[2]}"
     env_set RMW_IMPLEMENTATION                  "$new_rmw"
-    env_set RCUTILS_LOGGING_USE_STDOUT          "${cfg_vals[2]}"
-    env_set RCUTILS_LOGGING_BUFFERED_STREAM     "${cfg_vals[3]}"
-    env_set PYTHONUNBUFFERED                    "${cfg_vals[4]}"
-    env_set RCUTILS_COLORIZED_OUTPUT            "${cfg_vals[5]}"
-    env_set FASTDDS_USE_DISCOVERY_SERVER        "${cfg_vals[6]}"
-    env_set FASTDDS_REMOTE_DISCOVERY_SERVER_IP  "${cfg_vals[7]}"
-    env_set FASTDDS_REMOTE_DISCOVERY_CLIENT_IP  "${cfg_vals[8]}"
-    env_set FASTDDS_SUPER_CLIENT                "${cfg_vals[9]}"
-    env_set ZENOH_USE_LOCAL_ROUTER              "${cfg_vals[10]}"
-    env_set ZENOH_REMOTE_ROUTER_IP              "${cfg_vals[11]}"
-    env_set ZENOH_REMOTE_ROUTER_PORT            "${cfg_vals[12]}"
-    env_set ZENOH_ROUTER_CHECK_ATTEMPTS         "${cfg_vals[13]}"
-    env_set ZENOH_SESSION_CONFIG_URI            "${cfg_vals[14]}"
-    env_set ZENOH_CONFIG_OVERRIDE               "${cfg_vals[15]}"
-    env_set EMAIL_USER                          "${cfg_vals[16]}"
-    env_set EMAIL_PASSWORD                      "${cfg_vals[17]}"
-    env_set EMAIL_RECIPIENT                     "${cfg_vals[18]}"
-    env_set SMTP_SERVER                         "${cfg_vals[19]}"
-    env_set SMTP_PORT                           "${cfg_vals[20]}"
+    env_set RCUTILS_LOGGING_USE_STDOUT          "${cfg_vals[3]}"
+    env_set RCUTILS_LOGGING_BUFFERED_STREAM     "${cfg_vals[4]}"
+    env_set PYTHONUNBUFFERED                    "${cfg_vals[5]}"
+    env_set RCUTILS_COLORIZED_OUTPUT            "${cfg_vals[6]}"
+    env_set FASTDDS_USE_DISCOVERY_SERVER        "${cfg_vals[7]}"
+    env_set FASTDDS_REMOTE_DISCOVERY_SERVER_IP  "${cfg_vals[8]}"
+    env_set FASTDDS_REMOTE_DISCOVERY_CLIENT_IP  "${cfg_vals[9]}"
+    env_set FASTDDS_SUPER_CLIENT                "${cfg_vals[10]}"
+    env_set ZENOH_USE_LOCAL_ROUTER              "${cfg_vals[11]}"
+    env_set ZENOH_REMOTE_ROUTER_IP              "${cfg_vals[12]}"
+    env_set ZENOH_REMOTE_ROUTER_PORT            "${cfg_vals[13]}"
+    env_set ZENOH_ROUTER_CHECK_ATTEMPTS         "${cfg_vals[14]}"
+    env_set ZENOH_SESSION_CONFIG_URI            "${cfg_vals[15]}"
+    env_set ZENOH_CONFIG_OVERRIDE               "${cfg_vals[16]}"
+    env_set EMAIL_USER                          "${cfg_vals[17]}"
+    env_set EMAIL_PASSWORD                      "${cfg_vals[18]}"
+    env_set EMAIL_RECIPIENT                     "${cfg_vals[19]}"
+    env_set SMTP_SERVER                         "${cfg_vals[20]}"
+    env_set SMTP_PORT                           "${cfg_vals[21]}"
 
     echo
     info "Saved to $ENV_FILE"
     info "  RMW_IMPLEMENTATION=$new_rmw"
-    info "  ROS_DOMAIN_ID=${cfg_vals[0]}"
+    info "  ROS_DOMAIN_ID=${cfg_vals[2]}"
     if [[ -n "$new_skipped" ]]; then
         info "  WAYWISER_SKIPPED_PACKAGES=\"$new_skipped\""
     elif [[ -n "$REPO_DIR" ]]; then
