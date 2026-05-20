@@ -149,12 +149,16 @@ Then, run the build and test job using `act`. The `--pull=false` flag ensures `a
 act -P ubuntu-22.04=ghcr.io/das-rise/waywiser/ci-image-amd64:humble \
   --pull=false \
   -C $WAYWISER_WS/src/WayWiseR \
+  --env WAYWISER_CHECKOUT_PATH=. \
+  --env WAYWISER_WORKING_DIRECTORY=. \
   -j build-and-test
 
 # Run the CI pipeline locally for arm64
 act -P ubuntu-22.04=ghcr.io/das-rise/waywiser/ci-image-arm64:humble \
   --pull=false \
   -C $WAYWISER_WS/src/WayWiseR \
+  --env WAYWISER_CHECKOUT_PATH=. \
+  --env WAYWISER_WORKING_DIRECTORY=. \
   -j build-and-test
 ```
 

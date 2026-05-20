@@ -23,6 +23,8 @@ jobs:
       WAYWISER_VENV_PATH: /opt/waywiser-ci-venv
       WAYWISER_REUSE_VENV: "true"
       WAYWISER_UNDERLAY_SETUP: /home/waywiser/workspaces/waywiser_ws/install/setup.bash
+      WAYWISER_CHECKOUT_PATH: src/WayWiseR
+      WAYWISER_WORKING_DIRECTORY: src/WayWiseR
       WAYWISER_CMAKE_ARGS: >-
         --no-warn-unused-cli
         -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
@@ -35,12 +37,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          path: src/WayWiseR
+          path: ${{ env.WAYWISER_CHECKOUT_PATH }}
           submodules: recursive
           fetch-depth: 0
 
       - name: Prep for local act
         if: ${{ env.ACT == 'true' }}
+        working-directory: ${{ env.WAYWISER_WORKING_DIRECTORY }}
         run: |
           # Use a local git repo to avoid "reference is not a tree" since act doesn't copy .git reliably
           git init
@@ -62,10 +65,13 @@ jobs:
             ${{ runner.os }}-ccache-humble-
 
       - name: Setup Workspace
+        working-directory: ${{ env.WAYWISER_WORKING_DIRECTORY }}
         run: make setup ARGS="--quiet"
 
       - name: Build Workspace
+        working-directory: ${{ env.WAYWISER_WORKING_DIRECTORY }}
         run: make build
 
       - name: Run Tests
+        working-directory: ${{ env.WAYWISER_WORKING_DIRECTORY }}
         run: make test

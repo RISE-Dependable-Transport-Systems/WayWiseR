@@ -98,7 +98,7 @@ rebuild:
 	@WAYWISER_WS=$(WAYWISER_WS) bash $(BOOTSTRAP) --build-only $(ARGS)
 
 test:
-	$(eval SKIPPED := $(shell grep '^WAYWISER_SKIPPED_PACKAGES=' $(WAYWISER_WS)/.env 2>/dev/null | sed 's/^WAYWISER_SKIPPED_PACKAGES=//;s/"//g'))
+	$(eval SKIPPED := $(shell grep '^WAYWISER_SKIPPED_PACKAGES=' $(dir $(MAKEFILE_REAL)).env 2>/dev/null | sed 's/^WAYWISER_SKIPPED_PACKAGES=//;s/"//g'))
 	$(eval SKIPPED := $(or $(WAYWISER_SKIPPED_PACKAGES),$(SKIPPED)))
 	$(eval TEST_SELECTION := $(or $(WAYWISER_TEST_PACKAGES),$(WAYWISER_BUILD_PACKAGES),$(WAYWISER_PACKAGES)))
 	$(eval PKG_LIST := $(filter-out $(SKIPPED),$(TEST_SELECTION)))

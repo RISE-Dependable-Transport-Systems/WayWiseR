@@ -36,6 +36,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     git \
     make \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js v20 from NodeSource for modern GitHub Actions tooling.
