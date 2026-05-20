@@ -52,6 +52,8 @@ install(
 
 install(
   PROGRAMS
+  py_src/waywiser_test_runner_py/communication_channel_emulator.py
+  py_src/waywiser_test_runner_py/drone_scenario_runner.py
   py_src/waywiser_test_runner_py/track_test_runner.py
   DESTINATION lib/${PROJECT_NAME}
 )

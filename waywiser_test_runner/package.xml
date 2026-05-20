@@ -17,6 +17,7 @@
   <depend>ament_index_python</depend>
   <depend>rclcpp</depend>
   <depend>rclpy</depend>
+  <depend>rcl_interfaces</depend>
   <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>

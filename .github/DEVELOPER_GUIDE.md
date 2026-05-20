@@ -17,6 +17,39 @@ code --install-extension esbenp.prettier-vscode
 code --install-extension DotJoshJohnson.xml
 ```
 
+## Develop in a Dev Container
+
+If you want to keep ROS, apt, and Python dependencies off the host, use the committed devcontainer in `.devcontainer/`.
+
+1. Install Docker Engine and the VS Code Dev Containers extension.
+2. Open the repository in VS Code and run `Dev Containers: Reopen in Container`.
+3. The container mounts this repository at `/workspaces/waywiser_ws/src/WayWiseR`, sets `WAYWISER_WS=/workspaces/waywiser_ws`, and keeps `build/`, `install/`, `log/`, `.venv/`, rosdep state, ccache, and `/etc/waywiser/waywiser.env` in Docker volumes instead of the host checkout.
+4. After the first create, `.devcontainer/post-create.sh` writes the container runtime config to `/etc/waywiser/waywiser.env`, enables `waywiser_gazebo` by default, and runs `make setup ARGS="--quiet"` inside the container.
+
+The devcontainer also forwards `DISPLAY` and mounts `/tmp/.X11-unix` so Gazebo GUI applications can connect to the host X server. If Gazebo starts but the GUI cannot open, allow local Docker clients on the host before reopening the container:
+
+```bash
+xhost +local:
+```
+
+Build and test from a terminal in the container:
+
+```bash
+cd $WAYWISER_WS
+make build
+make test
+```
+
+Launch Gazebo from inside the container with:
+
+```bash
+cd $WAYWISER_WS
+source .venv/bin/activate
+ros2 launch waywiser_gazebo gazebo.launch.py
+```
+
+`make configure` also targets `/etc/waywiser/waywiser.env` when `WAYWISER_ENV_FILE` is set, so container-side configuration stays inside Docker-managed storage.
+
 ## Configure VS Code Workspace
 
 To keep `src/`, `resources/`, and workspace-level build outputs visible in Explorer while still using repository-managed VS Code settings, create a workspace file at `$WAYWISER_WS` and symlink the `.vscode` folder:

@@ -202,31 +202,6 @@ prune_missing_prefix_paths() {
     done
 }
 
-sanitized_pythonpath() {
-    local venv_site=""
-    local cleaned_pythonpath="${PYTHONPATH:-}"
-
-    if [[ -x "$VENV_DIR/bin/python" ]]; then
-        venv_site="$("$VENV_DIR/bin/python" -c 'import site; print(site.getsitepackages()[0])' 2>/dev/null || true)"
-    fi
-
-    if [[ -n "$venv_site" && -n "$cleaned_pythonpath" ]]; then
-        cleaned_pythonpath="$(printf '%s' "$cleaned_pythonpath" | tr ':' '\n' | grep -vx "$venv_site" | paste -sd: -)"
-    fi
-
-    printf '%s\n' "$cleaned_pythonpath"
-}
-
-run_without_venv_pythonpath() {
-    local cleaned_pythonpath
-    cleaned_pythonpath="$(sanitized_pythonpath)"
-    PYTHONPATH="$cleaned_pythonpath" "$@"
-}
-
-run_rosdep() {
-    run_without_venv_pythonpath rosdep "$@"
-}
-
 # Activate venv + ROS (used by sim package functions).
 activate_env() {
     local venv="$VENV_DIR"
@@ -679,7 +654,7 @@ init_rosdep() {
             info "Registered WayWiseR rosdep rules: $waywiser_rosdep_yaml"
         fi
     fi
-    run_rosdep update --rosdistro "${ROS_DISTRO:-humble}"
+    rosdep update --rosdistro "${ROS_DISTRO:-humble}"
 }
 
 check_prerequisites() {
@@ -902,8 +877,8 @@ setup_venv() {
         --quiet
     )
     prepare_venv_path
-    # In reuse mode an empty venv directory is expected on first run,
-    # only force a clear when reuse is disabled.
+    # In reuse mode an empty mounted venv directory is expected on first run,
+    # so only force a clear when reuse is disabled.
     if [[ "${WAYWISER_REUSE_VENV:-}" != "true" ]]; then
         setup_args+=(--clear)
     fi
@@ -940,10 +915,10 @@ install_ros_deps() {
     if [[ -n "$skipped" ]]; then
         local skip_pattern
         skip_pattern=$(echo "$skipped" | tr ' ' '|')
-        paths=$(run_without_venv_pythonpath colcon list --base-paths "${base_paths[@]}" --paths-only \
+        paths=$(colcon list --base-paths "${base_paths[@]}" --paths-only \
             | grep -Evw "$skip_pattern" || true)
     else
-        paths=$(run_without_venv_pythonpath colcon list --base-paths "${base_paths[@]}" --paths-only)
+        paths=$(colcon list --base-paths "${base_paths[@]}" --paths-only)
     fi
 
     [[ -n "$paths" ]] || die "No packages found to install dependencies for."
@@ -977,7 +952,7 @@ install_ros_deps() {
     fi
 
     # shellcheck disable=SC2086
-    run_rosdep install --from-paths $paths \
+    rosdep install --from-paths $paths \
         --ignore-src --rosdistro "$ROS_DISTRO" \
         --skip-keys "$skip_keys" -r $(yes_args -y)
     info "Dependencies installed."
