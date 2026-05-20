@@ -128,7 +128,12 @@ RUN BOOTSTRAP_PATH=""; \
     [[ -f Makefile && -n "$BOOTSTRAP_PATH" ]] || { echo "WayWiseR Makefile/bootstrap not found in $PWD" >&2; exit 1; }; \
     echo "Building underlay with WayWiseR Makefile/bootstrap flow from $WAYWISER_REF." \
     && CI=true WAYWISER_WS="$WAYWISER_UNDERLAY_WS" WAYWISER_UNDERLAY_SETUP="" \
-        make build ARGS="--quiet"
+        make build ARGS="--quiet" \
+    || { \
+        status=$?; \
+        find "$WAYWISER_UNDERLAY_WS/log" -path '*/stdout_stderr.log' -print -exec sh -c 'echo "===== $1"; tail -n 200 "$1"' sh {} \;; \
+        exit "$status"; \
+    }
 
 RUN if [[ -f "$WAYWISER_UNDERLAY_WS/.venv/bin/activate" ]] \
         && ! grep -q "WayWiseR Environment Setup" "$WAYWISER_UNDERLAY_WS/.venv/bin/activate" 2>/dev/null; then \

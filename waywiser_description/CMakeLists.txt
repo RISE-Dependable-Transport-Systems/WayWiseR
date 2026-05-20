@@ -20,8 +20,14 @@ ament_python_install_package(${PROJECT_NAME}_py
 )
 
 install(
-  DIRECTORY urdf sdf meshes scripts
+  DIRECTORY urdf sdf meshes
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  PROGRAMS
+  scripts/scale_urdf.sh
+  DESTINATION share/${PROJECT_NAME}/scripts
 )
 
 install(

@@ -577,6 +577,13 @@ run_container() {
     fi
 
     cd "$workspace"
+    if [[ " $skipped_packages " != *" waywiser_gazebo "* ]]; then
+        info "Prebuilding waywiser_core before waywiser_gazebo to avoid PX4 submodule lock contention..."
+        colcon --log-base "$log_base" build "${colcon_args[@]}" \
+            --packages-up-to waywiser_core \
+            --cmake-args "${cmake_args[@]}"
+    fi
+
     colcon --log-base "$log_base" build "${colcon_args[@]}" --cmake-args "${cmake_args[@]}"
     cd "$repo_dir"
 

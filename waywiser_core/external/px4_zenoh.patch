@@ -94,6 +94,58 @@ diff --git a/Tools/zenoh/templates/zenoh/uorb_pubsub_factory.hpp.em b/Tools/zeno
  @[end for]
  
  @[for idx, topic_name in enumerate(datatypes)]@
+diff --git a/src/modules/zenoh/publishers/uorb_publisher.hpp b/src/modules/zenoh/publishers/uorb_publisher.hpp
+index 8c2771212d..0b64f2b383 100644
+--- a/src/modules/zenoh/publishers/uorb_publisher.hpp
++++ b/src/modules/zenoh/publishers/uorb_publisher.hpp
+@@ -42,7 +42,7 @@
+ #include <uORB/Subscription.hpp>
+ #include <dds_serializer.h>
+ 
+-#define CDR_SAFETY_MARGIN 24
++#define CDR_SAFETY_MARGIN 512
+ 
+ class uORB_Zenoh_Publisher : public Zenoh_Publisher
+ {
+@@ -79,19 +79,20 @@ public:
+ 		uint8_t data[_uorb_meta->o_size];
+ 		orb_copy(_uorb_meta, _uorb_sub, data);
+ 
+-		uint8_t buf[_uorb_meta->o_size + 4 + CDR_SAFETY_MARGIN];
++		const uint32_t payload_capacity = (_uorb_meta->o_size * 2U) + CDR_SAFETY_MARGIN;
++		uint8_t buf[payload_capacity + sizeof(ros2_header)];
+ 		memcpy(buf, ros2_header, sizeof(ros2_header));
+ 
+ 		dds_ostream_t os;
+ 		os.m_buffer = &buf[4];
+ 		os.m_index = 0;
+-		os.m_size = (uint32_t)sizeof(ros2_header) + _uorb_meta->o_size + CDR_SAFETY_MARGIN;
++		os.m_size = payload_capacity;
+ 		os.m_xcdr_version = DDSI_RTPS_CDR_ENC_VERSION_1;
+ 
+ 		if (dds_stream_write(&os,
+ 				     &dds_allocator,
+ 				     (const char *)&data,
+ 				     _cdr_ops)) {
+-			return publish((const uint8_t *)buf, os.m_size);
++			return publish((const uint8_t *)buf, os.m_index + sizeof(ros2_header));
+ 
+ 		} else {
+ 			return _Z_ERR_MESSAGE_SERIALIZATION_FAILED;
+diff --git a/Tools/msg/px_generate_uorb_topic_files.py b/Tools/msg/px_generate_uorb_topic_files.py
+index 6e7d44124c..925a12e263 100755
+--- a/Tools/msg/px_generate_uorb_topic_files.py
++++ b/Tools/msg/px_generate_uorb_topic_files.py
+@@ -158,8 +158,7 @@ def generate_output_from_file(format_idx, filename, outputdir, package, template
+     }
+ 
+     # Make sure output directory exists:
+-    if not os.path.isdir(outputdir):
+-        os.makedirs(outputdir)
++    os.makedirs(outputdir, exist_ok=True)
+ 
+     template_file = os.path.join(templatedir, TEMPLATE_FILE[format_idx])
+     extension = os.path.splitext(os.path.splitext(TEMPLATE_FILE[format_idx])[0])[1]
 diff --git a/src/lib/cdrstream/msg2idl.py b/src/lib/cdrstream/msg2idl.py
 index 2b02739907..dbb90a1b76 100644
 --- a/src/lib/cdrstream/msg2idl.py
@@ -204,7 +256,7 @@ index b16a0c41fa..7a8278eaef 100644
 diff --git a/src/modules/zenoh/dds_topics.yaml b/src/modules/zenoh/dds_topics.yaml
 --- a/src/modules/zenoh/dds_topics.yaml
 +++ b/src/modules/zenoh/dds_topics.yaml
-@@ -15,15 +15,21 @@ publications:
+@@ -15,15 +15,19 @@ publications:
    - topic: /fmu/out/mode_completed
      type: px4_msgs::msg::ModeCompleted
  
@@ -217,8 +269,8 @@ diff --git a/src/modules/zenoh/dds_topics.yaml b/src/modules/zenoh/dds_topics.ya
    - topic: /fmu/out/collision_constraints
      type: px4_msgs::msg::CollisionConstraints
  
-   - topic: /fmu/out/estimator_status_flags
-     type: px4_msgs::msg::EstimatorStatusFlags
+-  - topic: /fmu/out/estimator_status_flags
+-    type: px4_msgs::msg::EstimatorStatusFlags
  
    - topic: /fmu/out/failsafe_flags
      type: px4_msgs::msg::FailsafeFlags
