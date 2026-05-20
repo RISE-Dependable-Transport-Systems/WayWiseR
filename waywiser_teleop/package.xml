@@ -29,6 +29,7 @@
 
   <depend>joy</depend>
   <depend>teleop_twist_joy</depend>
+  <depend>tf_transformations</depend>
   <depend>twist_mux</depend>
   <depend>rclpy</depend>
   <depend>waywiser_twist_safety</depend>
