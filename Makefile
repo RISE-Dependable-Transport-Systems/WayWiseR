@@ -79,8 +79,8 @@ all:
 configure:
 	@WAYWISER_WS=$(WAYWISER_WS) \
 	  WAYWISER_REPO_DIR=$(dir $(MAKEFILE_REAL)) \
-	  WAYWISER_ENV_FILE=$(dir $(MAKEFILE_REAL)).env \
-	  WAYWISER_ENV_FILE_EXAMPLE=$(dir $(MAKEFILE_REAL)).env.example \
+	  WAYWISER_ENV_FILE=$(or $(WAYWISER_ENV_FILE),$(dir $(MAKEFILE_REAL)).env) \
+	  WAYWISER_ENV_FILE_EXAMPLE=$(or $(WAYWISER_ENV_FILE_EXAMPLE),$(dir $(MAKEFILE_REAL)).env.example) \
 	  bash $(CONFIGURE_ENV) $(ARGS)
 
 setup:
