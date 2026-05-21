@@ -22,7 +22,7 @@ ENV ROS_DISTRO=${ROS_DISTRO}
 ENV WAYWISER_VENV_PATH=/opt/waywiser-ci-venv
 ENV WAYWISER_REUSE_VENV=true
 ENV WAYWISER_OPENSSL_CMAKE_ARGS="-DOPENSSL_ROOT_DIR=/usr -DOPENSSL_CRYPTO_LIBRARY=/usr/lib/aarch64-linux-gnu/libcrypto.so -DOPENSSL_SSL_LIBRARY=/usr/lib/aarch64-linux-gnu/libssl.so -DOPENSSL_INCLUDE_DIR=/usr/include"
-ENV WAYWISER_CMAKE_ARGS="-U_lib -U*_LIBRARY -U*_LIBRARIES ${WAYWISER_OPENSSL_CMAKE_ARGS}"
+ENV WAYWISER_CMAKE_ARGS="-U_lib -U*_LIBRARY -U*_LIBRARIES -DPython3_EXECUTABLE=/usr/bin/python3 -DPYTHON_EXECUTABLE=/usr/bin/python3 ${WAYWISER_OPENSSL_CMAKE_ARGS}"
 ENV UV_HTTP_TIMEOUT=600
 ENV UV_CONCURRENT_DOWNLOADS=4
 ENV WAYWISER_SKIPPED_PACKAGES=${WAYWISER_SKIPPED_PACKAGES}
@@ -38,6 +38,7 @@ RUN apt-get update && apt-get install -y \
     git \
     libssl-dev \
     make \
+    python3-dev \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
@@ -141,7 +142,11 @@ RUN BOOTSTRAP_PATH=""; \
         make build ARGS="--quiet" \
     || { \
         status=$?; \
-        find "$WAYWISER_UNDERLAY_WS/log" -path '*/stdout_stderr.log' -print -exec sh -c 'echo "===== $1"; tail -n 200 "$1"' sh {} \;; \
+        echo "Build failed; dumping colcon error logs." >&2; \
+        find "$WAYWISER_UNDERLAY_WS/log" \( -path '*/stderr.log' -o -path '*/stdout_stderr.log' \) -print \
+            -exec sh -c 'echo "===== $1"; grep -nEi "CMake Error|Traceback|(^|[^A-Za-z])(error|fatal):|undefined reference|No such file|not found|failed" "$1" | tail -n 100 || true; tail -n 300 "$1"' sh {} \;; \
+        find "$WAYWISER_UNDERLAY_WS/build" -path '*/CMakeFiles/CMakeError.log' -print \
+            -exec sh -c 'echo "===== $1"; tail -n 160 "$1"' sh {} \;; \
         exit "$status"; \
     }
 

@@ -11,14 +11,27 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-22.04
+    name: Build and test ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-22.04
+            image: ghcr.io/das-rise/waywiser/ci-image-amd64:humble
+            skipped_packages: ""
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+            image: ghcr.io/das-rise/waywiser/ci-image-arm64:humble
+            skipped_packages: "waywiser_agrarsense waywiser_carla waywiser_gazebo waywiser_rviz2 waywiser_teleop"
     container:
-      image: ghcr.io/das-rise/waywiser/ci-image-amd64:humble
+      image: ${{ matrix.image }}
       options: --user root
     env:
       CI: "true"
       CCACHE_DIR: /opt/ccache
-      WAYWISER_SKIPPED_PACKAGES: ""
+      WAYWISER_SKIPPED_PACKAGES: ${{ matrix.skipped_packages }}
       WAYWISER_PYTHON_EXTRAS: "build,waywiser_test_runner"
       WAYWISER_VENV_PATH: /opt/waywiser-ci-venv
       WAYWISER_REUSE_VENV: "true"
@@ -27,6 +40,8 @@ jobs:
       WAYWISER_WORKING_DIRECTORY: src/WayWiseR
       WAYWISER_CMAKE_ARGS: >-
         --no-warn-unused-cli
+        -DPython3_EXECUTABLE=/usr/bin/python3
+        -DPYTHON_EXECUTABLE=/usr/bin/python3
         -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         -DCMAKE_C_COMPILER_LAUNCHER=ccache
     defaults:
@@ -54,6 +69,7 @@ jobs:
           git commit -m "Local build for act" --allow-empty
           mkdir -p /tmp/fake_github/${{ github.repository_owner }}
           ln -sf $(pwd) /tmp/fake_github/${{ github.repository }}.git
+          rm -rf ../../build ../../install ../../log
 
       - name: Cache ccache
         if: ${{ env.ACT != 'true' }}
@@ -66,12 +82,20 @@ jobs:
 
       - name: Setup Workspace
         working-directory: ${{ env.WAYWISER_WORKING_DIRECTORY }}
-        run: make setup ARGS="--quiet"
+        run: WAYWISER_SKIPPED_PACKAGES="${{ matrix.skipped_packages }}" make setup ARGS="--quiet"
 
       - name: Build Workspace
         working-directory: ${{ env.WAYWISER_WORKING_DIRECTORY }}
-        run: make build
+        run: |
+          export WAYWISER_SKIPPED_PACKAGES="${{ matrix.skipped_packages }}"
+          workspace="${WAYWISER_WS:-$(cd ../.. && pwd)}"
+          make build || {
+            status=$?
+            find "$workspace/log" \( -path '*/stderr.log' -o -path '*/stdout_stderr.log' \) -print \
+              -exec sh -c 'echo "===== $1"; grep -nEi "CMake Error|Traceback|(^|[^A-Za-z])(error|fatal):|undefined reference|No such file|not found|failed" "$1" | tail -n 100 || true; tail -n 300 "$1"' sh {} \;
+            exit "$status"
+          }
 
       - name: Run Tests
         working-directory: ${{ env.WAYWISER_WORKING_DIRECTORY }}
-        run: make test
+        run: WAYWISER_SKIPPED_PACKAGES="${{ matrix.skipped_packages }}" make test

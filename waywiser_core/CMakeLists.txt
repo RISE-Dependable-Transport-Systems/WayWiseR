@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.8)
 cmake_policy(SET CMP0071 NEW)
 project(waywiser_core)
 
+if(POLICY CMP0125)
+  cmake_policy(SET CMP0125 NEW)
+endif()
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
@@ -14,7 +18,14 @@ include(ExternalProject)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(Python3 COMPONENTS Interpreter REQUIRED)
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
+set(PYTHON_INCLUDE_DIRS ${Python3_INCLUDE_DIRS})
+set(PYTHON_LIBRARIES ${Python3_LIBRARIES})
+set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE} CACHE FILEPATH "Legacy Python executable for ROSIDL" FORCE)
+set(PYTHON_INCLUDE_DIRS ${Python3_INCLUDE_DIRS} CACHE PATH "Legacy Python includes for ROSIDL" FORCE)
+set(PYTHON_LIBRARIES ${Python3_LIBRARIES} CACHE FILEPATH "Legacy Python library for ROSIDL" FORCE)
+unset(_lib CACHE)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
@@ -38,6 +49,25 @@ find_package(
   COMPONENTS Core SerialPort Network Widgets
   REQUIRED)
 find_package(MAVSDK REQUIRED)
+if(TARGET MAVSDK::mavsdk)
+  get_target_property(mavsdk_interface_include_dirs MAVSDK::mavsdk INTERFACE_INCLUDE_DIRECTORIES)
+  if(mavsdk_interface_include_dirs)
+    set(mavsdk_fixed_include_dirs)
+    foreach(mavsdk_include_dir IN LISTS mavsdk_interface_include_dirs)
+      if(mavsdk_include_dir STREQUAL "/include")
+        list(APPEND mavsdk_fixed_include_dirs /usr/include)
+      elseif(mavsdk_include_dir MATCHES "^/include/")
+        string(REGEX REPLACE "^/include" "/usr/include" mavsdk_include_dir "${mavsdk_include_dir}")
+        list(APPEND mavsdk_fixed_include_dirs "${mavsdk_include_dir}")
+      else()
+        list(APPEND mavsdk_fixed_include_dirs "${mavsdk_include_dir}")
+      endif()
+    endforeach()
+    set_target_properties(MAVSDK::mavsdk PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES "${mavsdk_fixed_include_dirs}"
+    )
+  endif()
+endif()
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
@@ -57,7 +87,14 @@ if(EXISTS "${PX4_MSGS_SOURCE_DIR}/CMakeLists.txt")
     CMAKE_ARGS
       -DBUILD_TESTING=OFF
       -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
+      -DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}
+      -DCMAKE_LIBRARY_PATH=${CMAKE_LIBRARY_PATH}
       -DPython3_EXECUTABLE=${Python3_EXECUTABLE}
+      -DPython3_INCLUDE_DIRS=${Python3_INCLUDE_DIRS}
+      -DPython3_LIBRARIES=${Python3_LIBRARIES}
+      -DPYTHON_EXECUTABLE=${Python3_EXECUTABLE}
+      -DPYTHON_INCLUDE_DIRS=${Python3_INCLUDE_DIRS}
+      -DPYTHON_LIBRARIES=${Python3_LIBRARIES}
       -DPX4_AUTOPILOT_DIR=${PX4_AUTOPILOT_DIR}
   )
 else()

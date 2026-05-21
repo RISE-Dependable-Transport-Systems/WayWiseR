@@ -117,6 +117,49 @@ colcon_supports_allow_overriding() {
     colcon build --help 2>/dev/null | grep -q -- "--allow-overriding"
 }
 
+sync_package_logs() {
+    local source_log_base="$1"
+    local target_log_base="$2"
+
+    [[ -d "$source_log_base" ]] || return 0
+    [[ "$source_log_base" != "$target_log_base" ]] || return 0
+
+    rm -rf "$target_log_base"
+    mkdir -p "$(dirname "$target_log_base")"
+    cp -a "$source_log_base" "$target_log_base"
+}
+
+# Drop stale overlay prefixes left behind by a previously sourced install space.
+# Package builds clean build/install trees between runs, so pruning keeps colcon
+# from inheriting dead overlay entries during configure.
+prune_missing_prefix_paths() {
+    local var value IFS entry new_value
+    local -a prefix_vars=(
+        AMENT_PREFIX_PATH
+        CMAKE_PREFIX_PATH
+        COLCON_PREFIX_PATH
+    )
+
+    for var in "${prefix_vars[@]}"; do
+        value="${!var:-}"
+        [[ -n "$value" ]] || continue
+
+        new_value=""
+        IFS=':'
+        for entry in $value; do
+            [[ -z "$entry" || -e "$entry" ]] || continue
+            new_value+="${new_value:+:}$entry"
+        done
+        unset IFS
+
+        if [[ -n "$new_value" ]]; then
+            export "$var=$new_value"
+        else
+            unset "$var"
+        fi
+    done
+}
+
 debianize_ros_name() {
     printf 'ros-%s-%s' "$ros_distro" "${1//_/-}"
 }
@@ -193,16 +236,21 @@ run_host() {
     local container_repo_dir
     local host_uid
     local host_gid
+    local docker_cmake_args
+    local docker_multiarch
+    local package_user_cmake_args
 
     arch="$requested_arch"
     case "$arch" in
         amd64)
             platform="linux/amd64"
+            docker_multiarch="x86_64-linux-gnu"
             image="${WAYWISER_DEB_IMAGE:-${WAYWISER_DEB_AMD64_IMAGE:-$default_amd64_image}}"
             ;;
         arm64|aarch64)
             platform="linux/arm64"
             arch="arm64"
+            docker_multiarch="aarch64-linux-gnu"
             image="${WAYWISER_DEB_IMAGE:-${WAYWISER_DEB_ARM64_IMAGE:-$default_arm64_image}}"
             ;;
         *) echo "Usage: $0 [amd64|arm64]..." >&2; exit 2 ;;
@@ -214,6 +262,8 @@ run_host() {
     container_repo_dir="$workspace/$relative_repo_dir"
     host_uid="$(id -u)"
     host_gid="$(id -g)"
+    docker_cmake_args="-DPython3_EXECUTABLE=/usr/bin/python3 -DPYTHON_EXECUTABLE=/usr/bin/python3 -DPYTHON_INCLUDE_DIRS=/usr/include/python3.10 -DPYTHON_LIBRARIES=/usr/lib/$docker_multiarch/libpython3.10.so -DCMAKE_POLICY_DEFAULT_CMP0125=NEW -DCMAKE_LIBRARY_PATH=/usr/lib/$docker_multiarch;/lib/$docker_multiarch;/opt/ros/$ros_distro/lib -DOPENSSL_CRYPTO_LIBRARY=/usr/lib/$docker_multiarch/libcrypto.so -DOPENSSL_SSL_LIBRARY=/usr/lib/$docker_multiarch/libssl.so -DOPENSSL_INCLUDE_DIR=/usr/include"
+    package_user_cmake_args="${WAYWISER_CMAKE_ARGS:-}"
 
     MAVSDK_DEB_PATH="$(stage_mavsdk_deb "$arch" | tail -n 1 || true)"
     export MAVSDK_DEB_PATH
@@ -242,7 +292,9 @@ run_host() {
         -e WAYWISER_DEB_UBUNTU_LABEL="${WAYWISER_DEB_UBUNTU_LABEL:-}" \
         -e WAYWISER_DEB_MAINTAINER="${WAYWISER_DEB_MAINTAINER:-}" \
         -e WAYWISER_SKIPPED_PACKAGES="${WAYWISER_SKIPPED_PACKAGES:-}" \
-        -e WAYWISER_CMAKE_ARGS="${WAYWISER_CMAKE_ARGS:-}" \
+        -e WAYWISER_CMAKE_ARGS= \
+        -e WAYWISER_PACKAGE_CMAKE_ARGS="$docker_cmake_args" \
+        -e WAYWISER_PACKAGE_USER_CMAKE_ARGS="$package_user_cmake_args" \
         -e WAYWISER_COLCON_PARALLEL_WORKERS="${WAYWISER_COLCON_PARALLEL_WORKERS:-}" \
         -e WAYWISER_PACKAGE_CLEAN="${WAYWISER_PACKAGE_CLEAN:-}" \
         -e CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-}" \
@@ -448,6 +500,7 @@ run_container() {
     local ubuntu_label="${WAYWISER_DEB_UBUNTU_LABEL:-ubuntu22-04}"
     local skipped_packages="${WAYWISER_SKIPPED_PACKAGES:-}"
     local deb_arch
+    local deb_multiarch
     local package_env_file
     local host_uid="${WAYWISER_HOST_UID:-}"
     local host_gid="${WAYWISER_HOST_GID:-}"
@@ -504,6 +557,7 @@ run_container() {
         gnupg \
         lsb-release \
         python3-colcon-common-extensions \
+        python3-dev \
         python3-pip \
         python3-rosdep \
         sudo
@@ -522,7 +576,17 @@ run_container() {
     set +u
     source "/opt/ros/$ros_distro/setup.bash"
     source "$WAYWISER_VENV_PATH/bin/activate"
+    source "/opt/ros/$ros_distro/setup.bash"
+    prune_missing_prefix_paths
+    export PATH="$WAYWISER_VENV_PATH/bin:$PATH"
     set -u
+
+    unset WAYWISER_ENV_FILE
+
+    deb_multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || true)"
+    if [[ -n "$deb_multiarch" ]]; then
+        export CMAKE_LIBRARY_PATH="/usr/lib/$deb_multiarch:/lib/$deb_multiarch:/opt/ros/$ros_distro/lib${CMAKE_LIBRARY_PATH:+:$CMAKE_LIBRARY_PATH}"
+    fi
 
     base_paths=("$workspace/src")
     allow_overriding=()
@@ -536,20 +600,72 @@ run_container() {
         "-U*_LIBRARY"
         "-U*_LIBRARIES"
         -DCMAKE_BUILD_TYPE=Release
+        -DPython3_EXECUTABLE=/usr/bin/python3
+        -DPYTHON_EXECUTABLE=/usr/bin/python3
+        -DCMAKE_POLICY_DEFAULT_CMP0125=NEW
     )
-    if [[ -n "${WAYWISER_CMAKE_ARGS:-}" ]]; then
+    if [[ -n "$deb_multiarch" ]]; then
+        cmake_args+=("-DCMAKE_LIBRARY_PATH=/usr/lib/$deb_multiarch;/lib/$deb_multiarch;/opt/ros/$ros_distro/lib")
+        if [[ -f "/usr/lib/$deb_multiarch/libcrypto.so" && -f "/usr/lib/$deb_multiarch/libssl.so" ]]; then
+            cmake_args+=(
+                "-DOPENSSL_CRYPTO_LIBRARY=/usr/lib/$deb_multiarch/libcrypto.so"
+                "-DOPENSSL_SSL_LIBRARY=/usr/lib/$deb_multiarch/libssl.so"
+                -DOPENSSL_INCLUDE_DIR=/usr/include
+            )
+        fi
+        if [[ -f "/usr/lib/$deb_multiarch/liborocos-kdl.so" ]]; then
+            cmake_args+=("-Dorocos_kdl_LIBRARY=/usr/lib/$deb_multiarch/liborocos-kdl.so")
+        fi
+        if [[ -d /usr/include/python3.10 && -f "/usr/lib/$deb_multiarch/libpython3.10.so" ]]; then
+            cmake_args+=(
+                -DPYTHON_INCLUDE_DIRS=/usr/include/python3.10
+                "-DPYTHON_LIBRARIES=/usr/lib/$deb_multiarch/libpython3.10.so"
+            )
+        fi
+    fi
+    if [[ -n "${WAYWISER_PACKAGE_CMAKE_ARGS:-}" ]]; then
+        # shellcheck disable=SC2206
+        extra_cmake_args=($WAYWISER_PACKAGE_CMAKE_ARGS)
+        cmake_args+=("${extra_cmake_args[@]}")
+    fi
+    if [[ -n "${WAYWISER_PACKAGE_USER_CMAKE_ARGS:-}" ]]; then
+        # shellcheck disable=SC2206
+        extra_cmake_args=($WAYWISER_PACKAGE_USER_CMAKE_ARGS)
+        cmake_args+=("${extra_cmake_args[@]}")
+    elif [[ -n "${WAYWISER_CMAKE_ARGS:-}" ]]; then
+        # Preserve direct container-mode overrides for callers that invoke this
+        # script without going through run_host.
         # shellcheck disable=SC2206
         extra_cmake_args=($WAYWISER_CMAKE_ARGS)
         cmake_args+=("${extra_cmake_args[@]}")
     fi
 
+    # Keep package-time wrapper state out of the actual colcon/CMake process.
+    # The arm64 build succeeds with a minimal environment, but wrapper-only
+    # variables from the CI image and packaging flow can leak into package hooks
+    # for downstream packages and destabilize configure-time dependency lookup.
+    unset WAYWISER_CMAKE_ARGS
+    unset WAYWISER_ENV_FILE
+    unset WAYWISER_OPENSSL_CMAKE_ARGS
+    unset WAYWISER_PACKAGE_CMAKE_ARGS
+    unset WAYWISER_PACKAGE_MODE
+    unset WAYWISER_PACKAGE_USER_CMAKE_ARGS
+    unset WAYWISER_PYTHON_EXTRAS
+    unset WAYWISER_REUSE_VENV
+    unset WAYWISER_UNDERLAY_SETUP
+    unset WAYWISER_UNDERLAY_WS
+    unset WAYWISER_USER
+
     info "Building workspace for package staging..."
     if [[ "${WAYWISER_NATIVE_PACKAGE_BUILD:-false}" == "true" ]]; then
         build_base="${WAYWISER_BUILD_BASE:-$workspace/build}"
         install_base="${WAYWISER_INSTALL_BASE:-$workspace/install}"
+        log_base="${WAYWISER_LOG_BASE:-$workspace/log}"
     else
-        build_base="${WAYWISER_BUILD_BASE:-$workspace/build-$deb_arch}"
-        install_base="${WAYWISER_INSTALL_BASE:-$workspace/install-$deb_arch}"
+        local package_tmp_root="${WAYWISER_PACKAGE_TMP_ROOT:-/tmp/waywiser-package-$deb_arch}"
+        build_base="${WAYWISER_BUILD_BASE:-$package_tmp_root/build}"
+        install_base="${WAYWISER_INSTALL_BASE:-$package_tmp_root/install}"
+        log_base="${WAYWISER_LOG_BASE:-$package_tmp_root/log}"
         if [[ "${WAYWISER_PACKAGE_CLEAN:-true}" == "true" ]]; then
             rm -rf "$build_base" "$install_base" "$log_base"
         fi
@@ -579,12 +695,22 @@ run_container() {
     cd "$workspace"
     if [[ " $skipped_packages " != *" waywiser_gazebo "* ]]; then
         info "Prebuilding waywiser_core before waywiser_gazebo to avoid PX4 submodule lock contention..."
+        colcon_status=0
         colcon --log-base "$log_base" build "${colcon_args[@]}" \
             --packages-up-to waywiser_core \
-            --cmake-args "${cmake_args[@]}"
+            --cmake-args "${cmake_args[@]}" || colcon_status=$?
+        sync_package_logs "$log_base" "$workspace/log-$deb_arch"
+        if [[ $colcon_status -ne 0 ]]; then
+            exit $colcon_status
+        fi
     fi
 
-    colcon --log-base "$log_base" build "${colcon_args[@]}" --cmake-args "${cmake_args[@]}"
+    colcon_status=0
+    colcon --log-base "$log_base" build "${colcon_args[@]}" --cmake-args "${cmake_args[@]}" || colcon_status=$?
+    sync_package_logs "$log_base" "$workspace/log-$deb_arch"
+    if [[ $colcon_status -ne 0 ]]; then
+        exit $colcon_status
+    fi
     cd "$repo_dir"
 
     rm -rf "$install_tmp"
@@ -615,7 +741,7 @@ run_container() {
         for path in "$package_install_dir"/*; do
             name="$(basename "$path")"
             case "$name" in
-                bin|include|lib|share)
+                bin|include|lib|local|share)
                     cp -aL "$path" "$package_stage/opt/ros/$ros_distro/"
                     ;;
             esac

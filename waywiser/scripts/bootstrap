@@ -513,6 +513,7 @@ Check packages to BUILD (uncheck to skip).
             build-essential
             cmake
             python3-colcon-common-extensions
+            python3-dev
             curl
             software-properties-common
         )

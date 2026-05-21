@@ -2,12 +2,17 @@ cmake_minimum_required(VERSION 3.8)
 cmake_policy(SET CMP0071 NEW)
 project(waywiser)
 
+if(POLICY CMP0125)
+  cmake_policy(SET CMP0125 NEW)
+endif()
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+unset(_lib CACHE)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 
