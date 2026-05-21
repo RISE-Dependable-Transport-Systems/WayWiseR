@@ -7,6 +7,13 @@
 
 void CopterAutopilotComponent::reset()
 {
+  if (mWaypointFollower) {
+    mWaypointFollower->clearRoute();
+    mWaypointFollower->resetState();
+  }
+  mWaypointList.clear();
+  updateMissionState(MissionState::WaitingForVehicleInit);
+
   if (mAutopilotMovementController) {
     mAutopilotMovementController->setDesiredSpeed(0.0);
     mAutopilotMovementController->setDesiredSteering(0.0);
@@ -72,6 +79,18 @@ void CopterAutopilotComponent::setupAutopilot(QSharedPointer<EmergencyStopState>
 
   mAutopilotMovementController.reset(new MovementController(mCopterState));
 
+  mWaypointFollower.reset(new CopterWaypointFollower(mAutopilotMovementController, mMissionPosTypeUsed));
+  mWaypointFollower->setRepeatRoute(false);
+  mWaypointFollower->setWaypointProximity(mWaypointProximity);
+  mWaypointFollower->setEndGoalAlignmentThreshold(mEndGoalAlignmentThreshold);
+  mWaypointFollower->setCruiseSpeed(mCruiseSpeed);
+  mWaypointFollower->setMaxSpeed(mMaxMissionSpeed);
+  mWaypointFollower->setMinApproachSpeed(mMinApproachSpeed);
+  mWaypointFollower->setApproachSlowdownRadius(mApproachSlowdownRadius);
+  mWaypointFollower->setFaceTravelDirection(mFaceTravelDirection);
+  mWaypointFollower->setYawGain(mYawGain);
+  mWaypointFollower->setMaxYawRate(mMaxYawRate);
+
   // -- MAVLINK communication towards ControlTower --
   if (mEnableMavlinkInterface) {
     mMavsdkVehicleServer.reset(
@@ -80,6 +99,7 @@ void CopterAutopilotComponent::setupAutopilot(QSharedPointer<EmergencyStopState>
         QHostAddress(QString::fromStdString(mWaywiseControlTowerAddress)),
         mWaywiseControlTowerPort));
     mMavsdkVehicleServer->setMovementController(mAutopilotMovementController);
+    mMavsdkVehicleServer->setWaypointFollower(mWaypointFollower);
     mMavsdkVehicleServer->setTransferLogs(false);
   }
 }
@@ -92,4 +112,216 @@ void CopterAutopilotComponent::provideParametersToParameterServer()
   if (mMavsdkVehicleServer) {
     mMavsdkVehicleServer->provideParametersToParameterServer();
   }
+}
+
+void CopterAutopilotComponent::processMissionStateMachine()
+{
+  const bool vehicleInitialized =
+    mVehicleInitialized ||
+    (!mRequireGnssForMission &&
+    !mCopterState->getPosition(mMissionPosTypeUsed).getTime().isNull());
+
+  if (!vehicleInitialized) {
+    if (currentMissionState != MissionState::WaitingForVehicleInit) {
+      updateMissionState(MissionState::WaitingForVehicleInit);
+    }
+    return;
+  }
+
+  if (mRequireGnssForMission) {
+    switch (mGnssFixStatus.fixType) {
+      case GNSS_FIX_TYPE::NO_FIX:
+      case GNSS_FIX_TYPE::TIME_ONLY_FIX:
+        if (currentMissionState != MissionState::WaitingForVehicleInit) {
+          updateMissionState(MissionState::WaitingForVehicleInit);
+        }
+        return;
+      default:
+        break;
+    }
+  }
+
+  switch (currentMissionState) {
+    case MissionState::WaitingForVehicleInit:
+      updateMissionState(MissionState::Idle);
+      break;
+
+    case MissionState::Idle:
+      if (mWaypointFollower->isActive()) {
+        if (mWaypointFollower->getCurrentRoute().size() > 0) {
+          mWaypointList = mWaypointFollower->getCurrentRoute();
+          updateMissionState(CoreUtils::convertToMissionState(
+              mWaypointFollower->getCurrentState().stmState));
+        } else {
+          updateMissionState(MissionState::WaitingForRoute);
+        }
+      }
+      break;
+
+    case MissionState::WaitingForRoute:
+      if (!mWaypointList.isEmpty()) {
+        if (mEmergencyStopState->is_active()) {
+          updateMissionState(MissionState::WaitingForEmergencyStopClear);
+        } else if (mRequireGnssForMission && !assertGnssFixAccuracy()) {
+          updateMissionState(MissionState::WaitingForGnssAccuracy);
+          emit gnssFixAccuracyAssertionFailed(mGnssFixStatus);
+        } else {
+          startWaypointFollower(mWaypointList);
+          updateMissionState(MissionState::FollowRouteInit);
+        }
+      } else if (mWaypointFollower->getCurrentRoute().size() > 0) {
+        mWaypointList = mWaypointFollower->getCurrentRoute();
+        updateMissionState(CoreUtils::convertToMissionState(
+            mWaypointFollower->getCurrentState().stmState));
+      }
+      break;
+
+    case MissionState::WaitingForEmergencyStopClear:
+      if (mEmergencyStopState->is_clear()) {
+        updateMissionState(MissionState::Idle);
+      }
+      break;
+
+    case MissionState::WaitingForGnssAccuracy:
+      if (!mRequireGnssForMission || assertGnssFixAccuracy()) {
+        if (mWaypointList.isEmpty()) {
+          updateMissionState(MissionState::WaitingForRoute);
+        } else if (mEmergencyStopState->is_active()) {
+          updateMissionState(MissionState::WaitingForEmergencyStopClear);
+        } else {
+          startWaypointFollower(mWaypointList);
+          updateMissionState(MissionState::FollowRouteInit);
+        }
+      } else if (mWaypointFollower->isActive()) {
+        stopWaypointFollower();
+        emit gnssFixAccuracyAssertionFailed(mGnssFixStatus);
+      }
+      break;
+
+    case MissionState::FollowRouteInit:
+    case MissionState::FollowRouteGotoBegin:
+    case MissionState::FollowRouteFollowing:
+    case MissionState::FollowRouteApproachingEndGoal:
+      if (mEmergencyStopState->is_active()) {
+        stopWaypointFollower();
+        updateMissionState(MissionState::WaitingForEmergencyStopClear);
+      } else if (mRequireGnssForMission && !assertGnssFixAccuracy()) {
+        stopWaypointFollower();
+        updateMissionState(MissionState::WaitingForGnssAccuracy);
+        emit gnssFixAccuracyAssertionFailed(mGnssFixStatus);
+      } else {
+        WayPointFollowerSTMstates wayPointFollowerSTMstate =
+          mWaypointFollower->getCurrentState().stmState;
+        if (CoreUtils::convertToWayPointFollowerSTMstates(currentMissionState) !=
+          wayPointFollowerSTMstate)
+        {
+          updateMissionState(CoreUtils::convertToMissionState(wayPointFollowerSTMstate));
+        }
+
+        if (wayPointFollowerSTMstate == WayPointFollowerSTMstates::FOLLOW_ROUTE_FINISHED ||
+          (currentMissionState == MissionState::FollowRouteApproachingEndGoal &&
+          !mWaypointFollower->isActive()))
+        {
+          updateMissionState(MissionState::FollowRouteFinished);
+        }
+      }
+      break;
+
+    case MissionState::FollowRouteFinished:
+      stopWaypointFollower();
+      break;
+
+    default:
+      break;
+  }
+}
+
+void CopterAutopilotComponent::switchAutopilot(bool enable)
+{
+  if (enable) {
+    if (currentMissionState == MissionState::Idle) {
+      updateMissionState(MissionState::WaitingForRoute);
+    } else if (currentMissionState == MissionState::WaitingForVehicleInit) {
+      qDebug() << "Waiting for vehicle init, ignoring autopilot start request.";
+    }
+  } else if (currentMissionState != MissionState::Idle) {
+    stopWaypointFollower();
+    updateMissionState(MissionState::Idle);
+  }
+}
+
+void CopterAutopilotComponent::startWaypointFollower(QList<PosPoint> & waypointList)
+{
+  mWaypointFollower->clearRoute();
+  mWaypointFollower->resetState();
+  mWaypointFollower->addRoute(waypointList);
+  mWaypointFollower->startFollowingRoute(false);
+  qDebug() << "Started copter waypoint follower with a route of " << waypointList.size() <<
+    " waypoints";
+}
+
+void CopterAutopilotComponent::stopWaypointFollower()
+{
+  mWaypointFollower->stop();
+  updateMissionState(MissionState::Idle);
+  if (mAutopilotMovementController) {
+    mAutopilotMovementController->setDesiredSpeed(0.0);
+    mAutopilotMovementController->setDesiredSteering(0.0);
+  }
+  qDebug() << "Copter waypoint follower is stopped.";
+}
+
+bool CopterAutopilotComponent::isActive()
+{
+  return mWaypointFollower && mWaypointFollower->isActive();
+}
+
+void CopterAutopilotComponent::updateWaypointFollowerRoute(QList<PosPoint> & waypointList)
+{
+  switch (currentMissionState) {
+    case MissionState::FollowRouteInit:
+    case MissionState::FollowRouteGotoBegin:
+    case MissionState::FollowRouteFollowing:
+    case MissionState::FollowRouteApproachingEndGoal:
+      stopWaypointFollower();
+      startWaypointFollower(waypointList);
+      mWaypointList = mWaypointFollower->getCurrentRoute();
+      break;
+    default:
+      mWaypointList = waypointList;
+      break;
+  }
+}
+
+geometry_msgs::msg::Twist CopterAutopilotComponent::getAutopilotTwistCommand() const
+{
+  geometry_msgs::msg::Twist twist;
+  if (!mWaypointFollower) {
+    return twist;
+  }
+
+  const CopterVelocityCommand command = mWaypointFollower->getDesiredVelocityCommand();
+  twist.linear.x = command.forward;
+  twist.linear.y = command.left;
+  twist.linear.z = command.up;
+  twist.angular.z = command.yawRate;
+  return twist;
+}
+
+void CopterAutopilotComponent::updateMissionState(MissionState state)
+{
+  currentMissionState = state;
+  qDebug() << "MissionState: " << CoreUtils::missionStateToString(currentMissionState).c_str();
+  emit updatedMissionState(currentMissionState);
+}
+
+bool CopterAutopilotComponent::assertGnssFixAccuracy()
+{
+  if (mGnssFixStatus.horizontalAccuracy > mPositionAccuracyThresholdForMission ||
+    mGnssFixStatus.verticalAccuracy > mYawAccuracyThresholdForMission)
+  {
+    return false;
+  }
+
+  return true;
 }

@@ -29,7 +29,9 @@
 #include "tf2_ros/transform_broadcaster.h"
 #include "tf2_ros/transform_listener.h"
 #include "waywiser_core/msg/battery_state.hpp"
+#include "waywiser_core/msg/mission_state.hpp"
 #include "waywiser_core/msg/nav_sat_fix_extended.hpp"
+#include "waywiser_core/msg/path_with_twists.hpp"
 #include "waywiser_core/msg/quadcopter_state.hpp"
 #include "waywiser_twist_safety/msg/emergency_stop_state.hpp"
 
@@ -88,7 +90,9 @@ protected:
     const px4_msgs::msg::VehicleLocalPosition::SharedPtr msg);
   void px4_vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
   void arm_command_callback(const std_msgs::msg::Bool::SharedPtr msg);
+  void autopilot_state_control_callback(const std_msgs::msg::Bool::SharedPtr bool_msg);
   void twist_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg);
+  void path_with_twists_callback(const waywiser_core::msg::PathWithTwists::SharedPtr msg);
   void fused_nav_sat_fix_extended_callback(
     const waywiser_core::msg::NavSatFixExtended::SharedPtr msg);
   void range_callback(const sensor_msgs::msg::Range::SharedPtr msg);
@@ -137,6 +141,8 @@ protected:
   std::string battery_state_topic_;
   std::string emergency_stop_status_topic_;
   std::string emergency_stop_update_topic_;
+  std::string autopilot_state_control_topic_;
+  std::string mission_status_topic_;
 
   bool enable_autopilot_component_ = false;
   bool publish_odom_to_baselink_tf_ = true;
@@ -157,6 +163,7 @@ protected:
   rclcpp::Publisher<waywiser_twist_safety::msg::EmergencyStopState>::SharedPtr
     emergency_stop_update_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_out_pub_;
+  rclcpp::Publisher<waywiser_core::msg::MissionState>::SharedPtr mission_status_pub_;
 
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_command_sub_;
@@ -175,8 +182,11 @@ protected:
     fused_nav_sat_fix_extended_sub_;
   rclcpp::Subscription<waywiser_twist_safety::msg::EmergencyStopState>::SharedPtr
     emergency_stop_status_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr autopilot_state_control_sub_;
+  rclcpp::Subscription<waywiser_core::msg::PathWithTwists>::SharedPtr path_with_twists_sub_;
 
   rclcpp::TimerBase::SharedPtr node_management_timer_;
+  rclcpp::TimerBase::SharedPtr autopilot_state_machine_timer_;
   rclcpp::TimerBase::SharedPtr setpoint_timer_;
 
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_pub_;

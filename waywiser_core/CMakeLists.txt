@@ -187,6 +187,8 @@ set(WAYWISE_CAR_SOURCES
 
 set(WAYWISE_COPTER_SOURCES
   WayWise/vehicles/copterstate.cpp
+  WayWise/autopilot/copterwaypointfollower.cpp
+  WayWise/autopilot/copterwaypointfollower.h
 )
 
 set(WAYWISE_TRUCK_SOURCES

@@ -5,9 +5,13 @@
 
 #include <array>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <iomanip>
+#include <sstream>
 
 #include "tf2/LinearMath/Quaternion.h"
+#include "tf2/utils.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "waywiser/waywiser_utils.hpp"
 #include "copter_interface_component.hpp"
@@ -21,6 +25,28 @@ constexpr float kLandingHeightMargin = 0.15F;
 constexpr float kTakeoffHeightMargin = 0.10F;
 constexpr double kInputCommandThreshold = 0.001;
 constexpr double kInputCommandTimeout = 0.25;
+
+PosType parse_pos_type(const std::string & value)
+{
+  std::string normalized = value;
+  std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char c) {
+      return static_cast<char>(std::tolower(c));
+    });
+
+  if (normalized == "fused") {
+    return PosType::fused;
+  }
+  if (normalized == "gnss") {
+    return PosType::GNSS;
+  }
+  if (normalized == "uwb") {
+    return PosType::UWB;
+  }
+  if (normalized == "simulated") {
+    return PosType::simulated;
+  }
+  return PosType::odom;
+}
 }  // namespace
 
 void WaywiserCopter::initialize_node()
@@ -85,6 +111,9 @@ void WaywiserCopter::setup_parameters()
     "emergency_stop_status_topic", "/emergency_stop/current_state");
   emergency_stop_update_topic_ = declare_parameter(
     "emergency_stop_update_topic", "/emergency_stop/target_state");
+  autopilot_state_control_topic_ = declare_parameter(
+    "autopilot_state_control_topic", "/autopilot_state_control");
+  mission_status_topic_ = declare_parameter("mission_status_topic", "/mission_status");
 
   publish_odom_to_baselink_tf_ = declare_parameter("publish_odom_to_baselink_tf", true);
   publish_world_to_odom_tf_ = declare_parameter("publish_world_to_odom_tf", false);
@@ -130,12 +159,37 @@ void WaywiserCopter::setup_parameters()
       declare_parameter("vehicle_interface_type", std::string("ext_simulated"))));
 
   if (enable_autopilot_component_) {
+    mCopterAutopilotComponent->setAutopilotTimerRate(
+      declare_parameter("autopilot_timer_rate", 10));
     mCopterAutopilotComponent->setEnableMavlinkInterface(
       declare_parameter("enable_mavlink_interface", true));
     mCopterAutopilotComponent->setWaywiseControlTowerAddress(
       declare_parameter("waywise_control_tower_address", std::string("127.0.0.1")));
     mCopterAutopilotComponent->setWaywiseControlTowerPort(
       declare_parameter("waywise_control_tower_port", 14540));
+    mCopterAutopilotComponent->setMissionPosTypeUsed(
+      parse_pos_type(declare_parameter("mission_position_type", std::string("odom"))));
+    mCopterAutopilotComponent->setRequireGnssForMission(
+      declare_parameter("require_gnss_for_mission", false));
+    mCopterAutopilotComponent->setWaypointProximity(
+      declare_parameter("mission_waypoint_proximity", 0.5));
+    mCopterAutopilotComponent->setEndGoalAlignmentThreshold(
+      declare_parameter("mission_end_goal_alignment_threshold", 0.25));
+    mCopterAutopilotComponent->setCruiseSpeed(declare_parameter("mission_cruise_speed", 1.0));
+    mCopterAutopilotComponent->setMaxMissionSpeed(
+      declare_parameter("mission_max_speed", 2.0));
+    mCopterAutopilotComponent->setMinApproachSpeed(
+      declare_parameter("mission_min_approach_speed", 0.1));
+    mCopterAutopilotComponent->setApproachSlowdownRadius(
+      declare_parameter("mission_approach_slowdown_radius", 1.5));
+    mCopterAutopilotComponent->setFaceTravelDirection(
+      declare_parameter("mission_face_travel_direction", true));
+    mCopterAutopilotComponent->setYawGain(declare_parameter("mission_yaw_gain", 1.5));
+    mCopterAutopilotComponent->setMaxYawRate(declare_parameter("mission_max_yaw_rate", 1.0));
+    mCopterAutopilotComponent->setPositionAccuracyThresholdForMission(
+      declare_parameter("position_accuracy_threshold_for_mission", 0.5));
+    mCopterAutopilotComponent->setYawAccuracyThresholdForMission(
+      declare_parameter("yaw_accuracy_threshold_for_mission", 5.0));
   }
 
   auto vector3_param = RosUtils::get_vector3_param(this, "enuref");
@@ -177,6 +231,30 @@ void WaywiserCopter::setup_publishers()
     emergency_stop_update_pub_ =
       create_publisher<waywiser_twist_safety::msg::EmergencyStopState>(
       emergency_stop_update_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
+  }
+  if (enable_autopilot_component_ && !mission_status_topic_.empty()) {
+    mission_status_pub_ =
+      create_publisher<waywiser_core::msg::MissionState>(
+      mission_status_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
+
+    QObject::connect(
+      mCopterAutopilotComponent.get(), &CopterAutopilotComponent::gnssFixAccuracyAssertionFailed,
+      [&](GnssFixStatus gnssFixStatus) {
+        if (emergency_stop_update_pub_ && !mEmergencyStopState->is_active()) {
+          std::stringstream emergency_stop_reason;
+          emergency_stop_reason << "GNSS accuracy dropped below thresholds: " <<
+            std::fixed << std::setprecision(2) << gnssFixStatus.horizontalAccuracy <<
+            " m and " << std::fixed << std::setprecision(2) <<
+            gnssFixStatus.headingAccuracy << " deg.";
+
+          auto emergency_stop_msg = waywiser_twist_safety::msg::EmergencyStopState();
+          emergency_stop_msg.state = waywiser_twist_safety::msg::EmergencyStopState::ACTIVE;
+          emergency_stop_msg.sender_id = this->get_name();
+          emergency_stop_msg.stamp = this->get_clock()->now();
+          emergency_stop_msg.reason = emergency_stop_reason.str();
+          emergency_stop_update_pub_->publish(emergency_stop_msg);
+        }
+      });
   }
 
   cmd_vel_out_pub_ = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel_out", 10);
@@ -239,6 +317,19 @@ void WaywiserCopter::setup_subscribers()
       emergency_stop_status_topic_, 10,
       std::bind(&WaywiserCopter::emergency_stop_status_callback, this, _1));
   }
+
+  if (enable_autopilot_component_) {
+    if (!autopilot_state_control_topic_.empty()) {
+      autopilot_state_control_sub_ = create_subscription<std_msgs::msg::Bool>(
+        autopilot_state_control_topic_,
+        QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS,
+        std::bind(&WaywiserCopter::autopilot_state_control_callback, this, _1));
+    }
+
+    path_with_twists_sub_ = create_subscription<waywiser_core::msg::PathWithTwists>(
+      "waywiser_path", QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS,
+      std::bind(&WaywiserCopter::path_with_twists_callback, this, _1));
+  }
 }
 
 void WaywiserCopter::setup_timers()
@@ -258,6 +349,16 @@ void WaywiserCopter::setup_timers()
       this->get_clock(),
       std::chrono::milliseconds(static_cast<int>(1000.0 / setpoint_rate_)),
       std::bind(&WaywiserCopter::setpoint_timer_callback, this));
+  }
+
+  if (enable_autopilot_component_) {
+    autopilot_state_machine_timer_ = rclcpp::create_timer(
+      this->get_node_base_interface(),
+      this->get_node_timers_interface(),
+      this->get_clock(),
+      std::chrono::milliseconds(1000 / mCopterAutopilotComponent->getAutopilotTimerRate()),
+      std::bind(&CopterAutopilotComponent::processMissionStateMachine, mCopterAutopilotComponent)
+    );
   }
 }
 
@@ -280,6 +381,13 @@ void WaywiserCopter::node_management_timer_callback()
   if (publish_odom_to_baselink_tf_ || publish_world_to_odom_tf_) {
     publish_tfs();
   }
+
+  if (enable_autopilot_component_ && mission_status_pub_) {
+    waywiser_core::msg::MissionState missionStateMsg;
+    missionStateMsg.state =
+      static_cast<uint8_t>(mCopterAutopilotComponent->getCurrentMissionState());
+    mission_status_pub_->publish(missionStateMsg);
+  }
 }
 
 void WaywiserCopter::emergency_stop_status_callback(
@@ -301,6 +409,11 @@ void WaywiserCopter::odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom
 
   CoreUtils::update_pospoint_from_pose(
     mCopterState, {0.0, 0.0, 0.0}, odom_msg->pose.pose, PosType::odom);
+  if (mCopterAutopilotComponent &&
+    mCopterAutopilotComponent->getMissionPosTypeUsed() == PosType::odom)
+  {
+    mCopterAutopilotComponent->setVehicleInitialized(true);
+  }
 
   mCopterState->setVelocity(
     xyz_t{
@@ -715,7 +828,42 @@ void WaywiserCopter::publish_quadcopter_state()
 
 void WaywiserCopter::twist_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg)
 {
+  if (mCopterAutopilotComponent && mCopterAutopilotComponent->isActive()) {
+    mCopterAutopilotComponent->stopWaypointFollower();
+  }
   process_twist_msg(twist_msg);
+}
+
+void WaywiserCopter::autopilot_state_control_callback(
+  const std_msgs::msg::Bool::SharedPtr bool_msg)
+{
+  mCopterAutopilotComponent->switchAutopilot(bool_msg->data);
+}
+
+void WaywiserCopter::path_with_twists_callback(
+  const waywiser_core::msg::PathWithTwists::SharedPtr msg)
+{
+  QList<PosPoint> waypointList;
+  for (size_t i = 0; i < msg->path.poses.size(); ++i) {
+    PosPoint currentPoint;
+    const auto & pose = msg->path.poses[i].pose;
+    currentPoint.setX(pose.position.x);
+    currentPoint.setY(pose.position.y);
+    currentPoint.setHeight(pose.position.z);
+    currentPoint.setYaw(tf2::getYaw(pose.orientation) * 180.0 / M_PI);
+    if (i < msg->twists.size()) {
+      currentPoint.setSpeed(std::hypot(
+          msg->twists[i].linear.x,
+          msg->twists[i].linear.y,
+          msg->twists[i].linear.z));
+    } else {
+      currentPoint.setSpeed(mCopterAutopilotComponent->getCruiseSpeed());
+    }
+
+    waypointList.append(currentPoint);
+  }
+
+  mCopterAutopilotComponent->updateWaypointFollowerRoute(waypointList);
 }
 
 void WaywiserCopter::fused_nav_sat_fix_extended_callback(
@@ -736,6 +884,20 @@ void WaywiserCopter::fused_nav_sat_fix_extended_callback(
   pos_point.setPitch(-msg->pitch);
   pos_point.setTime(QTime::currentTime().addSecs(-QDateTime::currentDateTime().offsetFromUtc()));
   mCopterState->setPosition(pos_point);
+  if (mCopterAutopilotComponent) {
+    GnssFixStatus gnssFixStatus;
+    gnssFixStatus.isFusedOnChip = msg->is_fused_on_chip;
+    gnssFixStatus.fixType = static_cast<GNSS_FIX_TYPE>(msg->fix_type);
+    gnssFixStatus.horizontalAccuracy = msg->horizontal_accuracy;
+    gnssFixStatus.verticalAccuracy = msg->vertical_accuracy;
+    gnssFixStatus.headingAccuracy = msg->heading_accuracy;
+    gnssFixStatus.lastRtcmCorrectionAge = msg->last_rtcm_correction_age;
+    gnssFixStatus.numSatellites = msg->num_satellites;
+    mCopterAutopilotComponent->setGnssFixStatus(gnssFixStatus);
+    if (mCopterAutopilotComponent->getMissionPosTypeUsed() == PosType::fused) {
+      mCopterAutopilotComponent->setVehicleInitialized(true);
+    }
+  }
 }
 
 void WaywiserCopter::range_callback(const sensor_msgs::msg::Range::SharedPtr msg)
@@ -821,6 +983,12 @@ void WaywiserCopter::publish_command()
       set_parameter(rclcpp::Parameter("auto_lift_off", false));
     }
     if (lift_off_command_active) {
+      last_input_command_time_ = get_clock()->now().seconds();
+      if (auto_arm_enabled_ && !armed_ && output.linear.z > 0.001) {
+        request_arm_state(true);
+      }
+    } else if (mCopterAutopilotComponent->isActive()) {
+      output = mCopterAutopilotComponent->getAutopilotTwistCommand();
       last_input_command_time_ = get_clock()->now().seconds();
       if (auto_arm_enabled_ && !armed_ && output.linear.z > 0.001) {
         request_arm_state(true);
