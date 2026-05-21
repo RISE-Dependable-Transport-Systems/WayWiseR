@@ -165,7 +165,7 @@ act --pull=false \
   -j build-and-test
 ```
 
-## Building Debian Packages
+## (Experimental) Build amd64 packages
 
 Build amd64 packages:
 
