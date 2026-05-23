@@ -57,7 +57,7 @@ void WaywiserCopter::initialize_node()
   mCopterState.reset(new CopterState());
   mCopterInterfaceComponent.reset(new CopterInterfaceComponent(this, mCopterState));
 
-  enable_autopilot_component_ = declare_parameter("enable_autopilot_component", false);
+  enable_autopilot_component_ = declare_parameter("enable_autopilot_component", true);
   mCopterAutopilotComponent.reset(new CopterAutopilotComponent(this, mCopterState));
 
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
@@ -114,10 +114,12 @@ void WaywiserCopter::setup_parameters()
   autopilot_state_control_topic_ = declare_parameter(
     "autopilot_state_control_topic", "/autopilot_state_control");
   mission_status_topic_ = declare_parameter("mission_status_topic", "/mission_status");
+  joint_states_topic_ = declare_parameter("joint_states_topic", "/joint_states");
 
   publish_odom_to_baselink_tf_ = declare_parameter("publish_odom_to_baselink_tf", true);
   publish_world_to_odom_tf_ = declare_parameter("publish_world_to_odom_tf", false);
   in_flight_range_threshold_ = declare_parameter("in_air_range_threshold", 0.2);
+  min_steering_height_ = declare_parameter("min_steering_height", 0.5);
   force_arm_ = declare_parameter("force_arm", false);
 
   auto_arm_enabled_ = declare_parameter("auto_arm", true);
@@ -137,6 +139,9 @@ void WaywiserCopter::setup_parameters()
   auto_offboard_ = declare_parameter("auto_offboard", false);
   require_motion_before_engage_ = declare_parameter("require_motion_before_engage", true);
   request_retry_period_ = declare_parameter("request_retry_period", 1.0);
+  // Disabled by default: the control tower already visualises the route it sent.
+  // Set to true in the YAML to publish markers for RViz2 or other consumers.
+  publish_waypoint_markers_ = declare_parameter("publish_waypoint_markers", false);
   mCopterAutopilotComponent->setAutoLiftOffEnabled(
     declare_parameter("auto_lift_off_enabled", true));
   mCopterAutopilotComponent->setAutoLiftOffActive(declare_parameter("auto_lift_off", false));
@@ -253,6 +258,29 @@ void WaywiserCopter::setup_publishers()
           emergency_stop_msg.stamp = this->get_clock()->now();
           emergency_stop_msg.reason = emergency_stop_reason.str();
           emergency_stop_update_pub_->publish(emergency_stop_msg);
+        }
+      });
+  }
+
+  if (enable_autopilot_component_) {
+    route_marker_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>(
+      "waypoint_markers", QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
+    autopilot_marker_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>(
+      "autopilot_markers", QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
+
+    QObject::connect(
+      mCopterAutopilotComponent.get(), &CopterAutopilotComponent::updatedMissionState,
+      [&](MissionState state) {
+        switch (state) {
+          case MissionState::FollowRouteInit:
+            publish_route_markers();
+            break;
+          case MissionState::Idle:
+          case MissionState::FollowRouteFinished:
+            publish_autopilot_markers();
+            break;
+          default:
+            break;
         }
       });
   }
@@ -387,6 +415,10 @@ void WaywiserCopter::node_management_timer_callback()
     missionStateMsg.state =
       static_cast<uint8_t>(mCopterAutopilotComponent->getCurrentMissionState());
     mission_status_pub_->publish(missionStateMsg);
+  }
+
+  if (enable_autopilot_component_ && autopilot_marker_pub_) {
+    publish_autopilot_markers();
   }
 }
 
@@ -756,13 +788,18 @@ void WaywiserCopter::publish_quadcopter_state()
     if (mCopterAutopilotComponent && mCopterAutopilotComponent->getAutoLiftOffActive()) {
       next_state = HighLevelState::AUTO_LIFTING_OFF;
     } else if (in_flight_) {
-      const double now_monotonic = get_clock()->now().seconds();
-      const bool input_command_active =
-        (now_monotonic - last_input_command_time_) <= kInputCommandTimeout;
-      if (!input_command_active) {
-        next_state = hover_hold_on_idle_ ? HighLevelState::HOVERING : HighLevelState::IDLE_DESCENT;
+      if (mCopterAutopilotComponent &&
+          mCopterAutopilotComponent->getCurrentMissionState() != MissionState::Idle) {
+        next_state = HighLevelState::ON_MISSION;
       } else {
-        next_state = HighLevelState::IN_FLIGHT;
+        const double now_monotonic = get_clock()->now().seconds();
+        const bool input_command_active =
+          (now_monotonic - last_input_command_time_) <= kInputCommandTimeout;
+        if (!input_command_active) {
+          next_state = hover_hold_on_idle_ ? HighLevelState::HOVERING : HighLevelState::IDLE_DESCENT;
+        } else {
+          next_state = HighLevelState::IN_FLIGHT;
+        }
       }
     } else if (current_cmd_vel_out_.linear.z > 0.01) {
       next_state = HighLevelState::LIFTING_OFF;
@@ -820,6 +857,9 @@ void WaywiserCopter::publish_quadcopter_state()
       break;
     case HighLevelState::EMERGENCY:
       msg.state_str = "EMERGENCY STOP";
+      break;
+    case HighLevelState::ON_MISSION:
+      msg.state_str = "On Mission";
       break;
   }
 
@@ -989,6 +1029,19 @@ void WaywiserCopter::publish_command()
       }
     } else if (mCopterAutopilotComponent->isActive()) {
       output = mCopterAutopilotComponent->getAutopilotTwistCommand();
+      {
+        // Suppress horizontal motion and yaw until drone is above min_steering_height_ AGL.
+        const float height_agl =
+          (px4_dist_bottom_valid_ && std::isfinite(px4_dist_bottom_))
+          ? px4_dist_bottom_
+          : (has_px4_altitude_ && std::isfinite(latest_px4_altitude_)
+             ? latest_px4_altitude_ : 0.0F);
+        if (height_agl < static_cast<float>(min_steering_height_)) {
+          output.linear.x = 0.0;
+          output.linear.y = 0.0;
+          output.angular.z = 0.0;
+        }
+      }
       last_input_command_time_ = get_clock()->now().seconds();
       if (auto_arm_enabled_ && !armed_ && output.linear.z > 0.001) {
         request_arm_state(true);
@@ -1322,4 +1375,166 @@ bool WaywiserCopter::engagement_requested()
 bool WaywiserCopter::is_offboard_px4() const
 {
   return px4_nav_state_ == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD;
+}
+
+void WaywiserCopter::publish_route_markers()
+{
+  if (!route_marker_pub_ || !publish_waypoint_markers_) {
+    return;
+  }
+
+  visualization_msgs::msg::MarkerArray marker_array;
+  const std::string marker_ns = std::string(this->get_name()) + "/route_markers";
+
+  // Delete previous markers
+  visualization_msgs::msg::Marker del_marker;
+  del_marker.header.frame_id = world_frame_;
+  del_marker.header.stamp = this->get_clock()->now();
+  del_marker.ns = marker_ns;
+  del_marker.action = visualization_msgs::msg::Marker::DELETEALL;
+  marker_array.markers.push_back(del_marker);
+  route_marker_pub_->publish(marker_array);
+
+  marker_array.markers.clear();
+  const double proximity = mCopterAutopilotComponent->getWaypointProximity();
+  const auto & waypointList = mCopterAutopilotComponent->getWaypointList();
+  int marker_id = 0;
+  for (int i = 0; i < waypointList.size(); ++i) {
+    const PosPoint & wp = waypointList.at(i);
+    visualization_msgs::msg::Marker marker;
+    marker.header.frame_id = world_frame_;
+    marker.header.stamp = this->get_clock()->now();
+    marker.ns = marker_ns;
+    marker.id = marker_id++;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+    marker.pose.position.x = wp.getX();
+    marker.pose.position.y = wp.getY();
+    marker.pose.position.z = wp.getHeight();
+    tf2::Quaternion orientation;
+    orientation.setRPY(0.0, 0.0, wp.getYaw() * M_PI / 180.0);
+    marker.pose.orientation = tf2::toMsg(orientation);
+
+    const double base_scale = proximity;
+    if (i == 0) {
+      // Orient the start arrow toward the next waypoint, matching control tower behaviour.
+      if (waypointList.size() > 1) {
+        const double dx = waypointList.at(1).getX() - wp.getX();
+        const double dy = waypointList.at(1).getY() - wp.getY();
+        orientation.setRPY(0.0, 0.0, std::atan2(dy, dx));
+        marker.pose.orientation = tf2::toMsg(orientation);
+      }
+      marker.type = visualization_msgs::msg::Marker::ARROW;
+      marker.color.r = 0.0f;
+      marker.color.g = 1.0f;
+      marker.color.b = 0.0f;
+      marker.color.a = 0.55f;
+      marker.scale.x = base_scale * 1.5;
+      marker.scale.y = base_scale * 0.5;
+      marker.scale.z = base_scale * 0.5;
+    } else if (i == waypointList.size() - 1) {
+      marker.type = visualization_msgs::msg::Marker::CUBE;
+      marker.color.r = 1.0f;
+      marker.color.g = 0.0f;
+      marker.color.b = 0.0f;
+      marker.color.a = 0.55f;
+      marker.scale.x = base_scale * 0.75;
+      marker.scale.y = base_scale * 0.75;
+      marker.scale.z = base_scale * 0.75;
+    } else {
+      marker.type = visualization_msgs::msg::Marker::SPHERE;
+      marker.color.r = 0.0f;
+      marker.color.g = 1.0f;
+      marker.color.b = 0.0f;
+      marker.color.a = 1.0f;
+      marker.scale.x = base_scale * 0.5;
+      marker.scale.y = base_scale * 0.5;
+      marker.scale.z = base_scale * 0.5;
+    }
+    marker_array.markers.push_back(marker);
+  }
+
+  route_marker_pub_->publish(marker_array);
+}
+
+void WaywiserCopter::publish_autopilot_markers()
+{
+  if (!autopilot_marker_pub_) {
+    return;
+  }
+
+  visualization_msgs::msg::MarkerArray marker_array;
+  const std::string marker_ns = std::string(this->get_name()) + "/autopilot_markers";
+
+  // Delete previous markers
+  visualization_msgs::msg::Marker del_marker;
+  del_marker.header.frame_id = world_frame_;
+  del_marker.header.stamp = this->get_clock()->now();
+  del_marker.ns = marker_ns;
+  del_marker.action = visualization_msgs::msg::Marker::DELETEALL;
+  marker_array.markers.push_back(del_marker);
+  autopilot_marker_pub_->publish(marker_array);
+
+  if (mCopterAutopilotComponent->getCurrentMissionState() == MissionState::Idle) {
+    return;
+  }
+
+  marker_array.markers.clear();
+  const double proximity = mCopterAutopilotComponent->getWaypointProximity();
+  const double approach_radius = mCopterAutopilotComponent->getApproachSlowdownRadius();
+  const PosPoint currentPos = mCopterState->getPosition(PosType::fused);
+  int marker_id = 0;
+
+  // Proximity acceptance circle drawn at the vehicle's current altitude
+  visualization_msgs::msg::Marker circle_marker;
+  circle_marker.header.frame_id = world_frame_;
+  circle_marker.header.stamp = this->get_clock()->now();
+  circle_marker.ns = marker_ns;
+  circle_marker.id = marker_id++;
+  circle_marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
+  circle_marker.action = visualization_msgs::msg::Marker::ADD;
+  circle_marker.pose.orientation.w = 1.0;
+  // line thickness scaled to the approach radius for consistent visualization
+  circle_marker.scale.x = std::max(0.01, approach_radius * 0.03);
+  circle_marker.color.r = 0.0;
+  circle_marker.color.g = 0.0;
+  circle_marker.color.b = 1.0;
+  circle_marker.color.a = 1.0;
+  constexpr int kNumPoints = 36;
+  for (int i = 0; i <= kNumPoints; ++i) {
+    const double angle = 2.0 * M_PI * i / kNumPoints;
+    geometry_msgs::msg::Point p;
+    // draw the circle at the approach slowdown radius so the autopilot target
+    // (which is placed on that circle) appears on the circumference
+    p.x = currentPos.getX() + approach_radius * std::cos(angle);
+    p.y = currentPos.getY() + approach_radius * std::sin(angle);
+    p.z = currentPos.getHeight();
+    circle_marker.points.push_back(p);
+  }
+  marker_array.markers.push_back(circle_marker);
+
+  // Target waypoint sphere — position from current 3D goal, small dot matching the car node style
+  const PosPoint currentGoal = mCopterAutopilotComponent->getCurrentGoal();
+  const QPointF targetXY = mCopterState->getAutopilotTargetPoint();
+  visualization_msgs::msg::Marker target_marker;
+  target_marker.header.frame_id = world_frame_;
+  target_marker.header.stamp = this->get_clock()->now();
+  target_marker.ns = marker_ns;
+  target_marker.id = marker_id++;
+  target_marker.type = visualization_msgs::msg::Marker::SPHERE;
+  target_marker.action = visualization_msgs::msg::Marker::ADD;
+  target_marker.pose.position.x = targetXY.x();
+  target_marker.pose.position.y = targetXY.y();
+  target_marker.pose.position.z = currentGoal.getHeight();
+  target_marker.pose.orientation.w = 1.0;
+  const double dot_size = proximity * 0.2;
+  target_marker.scale.x = dot_size;
+  target_marker.scale.y = dot_size;
+  target_marker.scale.z = dot_size;
+  target_marker.color.r = 1.0f;
+  target_marker.color.g = 0.0f;
+  target_marker.color.b = 0.0f;
+  target_marker.color.a = 1.0f;
+  marker_array.markers.push_back(target_marker);
+
+  autopilot_marker_pub_->publish(marker_array);
 }

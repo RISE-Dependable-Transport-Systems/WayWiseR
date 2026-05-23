@@ -2,6 +2,7 @@ import json
 import math
 import os
 from pathlib import Path
+import shlex
 import tempfile
 import xml.etree.ElementTree as ET
 
@@ -49,6 +50,16 @@ def generate_launch_description():
         default_value='ros_gz_sim',
         description='Model spawn backend: ros_gz_sim or gz_service.',
     )
+    gz_service_timeout_la = DeclareLaunchArgument(
+        'gz_service_timeout',
+        default_value='5000',
+        description='Timeout in milliseconds for gz service spawn requests.',
+    )
+    gz_service_suppress_output_la = DeclareLaunchArgument(
+        'gz_service_suppress_output',
+        default_value='False',
+        description='Suppress gz service spawn command output.',
+    )
     # create launch description
     ld = LaunchDescription()
 
@@ -60,6 +71,8 @@ def generate_launch_description():
     ld.add_action(spawn_interval_la)
     ld.add_action(start_gazebo_bridge_la)
     ld.add_action(spawn_backend_la)
+    ld.add_action(gz_service_timeout_la)
+    ld.add_action(gz_service_suppress_output_la)
 
     # spawn models if spawn_config_file is set
     ld.add_action(OpaqueFunction(function=spawn_models))
@@ -78,6 +91,10 @@ def spawn_models(context):
         LaunchConfiguration('start_gazebo_bridge').perform(context).lower() == 'true'
     )
     spawn_backend = LaunchConfiguration('spawn_backend').perform(context)
+    gz_service_timeout = LaunchConfiguration('gz_service_timeout').perform(context)
+    gz_service_suppress_output = (
+        LaunchConfiguration('gz_service_suppress_output').perform(context).lower() == 'true'
+    )
 
     # JSON based spawning
     if spawn_config_file != '':
@@ -89,6 +106,8 @@ def spawn_models(context):
             spawn_interval,
             start_gazebo_bridge,
             spawn_backend,
+            gz_service_timeout,
+            gz_service_suppress_output,
         )
         if json_actions:
             spawn_action.extend(json_actions)
@@ -121,6 +140,8 @@ def spawn_from_json(
     spawn_interval=1.0,
     start_gazebo_bridge=True,
     spawn_backend='ros_gz_sim',
+    gz_service_timeout='5000',
+    gz_service_suppress_output=False,
 ):
     actions = []
     model_index = 0
@@ -147,6 +168,8 @@ def spawn_from_json(
                             model.get('name'),
                             model.get('static'),
                             spawn_backend,
+                            gz_service_timeout,
+                            gz_service_suppress_output,
                         ),
                         spawn_start_delay,
                         spawn_interval,
@@ -264,6 +287,8 @@ def create_sdf_spawn_actions(
     name=None,
     static=None,
     spawn_backend='ros_gz_sim',
+    gz_service_timeout='5000',
+    gz_service_suppress_output=False,
 ):
     actions = []
     sdf_path = create_sdf_with_static_override(sdf_path, static)
@@ -319,7 +344,16 @@ def create_sdf_spawn_actions(
         arguments.extend(['-name', name])
 
     if spawn_backend == 'gz_service':
-        actions.append(create_gz_service_spawn_action(sdf_path, world_name, spawn_pose, name))
+        actions.append(
+            create_gz_service_spawn_action(
+                sdf_path,
+                world_name,
+                spawn_pose,
+                name,
+                gz_service_timeout,
+                gz_service_suppress_output,
+            )
+        )
     else:
         actions.append(
             Node(
@@ -328,7 +362,7 @@ def create_sdf_spawn_actions(
                 arguments=arguments,
                 ros_arguments=['--log-level', 'fatal'],
                 parameters=[{'use_sim_time': use_sim_time}],
-                output='screen',
+                output='log',
             )
         )
 
@@ -338,7 +372,14 @@ def create_sdf_spawn_actions(
     return actions
 
 
-def create_gz_service_spawn_action(sdf_path, world_name, spawn_pose, name=None):
+def create_gz_service_spawn_action(
+    sdf_path,
+    world_name,
+    spawn_pose,
+    name=None,
+    timeout_ms='5000',
+    suppress_output=False,
+):
     pose = [float(value) for value in spawn_pose[:6]]
     quaternion = quaternion_from_rpy(pose[3], pose[4], pose[5])
     request_parts = [
@@ -356,23 +397,25 @@ def create_gz_service_spawn_action(sdf_path, world_name, spawn_pose, name=None):
     if name:
         request_parts.insert(0, f'name: "{name}"')
 
-    return ExecuteProcess(
-        cmd=[
-            'gz',
-            'service',
-            '-s',
-            f'/world/{world_name}/create',
-            '--reqtype',
-            'gz.msgs.EntityFactory',
-            '--reptype',
-            'gz.msgs.Boolean',
-            '--timeout',
-            '5000',
-            '--req',
-            ', '.join(request_parts),
-        ],
-        output='screen',
-    )
+    cmd = [
+        'gz',
+        'service',
+        '-s',
+        f'/world/{world_name}/create',
+        '--reqtype',
+        'gz.msgs.EntityFactory',
+        '--reptype',
+        'gz.msgs.Boolean',
+        '--timeout',
+        str(timeout_ms),
+        '--req',
+        ', '.join(request_parts),
+    ]
+    if suppress_output:
+        shell_cmd = ' '.join(shlex.quote(part) for part in cmd) + ' >/dev/null 2>&1 || true'
+        cmd = ['bash', '-lc', shell_cmd]
+
+    return ExecuteProcess(cmd=cmd, output='log')
 
 
 def quaternion_from_rpy(roll, pitch, yaw):
@@ -463,7 +506,7 @@ def create_topic_spawn_actions(
             arguments=arguments,
             ros_arguments=['--log-level', 'fatal'],
             parameters=[{'use_sim_time': use_sim_time}],
-            output='screen',
+            output='log',
         )
     )
 
@@ -483,7 +526,7 @@ def create_bridge_node(bridge_path, use_sim_time, world_name):
             {'config_file': bridge_path},
             {'use_sim_time': use_sim_time},
         ],
-        output='screen',
+        output='log',
     )
 
 

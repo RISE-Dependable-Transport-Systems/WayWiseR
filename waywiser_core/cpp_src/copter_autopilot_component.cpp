@@ -276,6 +276,14 @@ bool CopterAutopilotComponent::isActive()
   return mWaypointFollower && mWaypointFollower->isActive();
 }
 
+PosPoint CopterAutopilotComponent::getCurrentGoal() const
+{
+  if (mWaypointFollower && mWaypointFollower->isActive()) {
+    return mWaypointFollower->getCurrentGoal();
+  }
+  return PosPoint{};
+}
+
 void CopterAutopilotComponent::updateWaypointFollowerRoute(QList<PosPoint> & waypointList)
 {
   switch (currentMissionState) {
@@ -302,7 +310,7 @@ geometry_msgs::msg::Twist CopterAutopilotComponent::getAutopilotTwistCommand() c
 
   const CopterVelocityCommand command = mWaypointFollower->getDesiredVelocityCommand();
   twist.linear.x = command.forward;
-  twist.linear.y = command.left;
+  twist.linear.y = -command.left;  // left→right sign: trajectory setpoint uses NED body-frame y = right
   twist.linear.z = command.up;
   twist.angular.z = command.yawRate;
   return twist;

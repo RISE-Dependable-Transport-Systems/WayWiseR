@@ -1,6 +1,20 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <sdf version="1.9">
   <world name="forest">
+    <plugin filename="ignition-gazebo-physics-system" name="ignition::gazebo::systems::Physics">
+    </plugin>
+    <plugin filename="ignition-gazebo-user-commands-system" name="ignition::gazebo::systems::UserCommands">
+    </plugin>
+    <plugin filename="ignition-gazebo-scene-broadcaster-system" name="ignition::gazebo::systems::SceneBroadcaster">
+    </plugin>
+    <plugin filename="ignition-gazebo-imu-system" name="ignition::gazebo::systems::Imu">
+    </plugin>
+    <plugin filename="ignition-gazebo-sensors-system" name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="ignition-gazebo-navsat-system" name="ignition::gazebo::systems::NavSat">
+    </plugin>
+
     <physics type="ode">
       <max_step_size>0.004</max_step_size>
       <real_time_factor>1.0</real_time_factor>
@@ -221,10 +235,10 @@
     </light>
     <spherical_coordinates>
       <surface_model>EARTH_WGS84</surface_model>
-      <world_frame_orientation>ENU</world_frame_orientation>
-      <latitude_deg>47.397971057728974</latitude_deg>
-      <longitude_deg> 8.546163739800146</longitude_deg>
-      <elevation>0</elevation>
+      <latitude_deg>57.713805</latitude_deg>
+      <longitude_deg>12.890088</longitude_deg>
+      <elevation>203.59</elevation>
+      <heading_deg>0</heading_deg>
     </spherical_coordinates>
   </world>
 </sdf>

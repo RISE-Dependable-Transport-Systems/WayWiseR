@@ -8,6 +8,7 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 find_package(xacro REQUIRED)
 find_program(BASH_EXECUTABLE bash REQUIRED)
@@ -134,6 +135,16 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
+ament_python_install_package(${PROJECT_NAME}_py
+  PACKAGE_DIR py_src/waywiser_gazebo_py
+)
+
+install(
+  PROGRAMS
+  py_src/waywiser_gazebo_py/gazebo_osm_tile_server.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 if(EXISTS "${PX4_AUTOPILOT_DIR}")
   set(PX4_INSTALL_DIR share/${PROJECT_NAME}/px4_sitl_zenoh)
 
@@ -189,13 +200,17 @@ if(BUILD_TESTING)
 
   ament_flake8(
     launch/gazebo.launch.py
+    launch/gazebo_osm_tile_server.launch.py
     launch/px4_sitl.launch.py
     launch/spawn.launch.py
+    py_src/waywiser_gazebo_py/gazebo_osm_tile_server.py
   )
   ament_pep257(
     launch/gazebo.launch.py
+    launch/gazebo_osm_tile_server.launch.py
     launch/px4_sitl.launch.py
     launch/spawn.launch.py
+    py_src/waywiser_gazebo_py/gazebo_osm_tile_server.py
   )
   ament_lint_cmake(CMakeLists.txt)
 endif()

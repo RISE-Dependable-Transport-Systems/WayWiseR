@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import socket
 import tempfile
+import xml.etree.ElementTree as ET
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
@@ -16,13 +17,16 @@ from launch.actions import (
     OpaqueFunction,
     RegisterEventHandler,
     SetEnvironmentVariable,
+    SetLaunchConfiguration,
     TimerAction,
 )
+from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node, PushRosNamespace, SetRemap
+from launch_ros.parameter_descriptions import ParameterValue
 
 from waywiser_description_py.waywiser_description_utils import (
     get_robot_state_publisher_node,
@@ -39,6 +43,12 @@ def generate_launch_description():
     waywiser_perception_dir = get_package_share_directory('waywiser_perception')
     waywiser_core_dir = get_package_share_directory('waywiser_core')
     waywiser_twist_safety_dir = get_package_share_directory('waywiser_twist_safety')
+    default_gazebo_osm_tile_cache_root = os.path.join(
+        os.environ.get('WAYWISER_WS', os.getcwd()),
+        'resources',
+        'control_tower',
+        'gazebo',
+    )
 
     # Zenoh router connection settings (read from environment / .env)
     zenoh_remote_ip = os.environ.get('ZENOH_REMOTE_ROUTER_IP', '127.0.0.1') or '127.0.0.1'
@@ -50,7 +60,7 @@ def generate_launch_description():
     )
     gazebo_world_la = DeclareLaunchArgument(
         'world',
-        default_value=os.path.join(waywiser_gazebo_dir, 'worlds/bounded_world.sdf'),
+        default_value=os.path.join(waywiser_gazebo_dir, 'worlds/forest.sdf'),
         description='Full path to gazebo sdf file',
     )
     rviz_config_la = DeclareLaunchArgument(
@@ -67,6 +77,48 @@ def generate_launch_description():
         'teleop',
         default_value='True',
         description='Launch teleop',
+    )
+    map_source_la = DeclareLaunchArgument(
+        'map_source',
+        default_value='Local OSM server',
+        description='Control Tower map source: OpenStreetMap, Local OSM server, or None',
+    )
+    gazebo_osm_tile_server_la = DeclareLaunchArgument(
+        'gazebo_osm_tile_server',
+        default_value='True',
+        description='Serve the Gazebo world as OSM-compatible map tiles',
+    )
+    gazebo_osm_tile_server_config_la = DeclareLaunchArgument(
+        'gazebo_osm_tile_server_config',
+        default_value=os.path.join(waywiser_gazebo_dir, 'config/gazebo_osm_tile_server.yaml'),
+        description='Full path to Gazebo OSM tile server config file',
+    )
+    gazebo_osm_tile_server_url_la = DeclareLaunchArgument(
+        'gazebo_osm_tile_server_url',
+        default_value='http://localhost:8081',
+        description='Control Tower tile URL for the Gazebo OSM tile server',
+    )
+    gazebo_osm_tile_cache_dir_la = DeclareLaunchArgument(
+        'gazebo_osm_tile_cache_dir',
+        default_value=PythonExpression(
+            [
+                repr(default_gazebo_osm_tile_cache_root + os.sep),
+                ' + __import__("os").path.splitext(__import__("os").path.basename("',
+                LaunchConfiguration('world'),
+                '"))[0]',
+            ]
+        ),
+        description='Control Tower cache directory for Gazebo-served OSM tiles',
+    )
+    startup_route_file_la = DeclareLaunchArgument(
+        'startup_route_file',
+        default_value='$WAYWISER_WS/resources/zigzag.xml',
+        description='Route file to load in Control Tower at startup',
+    )
+    use_nvidia_gpu_la = DeclareLaunchArgument(
+        'use_nvidia_gpu',
+        default_value='True',
+        description='Use NVIDIA PRIME offload environment variables for Gazebo rendering',
     )
     rviz2_la = DeclareLaunchArgument(
         'rviz2',
@@ -110,12 +162,17 @@ def generate_launch_description():
     )
     drone_spawn_delay_la = DeclareLaunchArgument(
         'drone_spawn_delay',
-        default_value='1.0',
+        default_value='5.0',
         description='Delay (seconds) before spawning drone models to let Gazebo world initialize.',
+    )
+    drone_spawn_service_timeout_la = DeclareLaunchArgument(
+        'drone_spawn_service_timeout',
+        default_value='30000',
+        description='Timeout in milliseconds for Gazebo drone spawn service calls.',
     )
     px4_start_delay_la = DeclareLaunchArgument(
         'px4_start_delay',
-        default_value='2.0',
+        default_value='7.0',
         description='Delay (seconds) before starting PX4 after Gazebo starts.',
     )
     drone_name = LaunchConfiguration('drone_name')
@@ -144,6 +201,7 @@ def generate_launch_description():
             'drone_name': LaunchConfiguration('drone_name'),
             'px4_sys_autostart': LaunchConfiguration('px4_sys_autostart'),
             'px4_start_delay': LaunchConfiguration('px4_start_delay'),
+            'use_nvidia_gpu': LaunchConfiguration('use_nvidia_gpu'),
         }.items(),
     )
 
@@ -171,7 +229,31 @@ def generate_launch_description():
                 '/',
                 LaunchConfiguration('control_vehicle_node_name'),
             ],
+            'map_source': LaunchConfiguration('map_source'),
+            'osm_tile_server_url': LaunchConfiguration('gazebo_osm_tile_server_url'),
+            'osm_tile_cache_dir': LaunchConfiguration('gazebo_osm_tile_cache_dir'),
+            'startup_route_file': LaunchConfiguration('startup_route_file'),
         }.items(),
+    )
+
+    gazebo_osm_tile_server = Node(
+        package='waywiser_gazebo',
+        executable='gazebo_osm_tile_server.py',
+        name='gazebo_osm_tile_server_node',
+        parameters=[
+            {'use_sim_time': LaunchConfiguration('use_sim_time')},
+            LaunchConfiguration('gazebo_osm_tile_server_config'),
+            {'world_sdf': ParameterValue(LaunchConfiguration('world'), value_type=str)},
+            {
+                'base_map_cache_dir': ParameterValue(
+                    LaunchConfiguration('gazebo_osm_tile_cache_dir'), value_type=str
+                )
+            },
+        ],
+        arguments=['--ros-args', '--log-level', 'info'],
+        output='screen',
+        emulate_tty=True,
+        condition=IfCondition(LaunchConfiguration('gazebo_osm_tile_server')),
     )
 
     drone_navsatfix_extended_wrapper = GroupAction(
@@ -310,6 +392,13 @@ def generate_launch_description():
     ld.add_action(rviz_config_la)
     ld.add_action(teleop_config_la)
     ld.add_action(teleop_la)
+    ld.add_action(map_source_la)
+    ld.add_action(gazebo_osm_tile_server_la)
+    ld.add_action(gazebo_osm_tile_server_config_la)
+    ld.add_action(gazebo_osm_tile_server_url_la)
+    ld.add_action(gazebo_osm_tile_cache_dir_la)
+    ld.add_action(startup_route_file_la)
+    ld.add_action(use_nvidia_gpu_la)
     ld.add_action(rviz2_la)
     ld.add_action(drone_config_la)
     ld.add_action(control_vehicle_node_name_la)
@@ -319,6 +408,7 @@ def generate_launch_description():
     ld.add_action(drone_localization_node_name_la)
     ld.add_action(px4_sys_autostart_la)
     ld.add_action(drone_spawn_delay_la)
+    ld.add_action(drone_spawn_service_timeout_la)
     ld.add_action(px4_start_delay_la)
     ld.add_action(RegisterEventHandler(OnProcessExit(on_exit=shutdown_on_process_error)))
 
@@ -336,7 +426,9 @@ def generate_launch_description():
             period=2.0,
             actions=[
                 px4_sitl,
+                OpaqueFunction(function=normalize_gazebo_osm_tile_cache_dir),
                 drone_gazebo_spawn,
+                gazebo_osm_tile_server,
                 drone_twist_safety,
                 teleop_rviz2,
                 drone_navsatfix_extended_wrapper,
@@ -350,6 +442,30 @@ def generate_launch_description():
     )
 
     return ld
+
+
+def normalize_gazebo_osm_tile_cache_dir(context):
+    cache_dir = LaunchConfiguration('gazebo_osm_tile_cache_dir').perform(context)
+    cache_name = os.path.basename(os.path.normpath(cache_dir))
+    if not cache_name.startswith('waywiser_harmonic_'):
+        return []
+
+    world_path = (
+        Path(os.path.expandvars(LaunchConfiguration('world').perform(context)))
+        .expanduser()
+        .resolve()
+    )
+    world_name = read_world_name(world_path)
+    stable_cache_dir = os.path.join(os.path.dirname(os.path.normpath(cache_dir)), world_name)
+    return [
+        LogInfo(
+            msg=(
+                f'Ignoring runtime-generated Gazebo OSM tile cache directory {cache_dir}; '
+                f'using {stable_cache_dir}.'
+            )
+        ),
+        SetLaunchConfiguration('gazebo_osm_tile_cache_dir', stable_cache_dir),
+    ]
 
 
 def drone_state_publisher_launch(context):
@@ -385,10 +501,23 @@ def yaml_to_dict(path_to_yaml):
         return yaml.load(f, Loader=yaml.SafeLoader)
 
 
+def read_world_name(world_path: Path):
+    if world_path.is_file():
+        try:
+            tree = ET.parse(world_path)
+            root = tree.getroot()
+            world_element = root if root.tag == 'world' else root.find('world')
+            if world_element is not None and world_element.get('name'):
+                return str(world_element.get('name'))
+        except (ET.ParseError, OSError):
+            pass
+    return world_path.stem
+
+
 def resolve_resource_path(path, base_dir):
     path = str(path)
     if path.startswith('package://'):
-        package_path = path[len('package://'):]
+        package_path = path[len('package://') :]
         package_name, _, relative_path = package_path.partition('/')
         if not package_name or not relative_path:
             raise RuntimeError(f'Invalid package resource URI: {path}')
@@ -451,6 +580,10 @@ def drone_gazebo_spawn_launch(context):
                         'spawn_config_file': temp_config.name,
                         'start_gazebo_bridge': 'False',
                         'spawn_backend': 'gz_service',
+                        'gz_service_timeout': LaunchConfiguration(
+                            'drone_spawn_service_timeout'
+                        ).perform(context),
+                        'gz_service_suppress_output': 'True',
                     }.items(),
                 )
             ],

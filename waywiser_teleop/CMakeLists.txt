@@ -14,6 +14,7 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(waywiser_twist_safety REQUIRED)
@@ -43,13 +44,13 @@ ament_python_install_package(${PROJECT_NAME}_py
 )
 
 install(
-  PROGRAMS py_src/waywiser_teleop_py/twist_keyboard.py
+  PROGRAMS py_src/waywiser_teleop_py/control_tower.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
 install(
-  DIRECTORY user_interface/twist_keyboard/
-  DESTINATION share/${PROJECT_NAME}/user_interface/twist_keyboard
+  DIRECTORY user_interface/control_tower/
+  DESTINATION share/${PROJECT_NAME}/user_interface/control_tower
 )
 
 if(BUILD_TESTING)

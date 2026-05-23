@@ -2,6 +2,7 @@
 """ROS 2 node for vehicle teleoperation using a keyboard and PyQt5 GUI."""
 
 from contextlib import contextmanager
+import json
 import os
 import subprocess
 import sys
@@ -37,15 +38,31 @@ with suppress_stderr():
     from rcl_interfaces.srv import GetParameters, SetParameters
     import rclpy
     from rclpy.node import Node
-    from sensor_msgs.msg import Joy
-    from std_msgs.msg import Bool
+    from sensor_msgs.msg import JointState, Joy
+    from std_msgs.msg import Bool, String
+    import tf2_ros
     from tf_transformations import euler_from_quaternion
+    from visualization_msgs.msg import MarkerArray
 
 try:
     with suppress_stderr():
-        from PyQt5.QtCore import Qt, QTimer, QUrl
+        from PyQt5.QtCore import QPoint, Qt, QTimer, QUrl
         from PyQt5.QtMultimedia import QAudio, QAudioDeviceInfo, QSoundEffect
-        from PyQt5.QtWidgets import QApplication, QDialog, QMainWindow
+        from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
+        from PyQt5.QtWidgets import (
+            QActionGroup,
+            QApplication,
+            QDialog,
+            QGraphicsOpacityEffect,
+            QHBoxLayout,
+            QMainWindow,
+            QMenu,
+            QMessageBox,
+            QPushButton,
+            QSizePolicy,
+            QSplitter,
+            QWidget,
+        )
         from PyQt5.uic import loadUi
     _PYQT5_AVAILABLE = True
 except ImportError:
@@ -64,37 +81,82 @@ except ImportError:
 
     QDialog = _QtStub  # type: ignore[misc,assignment]
     QMainWindow = _QtStub  # type: ignore[misc,assignment]
+    QWidget = _QtStub  # type: ignore[misc,assignment]
+    QPoint = _QtStub  # type: ignore[misc,assignment]
     Qt = None
     QTimer = _QtStub  # type: ignore[misc,assignment]
     QUrl = None
+    QActionGroup = _QtStub  # type: ignore[misc,assignment]
     QAudio = None
     QAudioDeviceInfo = None
     QSoundEffect = _QtStub  # type: ignore[misc,assignment]
     QApplication = _QtStub  # type: ignore[misc,assignment]
+    QGraphicsOpacityEffect = _QtStub  # type: ignore[misc,assignment]
+    QHBoxLayout = _QtStub  # type: ignore[misc,assignment]
+    QPushButton = _QtStub  # type: ignore[misc,assignment]
+    QMenu = _QtStub  # type: ignore[misc,assignment]
+    QMessageBox = _QtStub  # type: ignore[misc,assignment]
+    QSizePolicy = None
+    QSplitter = _QtStub  # type: ignore[misc,assignment]
     loadUi = None
 
 
 from waywiser_core.msg import (  # noqa: E402
     BatteryState,
+    MissionState,
     NavSatFixExtended,
+    PathWithTwists,
     QuadcopterState,
 )
 from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS, RosUtils  # noqa: E402
+from waywiser_teleop_py.route_messages import build_path_with_twists  # noqa: E402
 from waywiser_twist_safety.msg import EmergencyStopState  # noqa: E402
+
+try:
+    from waywiser_teleop_py.vehicle_overlay import VehicleOverlayModel  # noqa: E402
+except ModuleNotFoundError:
+    import importlib.util  # noqa: E402
+
+    overlay_module_path = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        'vehicle_overlay.py',
+    )
+    overlay_spec = importlib.util.spec_from_file_location(
+        'waywiser_teleop_py.vehicle_overlay',
+        overlay_module_path,
+    )
+    overlay_module = importlib.util.module_from_spec(overlay_spec)
+    sys.modules[overlay_spec.name] = overlay_module
+    overlay_spec.loader.exec_module(overlay_module)
+    VehicleOverlayModel = overlay_module.VehicleOverlayModel
 
 if _PYQT5_AVAILABLE:
     UI_BASE_PATH = os.path.join(
-        get_package_share_directory('waywiser_teleop'), 'user_interface', 'twist_keyboard'
+        get_package_share_directory('waywiser_teleop'), 'user_interface', 'control_tower'
+    )
+    from waywiser_teleop_py.route_planner import (  # noqa: E402
+        ACTIVE_BUTTON_STYLE,
+        OPENSTREETMAP_CACHE_DIR,
+        OPENSTREETMAP_TILE_SERVER_URL,
+        POPUP_MENU_STYLE,
+        RoutePlannerWidget,
+        UpMenuButton,
     )
 else:
     UI_BASE_PATH = None
+    RoutePlannerWidget = None
+    UpMenuButton = None
+    ACTIVE_BUTTON_STYLE = ''
+    OPENSTREETMAP_CACHE_DIR = ''
+    OPENSTREETMAP_TILE_SERVER_URL = ''
+    POPUP_MENU_STYLE = ''
 
 
-class TwistKeyboard(Node):
+class ControlTower(Node):
     """Publish twist messages using keypresses from the keyboard."""
 
     def __init__(self):
-        super().__init__('twist_keyboard', allow_undeclared_parameters=True)
+        super().__init__('control_tower', allow_undeclared_parameters=True)
 
         # Initialize emergency_stop_target_state_msg
         self.emergency_stop_target_state_msg = EmergencyStopState()
@@ -102,7 +164,7 @@ class TwistKeyboard(Node):
         self.emergency_stop_target_state_msg.state = EmergencyStopState.ACTIVE
 
         # Declare parameters
-        self.declare_parameter('control_vehicle_node_fqn', 'waywiser_car_node')
+        self.declare_parameter('control_vehicle_node_fqn', '')
         self.control_vehicle_node_fqn = (
             self.get_parameter('control_vehicle_node_fqn').get_parameter_value().string_value
         )
@@ -170,23 +232,34 @@ class TwistKeyboard(Node):
         self.battery_state_topic = ''
         self.arm_command_topic = ''
         self.quadcopter_state_topic = ''
+        self.mission_status_topic = ''
         self.nav_sat_fix_extended_topic = ''
         self.emergency_stop_status_topic = ''
         self.emergency_stop_update_topic = ''
-        self.enuref = [0.0, 0.0, 0.0]
+        self.joint_states_topic = ''
+        self.route_topic = ''
+        self.autopilot_state_control_topic = ''
+        self.enuref = [57.71495867, 12.89134921, 0.0]
         self.vehicle_namespace = ''
         self.waywise_object_type = 'generic'
+        self.vehicle_connected = False
 
         # Subscribers (will be created after fetching topics)
         self.odom_subscriber = None
         self.vehicle_pose_subscriber = None
         self.battery_state_subscriber = None
         self.quadcopter_state_subscriber = None
+        self.mission_status_subscriber = None
         self.nav_sat_fix_extended_subscriber = None
         self.emergency_stop_state_subscriber = None
+        self.robot_description_subscriber = None
+        self.joint_states_subscriber = None
+        self.marker_subscribers = []
         self.emergency_stop_request_publisher = None
         self.arm_command_publisher = None
         self.mux_publisher = None
+        self.route_publisher = None
+        self.autopilot_state_control_publisher = None
 
         # Mux initialization
         self.mux_output_topic = ''
@@ -195,6 +268,46 @@ class TwistKeyboard(Node):
             self.get_parameter('mux_output_topic').get_parameter_value().string_value
         )
         self.key_vel_publisher = self.create_publisher(Twist, 'key_vel', 10)
+        self.declare_parameter('route_topic', 'waywiser_path')
+        self.route_topic = self.get_parameter('route_topic').get_parameter_value().string_value
+        self.declare_parameter('startup_route_file', '')
+        self.startup_route_file = (
+            self.get_parameter('startup_route_file').get_parameter_value().string_value
+        )
+        self.declare_parameter('autopilot_state_control_topic', '/autopilot_state_control')
+        self.autopilot_state_control_topic = (
+            self.get_parameter('autopilot_state_control_topic').get_parameter_value().string_value
+        )
+        self.declare_parameter('osm_tile_server_url', OPENSTREETMAP_TILE_SERVER_URL)
+        self.osm_tile_server_url = (
+            self.get_parameter('osm_tile_server_url').get_parameter_value().string_value
+        )
+
+        # Determine default cache directory based on environment variable or current workspace
+        workspace_root = os.environ.get('WAYWISER_WS')
+        if not workspace_root:
+            workspace_root = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), '../../../../..')
+            )
+        default_cache_dir = OPENSTREETMAP_CACHE_DIR or os.path.join(
+            workspace_root, 'resources', 'control_tower', 'osm'
+        )
+        self.declare_parameter('osm_tile_cache_dir', default_cache_dir)
+        self.osm_tile_cache_dir = (
+            self.get_parameter('osm_tile_cache_dir').get_parameter_value().string_value
+        )
+
+        self.declare_parameter('map_source', 'OpenStreetMap')
+        self.map_source = self._normalize_map_source(
+            self.get_parameter('map_source').get_parameter_value().string_value
+        )
+
+        self.declare_parameter('world_frame', 'map')
+        self.world_frame = self.get_parameter('world_frame').get_parameter_value().string_value
+
+        # TF2 buffer and listener for transforming vehicle poses to world_frame
+        self._tf_buffer = tf2_ros.Buffer()
+        self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self)
 
         self.mux_sources = {}  # source_name -> {topic, priority, timeout, last_msg, last_stamp}
         self.active_mux_source = 'None'
@@ -207,11 +320,20 @@ class TwistKeyboard(Node):
 
         # State variables
         self.last_emergency_stop_state = {'msg': None, 'stamp': self.get_clock().now()}
-        self.last_odom = {'pose': None, 'twist': None, 'stamp': self.get_clock().now()}
-        self.last_vehicle_pose = {'pose': None, 'stamp': self.get_clock().now()}
+        self.last_odom = {
+            'pose': None,
+            'twist': None,
+            'stamp': self.get_clock().now(),
+            'frame_id': '',
+        }
+        self.last_vehicle_pose = {'pose': None, 'stamp': self.get_clock().now(), 'frame_id': ''}
         self.last_battery_state = {'msg': None, 'stamp': self.get_clock().now()}
         self.last_quadcopter_state = {'msg': None, 'stamp': self.get_clock().now()}
+        self.last_mission_state = {'msg': None, 'stamp': self.get_clock().now()}
         self.last_nav_sat_fix_extended = {'msg': None, 'stamp': self.get_clock().now()}
+        self.vehicle_overlay_model = VehicleOverlayModel()
+        self.visual_marker_store = {}
+        self.visual_markers = []
 
         # Current twist command
         self.current_twist = Twist()
@@ -248,6 +370,7 @@ class TwistKeyboard(Node):
 
     def request_params_from_vehicle_node(self):
         """Request params from the current vehicle node."""
+        self.vehicle_connected = False
         service_name = f'/{self.control_vehicle_node_fqn}/get_parameters'
         service_name = service_name.replace('//', '/')
         self.get_logger().info(f"Requesting parameters from '{self.control_vehicle_node_fqn}'")
@@ -270,6 +393,9 @@ class TwistKeyboard(Node):
             'emergency_stop_update_topic',
             'enuref',
             'waywise_object_type',
+            'autopilot_state_control_topic',
+            'joint_states_topic',
+            'mission_status_topic',
         ]
 
         future = client.call_async(request)
@@ -298,6 +424,20 @@ class TwistKeyboard(Node):
                 )
                 self.enuref = vals[6].double_array_value or self.enuref
                 self.waywise_object_type = vals[7].string_value or self.waywise_object_type
+                if len(vals) >= 9 and vals[8].string_value:
+                    self.autopilot_state_control_topic = self._prefix_with_vehicle_namespace(
+                        vals[8].string_value
+                    )
+                self.joint_states_topic = self._prefix_with_vehicle_namespace(
+                    vals[9].string_value
+                    if len(vals) >= 10 and vals[9].string_value
+                    else 'joint_states'
+                )
+                self.mission_status_topic = self._prefix_with_vehicle_namespace(
+                    vals[10].string_value
+                    if len(vals) >= 11 and vals[10].string_value
+                    else 'mission_status'
+                )
 
                 if self.waywise_object_type == 'quadcopter':
                     qc_request = GetParameters.Request()
@@ -331,6 +471,7 @@ class TwistKeyboard(Node):
 
                 # Create publishers
                 self._create_publishers()
+                self.vehicle_connected = True
 
                 self.get_logger().info(
                     f"Updated topics from '{self.control_vehicle_node_fqn}' "  # noqa: Q000
@@ -448,6 +589,8 @@ class TwistKeyboard(Node):
 
     def _create_subscribers(self):
         """Create or recreate subscribers based on topic names."""
+        self.vehicle_overlay_model = VehicleOverlayModel()
+
         if self.odom_topic:
             self.get_logger().info(f'Creating subscriber for odom topic {self.odom_topic}')
             if self.odom_subscriber:
@@ -483,6 +626,16 @@ class TwistKeyboard(Node):
                 RELIABLE_TRANSIENT_LOCAL_QOS,
             )
 
+        if self.mission_status_topic:
+            if self.mission_status_subscriber:
+                self.destroy_subscription(self.mission_status_subscriber)
+            self.mission_status_subscriber = self.create_subscription(
+                MissionState,
+                self.mission_status_topic,
+                self.mission_status_callback,
+                RELIABLE_TRANSIENT_LOCAL_QOS,
+            )
+
         if self.nav_sat_fix_extended_topic:
             if self.nav_sat_fix_extended_subscriber:
                 self.destroy_subscription(self.nav_sat_fix_extended_subscriber)
@@ -501,6 +654,43 @@ class TwistKeyboard(Node):
                 self.emergency_stop_status_topic,
                 self.emergency_stop_state_subscriber_callback,
                 10,
+            )
+
+        robot_description_topic = self._prefix_with_vehicle_namespace('robot_description')
+        if robot_description_topic:
+            if self.robot_description_subscriber:
+                self.destroy_subscription(self.robot_description_subscriber)
+            self.robot_description_subscriber = self.create_subscription(
+                String,
+                robot_description_topic,
+                self.robot_description_callback,
+                RELIABLE_TRANSIENT_LOCAL_QOS,
+            )
+
+        if self.joint_states_topic:
+            if self.joint_states_subscriber:
+                self.destroy_subscription(self.joint_states_subscriber)
+            self.joint_states_subscriber = self.create_subscription(
+                JointState,
+                self.joint_states_topic,
+                self.joint_states_callback,
+                10,
+            )
+
+        for marker_subscriber in self.marker_subscribers:
+            self.destroy_subscription(marker_subscriber)
+        self.marker_subscribers = []
+        self.visual_marker_store.clear()
+        self.visual_markers = []
+        for topic in ('waypoint_markers', 'autopilot_markers'):
+            topic_with_ns = self._prefix_with_vehicle_namespace(topic)
+            self.marker_subscribers.append(
+                self.create_subscription(
+                    MarkerArray,
+                    topic_with_ns,
+                    self.visual_marker_array_callback,
+                    RELIABLE_TRANSIENT_LOCAL_QOS,
+                )
             )
 
     def _create_publishers(self):
@@ -527,18 +717,120 @@ class TwistKeyboard(Node):
             mux_output_topic_with_ns = self._prefix_with_vehicle_namespace(self.mux_output_topic)
             self.mux_publisher = self.create_publisher(Twist, mux_output_topic_with_ns, 10)
 
+        if self.route_topic:
+            if self.route_publisher:
+                self.destroy_publisher(self.route_publisher)
+            route_topic_with_ns = self._prefix_with_vehicle_namespace(self.route_topic)
+            self.route_publisher = self.create_publisher(
+                PathWithTwists, route_topic_with_ns, RELIABLE_TRANSIENT_LOCAL_QOS
+            )
+
+        if self.autopilot_state_control_topic:
+            if self.autopilot_state_control_publisher:
+                self.destroy_publisher(self.autopilot_state_control_publisher)
+            self.autopilot_state_control_publisher = self.create_publisher(
+                Bool, self.autopilot_state_control_topic, RELIABLE_TRANSIENT_LOCAL_QOS
+            )
+
+    def publish_route(self, route_points, altitude, speed):
+        """Publish a planned route to the selected vehicle and request autopilot enable."""
+        if not self.vehicle_connected:
+            self.get_logger().warn('Connect a vehicle node before sending a route.')
+            return False
+
+        if len(route_points) < 1:
+            self.get_logger().warn('Route is empty. Add at least one waypoint before sending.')
+            return False
+
+        if self.route_publisher is None or self.autopilot_state_control_publisher is None:
+            self._create_publishers()
+
+        if self.route_publisher is None:
+            self.get_logger().warn('Route publisher is not available.')
+            return False
+
+        route_altitude = float(altitude) if self.waywise_object_type == 'quadcopter' else 0.0
+        route_speed = max(float(speed), 0.0)
+        msg = build_path_with_twists(
+            route_points,
+            self.get_clock().now().to_msg(),
+            frame_id='map',
+            altitude=route_altitude,
+            speed=route_speed,
+        )
+        self.route_publisher.publish(msg)
+
+        if self.autopilot_state_control_publisher is not None:
+            autopilot_msg = Bool()
+            autopilot_msg.data = True
+            self.autopilot_state_control_publisher.publish(autopilot_msg)
+
+        self.get_logger().info(
+            f'Sent route with {len(route_points)} waypoint(s), speed={route_speed:.2f} m/s, '
+            f'z={route_altitude:.2f} m to {self._prefix_with_vehicle_namespace(self.route_topic)}'
+        )
+        return True
+
+    @staticmethod
+    def _normalize_map_source(source):
+        source_by_key = {
+            'osm': 'OpenStreetMap',
+            'openstreetmap': 'OpenStreetMap',
+            'open street map': 'OpenStreetMap',
+            'open streetmap': 'OpenStreetMap',
+            'local': 'Local OSM server',
+            'local osm': 'Local OSM server',
+            'local osm server': 'Local OSM server',
+            'none': 'None',
+        }
+        return source_by_key.get(str(source).strip().lower(), 'OpenStreetMap')
+
     def odom_callback(self, msg):
         """Handle odometry messages."""
         # Nav_msgs/Odometry: pose and twist are nested in PoseWithCovariance / TwistWithCovariance
         self.last_odom['pose'] = msg.pose.pose
         self.last_odom['twist'] = msg.twist.twist
         self.last_odom['stamp'] = self.get_clock().now()
+        self.last_odom['frame_id'] = msg.header.frame_id
 
     def vehicle_pose_callback(self, msg):
         """Handle vehicle pose messages."""
         # Geometry_msgs/PoseStamped: world pose is in the 'pose' field
         self.last_vehicle_pose['pose'] = msg.pose
         self.last_vehicle_pose['stamp'] = self.get_clock().now()
+        self.last_vehicle_pose['frame_id'] = msg.header.frame_id
+
+    def robot_description_callback(self, msg):
+        """Parse robot_description into a top-view overlay model."""
+        if not msg.data:
+            return
+        try:
+            self.vehicle_overlay_model.load_urdf(msg.data)
+        except Exception as exc:
+            self.get_logger().warn(f'Could not parse robot_description for map overlay: {exc}')
+
+    def joint_states_callback(self, msg):
+        """Update the top-view overlay with the latest joint positions."""
+        self.vehicle_overlay_model.update_joint_states(msg.name, msg.position)
+
+    def visual_marker_array_callback(self, msg):
+        """Cache vehicle visualization markers for drawing on the route map."""
+        for marker in msg.markers:
+            action = marker.action
+            if action == 3:  # DELETEALL
+                if marker.ns:
+                    for key in list(self.visual_marker_store):
+                        if key[0] == marker.ns:
+                            self.visual_marker_store.pop(key, None)
+                else:
+                    self.visual_marker_store.clear()
+                continue
+            key = (marker.ns, marker.id)
+            if action == 2:  # DELETE
+                self.visual_marker_store.pop(key, None)
+                continue
+            self.visual_marker_store[key] = marker
+        self.visual_markers = list(self.visual_marker_store.values())
 
     def battery_state_callback(self, msg):
         """Handle battery state messages."""
@@ -553,6 +845,11 @@ class TwistKeyboard(Node):
         # Sync auto landing state from vehicle node
         self.auto_landing_active = msg.state_code == QuadcopterState.LANDING
         self.auto_lift_off_active = msg.state_code == QuadcopterState.AUTO_LIFTING_OFF
+
+    def mission_status_callback(self, msg):
+        """Handle mission state updates."""
+        self.last_mission_state['msg'] = msg
+        self.last_mission_state['stamp'] = self.get_clock().now()
 
     def nav_sat_fix_extended_callback(self, msg):
         """Handle extended GPS/FIX messages."""
@@ -634,6 +931,7 @@ class TwistKeyboard(Node):
                 'priority': priority,
                 'last_msg': Twist(),
                 'last_stamp': self.get_clock().now(),
+                'active': False,
             }
 
             if name != 'keyboard':
@@ -655,6 +953,12 @@ class TwistKeyboard(Node):
         if source_name in self.mux_sources:
             self.mux_sources[source_name]['last_msg'] = msg
             self.mux_sources[source_name]['last_stamp'] = self.get_clock().now()
+            self.mux_sources[source_name]['active'] = True
+
+    def _deactivate_mux_source(self, source_name):
+        """Let a source go quiet so lower-priority sources can win."""
+        if source_name in self.mux_sources:
+            self.mux_sources[source_name]['active'] = False
 
     def _evaluate_mux_and_publish(self):
         """Evaluate priorities and publish the winning command."""
@@ -669,6 +973,8 @@ class TwistKeyboard(Node):
         )
 
         for name, data in sorted_sources:
+            if not data.get('active', False):
+                continue
             time_since_last = (now - data['last_stamp']).nanoseconds / 1e9
             if time_since_last <= data['timeout']:
                 # Found the highest priority valid command
@@ -676,9 +982,9 @@ class TwistKeyboard(Node):
                 winner_name = name
                 break
 
-        # If no winner or all timed out, publish zero velocity
         if winner is None:
-            winner = Twist()
+            self.active_mux_source = winner_name
+            return
 
         self.active_mux_source = winner_name
         if self.mux_publisher:
@@ -738,9 +1044,12 @@ class TwistKeyboard(Node):
                     if Qt.Key.Key_F in self.keys_pressed:
                         twist.linear.z -= self.linear_speed
 
-        # Always update keyboard source in mux
-        self._update_mux_source('keyboard', twist)
-        self.key_vel_publisher.publish(twist)
+        publish_keyboard_cmd = is_actuation_requested_now or self.is_actuation_requested
+        if publish_keyboard_cmd:
+            self._update_mux_source('keyboard', twist)
+            self.key_vel_publisher.publish(twist)
+        else:
+            self._deactivate_mux_source('keyboard')
 
         # Select winner and publish to muxed output
         self._evaluate_mux_and_publish()
@@ -1000,7 +1309,7 @@ class VehicleNodeDialog(QDialog):
 
 
 class UsageGuideDialog(QDialog):
-    """Dialog to show usage guide for the twist keyboard."""
+    """Dialog to show usage guide for the control tower."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1013,16 +1322,20 @@ class UsageGuideDialog(QDialog):
         self.close_button.clicked.connect(self.accept)
 
 
-class TwistKeyboardUI(QMainWindow):
-    """PyQt5 GUI for TwistKeyboard node using .ui file."""
+class ControlTowerUI(QMainWindow):
+    """PyQt5 GUI for ControlTower node using .ui file."""
 
-    def __init__(self, node: TwistKeyboard):
+    def __init__(self, node: ControlTower):
         super().__init__()
         self.node = node
+        self._startup_route_loaded = False
 
         # Load the main UI from file
-        ui_path = os.path.join(UI_BASE_PATH, 'twist_keyboard.ui')
+        ui_path = os.path.join(UI_BASE_PATH, 'twist_control.ui')
         loadUi(ui_path, self)
+
+        # Recompose loaded UI into a control-tower layout with route planning on the left.
+        self.setup_route_planner_shell()
 
         # Setup audio for low battery warning
         self.setup_audio()
@@ -1052,20 +1365,258 @@ class TwistKeyboardUI(QMainWindow):
         self.yellow_color = '#EFA90B'
         self.red_color = '#D32F2F'
         self.blue_color = '#0076CE'
+        self.inactive_muted_color = '#6b7280'
+
+        self.control_group_opacity = QGraphicsOpacityEffect(self.control_group)
+        self.control_group.setGraphicsEffect(self.control_group_opacity)
+
+        self.status_group_opacity = QGraphicsOpacityEffect(self.status_group)
+        self.status_group.setGraphicsEffect(self.status_group_opacity)
+
+        self.update_control_group_state()
 
         # Track if we've already played warning sound
         self.last_battery_warning = False
 
-        # Show vehicle node dialog on startup with auto-connect enabled
-        QTimer.singleShot(100, lambda: self.show_vehicle_node_dialog(auto_connect=True))
+        # Auto-connect only when launch/config provided an explicit vehicle node name.
+        if self.node.control_vehicle_node_fqn.strip():
+            QTimer.singleShot(100, lambda: self.show_vehicle_node_dialog(auto_connect=True))
+
+    def setup_route_planner_shell(self):
+        """Mount the route planner next to the existing twist control panel."""
+        self._move_button_layout_to_top()
+
+        self.plan_route_button = QPushButton('MISSION PLANNER')
+        self.plan_route_button.setCheckable(True)
+        self.plan_route_button.setStyleSheet(ACTIVE_BUTTON_STYLE)
+        self.button_layout.insertWidget(1, self.plan_route_button)
+
+        twist_control_widget = self.takeCentralWidget()
+        self.twist_control_widget = twist_control_widget
+        central_widget = QWidget(self)
+        central_layout = QHBoxLayout(central_widget)
+        central_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.main_splitter = QSplitter(Qt.Horizontal, central_widget)
+        self.route_planner = RoutePlannerWidget(UI_BASE_PATH, self.main_splitter)
+        self.route_planner.set_vehicle_type(self.node.waywise_object_type)
+        self.route_planner.set_vehicle_connected(self.node.vehicle_connected)
+        self.route_planner.set_tile_server_url(self.node.osm_tile_server_url)
+        self.route_planner.set_tile_cache_dir(self.node.osm_tile_cache_dir)
+        self.osm_status_network = QNetworkAccessManager(self)
+        self.osm_status_timer = QTimer(self)
+        self.osm_status_timer.setInterval(1000)
+        self.osm_status_timer.timeout.connect(self.poll_osm_server_status)
+        self.osm_status_reply = None
+        self.osm_server_status = None
+        self._setup_map_config_button()
+        self.node.get_logger().info(
+            f'Control Tower map source: {self.node.map_source}; '
+            f'OSM tile server: {self.node.osm_tile_server_url}'
+        )
+        self.on_map_source_selected(self.node.map_source)
+        self.route_planner.setMinimumWidth(120)
+        self.main_splitter.addWidget(self.route_planner)
+        self.main_splitter.addWidget(twist_control_widget)
+        self.main_splitter.setStretchFactor(0, 1)
+        self.main_splitter.setStretchFactor(1, 0)
+        self.main_splitter.setCollapsible(0, True)
+        self.main_splitter.setCollapsible(1, False)
+
+        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        twist_control_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        central_layout.addWidget(self.main_splitter)
+        self.setCentralWidget(central_widget)
+        self._update_right_pane_min_width(force=True)
+        QTimer.singleShot(0, self._try_load_startup_route)
+
+    def _setup_map_config_button(self):
+        self.map_config_button = UpMenuButton('MAP CONFIG')
+        self.map_config_button.setToolTip('Map source')
+        self.map_config_button.setFixedWidth(132)
+        self.map_config_menu = QMenu(self.map_config_button)
+        self.map_config_menu.setStyleSheet(POPUP_MENU_STYLE)
+        self.map_source_action_group = QActionGroup(self.map_config_menu)
+        self.map_source_action_group.setExclusive(True)
+        for source in ('OpenStreetMap', 'Local OSM server', 'None'):
+            action = self.map_config_menu.addAction(source)
+            action.setCheckable(True)
+            action.setChecked(source == self.node.map_source)
+            action.triggered.connect(
+                lambda checked=False, selected_source=source: self.on_map_source_selected(
+                    selected_source
+                )
+            )
+            self.map_source_action_group.addAction(action)
+        self.map_config_button.clicked.connect(self.show_map_config_menu)
+        self.route_planner.set_map_config_widget(self.map_config_button)
+        self.route_planner.osm_url_edit.editingFinished.connect(self.on_osm_config_edited)
+        self.route_planner.osm_cache_edit.editingFinished.connect(self.on_osm_config_edited)
+        self.route_planner.osm_cache_browse_button.clicked.connect(self.on_osm_config_edited)
+        self.route_planner.osm_refresh_requested.connect(self.on_osm_refresh_requested)
+
+    def show_map_config_menu(self):
+        menu_size = self.map_config_menu.sizeHint()
+        popup_pos = self.map_config_button.mapToGlobal(QPoint(0, -menu_size.height()))
+        self.map_config_menu.exec_(popup_pos)
+
+    def on_osm_config_edited(self):
+        if self.node.map_source == 'Local OSM server':
+            self.node.osm_tile_server_url = self.route_planner.osm_url_edit.text()
+            self.node.osm_tile_cache_dir = self.route_planner.osm_cache_edit.text()
+            self.poll_osm_server_status()
+
+    def on_osm_refresh_requested(self):
+        if self.node.map_source != 'Local OSM server':
+            return
+        self.on_osm_config_edited()
+        self.route_planner.refresh_tiles(clear_disk=False)
+
+    def poll_osm_server_status(self):
+        if (
+            self.node.map_source != 'Local OSM server'
+            or self.osm_status_reply is not None
+            or not self.node.osm_tile_server_url
+        ):
+            return
+        metadata_url = self.node.osm_tile_server_url.rstrip('/') + '/metadata'
+        request = QNetworkRequest(QUrl(metadata_url))
+        request.setRawHeader(b'User-Agent', b'Waywiser-ControlTower/1.0')
+        self.osm_status_reply = self.osm_status_network.get(request)
+        self.osm_status_reply.finished.connect(self.on_osm_status_reply)
+
+    def on_osm_status_reply(self):
+        reply = self.osm_status_reply
+        self.osm_status_reply = None
+        if reply is None:
+            return
+        try:
+            status = 'Busy'
+            if reply.error() == QNetworkReply.NoError:
+                payload = json.loads(bytes(reply.readAll()).decode('utf-8'))
+                status = payload.get('status', 'Ready')
+                if status == 'Ready' and self.osm_server_status != 'Ready':
+                    self.route_planner.refresh_tiles(clear_disk=True)
+                    self.osm_status_timer.stop()
+            self.route_planner.set_osm_server_status(status)
+            self.osm_server_status = status
+        except Exception:
+            self.route_planner.set_osm_server_status('Busy')
+            self.osm_server_status = 'Busy'
+        finally:
+            reply.deleteLater()
+
+    def _try_load_startup_route(self):
+        if self._startup_route_loaded:
+            return
+
+        route_file = self.node.startup_route_file.strip()
+        if not route_file:
+            self._startup_route_loaded = True
+            return
+
+        if self.node.control_vehicle_node_fqn.strip() and not self.node.vehicle_connected:
+            return
+
+        route_file = os.path.expanduser(os.path.expandvars(route_file))
+        try:
+            self.route_planner.set_enu_ref(self.node.enuref)
+            loaded_count = self.route_planner.load_route_file(route_file)
+            self._startup_route_loaded = True
+            self.node.get_logger().info(
+                f'Loaded startup route with {loaded_count} points from: {route_file}'
+            )
+        except Exception as exc:
+            self._startup_route_loaded = True
+            self.node.get_logger().error(str(exc))
+
+    def on_map_source_selected(self, source):
+        """Switch the route planner map background source."""
+        if not hasattr(self, 'route_planner'):
+            return
+        source = self.node._normalize_map_source(source)
+        self.node.map_source = source
+        if source == 'OpenStreetMap':
+            self.node.osm_tile_server_url = OPENSTREETMAP_TILE_SERVER_URL
+            self.node.osm_tile_cache_dir = OPENSTREETMAP_CACHE_DIR
+        self._set_checked_map_source(source)
+        self.route_planner.set_tile_server_url(self.node.osm_tile_server_url)
+        self.route_planner.set_tile_cache_dir(self.node.osm_tile_cache_dir)
+        self.route_planner.set_map_source(source)
+        self.route_planner.set_osm_config_mode(source)
+        if source == 'Local OSM server':
+            self.route_planner.set_osm_server_status('Busy')
+            self.osm_server_status = 'Busy'
+            self.osm_status_timer.start()
+            self.poll_osm_server_status()
+            self.route_planner.refresh_tiles()
+        else:
+            self.osm_status_timer.stop()
+
+    def _set_checked_map_source(self, source):
+        if not hasattr(self, 'map_source_action_group'):
+            return
+        for action in self.map_source_action_group.actions():
+            action.setChecked(action.text() == source)
+
+    def _update_right_pane_min_width(self, force=False):
+        """Keep the control pane wide enough; grow the window minimum if needed."""
+        if not hasattr(self, 'twist_control_widget') or not hasattr(self, 'main_splitter'):
+            return
+
+        total_width = max(
+            self.centralWidget().width() if self.centralWidget() else self.width(), 1
+        )
+        content_width = max(self.scrollAreaWidgetContents.minimumSizeHint().width(), 480)
+        margin_and_scrollbar_width = 56
+        right_min_width = max(int(total_width * 0.4), content_width + margin_and_scrollbar_width)
+        map_min_width = self.route_planner.minimumWidth()
+        splitter_handle_width = max(self.main_splitter.handleWidth(), 1)
+        required_window_width = right_min_width + map_min_width + splitter_handle_width
+
+        self.twist_control_widget.setMinimumWidth(right_min_width)
+        self.twist_control_widget.setMaximumWidth(16777215)
+        self.setMinimumWidth(required_window_width)
+
+        sizes = self.main_splitter.sizes()
+        if force or (len(sizes) >= 2 and sizes[1] < right_min_width):
+            available = max(sum(sizes), total_width, required_window_width)
+            self.main_splitter.setSizes(
+                [max(map_min_width, available - right_min_width), right_min_width]
+            )
+
+    def _move_button_layout_to_top(self):
+        """Move the existing bottom button row above the control/status panels."""
+        try:
+            parent_layout = self.verticalLayout_2
+            for index in range(parent_layout.count()):
+                item = parent_layout.itemAt(index)
+                if item.layout() is self.button_layout:
+                    parent_layout.takeAt(index)
+                    break
+            parent_layout.insertLayout(0, self.button_layout)
+        except Exception as exc:
+            self.node.get_logger().warn(f'Could not move control buttons to the top: {exc}')
 
     def setup_connections(self):
         """Connect UI signals to slots."""
         self.vehicle_node_button.clicked.connect(self.show_vehicle_node_dialog)
         self.usage_button.clicked.connect(self.show_usage_guide)
+        self.plan_route_button.toggled.connect(self.on_plan_route_toggled)
+        self.route_planner.send_route_requested.connect(self.on_send_route_requested)
         self.auto_arm_checkbox.stateChanged.connect(self.on_auto_arm_changed)
         self.hover_hold_checkbox.stateChanged.connect(self.on_hover_hold_changed)
         self.auto_lift_off_checkbox.stateChanged.connect(self.on_auto_lift_off_changed)
+
+    def on_plan_route_toggled(self, checked):
+        """Enable or disable waypoint editing on the map."""
+        self.route_planner.set_planning_enabled(checked)
+        self.plan_route_button.setText('MISSION PLANNER')
+
+    def on_send_route_requested(self, points, altitude, speed):
+        """Send the route shown in the map to the selected vehicle."""
+        if self.node.publish_route(points, altitude, speed):
+            self.plan_route_button.setChecked(False)
 
     def on_auto_arm_changed(self, state):
         """Handle auto arm checkbox state change."""
@@ -1119,7 +1670,7 @@ class TwistKeyboardUI(QMainWindow):
 
             # Create a temporary WAV file
             temp_dir = tempfile.mkdtemp()
-            self.temp_wav_file = os.path.join(temp_dir, 'twist_keyboard_beep.wav')
+            self.temp_wav_file = os.path.join(temp_dir, 'control_tower_beep.wav')
 
             # Write WAV file
             with wave.open(self.temp_wav_file, 'w') as wav_file:
@@ -1169,9 +1720,38 @@ class TwistKeyboardUI(QMainWindow):
                 self.node.request_params_from_vehicle_node()
                 self.sync_control_options_from_node()
                 self.update_ui_for_vehicle_type()
+                self.update_control_group_state()
+                self._try_load_startup_route()
+
+    def update_control_group_state(self):
+        """Reflect whether the control pane has an active vehicle target."""
+        has_vehicle_selected = bool(self.node.control_vehicle_node_fqn.strip())
+        if hasattr(self, 'route_planner'):
+            self.route_planner.set_vehicle_connected(self.node.vehicle_connected)
+
+        # Control group dimming
+        self.control_group.setEnabled(has_vehicle_selected)
+        self.control_group_opacity.setOpacity(1.0 if has_vehicle_selected else 0.45)
+        self.control_group.setToolTip(
+            '' if has_vehicle_selected else 'Select a vehicle node to enable vehicle control.'
+        )
+
+        # Status group dimming
+        self.status_group.setEnabled(has_vehicle_selected)
+        self.status_group_opacity.setOpacity(1.0 if has_vehicle_selected else 0.45)
+        self.status_group.setToolTip(
+            '' if has_vehicle_selected else 'Select a vehicle node to enable vehicle status.'
+        )
+
+        # Vehicle node button text
+        if has_vehicle_selected:
+            self.vehicle_node_button.setText('CHANGE VEHICLE NODE (F1)')
+        else:
+            self.vehicle_node_button.setText('SELECT VEHICLE NODE (F1)')
 
     def update_ui_for_vehicle_type(self):
         """Update UI elements based on the waywise_object_type."""
+        self.route_planner.set_vehicle_type(self.node.waywise_object_type)
         if self.node.waywise_object_type == 'quadcopter':
             self.auto_arm_status_box.show()
             self.hover_hold_status_box.show()
@@ -1268,8 +1848,17 @@ class TwistKeyboardUI(QMainWindow):
 
     def update_display(self):
         """Update the status display with modern UI elements."""
-        self.vehicle_node_label.setText(self.node.control_vehicle_node_fqn)
-        self.vehicle_node_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
+        has_vehicle_selected = bool(self.node.control_vehicle_node_fqn.strip())
+        self.update_control_group_state()
+
+        self.vehicle_node_label.setText(
+            self.node.control_vehicle_node_fqn if has_vehicle_selected else 'No vehicle selected'
+        )
+        self.vehicle_node_label.setStyleSheet(
+            f'color: {self.green_color}; font-weight: 700;'
+            if has_vehicle_selected
+            else f'color: {self.inactive_muted_color}; font-weight: 700;'
+        )
         self.vehicle_type_label.setText(self.node.waywise_object_type.replace('_', ' ').title())
         self.vehicle_type_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
 
@@ -1280,11 +1869,14 @@ class TwistKeyboardUI(QMainWindow):
 
         self._update_estop_display()
         self._update_quadcopter_state_display()
+        self._update_mission_state_display()
         self._update_speed_display()
         self._update_battery_display()
         self._update_odom_display()
         self._update_world_pose_display()
         self._update_gnss_display()
+        self._update_route_planner_display()
+        self._update_right_pane_min_width()
 
         # Show/hide low battery warning
         is_battery_low = self.node.is_battery_low()
@@ -1299,6 +1891,72 @@ class TwistKeyboardUI(QMainWindow):
         else:
             self.warning_label.hide()
             self.last_battery_warning = False
+
+    def _update_route_planner_display(self):
+        """Update route planner context from the active vehicle state."""
+        self.route_planner.set_vehicle_type(self.node.waywise_object_type)
+        self.route_planner.set_enu_ref(self.node.enuref)
+        self._try_load_startup_route()
+        self.route_planner.set_vehicle_overlay_model(self.node.vehicle_overlay_model)
+        self.route_planner.set_visual_markers(self.node.visual_markers)
+
+        # Animate rotor/propeller joints when the drone is armed or in-flight.
+        # STARTING_UP and READY_TO_ARM are the only states where motors are still.
+        qc_msg = self.node.last_quadcopter_state.get('msg')
+        if qc_msg is not None and qc_msg.state_code not in (
+            QuadcopterState.STARTING_UP,
+            QuadcopterState.READY_TO_ARM,
+        ):
+            self.node.vehicle_overlay_model.tick(time.time())
+
+        pose = None
+        frame_id = ''
+        if self.node.last_vehicle_pose['pose'] is not None:
+            pose = self.node.last_vehicle_pose['pose']
+            frame_id = self.node.last_vehicle_pose['frame_id']
+        elif self.node.last_odom['pose'] is not None:
+            pose = self.node.last_odom['pose']
+            frame_id = self.node.last_odom['frame_id']
+
+        if pose is None:
+            return
+
+        orientation = pose.orientation
+        _, _, yaw = euler_from_quaternion(
+            [orientation.x, orientation.y, orientation.z, orientation.w]
+        )
+        x = pose.position.x
+        y = pose.position.y
+
+        # Transform pose to world_frame if it arrives in a different frame.
+        world_frame = self.node.world_frame
+        if frame_id and frame_id != world_frame:
+            try:
+                t = self.node._tf_buffer.lookup_transform(
+                    world_frame,
+                    frame_id,
+                    rclpy.time.Time(),
+                )
+                tx = t.transform.translation.x
+                ty = t.transform.translation.y
+                q = t.transform.rotation
+                _, _, frame_yaw = euler_from_quaternion([q.x, q.y, q.z, q.w])
+                import math
+
+                cos_fy = math.cos(frame_yaw)
+                sin_fy = math.sin(frame_yaw)
+                orig_x, orig_y = x, y
+                x = orig_x * cos_fy - orig_y * sin_fy + tx
+                y = orig_x * sin_fy + orig_y * cos_fy + ty
+                yaw += frame_yaw
+            except (
+                tf2_ros.LookupException,
+                tf2_ros.ConnectivityException,
+                tf2_ros.ExtrapolationException,
+            ):
+                pass  # No transform available yet — render at raw pose
+
+        self.route_planner.set_vehicle_pose(x, y, yaw)
 
     def _get_time_ago_and_color(self, stamp):
         """Format time since stamp and return a corresponding UI color."""
@@ -1368,7 +2026,11 @@ class TwistKeyboardUI(QMainWindow):
         if msg:
             if msg.state_code == QuadcopterState.EMERGENCY:
                 color = self.red_color
-            elif msg.state_code in [QuadcopterState.ARMED, QuadcopterState.IN_FLIGHT]:
+            elif msg.state_code in [
+                QuadcopterState.ARMED,
+                QuadcopterState.IN_FLIGHT,
+                QuadcopterState.ON_MISSION,
+            ]:
                 color = self.green_color
             elif msg.state_code in [
                 QuadcopterState.ARMING,
@@ -1393,6 +2055,52 @@ class TwistKeyboardUI(QMainWindow):
         elif self.warning_label.text() == 'AUTO LIFT-OFF ACTIVE - MANUAL INPUT TO CANCEL':
             self.warning_label.hide()
             self.warning_label.setText('')
+
+    _MISSION_STATE_STRINGS = {
+        MissionState.IDLE: ('Idle', None),
+        MissionState.WAITING_FOR_ROUTE: ('Waiting for route', '#60a5fa'),
+        MissionState.WAITING_FOR_VEHICLE_INIT: ('Waiting for init', '#60a5fa'),
+        MissionState.WAITING_FOR_EMERGENCY_STOP_CLEAR: ('Waiting for E-stop', '#fbbf24'),
+        MissionState.WAITING_FOR_GNSS_ACCURACY: ('Waiting for GNSS', '#fbbf24'),
+        MissionState.FOLLOW_ROUTE_INIT: ('Route: Init', '#60a5fa'),
+        MissionState.FOLLOW_ROUTE_GOTO_BEGIN: ('Route: Go to start', '#60a5fa'),
+        MissionState.FOLLOW_ROUTE_FOLLOWING: ('Following route', None),
+        MissionState.FOLLOW_ROUTE_APPROACHING_END_GOAL: ('Route: Approaching end', '#fbbf24'),
+        MissionState.FOLLOW_ROUTE_FINISHED: ('Route: Finished', '#60a5fa'),
+    }
+
+    def _update_mission_state_display(self):
+        """Update mission state display for all vehicle types."""
+        has_vehicle = bool(self.node.control_vehicle_node_fqn.strip())
+        self.mission_state_static_label.setVisible(has_vehicle)
+        self.mission_state_label.setVisible(has_vehicle)
+        self.mission_state_time_label.setVisible(has_vehicle)
+
+        if not has_vehicle:
+            return
+
+        msg = self.node.last_mission_state['msg']
+        if msg is None:
+            self.mission_state_label.setText('UNKNOWN')
+            self.mission_state_label.setStyleSheet(f'color: {self.gray_color}; font-weight: 700;')
+            self.mission_state_time_label.setText('Last updated: never')
+            self.mission_state_time_label.setStyleSheet(
+                f'color: {self.gray_color}; font-size: 9pt;'
+            )
+            return
+
+        state_text, color = self._MISSION_STATE_STRINGS.get(msg.state, ('Unknown', None))
+        if color is None:
+            color = (
+                self.green_color
+                if msg.state == MissionState.FOLLOW_ROUTE_FOLLOWING
+                else self.inactive_muted_color
+            )
+        time_str, time_color = self._get_time_ago_and_color(self.node.last_mission_state['stamp'])
+        self.mission_state_label.setText(state_text.upper())
+        self.mission_state_label.setStyleSheet(f'color: {color}; font-weight: 700;')
+        self.mission_state_time_label.setText(f'Last updated: {time_str}')
+        self.mission_state_time_label.setStyleSheet(f'color: {time_color}; font-size: 9pt;')
 
     def _update_speed_display(self):
         """Update speed bars and labels on the UI."""
@@ -1698,6 +2406,11 @@ class TwistKeyboardUI(QMainWindow):
 
         event.accept()
 
+    def resizeEvent(self, event):
+        """Keep the splitter minimums aligned with the current window width."""
+        super().resizeEvent(event)
+        self._update_right_pane_min_width()
+
 
 def check_pulseaudio():
     """Check if PulseAudio is running and reachable."""
@@ -1716,7 +2429,7 @@ def check_pulseaudio():
 def main():
     if not _PYQT5_AVAILABLE:
         print(
-            'ERROR: PyQt5 is not installed. twist_keyboard requires PyQt5 (python3-pyqt5) to run.',
+            'ERROR: PyQt5 is not installed. control_tower requires PyQt5 (python3-pyqt5) to run.',
             file=sys.stderr,
         )
         sys.exit(1)
@@ -1729,8 +2442,8 @@ def main():
         rclpy.init()
         app = QApplication(sys.argv)
 
-    node = TwistKeyboard()
-    gui = TwistKeyboardUI(node)
+    node = ControlTower()
+    gui = ControlTowerUI(node)
 
     # Handle Ctrl+C gracefully
     def signal_handler(_sig, _frame):
@@ -1744,7 +2457,7 @@ def main():
     timer.timeout.connect(lambda: None)
     timer.start(100)
 
-    gui.show()
+    gui.showMaximized()
 
     exit_code = app.exec()
 

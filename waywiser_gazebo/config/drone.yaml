@@ -50,15 +50,32 @@ waywiser_drone_node:
     odom_topic: "odometry"
     input_odom_topic: "gazebo/odometry"
     vehicle_pose_topic: "drone_pose"
+    quadcopter_state_topic: "quadcopter_state"
     range_topic: "sensors/range/down"
     battery_state_topic: ""
+    arm_command_topic: "arm_command"
     fused_nav_sat_fix_extended_topic: "sensors/gnss/fused_nav_sat_fix_extended"
     emergency_stop_status_topic: "emergency_stop/current_state"
     emergency_stop_update_topic: "emergency_stop/target_state"
+    mission_status_topic: "mission_status"
+    autopilot_state_control_topic: "autopilot_state_control"
+    joint_states_topic: "joint_states"
     publish_odom_to_baselink_tf: true
     publish_world_to_odom_tf: true
     vehicle_state_poll_rate: 30
     in_air_range_threshold: 0.20
+    autopilot_timer_rate: 10
+    mission_position_type: "odom"
+    require_gnss_for_mission: false
+    mission_waypoint_proximity: 0.5
+    mission_end_goal_alignment_threshold: 0.25
+    mission_cruise_speed: 1.0
+    mission_max_speed: 2.0
+    mission_min_approach_speed: 0.1
+    mission_approach_slowdown_radius: 1.5
+    mission_face_travel_direction: true
+    mission_yaw_gain: 1.5
+    mission_max_yaw_rate: 1.0
     # PX4 offboard setpoint bridge parameters
     command_timeout: 0.5
     setpoint_rate: 20.0

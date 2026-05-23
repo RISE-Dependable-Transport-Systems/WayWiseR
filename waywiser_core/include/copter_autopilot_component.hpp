@@ -65,6 +65,7 @@ public:
   bool getRequireGnssForMission() const {return mRequireGnssForMission;}
   QList<PosPoint> getWaypointList() const {return mWaypointList;}
   MissionState getCurrentMissionState() const {return currentMissionState;}
+  PosPoint getCurrentGoal() const;
   QSharedPointer<MovementController> getAutopilotMovementController() const
   {
     return mAutopilotMovementController;

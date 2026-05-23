@@ -28,6 +28,26 @@ def generate_launch_description():
         default_value='',
         description='Fully qualified name of the vehicle node to control',
     )
+    map_source_la = DeclareLaunchArgument(
+        'map_source',
+        default_value='',
+        description='Control Tower map source: OpenStreetMap, Local OSM server, or None',
+    )
+    osm_tile_server_url_la = DeclareLaunchArgument(
+        'osm_tile_server_url',
+        default_value='',
+        description='Control Tower OSM tile server URL',
+    )
+    osm_tile_cache_dir_la = DeclareLaunchArgument(
+        'osm_tile_cache_dir',
+        default_value='',
+        description='Control Tower OSM tile cache directory',
+    )
+    startup_route_file_la = DeclareLaunchArgument(
+        'startup_route_file',
+        default_value='',
+        description='Route file to load in Control Tower at startup',
+    )
 
     # start nodes and use args to set parameters
     joy_node = Node(
@@ -67,8 +87,8 @@ def generate_launch_description():
         ],
     )
 
-    twist_keyboard_conditional_launch_action = OpaqueFunction(
-        function=twist_keyboard_conditional_launch
+    control_tower_conditional_launch_action = OpaqueFunction(
+        function=control_tower_conditional_launch
     )
 
     # create launch description
@@ -78,44 +98,65 @@ def generate_launch_description():
     ld.add_action(teleop_config_la)
     ld.add_action(use_sim_time_la)
     ld.add_action(control_vehicle_node_fqn_la)
+    ld.add_action(map_source_la)
+    ld.add_action(osm_tile_server_url_la)
+    ld.add_action(osm_tile_cache_dir_la)
+    ld.add_action(startup_route_file_la)
 
     # start nodes
     ld.add_action(joy_node)
     ld.add_action(teleop_twist_joy_node)
     ld.add_action(twist_angular_correction_node)
-    ld.add_action(twist_keyboard_conditional_launch_action)
+    ld.add_action(control_tower_conditional_launch_action)
 
     return ld
 
 
-def twist_keyboard_conditional_launch(context):
+def control_tower_conditional_launch(context):
     with open(LaunchConfiguration('teleop_config').perform(context)) as f:
         config_data = yaml.safe_load(f)
-        if 'twist_keyboard' in config_data:
-            twist_keyboard_params = config_data['twist_keyboard']['ros__parameters']
-            enable_twist_keyboard = twist_keyboard_params['enable']
+        if 'control_tower' in config_data:
+            control_tower_params = config_data['control_tower']['ros__parameters']
+            enable_control_tower = control_tower_params['enable']
             control_vehicle_node_fqn = LaunchConfiguration('control_vehicle_node_fqn').perform(
                 context
             )
             if control_vehicle_node_fqn != '':
-                twist_keyboard_params['control_vehicle_node_fqn'] = control_vehicle_node_fqn
-            if enable_twist_keyboard:
+                control_tower_params['control_vehicle_node_fqn'] = control_vehicle_node_fqn
+            map_source = LaunchConfiguration('map_source').perform(context)
+            if map_source != '':
+                control_tower_params['map_source'] = map_source
+            osm_tile_server_url = LaunchConfiguration('osm_tile_server_url').perform(context)
+            if osm_tile_server_url != '':
+                control_tower_params['osm_tile_server_url'] = osm_tile_server_url
+            osm_tile_cache_dir = LaunchConfiguration('osm_tile_cache_dir').perform(context)
+            if osm_tile_cache_dir != '':
+                control_tower_params['osm_tile_cache_dir'] = osm_tile_cache_dir
+            startup_route_file = LaunchConfiguration('startup_route_file').perform(context)
+            if startup_route_file != '':
+                control_tower_params['startup_route_file'] = startup_route_file
+            if enable_control_tower:
                 if 'DISPLAY' in os.environ:
-                    twist_keyboard_node = Node(
+                    control_tower_node = Node(
                         package='waywiser_teleop',
-                        executable='twist_keyboard.py',
-                        name='twist_keyboard',
+                        executable='control_tower.py',
+                        name='control_tower',
                         output='screen',
                         parameters=[
-                            twist_keyboard_params,
-                            {'use_sim_time': LaunchConfiguration('use_sim_time')},
+                            control_tower_params,
+                            {
+                                'use_sim_time': LaunchConfiguration('use_sim_time'),
+                                'map_source': control_tower_params.get(
+                                    'map_source', 'OpenStreetMap'
+                                ),
+                            },
                         ],
                         remappings={},
                     )
-                    return [twist_keyboard_node]
+                    return [control_tower_node]
                 else:
                     log_no_display = LogInfo(
-                        msg='No GUI display detected. twist_keyboard_node will not be launched.'
+                        msg='No GUI display detected. control_tower_node will not be launched.'
                     )
                     return [log_no_display]
 

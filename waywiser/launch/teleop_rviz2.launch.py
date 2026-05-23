@@ -39,6 +39,26 @@ def generate_launch_description():
         default_value='',
         description='Name of the vehicle node to control',
     )
+    map_source_la = DeclareLaunchArgument(
+        'map_source',
+        default_value='',
+        description='Control Tower map source: OSM or None',
+    )
+    osm_tile_server_url_la = DeclareLaunchArgument(
+        'osm_tile_server_url',
+        default_value='',
+        description='Control Tower OSM tile server URL',
+    )
+    osm_tile_cache_dir_la = DeclareLaunchArgument(
+        'osm_tile_cache_dir',
+        default_value='',
+        description='Control Tower OSM tile cache directory',
+    )
+    startup_route_file_la = DeclareLaunchArgument(
+        'startup_route_file',
+        default_value='',
+        description='Route file to load in Control Tower at startup',
+    )
 
     # create opaque functions to launch nodes using context
     teleop_rviz2_launch_action = OpaqueFunction(function=teleop_rviz2_launch)
@@ -53,6 +73,10 @@ def generate_launch_description():
     ld.add_action(teleop_la)
     ld.add_action(rviz2_la)
     ld.add_action(control_vehicle_node_fqn_la)
+    ld.add_action(map_source_la)
+    ld.add_action(osm_tile_server_url_la)
+    ld.add_action(osm_tile_cache_dir_la)
+    ld.add_action(startup_route_file_la)
 
     # start nodes
     ld.add_action(teleop_rviz2_launch_action)
@@ -80,6 +104,10 @@ def teleop_rviz2_launch(context):
                     'use_sim_time': LaunchConfiguration('use_sim_time'),
                     'teleop_config': LaunchConfiguration('teleop_config'),
                     'control_vehicle_node_fqn': LaunchConfiguration('control_vehicle_node_fqn'),
+                    'map_source': LaunchConfiguration('map_source'),
+                    'osm_tile_server_url': LaunchConfiguration('osm_tile_server_url'),
+                    'osm_tile_cache_dir': LaunchConfiguration('osm_tile_cache_dir'),
+                    'startup_route_file': LaunchConfiguration('startup_route_file'),
                 }.items(),
             )
         )

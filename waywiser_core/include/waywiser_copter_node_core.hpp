@@ -28,6 +28,7 @@
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_broadcaster.h"
 #include "tf2_ros/transform_listener.h"
+#include "visualization_msgs/msg/marker_array.hpp"
 #include "waywiser_core/msg/battery_state.hpp"
 #include "waywiser_core/msg/mission_state.hpp"
 #include "waywiser_core/msg/nav_sat_fix_extended.hpp"
@@ -66,7 +67,8 @@ public:
     LIFTING_OFF = waywiser_core::msg::QuadcopterState::LIFTING_OFF,
     HOVERING = waywiser_core::msg::QuadcopterState::HOVERING,
     IDLE_DESCENT = waywiser_core::msg::QuadcopterState::IDLE_DESCENT,
-    AUTO_LIFTING_OFF = waywiser_core::msg::QuadcopterState::AUTO_LIFTING_OFF
+    AUTO_LIFTING_OFF = waywiser_core::msg::QuadcopterState::AUTO_LIFTING_OFF,
+    ON_MISSION = waywiser_core::msg::QuadcopterState::ON_MISSION
   };
 
   void initialize_node();
@@ -107,6 +109,8 @@ protected:
   void publish_quadcopter_state();
   void publish_tfs();
   void publish_world_pose();
+  void publish_route_markers();
+  void publish_autopilot_markers();
   static void qtMessageHandler(
     QtMsgType type, const QMessageLogContext &, const QString & msg);
 
@@ -143,12 +147,14 @@ protected:
   std::string emergency_stop_update_topic_;
   std::string autopilot_state_control_topic_;
   std::string mission_status_topic_;
+  std::string joint_states_topic_;
 
   bool enable_autopilot_component_ = false;
   bool publish_odom_to_baselink_tf_ = true;
   bool publish_world_to_odom_tf_ = false;
   bool received_first_odom_msg_ = false;
   float in_flight_range_threshold_ = 0.15F;
+  float min_steering_height_ = 0.5F;
   geometry_msgs::msg::Twist current_cmd_vel_out_;
 
   llh_t enuref_;
@@ -164,6 +170,8 @@ protected:
     emergency_stop_update_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_out_pub_;
   rclcpp::Publisher<waywiser_core::msg::MissionState>::SharedPtr mission_status_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr route_marker_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr autopilot_marker_pub_;
 
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_command_sub_;
@@ -266,6 +274,7 @@ protected:
   bool auto_offboard_ = false;
   bool require_motion_before_engage_ = true;
   double request_retry_period_ = 1.0;
+  bool publish_waypoint_markers_ = false;  // disabled by default; control tower draws its own route
 
   static rclcpp::Logger node_logger_;
 };

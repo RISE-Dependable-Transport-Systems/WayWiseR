@@ -1,0 +1,12 @@
+gazebo_osm_tile_server_node:
+  ros__parameters:
+    tcp_server_ip: localhost
+    tcp_server_port: 8081
+    base_map_cache_dir: ""
+    reset_base_map_image: false
+    enuref: [57.713805, 12.890088, 203.59]
+    max_image_size_px: 640
+    gazebo_bev_view_camera_fov: 10.0 # in degrees (min: 0.1 rad = 5.73 deg)
+    gazebo_bev_view_camera_height: 100.0
+    render_timeout_s: 20.0
+    map_region: [40.0, 40.0, -40.0, -40.0] # Top, right, bottom, left in Gazebo world meters

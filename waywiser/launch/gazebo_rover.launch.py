@@ -9,8 +9,9 @@ from launch.actions import (
 )
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import PushRosNamespace, SetRemap
+from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch_ros.actions import Node, PushRosNamespace, SetRemap
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -21,6 +22,12 @@ def generate_launch_description():
     waywiser_teleop_dir = get_package_share_directory('waywiser_teleop')
     waywiser_slam_dir = get_package_share_directory('waywiser_slam')
     waywiser_perception_dir = get_package_share_directory('waywiser_perception')
+    default_gazebo_osm_tile_cache_root = os.path.join(
+        os.environ.get('WAYWISER_WS', os.getcwd()),
+        'resources',
+        'control_tower',
+        'gazebo',
+    )
 
     # args that can be set from the command line or a default will be used
     use_sim_time_la = DeclareLaunchArgument(
@@ -28,7 +35,7 @@ def generate_launch_description():
     )
     gazebo_world_la = DeclareLaunchArgument(
         'world',
-        default_value=os.path.join(waywiser_gazebo_dir, 'worlds/car_world.sdf'),
+        default_value=os.path.join(waywiser_gazebo_dir, 'worlds/bounded_world.sdf'),
         description='Full path to gazebo sdf file',
     )
     rover_enable_nav2_collision_monitor_la = DeclareLaunchArgument(
@@ -55,6 +62,48 @@ def generate_launch_description():
         'teleop',
         default_value='True',
         description='Launch teleop',
+    )
+    map_source_la = DeclareLaunchArgument(
+        'map_source',
+        default_value='Local OSM server',
+        description='Control Tower map source: OpenStreetMap, Local OSM server, or None',
+    )
+    gazebo_osm_tile_server_la = DeclareLaunchArgument(
+        'gazebo_osm_tile_server',
+        default_value='True',
+        description='Serve the Gazebo world as OSM-compatible map tiles',
+    )
+    gazebo_osm_tile_server_config_la = DeclareLaunchArgument(
+        'gazebo_osm_tile_server_config',
+        default_value=os.path.join(waywiser_gazebo_dir, 'config/gazebo_osm_tile_server.yaml'),
+        description='Full path to Gazebo OSM tile server config file',
+    )
+    gazebo_osm_tile_server_url_la = DeclareLaunchArgument(
+        'gazebo_osm_tile_server_url',
+        default_value='http://localhost:8081',
+        description='Control Tower tile URL for the Gazebo OSM tile server',
+    )
+    gazebo_osm_tile_cache_dir_la = DeclareLaunchArgument(
+        'gazebo_osm_tile_cache_dir',
+        default_value=PythonExpression(
+            [
+                repr(default_gazebo_osm_tile_cache_root + os.sep),
+                ' + __import__("os").path.splitext(__import__("os").path.basename("',
+                LaunchConfiguration('world'),
+                '"))[0]',
+            ]
+        ),
+        description='Control Tower cache directory for Gazebo-served OSM tiles',
+    )
+    startup_route_file_la = DeclareLaunchArgument(
+        'startup_route_file',
+        default_value='',
+        description='Route file to load in Control Tower at startup',
+    )
+    use_nvidia_gpu_la = DeclareLaunchArgument(
+        'use_nvidia_gpu',
+        default_value='True',
+        description='Use NVIDIA PRIME offload environment variables for Gazebo rendering',
     )
     rviz2_la = DeclareLaunchArgument(
         'rviz2',
@@ -289,6 +338,7 @@ def generate_launch_description():
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'world': LaunchConfiguration('world'),
+            'use_nvidia_gpu': LaunchConfiguration('use_nvidia_gpu'),
         }.items(),
     )
 
@@ -330,7 +380,31 @@ def generate_launch_description():
                 '/',
                 LaunchConfiguration('control_vehicle_node_name'),
             ],
+            'map_source': LaunchConfiguration('map_source'),
+            'osm_tile_server_url': LaunchConfiguration('gazebo_osm_tile_server_url'),
+            'osm_tile_cache_dir': LaunchConfiguration('gazebo_osm_tile_cache_dir'),
+            'startup_route_file': LaunchConfiguration('startup_route_file'),
         }.items(),
+    )
+
+    gazebo_osm_tile_server = Node(
+        package='waywiser_gazebo',
+        executable='gazebo_osm_tile_server.py',
+        name='gazebo_osm_tile_server_node',
+        parameters=[
+            {'use_sim_time': LaunchConfiguration('use_sim_time')},
+            LaunchConfiguration('gazebo_osm_tile_server_config'),
+            {'world_sdf': ParameterValue(LaunchConfiguration('world'), value_type=str)},
+            {
+                'base_map_cache_dir': ParameterValue(
+                    LaunchConfiguration('gazebo_osm_tile_cache_dir'), value_type=str
+                )
+            },
+        ],
+        arguments=['--ros-args', '--log-level', 'info'],
+        output='screen',
+        emulate_tty=True,
+        condition=IfCondition(LaunchConfiguration('gazebo_osm_tile_server')),
     )
 
     # create launch description
@@ -344,6 +418,13 @@ def generate_launch_description():
     ld.add_action(rviz_config_la)
     ld.add_action(teleop_config_la)
     ld.add_action(teleop_la)
+    ld.add_action(map_source_la)
+    ld.add_action(gazebo_osm_tile_server_la)
+    ld.add_action(gazebo_osm_tile_server_config_la)
+    ld.add_action(gazebo_osm_tile_server_url_la)
+    ld.add_action(gazebo_osm_tile_cache_dir_la)
+    ld.add_action(startup_route_file_la)
+    ld.add_action(use_nvidia_gpu_la)
     ld.add_action(rviz2_la)
     ld.add_action(control_vehicle_node_name_la)
     ld.add_action(rover_localization_node_name_la)
@@ -356,6 +437,7 @@ def generate_launch_description():
 
     # start nodes
     ld.add_action(gazebo)
+    ld.add_action(gazebo_osm_tile_server)
     ld.add_action(rover_twist_safety)
     ld.add_action(teleop_rviz2)
     ld.add_action(waywiser_car_launch)

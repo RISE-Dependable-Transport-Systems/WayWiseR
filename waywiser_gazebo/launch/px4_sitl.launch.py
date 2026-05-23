@@ -11,10 +11,12 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     ExecuteProcess,
+    IncludeLaunchDescription,
     OpaqueFunction,
     SetEnvironmentVariable,
     TimerAction,
 )
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -81,6 +83,13 @@ def generate_launch_description():
             'use_sim_time',
             default_value='True',
             description='Use Gazebo simulation time.',
+        )
+    )
+    ld.add_action(
+        DeclareLaunchArgument(
+            'use_nvidia_gpu',
+            default_value='True',
+            description='Use NVIDIA PRIME offload environment variables for Gazebo rendering.',
         )
     )
     ld.add_action(launch_setup_action)
@@ -241,11 +250,24 @@ def launch_setup(context):
         output='screen',
     )
 
-    gazebo_cmd = ['gz', 'sim', '-r', str(gazebo_world_path)]
-    gazebo_process = ExecuteProcess(
-        cmd=gazebo_cmd,
-        output='screen',
-        emulate_tty=True,
+    gazebo = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(
+                    gazebo_dir,
+                    'launch',
+                    'gazebo.launch.py',
+                )
+            ]
+        ),
+        launch_arguments={
+            'use_sim_time': use_sim_time,
+            'world': str(gazebo_world_path),
+            'launch_bridge': 'False',
+            'launch_map_frame_transform': 'False',
+            'gazebo_sim_version': '8',
+            'use_nvidia_gpu': LaunchConfiguration('use_nvidia_gpu'),
+        }.items(),
     )
 
     px4_sitl_process = ExecuteProcess(
@@ -269,7 +291,7 @@ def launch_setup(context):
     actions = [
         gazebo_resource_path_env,
         ign_resource_path_env,
-        gazebo_process,
+        gazebo,
         map_frame_transform,
         default_bridge_node,
         model_bridge_node,
@@ -536,7 +558,7 @@ def create_bridge_action(config_file, use_sim_time, bridge_install_prefix=''):
         return Node(
             package='ros_gz_bridge',
             executable='parameter_bridge',
-            output='screen',
+            output='log',
             arguments=[
                 '--ros-args',
                 '-p',
@@ -566,7 +588,7 @@ def create_bridge_action(config_file, use_sim_time, bridge_install_prefix=''):
             f'use_sim_time:={use_sim_time}',
         ],
         additional_env=bridge_env,
-        output='screen',
+        output='log',
     )
 
 
