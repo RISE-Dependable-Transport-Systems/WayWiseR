@@ -130,6 +130,11 @@ def generate_launch_description():
         default_value=os.path.join(waywiser_gazebo_dir, 'config/drone.yaml'),
         description='Full path to params file of drone',
     )
+    drone_vehicle_node_la = DeclareLaunchArgument(
+        'drone_vehicle_node',
+        default_value='True',
+        description='Launch the main WayWiseR drone vehicle node',
+    )
     control_vehicle_node_name_la = DeclareLaunchArgument(
         'control_vehicle_node_name',
         default_value='waywiser_drone_node',
@@ -380,7 +385,10 @@ def generate_launch_description():
     )
 
     drone_state_publisher = OpaqueFunction(function=drone_state_publisher_launch)
-    drone_vehicle_node = OpaqueFunction(function=drone_vehicle_node_launch)
+    drone_vehicle_node = OpaqueFunction(
+        function=drone_vehicle_node_launch,
+        condition=IfCondition(LaunchConfiguration('drone_vehicle_node')),
+    )
     zenoh_router = OpaqueFunction(function=zenoh_router_check)
 
     # create launch description
@@ -401,6 +409,7 @@ def generate_launch_description():
     ld.add_action(use_nvidia_gpu_la)
     ld.add_action(rviz2_la)
     ld.add_action(drone_config_la)
+    ld.add_action(drone_vehicle_node_la)
     ld.add_action(control_vehicle_node_name_la)
     ld.add_action(drone_spawn_config_file_la)
     ld.add_action(drone_yolo_config_la)
