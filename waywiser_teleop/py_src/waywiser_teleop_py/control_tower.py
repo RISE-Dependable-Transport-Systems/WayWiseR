@@ -906,6 +906,7 @@ class ControlTower(Node):
                 self.declare_parameter(f'mux_input.{name}.topic', '')
                 self.declare_parameter(f'mux_input.{name}.timeout', 0.0)
                 self.declare_parameter(f'mux_input.{name}.priority', 0)
+                self.declare_parameter(f'mux_input.{name}.prepend_vehicle_namespace', False)
                 topic = (
                     self.get_parameter(f'mux_input.{name}.topic')
                     .get_parameter_value()
@@ -921,12 +922,20 @@ class ControlTower(Node):
                     .get_parameter_value()
                     .integer_value
                 )
+                prepend_vehicle_namespace = (
+                    self.get_parameter(f'mux_input.{name}.prepend_vehicle_namespace')
+                    .get_parameter_value()
+                    .bool_value
+                )
             except Exception as e:
                 self.get_logger().warn(f'Incomplete configuration for source {name}: {e}')
                 continue
 
+            topic_with_ns = (
+                self._prefix_with_vehicle_namespace(topic) if prepend_vehicle_namespace else topic
+            )
             self.mux_sources[name] = {
-                'topic': topic,
+                'topic': topic_with_ns,
                 'timeout': timeout,
                 'priority': priority,
                 'last_msg': Twist(),
@@ -935,9 +944,9 @@ class ControlTower(Node):
             }
 
             if name != 'keyboard':
-                self.get_logger().info(f'Creating subscriber for {name} on topic {topic}')
+                self.get_logger().info(f'Creating subscriber for {name} on topic {topic_with_ns}')
                 self.create_subscription(
-                    Twist, topic, lambda msg, n=name: self._mux_callback(msg, n), 10
+                    Twist, topic_with_ns, lambda msg, n=name: self._mux_callback(msg, n), 10
                 )
 
         self.get_logger().info(

@@ -61,6 +61,7 @@ control_tower:
         topic: waypoint_follower_vel
         timeout: 0.5
         priority: 60
+        prepend_vehicle_namespace: true
       teleop_nav2:
         topic: teleop_nav2_vel
         timeout: 0.5
