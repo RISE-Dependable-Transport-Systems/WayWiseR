@@ -696,7 +696,7 @@ def drone_waypoint_follower_launch(context):
         },
         remappings=[
             ('/cmd_vel_in', 'waypoint_follower_cmd_vel_in'),
-            ('/cmd_vel_out', 'teleop_mux_vel'),
+            ('/cmd_vel_out', 'waypoint_follower_vel'),
         ],
     )
 

@@ -48,7 +48,7 @@ control_tower:
     osm_tile_server_url: http://c.osm.rrze.fau.de/osmhd
     map_source: OpenStreetMap
     mux_input:
-      sources: ["joystick", "keyboard", "teleop_nav2"]
+      sources: ["joystick", "keyboard", "waypoint_follower", "teleop_nav2"]
       joystick:
         topic: joy_vel_corrected
         timeout: 0.5
@@ -57,6 +57,10 @@ control_tower:
         topic: key_vel
         timeout: 0.5
         priority: 90
+      waypoint_follower:
+        topic: waypoint_follower_vel
+        timeout: 0.5
+        priority: 60
       teleop_nav2:
         topic: teleop_nav2_vel
         timeout: 0.5
