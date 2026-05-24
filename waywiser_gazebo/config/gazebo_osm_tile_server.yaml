@@ -1,6 +1,6 @@
 gazebo_osm_tile_server_node:
   ros__parameters:
-    tcp_server_ip: localhost
+    tcp_server_ip: 0.0.0.0
     tcp_server_port: 8081
     base_map_cache_dir: ""
     reset_base_map_image: false

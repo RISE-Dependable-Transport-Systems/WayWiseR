@@ -26,7 +26,6 @@ from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node, PushRosNamespace, SetRemap
-from launch_ros.parameter_descriptions import ParameterValue
 
 from waywiser_description_py.waywiser_description_utils import (
     get_robot_state_publisher_node,
@@ -97,6 +96,11 @@ def generate_launch_description():
         'gazebo_osm_tile_server_config',
         default_value=os.path.join(waywiser_gazebo_dir, 'config/gazebo_osm_tile_server.yaml'),
         description='Full path to Gazebo OSM tile server config file',
+    )
+    gazebo_osm_tile_server_ip_la = DeclareLaunchArgument(
+        'gazebo_osm_tile_server_ip',
+        default_value='0.0.0.0',
+        description='Bind address for the Gazebo OSM tile server',
     )
     gazebo_osm_tile_server_url_la = DeclareLaunchArgument(
         'gazebo_osm_tile_server_url',
@@ -256,23 +260,8 @@ def generate_launch_description():
         }.items(),
     )
 
-    gazebo_osm_tile_server = Node(
-        package='waywiser_gazebo',
-        executable='gazebo_osm_tile_server.py',
-        name='gazebo_osm_tile_server_node',
-        parameters=[
-            {'use_sim_time': LaunchConfiguration('use_sim_time')},
-            LaunchConfiguration('gazebo_osm_tile_server_config'),
-            {'world_sdf': ParameterValue(LaunchConfiguration('world'), value_type=str)},
-            {
-                'base_map_cache_dir': ParameterValue(
-                    LaunchConfiguration('gazebo_osm_tile_cache_dir'), value_type=str
-                )
-            },
-        ],
-        arguments=['--ros-args', '--log-level', 'info'],
-        output='screen',
-        emulate_tty=True,
+    gazebo_osm_tile_server = OpaqueFunction(
+        function=gazebo_osm_tile_server_launch,
         condition=IfCondition(LaunchConfiguration('gazebo_osm_tile_server')),
     )
 
@@ -439,6 +428,7 @@ def generate_launch_description():
     ld.add_action(map_source_la)
     ld.add_action(gazebo_osm_tile_server_la)
     ld.add_action(gazebo_osm_tile_server_config_la)
+    ld.add_action(gazebo_osm_tile_server_ip_la)
     ld.add_action(gazebo_osm_tile_server_url_la)
     ld.add_action(gazebo_osm_tile_cache_dir_la)
     ld.add_action(startup_route_file_la)
@@ -625,6 +615,32 @@ def drone_gazebo_spawn_launch(context):
                     }.items(),
                 )
             ],
+        )
+    ]
+
+
+def gazebo_osm_tile_server_launch(context):
+    config_path = LaunchConfiguration('gazebo_osm_tile_server_config').perform(context)
+    config_data = yaml_to_dict(config_path)
+    node_params = config_data.get('gazebo_osm_tile_server_node', {}).get('ros__parameters', {})
+    node_params = {
+        **node_params,
+        'use_sim_time': LaunchConfiguration('use_sim_time').perform(context).lower()
+        in ['true', '1', 'yes'],
+        'tcp_server_ip': LaunchConfiguration('gazebo_osm_tile_server_ip').perform(context),
+        'world_sdf': LaunchConfiguration('world').perform(context),
+        'base_map_cache_dir': LaunchConfiguration('gazebo_osm_tile_cache_dir').perform(context),
+    }
+
+    return [
+        Node(
+            package='waywiser_gazebo',
+            executable='gazebo_osm_tile_server.py',
+            name='gazebo_osm_tile_server_node',
+            parameters=[node_params],
+            arguments=['--ros-args', '--log-level', 'info'],
+            output='screen',
+            emulate_tty=True,
         )
     ]
 
