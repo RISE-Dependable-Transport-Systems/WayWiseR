@@ -58,6 +58,11 @@ def generate_launch_description():
     use_sim_time_la = DeclareLaunchArgument(
         'use_sim_time', default_value='True', description='Use simulation/Gazebo clock'
     )
+    simulator_nodes_la = DeclareLaunchArgument(
+        'simulator_nodes',
+        default_value='True',
+        description='Launch Gazebo/PX4 and simulator-side drone support nodes',
+    )
     gazebo_world_la = DeclareLaunchArgument(
         'world',
         default_value=os.path.join(waywiser_gazebo_dir, 'worlds/forest.sdf'),
@@ -389,6 +394,21 @@ def generate_launch_description():
         function=drone_vehicle_node_launch,
         condition=IfCondition(LaunchConfiguration('drone_vehicle_node')),
     )
+    simulator_nodes = GroupAction(
+        actions=[
+            px4_sitl,
+            OpaqueFunction(function=normalize_gazebo_osm_tile_cache_dir),
+            drone_gazebo_spawn,
+            gazebo_osm_tile_server,
+            drone_twist_safety,
+            drone_navsatfix_extended_wrapper,
+            drone_yolo,
+            drone_localization,
+            drone_rgbd_to_pointcloud,
+            drone_state_publisher,
+        ],
+        condition=IfCondition(LaunchConfiguration('simulator_nodes')),
+    )
     zenoh_router = OpaqueFunction(function=zenoh_router_check)
 
     # create launch description
@@ -396,6 +416,7 @@ def generate_launch_description():
 
     # declare launch args
     ld.add_action(use_sim_time_la)
+    ld.add_action(simulator_nodes_la)
     ld.add_action(gazebo_world_la)
     ld.add_action(rviz_config_la)
     ld.add_action(teleop_config_la)
@@ -434,17 +455,8 @@ def generate_launch_description():
         TimerAction(
             period=2.0,
             actions=[
-                px4_sitl,
-                OpaqueFunction(function=normalize_gazebo_osm_tile_cache_dir),
-                drone_gazebo_spawn,
-                gazebo_osm_tile_server,
-                drone_twist_safety,
+                simulator_nodes,
                 teleop_rviz2,
-                drone_navsatfix_extended_wrapper,
-                drone_yolo,
-                drone_localization,
-                drone_rgbd_to_pointcloud,
-                drone_state_publisher,
                 drone_vehicle_node,
             ],
         )
