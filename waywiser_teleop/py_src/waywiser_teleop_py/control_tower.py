@@ -168,6 +168,9 @@ class ControlTower(Node):
         self.control_vehicle_node_fqn = (
             self.get_parameter('control_vehicle_node_fqn').get_parameter_value().string_value
         )
+        self.vehicle_namespace = RosUtils.parent_namespace_from_fqn(
+            self.control_vehicle_node_fqn
+        )
 
         self.declare_parameter('max_linear_speed', 2.0)
         self.declare_parameter('max_angular_speed', 2.0)
@@ -240,7 +243,6 @@ class ControlTower(Node):
         self.route_topic = ''
         self.autopilot_state_control_topic = ''
         self.enuref = [57.71495867, 12.89134921, 0.0]
-        self.vehicle_namespace = ''
         self.waywise_object_type = 'generic'
         self.vehicle_connected = False
 
@@ -310,6 +312,7 @@ class ControlTower(Node):
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self)
 
         self.mux_sources = {}  # source_name -> {topic, priority, timeout, last_msg, last_stamp}
+        self.mux_source_subscribers = []
         self.active_mux_source = 'None'
         self._init_mux_sources()
 
@@ -885,6 +888,11 @@ class ControlTower(Node):
 
     def _init_mux_sources(self):
         """Initialize mux sources from parameters."""
+        for subscriber in self.mux_source_subscribers:
+            self.destroy_subscription(subscriber)
+        self.mux_source_subscribers = []
+        self.mux_sources = {}
+
         # Get the list of sources
         self.declare_parameter('mux_input.sources', [''])
         try:
@@ -945,8 +953,10 @@ class ControlTower(Node):
 
             if name != 'keyboard':
                 self.get_logger().info(f'Creating subscriber for {name} on topic {topic_with_ns}')
-                self.create_subscription(
-                    Twist, topic_with_ns, lambda msg, n=name: self._mux_callback(msg, n), 10
+                self.mux_source_subscribers.append(
+                    self.create_subscription(
+                        Twist, topic_with_ns, lambda msg, n=name: self._mux_callback(msg, n), 10
+                    )
                 )
 
         self.get_logger().info(
@@ -1726,6 +1736,7 @@ class ControlTowerUI(QMainWindow):
                 self.node.vehicle_namespace = RosUtils.parent_namespace_from_fqn(
                     self.node.control_vehicle_node_fqn
                 )
+                self.node._init_mux_sources()
                 self.node.request_params_from_vehicle_node()
                 self.sync_control_options_from_node()
                 self.update_ui_for_vehicle_type()
