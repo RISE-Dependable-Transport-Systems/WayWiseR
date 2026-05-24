@@ -894,7 +894,8 @@ class ControlTower(Node):
         self.mux_sources = {}
 
         # Get the list of sources
-        self.declare_parameter('mux_input.sources', [''])
+        if not self.has_parameter('mux_input.sources'):
+            self.declare_parameter('mux_input.sources', [''])
         try:
             source_names = (
                 self.get_parameter('mux_input.sources').get_parameter_value().string_array_value
@@ -911,10 +912,16 @@ class ControlTower(Node):
 
         for name in source_names:
             try:
-                self.declare_parameter(f'mux_input.{name}.topic', '')
-                self.declare_parameter(f'mux_input.{name}.timeout', 0.0)
-                self.declare_parameter(f'mux_input.{name}.priority', 0)
-                self.declare_parameter(f'mux_input.{name}.prepend_vehicle_namespace', False)
+                if not self.has_parameter(f'mux_input.{name}.topic'):
+                    self.declare_parameter(f'mux_input.{name}.topic', '')
+                if not self.has_parameter(f'mux_input.{name}.timeout'):
+                    self.declare_parameter(f'mux_input.{name}.timeout', 0.0)
+                if not self.has_parameter(f'mux_input.{name}.priority'):
+                    self.declare_parameter(f'mux_input.{name}.priority', 0)
+                if not self.has_parameter(f'mux_input.{name}.prepend_vehicle_namespace'):
+                    self.declare_parameter(
+                        f'mux_input.{name}.prepend_vehicle_namespace', False
+                    )
                 topic = (
                     self.get_parameter(f'mux_input.{name}.topic')
                     .get_parameter_value()
