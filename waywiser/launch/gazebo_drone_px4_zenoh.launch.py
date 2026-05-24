@@ -82,6 +82,16 @@ def generate_launch_description():
         default_value='True',
         description='Launch teleop',
     )
+    vehicle_control_enabled_la = DeclareLaunchArgument(
+        'vehicle_control_enabled',
+        default_value='True',
+        description='Enable Control Tower vehicle controls; set False for passive monitoring',
+    )
+    publish_control_tower_heartbeat_la = DeclareLaunchArgument(
+        'publish_control_tower_heartbeat',
+        default_value='True',
+        description='Publish the vehicle-scoped Control Tower heartbeat',
+    )
     map_source_la = DeclareLaunchArgument(
         'map_source',
         default_value='Local OSM server',
@@ -257,6 +267,10 @@ def generate_launch_description():
             'osm_tile_server_url': LaunchConfiguration('gazebo_osm_tile_server_url'),
             'osm_tile_cache_dir': LaunchConfiguration('gazebo_osm_tile_cache_dir'),
             'startup_route_file': LaunchConfiguration('startup_route_file'),
+            'vehicle_control_enabled': LaunchConfiguration('vehicle_control_enabled'),
+            'publish_control_tower_heartbeat': LaunchConfiguration(
+                'publish_control_tower_heartbeat'
+            ),
         }.items(),
     )
 
@@ -425,6 +439,8 @@ def generate_launch_description():
     ld.add_action(rviz_config_la)
     ld.add_action(teleop_config_la)
     ld.add_action(teleop_la)
+    ld.add_action(vehicle_control_enabled_la)
+    ld.add_action(publish_control_tower_heartbeat_la)
     ld.add_action(map_source_la)
     ld.add_action(gazebo_osm_tile_server_la)
     ld.add_action(gazebo_osm_tile_server_config_la)

@@ -39,7 +39,7 @@ with suppress_stderr():
     import rclpy
     from rclpy.node import Node
     from sensor_msgs.msg import JointState, Joy
-    from std_msgs.msg import Bool, String
+    from std_msgs.msg import Bool, Header, String
     import tf2_ros
     from tf_transformations import euler_from_quaternion
     from visualization_msgs.msg import MarkerArray
@@ -151,6 +151,8 @@ else:
     OPENSTREETMAP_TILE_SERVER_URL = ''
     POPUP_MENU_STYLE = ''
 
+AUTOPILOT_MARKER_TTL_SECONDS = 1.0
+
 
 class ControlTower(Node):
     """Publish twist messages using keypresses from the keyboard."""
@@ -179,6 +181,10 @@ class ControlTower(Node):
         self.declare_parameter('linear_speed_increment', 0.1)
         self.declare_parameter('angular_speed_increment', 0.1)
         self.declare_parameter('publish_rate', 10.0)
+        self.declare_parameter('vehicle_control_enabled', True)
+        self.declare_parameter('publish_control_tower_heartbeat', True)
+        self.declare_parameter('control_tower_heartbeat_topic', 'control_tower_heartbeat')
+        self.declare_parameter('control_tower_heartbeat_rate', 5.0)
 
         # Joy emergency stop parameters
         self.declare_parameter('emergency_stop_set_joy_button_index', 5)
@@ -218,6 +224,21 @@ class ControlTower(Node):
             .integer_value
         )
         self.joy_timeout = self.get_parameter('joy_timeout').get_parameter_value().double_value
+        self.vehicle_control_enabled = (
+            self.get_parameter('vehicle_control_enabled').get_parameter_value().bool_value
+        )
+        self.publish_control_tower_heartbeat = (
+            self.get_parameter('publish_control_tower_heartbeat').get_parameter_value().bool_value
+        )
+        self.control_tower_heartbeat_topic = (
+            self.get_parameter('control_tower_heartbeat_topic').get_parameter_value().string_value
+        )
+        self.control_tower_heartbeat_rate = max(
+            0.1,
+            self.get_parameter('control_tower_heartbeat_rate')
+            .get_parameter_value()
+            .double_value,
+        )
 
         # Wait for sim time if needed
         use_sim_time = self.get_parameter('use_sim_time').get_parameter_value().bool_value
@@ -262,6 +283,7 @@ class ControlTower(Node):
         self.mux_publisher = None
         self.route_publisher = None
         self.autopilot_state_control_publisher = None
+        self.control_tower_heartbeat_publisher = None
 
         # Mux initialization
         self.mux_output_topic = ''
@@ -320,6 +342,10 @@ class ControlTower(Node):
         self.joy_subscriber = self.create_subscription(Joy, '/joy', self.joy_callback, 10)
         self.joy_watchdog_timer = self.create_timer(self.joy_timeout, self.joy_watchdog_callback)
         self.joy_watchdog_timer.cancel()
+        self.control_tower_heartbeat_timer = self.create_timer(
+            1.0 / self.control_tower_heartbeat_rate,
+            self.publish_control_tower_heartbeat_msg,
+        )
 
         # State variables
         self.last_emergency_stop_state = {'msg': None, 'stamp': self.get_clock().now()}
@@ -735,8 +761,38 @@ class ControlTower(Node):
                 Bool, self.autopilot_state_control_topic, RELIABLE_TRANSIENT_LOCAL_QOS
             )
 
+        if self.control_tower_heartbeat_publisher:
+            self.destroy_publisher(self.control_tower_heartbeat_publisher)
+            self.control_tower_heartbeat_publisher = None
+        if self.publish_control_tower_heartbeat and self.control_tower_heartbeat_topic:
+            heartbeat_topic_with_ns = self._prefix_with_vehicle_namespace(
+                self.control_tower_heartbeat_topic
+            )
+            self.control_tower_heartbeat_publisher = self.create_publisher(
+                Header, heartbeat_topic_with_ns, 10
+            )
+
+    def publish_control_tower_heartbeat_msg(self):
+        """Publish the operator heartbeat consumed by the vehicle-side failsafe."""
+        if (
+            not self.publish_control_tower_heartbeat
+            or not self.vehicle_control_enabled
+            or not self.vehicle_connected
+            or self.control_tower_heartbeat_publisher is None
+        ):
+            return
+
+        msg = Header()
+        msg.stamp = self.get_clock().now().to_msg()
+        msg.frame_id = self.get_name()
+        self.control_tower_heartbeat_publisher.publish(msg)
+
     def publish_route(self, route_points, altitude, speed):
         """Publish a planned route to the selected vehicle and request autopilot enable."""
+        if not self.vehicle_control_enabled:
+            self.get_logger().warn('Vehicle control is disabled in passive monitoring mode.')
+            return False
+
         if not self.vehicle_connected:
             self.get_logger().warn('Connect a vehicle node before sending a route.')
             return False
@@ -818,6 +874,7 @@ class ControlTower(Node):
 
     def visual_marker_array_callback(self, msg):
         """Cache vehicle visualization markers for drawing on the route map."""
+        stamp = self.get_clock().now()
         for marker in msg.markers:
             action = marker.action
             if action == 3:  # DELETEALL
@@ -832,8 +889,19 @@ class ControlTower(Node):
             if action == 2:  # DELETE
                 self.visual_marker_store.pop(key, None)
                 continue
-            self.visual_marker_store[key] = marker
-        self.visual_markers = list(self.visual_marker_store.values())
+            self.visual_marker_store[key] = {'marker': marker, 'stamp': stamp}
+        self._refresh_visual_markers()
+
+    def _refresh_visual_markers(self):
+        """Drop short-lived autopilot markers that have stopped updating."""
+        now = self.get_clock().now()
+        for key, entry in list(self.visual_marker_store.items()):
+            marker = entry['marker']
+            if marker.ns.endswith('/autopilot_markers'):
+                age = (now - entry['stamp']).nanoseconds / 1e9
+                if age > AUTOPILOT_MARKER_TTL_SECONDS:
+                    self.visual_marker_store.pop(key, None)
+        self.visual_markers = [entry['marker'] for entry in self.visual_marker_store.values()]
 
     def battery_state_callback(self, msg):
         """Handle battery state messages."""
@@ -1033,6 +1101,12 @@ class ControlTower(Node):
     def process_keys_and_publish(self):
         """Process currently pressed keys and publish twist message."""
         twist = Twist()
+        if not self.vehicle_control_enabled:
+            self._deactivate_mux_source('keyboard')
+            self.active_mux_source = 'None'
+            self.is_actuation_requested = False
+            self.current_twist = twist
+            return
 
         # Check for actuation keys
         actuation_keys = {Qt.Key.Key_W, Qt.Key.Key_X, Qt.Key.Key_A, Qt.Key.Key_D, Qt.Key.Key_S}
@@ -1096,6 +1170,10 @@ class ControlTower(Node):
 
     def request_arm_state(self, arm=True):
         """Request arm or disarm through the selected vehicle node."""
+        if not self.vehicle_control_enabled:
+            self.get_logger().warn('Vehicle control is disabled in passive monitoring mode.')
+            return
+
         if self.waywise_object_type != 'quadcopter':
             self.get_logger().warn('Arm/disarm keys are only available for quadcopters.')
             return
@@ -1753,15 +1831,20 @@ class ControlTowerUI(QMainWindow):
     def update_control_group_state(self):
         """Reflect whether the control pane has an active vehicle target."""
         has_vehicle_selected = bool(self.node.control_vehicle_node_fqn.strip())
+        control_enabled = has_vehicle_selected and self.node.vehicle_control_enabled
         if hasattr(self, 'route_planner'):
             self.route_planner.set_vehicle_connected(self.node.vehicle_connected)
 
         # Control group dimming
-        self.control_group.setEnabled(has_vehicle_selected)
-        self.control_group_opacity.setOpacity(1.0 if has_vehicle_selected else 0.45)
-        self.control_group.setToolTip(
-            '' if has_vehicle_selected else 'Select a vehicle node to enable vehicle control.'
-        )
+        self.control_group.setEnabled(control_enabled)
+        self.control_group_opacity.setOpacity(1.0 if control_enabled else 0.45)
+        if not has_vehicle_selected:
+            control_tooltip = 'Select a vehicle node to enable vehicle control.'
+        elif not self.node.vehicle_control_enabled:
+            control_tooltip = 'Passive monitoring mode: vehicle control is disabled.'
+        else:
+            control_tooltip = ''
+        self.control_group.setToolTip(control_tooltip)
 
         # Status group dimming
         self.status_group.setEnabled(has_vehicle_selected)
@@ -1806,6 +1889,17 @@ class ControlTowerUI(QMainWindow):
             self.show_usage_guide()
             return
 
+        # Handle emergency stop even when Control Tower is in passive monitoring mode.
+        if key == Qt.Key.Key_E and modifiers & Qt.KeyboardModifier.ControlModifier:
+            if modifiers & Qt.KeyboardModifier.ShiftModifier:
+                self.node.set_emergency_stop(active=False)
+            else:
+                self.node.set_emergency_stop(active=True)
+            return
+
+        if not self.node.vehicle_control_enabled:
+            return
+
         # Handle speed adjustments
         if key == Qt.Key.Key_I:
             self.node.update_speed(linear_delta=self.node.linear_speed_increment)
@@ -1828,13 +1922,6 @@ class ControlTowerUI(QMainWindow):
                     )
             else:
                 self.node.update_speed(angular_delta=-self.node.angular_speed_increment)
-
-        # Handle emergency stop
-        if key == Qt.Key.Key_E and modifiers & Qt.KeyboardModifier.ControlModifier:
-            if modifiers & Qt.KeyboardModifier.ShiftModifier:
-                self.node.set_emergency_stop(active=False)
-            else:
-                self.node.set_emergency_stop(active=True)
 
         # Handle quadcopter arm/disarm
         if (
@@ -1925,6 +2012,7 @@ class ControlTowerUI(QMainWindow):
         self.route_planner.set_enu_ref(self.node.enuref)
         self._try_load_startup_route()
         self.route_planner.set_vehicle_overlay_model(self.node.vehicle_overlay_model)
+        self.node._refresh_visual_markers()
         self.route_planner.set_visual_markers(self.node.visual_markers)
 
         # Animate rotor/propeller joints when the drone is armed or in-flight.
@@ -2039,7 +2127,9 @@ class ControlTowerUI(QMainWindow):
         if msg is None:
             state_text = 'UNKNOWN'
             time_str, time_color = 'never', self.gray_color
+            state_code = None
         else:
+            state_code = msg.state_code
             state_text = msg.state_str.upper()
             time_str, time_color = self._get_time_ago_and_color(
                 self.node.last_quadcopter_state['stamp']
@@ -2050,20 +2140,22 @@ class ControlTowerUI(QMainWindow):
         self.copter_state_time_label.setStyleSheet(f'color: {time_color}; font-size: 9pt;')
 
         # Set color based on state
-        if msg:
-            if msg.state_code == QuadcopterState.EMERGENCY:
+        if state_code is not None:
+            if state_code == QuadcopterState.EMERGENCY:
                 color = self.red_color
-            elif msg.state_code in [
+            elif state_code in [
                 QuadcopterState.ARMED,
                 QuadcopterState.IN_FLIGHT,
                 QuadcopterState.ON_MISSION,
+                QuadcopterState.HOVERING,
             ]:
                 color = self.green_color
-            elif msg.state_code in [
+            elif state_code in [
                 QuadcopterState.ARMING,
                 QuadcopterState.LANDING,
                 QuadcopterState.LIFTING_OFF,
                 QuadcopterState.AUTO_LIFTING_OFF,
+                QuadcopterState.RETURNING_HOME,
             ]:
                 color = '#fbbf24'  # Amber
             else:
@@ -2116,16 +2208,10 @@ class ControlTowerUI(QMainWindow):
             )
             return
 
-        state_text, color = self._MISSION_STATE_STRINGS.get(msg.state, ('Unknown', None))
-        if color is None:
-            color = (
-                self.green_color
-                if msg.state == MissionState.FOLLOW_ROUTE_FOLLOWING
-                else self.inactive_muted_color
-            )
+        state_text, _ = self._MISSION_STATE_STRINGS.get(msg.state, ('Unknown', None))
         time_str, time_color = self._get_time_ago_and_color(self.node.last_mission_state['stamp'])
         self.mission_state_label.setText(state_text.upper())
-        self.mission_state_label.setStyleSheet(f'color: {color}; font-weight: 700;')
+        self.mission_state_label.setStyleSheet(f'color: {time_color}; font-weight: 700;')
         self.mission_state_time_label.setText(f'Last updated: {time_str}')
         self.mission_state_time_label.setStyleSheet(f'color: {time_color}; font-size: 9pt;')
 

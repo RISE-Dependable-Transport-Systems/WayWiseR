@@ -25,6 +25,7 @@
 #include "rclcpp/logger.hpp"
 #include "sensor_msgs/msg/range.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/header.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_broadcaster.h"
 #include "tf2_ros/transform_listener.h"
@@ -68,7 +69,8 @@ public:
     HOVERING = waywiser_core::msg::QuadcopterState::HOVERING,
     IDLE_DESCENT = waywiser_core::msg::QuadcopterState::IDLE_DESCENT,
     AUTO_LIFTING_OFF = waywiser_core::msg::QuadcopterState::AUTO_LIFTING_OFF,
-    ON_MISSION = waywiser_core::msg::QuadcopterState::ON_MISSION
+    ON_MISSION = waywiser_core::msg::QuadcopterState::ON_MISSION,
+    RETURNING_HOME = waywiser_core::msg::QuadcopterState::RETURNING_HOME
   };
 
   void initialize_node();
@@ -93,6 +95,8 @@ protected:
   void px4_vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
   void arm_command_callback(const std_msgs::msg::Bool::SharedPtr msg);
   void autopilot_state_control_callback(const std_msgs::msg::Bool::SharedPtr bool_msg);
+  void mission_status_callback(const waywiser_core::msg::MissionState::SharedPtr msg);
+  void control_tower_heartbeat_callback(const std_msgs::msg::Header::SharedPtr msg);
   void twist_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg);
   void path_with_twists_callback(const waywiser_core::msg::PathWithTwists::SharedPtr msg);
   void fused_nav_sat_fix_extended_callback(
@@ -102,8 +106,10 @@ protected:
   void request_arm_state(bool arm);
   void send_arm_command(bool arm);
   void send_offboard_mode_command();
+  void send_return_home_command();
   void process_twist_msg(const geometry_msgs::msg::Twist::SharedPtr twist_msg);
   void publish_command();
+  void update_control_tower_heartbeat_failsafe();
   void refresh_in_flight_status();
   void publish_odom();
   void publish_quadcopter_state();
@@ -147,6 +153,7 @@ protected:
   std::string emergency_stop_update_topic_;
   std::string autopilot_state_control_topic_;
   std::string mission_status_topic_;
+  std::string control_tower_heartbeat_topic_;
   std::string joint_states_topic_;
 
   bool enable_autopilot_component_ = false;
@@ -192,6 +199,8 @@ protected:
   rclcpp::Subscription<waywiser_twist_safety::msg::EmergencyStopState>::SharedPtr
     emergency_stop_status_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr autopilot_state_control_sub_;
+  rclcpp::Subscription<waywiser_core::msg::MissionState>::SharedPtr mission_status_sub_;
+  rclcpp::Subscription<std_msgs::msg::Header>::SharedPtr control_tower_heartbeat_sub_;
   rclcpp::Subscription<waywiser_core::msg::PathWithTwists>::SharedPtr path_with_twists_sub_;
 
   rclcpp::TimerBase::SharedPtr node_management_timer_;
@@ -235,6 +244,19 @@ protected:
   bool hover_hold_on_idle_ = true;
   HighLevelState current_state_ = HighLevelState::STARTING_UP;
   OnSetParametersCallbackHandle::SharedPtr parameter_callback_handle_;
+
+  bool received_active_mission_status_ = false;
+  rclcpp::Time last_active_mission_status_time_;
+  double mission_state_timeout_ = 1.0;
+
+  bool return_home_on_control_tower_timeout_ = true;
+  double control_tower_heartbeat_timeout_ = 2.0;
+  double return_home_command_retry_period_ = 2.0;
+  bool received_control_tower_heartbeat_ = false;
+  bool control_tower_timeout_return_home_active_ = false;
+  bool has_last_return_home_request_time_ = false;
+  rclcpp::Time last_control_tower_heartbeat_time_;
+  rclcpp::Time last_return_home_request_time_;
 
   bool last_arm_request_value_ = false;
   double last_arm_request_time_ = 0.0;

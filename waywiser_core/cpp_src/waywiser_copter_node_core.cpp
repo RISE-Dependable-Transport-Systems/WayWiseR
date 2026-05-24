@@ -114,6 +114,8 @@ void WaywiserCopter::setup_parameters()
   autopilot_state_control_topic_ = declare_parameter(
     "autopilot_state_control_topic", "/autopilot_state_control");
   mission_status_topic_ = declare_parameter("mission_status_topic", "/mission_status");
+  control_tower_heartbeat_topic_ =
+    declare_parameter("control_tower_heartbeat_topic", "control_tower_heartbeat");
   joint_states_topic_ = declare_parameter("joint_states_topic", "/joint_states");
 
   publish_odom_to_baselink_tf_ = declare_parameter("publish_odom_to_baselink_tf", true);
@@ -139,6 +141,13 @@ void WaywiserCopter::setup_parameters()
   auto_offboard_ = declare_parameter("auto_offboard", false);
   require_motion_before_engage_ = declare_parameter("require_motion_before_engage", true);
   request_retry_period_ = declare_parameter("request_retry_period", 1.0);
+  mission_state_timeout_ = declare_parameter("mission_state_timeout", 1.0);
+  return_home_on_control_tower_timeout_ =
+    declare_parameter("return_home_on_control_tower_timeout", true);
+  control_tower_heartbeat_timeout_ =
+    std::max(0.1, declare_parameter("control_tower_heartbeat_timeout", 2.0));
+  return_home_command_retry_period_ =
+    std::max(0.1, declare_parameter("return_home_command_retry_period", 2.0));
   // Disabled by default: the control tower already visualises the route it sent.
   // Set to true in the YAML to publish markers for RViz2 or other consumers.
   publish_waypoint_markers_ = declare_parameter("publish_waypoint_markers", false);
@@ -335,6 +344,12 @@ void WaywiserCopter::setup_subscribers()
       range_sub_ = create_subscription<sensor_msgs::msg::Range>(
         range_topic_, 10, std::bind(&WaywiserCopter::range_callback, this, _1));
     }
+
+    if (return_home_on_control_tower_timeout_ && !control_tower_heartbeat_topic_.empty()) {
+      control_tower_heartbeat_sub_ = create_subscription<std_msgs::msg::Header>(
+        control_tower_heartbeat_topic_, 10,
+        std::bind(&WaywiserCopter::control_tower_heartbeat_callback, this, _1));
+    }
   }
 
   if (!fused_nav_sat_fix_extended_topic_.empty()) {
@@ -365,6 +380,10 @@ void WaywiserCopter::setup_subscribers()
     path_with_twists_sub_ = create_subscription<waywiser_core::msg::PathWithTwists>(
       "waywiser_path", QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS,
       std::bind(&WaywiserCopter::path_with_twists_callback, this, _1));
+  } else if (!mission_status_topic_.empty()) {
+    mission_status_sub_ = create_subscription<waywiser_core::msg::MissionState>(
+      mission_status_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS,
+      std::bind(&WaywiserCopter::mission_status_callback, this, _1));
   }
 }
 
@@ -400,6 +419,7 @@ void WaywiserCopter::setup_timers()
 
 void WaywiserCopter::node_management_timer_callback()
 {
+  update_control_tower_heartbeat_failsafe();
   publish_command();
   publish_quadcopter_state();
 
@@ -710,6 +730,26 @@ void WaywiserCopter::send_offboard_mode_command()
   px4_vehicle_command_pub_->publish(command);
 }
 
+void WaywiserCopter::send_return_home_command()
+{
+  if (!px4_vehicle_command_pub_) {
+    RCLCPP_WARN(
+      this->get_logger(),
+      "Cannot send PX4 return-to-home command: publisher unavailable.");
+    return;
+  }
+
+  px4_msgs::msg::VehicleCommand command{};
+  command.timestamp = static_cast<uint64_t>(this->get_clock()->now().nanoseconds() / 1000);
+  command.command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_NAV_RETURN_TO_LAUNCH;
+  command.target_system = 1;
+  command.target_component = 1;
+  command.source_system = 1;
+  command.source_component = 191;
+  command.from_external = true;
+  px4_vehicle_command_pub_->publish(command);
+}
+
 void WaywiserCopter::refresh_in_flight_status()
 {
   if (!armed_) {
@@ -791,8 +831,16 @@ void WaywiserCopter::publish_quadcopter_state()
 
   if (mEmergencyStopState && mEmergencyStopState->is_active()) {
     next_state = HighLevelState::EMERGENCY;
+  } else if (control_tower_timeout_return_home_active_) {
+    next_state = HighLevelState::RETURNING_HOME;
   } else if (auto_landing_active_) {
     next_state = HighLevelState::LANDING;
+  } else if (!enable_autopilot_component_ && received_active_mission_status_ && in_flight_) {
+    const double mission_status_age =
+      (get_clock()->now() - last_active_mission_status_time_).seconds();
+    next_state = mission_status_age <= mission_state_timeout_
+      ? HighLevelState::ON_MISSION
+      : HighLevelState::HOVERING;
   } else if (armed_) {
     if (mCopterAutopilotComponent && mCopterAutopilotComponent->getAutoLiftOffActive()) {
       next_state = HighLevelState::AUTO_LIFTING_OFF;
@@ -870,6 +918,9 @@ void WaywiserCopter::publish_quadcopter_state()
     case HighLevelState::ON_MISSION:
       msg.state_str = "On Mission";
       break;
+    case HighLevelState::RETURNING_HOME:
+      msg.state_str = "Returning home";
+      break;
   }
 
   quadcopter_state_pub_->publish(msg);
@@ -887,6 +938,36 @@ void WaywiserCopter::autopilot_state_control_callback(
   const std_msgs::msg::Bool::SharedPtr bool_msg)
 {
   mCopterAutopilotComponent->switchAutopilot(bool_msg->data);
+}
+
+void WaywiserCopter::mission_status_callback(
+  const waywiser_core::msg::MissionState::SharedPtr msg)
+{
+  received_active_mission_status_ =
+    msg->state != static_cast<uint8_t>(MissionState::Idle) &&
+    msg->state != static_cast<uint8_t>(MissionState::FollowRouteFinished);
+  if (received_active_mission_status_) {
+    last_active_mission_status_time_ = get_clock()->now();
+  }
+  publish_quadcopter_state();
+}
+
+void WaywiserCopter::control_tower_heartbeat_callback(const std_msgs::msg::Header::SharedPtr)
+{
+  last_control_tower_heartbeat_time_ = get_clock()->now();
+  received_control_tower_heartbeat_ = true;
+
+  if (control_tower_timeout_return_home_active_) {
+    control_tower_timeout_return_home_active_ = false;
+    has_last_return_home_request_time_ = false;
+    if (armed_ && in_flight_) {
+      send_offboard_mode_command();
+    }
+    RCLCPP_INFO(
+      get_logger(),
+      "Control tower heartbeat restored. Cancelling return-to-home failsafe.");
+    publish_quadcopter_state();
+  }
 }
 
 void WaywiserCopter::path_with_twists_callback(
@@ -963,7 +1044,9 @@ void WaywiserCopter::range_callback(const sensor_msgs::msg::Range::SharedPtr msg
 void WaywiserCopter::process_twist_msg(const geometry_msgs::msg::Twist::SharedPtr twist_msg)
 {
   auto output = *twist_msg;
-  if (mEmergencyStopState && mEmergencyStopState->is_active()) {
+  if ((mEmergencyStopState && mEmergencyStopState->is_active()) ||
+    control_tower_timeout_return_home_active_)
+  {
     output = geometry_msgs::msg::Twist();
   }
 
@@ -1012,7 +1095,9 @@ void WaywiserCopter::publish_command()
 
   auto output = current_cmd_vel_out_;
 
-  if (auto_landing_active_) {
+  if (control_tower_timeout_return_home_active_) {
+    output = geometry_msgs::msg::Twist();
+  } else if (auto_landing_active_) {
     output.linear.x = 0.0;
     output.linear.y = 0.0;
     output.linear.z = -0.5;  // Default landing speed
@@ -1066,6 +1151,56 @@ void WaywiserCopter::publish_command()
   cmd_vel_out_pub_->publish(output);
 }
 
+void WaywiserCopter::update_control_tower_heartbeat_failsafe()
+{
+  if (!return_home_on_control_tower_timeout_ || !enable_px4_bridge_) {
+    return;
+  }
+
+  if (!received_control_tower_heartbeat_ || !armed_) {
+    control_tower_timeout_return_home_active_ = false;
+    return;
+  }
+
+  if (!in_flight_ && !control_tower_timeout_return_home_active_) {
+    return;
+  }
+
+  const auto now_time = get_clock()->now();
+  const double heartbeat_age = (now_time - last_control_tower_heartbeat_time_).seconds();
+  if (heartbeat_age <= control_tower_heartbeat_timeout_) {
+    if (control_tower_timeout_return_home_active_) {
+      control_tower_timeout_return_home_active_ = false;
+      has_last_return_home_request_time_ = false;
+      if (in_flight_) {
+        send_offboard_mode_command();
+      }
+      RCLCPP_INFO(
+        get_logger(),
+        "Control tower heartbeat restored. Cancelling return-to-home failsafe.");
+    }
+    return;
+  }
+
+  const bool request_due =
+    !has_last_return_home_request_time_ ||
+    (now_time - last_return_home_request_time_).seconds() >= return_home_command_retry_period_;
+
+  if (!control_tower_timeout_return_home_active_) {
+    control_tower_timeout_return_home_active_ = true;
+    RCLCPP_WARN(
+      get_logger(),
+      "Control tower heartbeat timed out after %.2f s. Requesting return-to-home.",
+      heartbeat_age);
+  }
+
+  if (request_due) {
+    send_return_home_command();
+    last_return_home_request_time_ = now_time;
+    has_last_return_home_request_time_ = true;
+  }
+}
+
 rcl_interfaces::msg::SetParametersResult WaywiserCopter::on_parameter_set(
   const std::vector<rclcpp::Parameter> & parameters)
 {
@@ -1096,6 +1231,16 @@ rcl_interfaces::msg::SetParametersResult WaywiserCopter::on_parameter_set(
       command_timeout_ = parameter.as_double();
     } else if (parameter.get_name() == "request_retry_period") {
       request_retry_period_ = parameter.as_double();
+    } else if (parameter.get_name() == "return_home_on_control_tower_timeout") {
+      return_home_on_control_tower_timeout_ = parameter.as_bool();
+      if (!return_home_on_control_tower_timeout_) {
+        control_tower_timeout_return_home_active_ = false;
+        has_last_return_home_request_time_ = false;
+      }
+    } else if (parameter.get_name() == "control_tower_heartbeat_timeout") {
+      control_tower_heartbeat_timeout_ = std::max(0.1, parameter.as_double());
+    } else if (parameter.get_name() == "return_home_command_retry_period") {
+      return_home_command_retry_period_ = std::max(0.1, parameter.as_double());
     } else if (parameter.get_name() == "auto_lift_off_enabled") {
       mCopterAutopilotComponent->setAutoLiftOffEnabled(parameter.as_bool());
     } else if (parameter.get_name() == "auto_lift_off") {
@@ -1233,6 +1378,10 @@ void WaywiserCopter::px4_vehicle_command_ack_callback(
 
 void WaywiserCopter::setpoint_timer_callback()
 {
+  if (control_tower_timeout_return_home_active_) {
+    return;
+  }
+
   const bool motion_requested = command_requests_motion();
 
   if (hover_hold_on_idle_ && was_command_active_ && !motion_requested &&

@@ -59,6 +59,16 @@ def generate_launch_description():
         default_value='',
         description='Route file to load in Control Tower at startup',
     )
+    vehicle_control_enabled_la = DeclareLaunchArgument(
+        'vehicle_control_enabled',
+        default_value='',
+        description='Enable Control Tower vehicle controls; set False for passive monitoring',
+    )
+    publish_control_tower_heartbeat_la = DeclareLaunchArgument(
+        'publish_control_tower_heartbeat',
+        default_value='',
+        description='Publish the vehicle-scoped Control Tower heartbeat',
+    )
 
     # create opaque functions to launch nodes using context
     teleop_rviz2_launch_action = OpaqueFunction(function=teleop_rviz2_launch)
@@ -77,6 +87,8 @@ def generate_launch_description():
     ld.add_action(osm_tile_server_url_la)
     ld.add_action(osm_tile_cache_dir_la)
     ld.add_action(startup_route_file_la)
+    ld.add_action(vehicle_control_enabled_la)
+    ld.add_action(publish_control_tower_heartbeat_la)
 
     # start nodes
     ld.add_action(teleop_rviz2_launch_action)
@@ -108,6 +120,10 @@ def teleop_rviz2_launch(context):
                     'osm_tile_server_url': LaunchConfiguration('osm_tile_server_url'),
                     'osm_tile_cache_dir': LaunchConfiguration('osm_tile_cache_dir'),
                     'startup_route_file': LaunchConfiguration('startup_route_file'),
+                    'vehicle_control_enabled': LaunchConfiguration('vehicle_control_enabled'),
+                    'publish_control_tower_heartbeat': LaunchConfiguration(
+                        'publish_control_tower_heartbeat'
+                    ),
                 }.items(),
             )
         )

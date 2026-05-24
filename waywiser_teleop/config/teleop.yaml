@@ -39,6 +39,10 @@ control_tower:
     angular_speed_increment: 0.1
     speed_control_rate: 10.0
     publish_rate: 10.0
+    vehicle_control_enabled: true
+    publish_control_tower_heartbeat: true
+    control_tower_heartbeat_topic: control_tower_heartbeat
+    control_tower_heartbeat_rate: 5.0
     emergency_stop_set_joy_button_index: 5
     emergency_stop_clear_joy_button_index: 7
     mux_output_topic: teleop_mux_vel

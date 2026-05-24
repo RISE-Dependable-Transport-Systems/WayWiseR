@@ -78,6 +78,11 @@ waywiser_drone_node:
     mission_max_yaw_rate: 1.0
     # PX4 offboard setpoint bridge parameters
     command_timeout: 0.5
+    mission_state_timeout: 1.0
+    return_home_on_control_tower_timeout: true
+    control_tower_heartbeat_topic: control_tower_heartbeat
+    control_tower_heartbeat_timeout: 2.0
+    return_home_command_retry_period: 2.0
     setpoint_rate: 20.0
     request_retry_period: 1.0
     auto_arm: true
