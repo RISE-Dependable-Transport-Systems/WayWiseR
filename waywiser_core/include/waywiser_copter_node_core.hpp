@@ -150,6 +150,7 @@ protected:
   std::string joint_states_topic_;
 
   bool enable_autopilot_component_ = false;
+  bool enable_px4_bridge_ = true;
   bool publish_odom_to_baselink_tf_ = true;
   bool publish_world_to_odom_tf_ = false;
   bool received_first_odom_msg_ = false;

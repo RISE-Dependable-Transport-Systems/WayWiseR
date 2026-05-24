@@ -162,6 +162,7 @@ void WaywiserCopter::setup_parameters()
   mCopterInterfaceComponent->setVehicleInterfaceType(
     parse_vehicle_interface_type(
       declare_parameter("vehicle_interface_type", std::string("ext_simulated"))));
+  enable_px4_bridge_ = declare_parameter("enable_px4_bridge", true);
 
   if (enable_autopilot_component_) {
     mCopterAutopilotComponent->setAutopilotTimerRate(
@@ -218,7 +219,9 @@ void WaywiserCopter::setup_publishers()
   if (!vehicle_pose_topic_.empty()) {
     vehicle_pose_pub_ = create_publisher<geometry_msgs::msg::PoseStamped>(vehicle_pose_topic_, 10);
   }
-  if (mCopterInterfaceComponent->getVehicleInterfaceType() == VehicleInterfaceType::EXT_SIMULATED) {
+  if (mCopterInterfaceComponent->getVehicleInterfaceType() == VehicleInterfaceType::EXT_SIMULATED &&
+    enable_px4_bridge_)
+  {
     px4_vehicle_command_pub_ = create_publisher<px4_msgs::msg::VehicleCommand>(
       "/fmu/in/vehicle_command", 10);
     auto offboard_qos = rclcpp::QoS(rclcpp::KeepLast(7)).reliable().durability_volatile();
@@ -290,9 +293,14 @@ void WaywiserCopter::setup_publishers()
 
 void WaywiserCopter::setup_subscribers()
 {
-  if (mCopterInterfaceComponent->getVehicleInterfaceType() == VehicleInterfaceType::EXT_SIMULATED) {
+  if (!input_odom_topic_.empty()) {
     odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
       input_odom_topic_, 10, std::bind(&WaywiserCopter::odom_callback, this, _1));
+  }
+
+  if (mCopterInterfaceComponent->getVehicleInterfaceType() == VehicleInterfaceType::EXT_SIMULATED &&
+    enable_px4_bridge_)
+  {
     if (!arm_command_topic_.empty()) {
       arm_command_sub_ = create_subscription<std_msgs::msg::Bool>(
         arm_command_topic_, 10, std::bind(&WaywiserCopter::arm_command_callback, this, _1));
@@ -401,6 +409,7 @@ void WaywiserCopter::node_management_timer_callback()
   }
 
   if (mCopterInterfaceComponent->getVehicleInterfaceType() == VehicleInterfaceType::EXT_SIMULATED &&
+    enable_px4_bridge_ &&
     !received_first_odom_msg_)
   {
     return;

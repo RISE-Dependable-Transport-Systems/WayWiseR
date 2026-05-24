@@ -140,6 +140,16 @@ def generate_launch_description():
         default_value='True',
         description='Launch the main WayWiseR drone vehicle node',
     )
+    drone_vehicle_node_enable_autopilot_la = DeclareLaunchArgument(
+        'drone_vehicle_node_enable_autopilot',
+        default_value='True',
+        description='Enable the waypoint follower inside the main drone vehicle node',
+    )
+    drone_waypoint_follower_la = DeclareLaunchArgument(
+        'drone_waypoint_follower',
+        default_value='False',
+        description='Launch a command-side copter waypoint follower that publishes velocity commands',
+    )
     control_vehicle_node_name_la = DeclareLaunchArgument(
         'control_vehicle_node_name',
         default_value='waywiser_drone_node',
@@ -394,6 +404,10 @@ def generate_launch_description():
         function=drone_vehicle_node_launch,
         condition=IfCondition(LaunchConfiguration('drone_vehicle_node')),
     )
+    drone_waypoint_follower = OpaqueFunction(
+        function=drone_waypoint_follower_launch,
+        condition=IfCondition(LaunchConfiguration('drone_waypoint_follower')),
+    )
     simulator_nodes = GroupAction(
         actions=[
             px4_sitl,
@@ -406,6 +420,7 @@ def generate_launch_description():
             drone_localization,
             drone_rgbd_to_pointcloud,
             drone_state_publisher,
+            drone_vehicle_node,
         ],
         condition=IfCondition(LaunchConfiguration('simulator_nodes')),
     )
@@ -431,6 +446,8 @@ def generate_launch_description():
     ld.add_action(rviz2_la)
     ld.add_action(drone_config_la)
     ld.add_action(drone_vehicle_node_la)
+    ld.add_action(drone_vehicle_node_enable_autopilot_la)
+    ld.add_action(drone_waypoint_follower_la)
     ld.add_action(control_vehicle_node_name_la)
     ld.add_action(drone_spawn_config_file_la)
     ld.add_action(drone_yolo_config_la)
@@ -457,7 +474,7 @@ def generate_launch_description():
             actions=[
                 simulator_nodes,
                 teleop_rviz2,
-                drone_vehicle_node,
+                drone_waypoint_follower,
             ],
         )
     )
@@ -638,6 +655,53 @@ def zenoh_router_check(context):
 
 
 def drone_vehicle_node_launch(context):
+    enable_autopilot = LaunchConfiguration('drone_vehicle_node_enable_autopilot').perform(
+        context
+    ).lower() in ['true', '1', 'yes']
+
+    return create_drone_vehicle_node(
+        context,
+        node_name=LaunchConfiguration('control_vehicle_node_name'),
+        parameter_overrides={
+            'enable_autopilot_component': enable_autopilot,
+            'enable_px4_bridge': True,
+        },
+        remappings=[
+            ('/cmd_vel_in', 'twist_safety_vel'),
+            ('/cmd_vel_out', 'cmd_vel_out'),
+        ],
+    )
+
+
+def drone_waypoint_follower_launch(context):
+    return create_drone_vehicle_node(
+        context,
+        node_name='waywiser_drone_waypoint_follower',
+        parameter_overrides={
+            'enable_autopilot_component': True,
+            'enable_px4_bridge': False,
+            'auto_arm': False,
+            'auto_lift_off': False,
+            'input_odom_topic': 'odometry',
+            'odom_topic': '',
+            'vehicle_pose_topic': '',
+            'quadcopter_state_topic': '',
+            'battery_state_topic': '',
+            'arm_command_topic': '',
+            'emergency_stop_update_topic': '',
+            'joint_states_topic': '',
+            'min_steering_height': 0.0,
+            'publish_odom_to_baselink_tf': False,
+            'publish_world_to_odom_tf': False,
+        },
+        remappings=[
+            ('/cmd_vel_in', 'waypoint_follower_cmd_vel_in'),
+            ('/cmd_vel_out', 'teleop_mux_vel'),
+        ],
+    )
+
+
+def create_drone_vehicle_node(context, node_name, parameter_overrides, remappings):
     drone_config = LaunchConfiguration('drone_config').perform(context)
     drone_name = LaunchConfiguration('drone_name').perform(context)
     use_sim_time = LaunchConfiguration('use_sim_time').perform(context).lower() in [
@@ -649,7 +713,7 @@ def drone_vehicle_node_launch(context):
     config_data = yaml_to_dict(drone_config)
     shared_params = config_data.get('/**', {}).get('ros__parameters', {})
     node_specific_params = config_data.get('waywiser_drone_node', {}).get('ros__parameters', {})
-    node_params = {**shared_params, **node_specific_params}
+    node_params = {**shared_params, **node_specific_params, **parameter_overrides}
 
     # Get the processed URDF string for the vehicle node as well
     from waywiser_description_py.waywiser_description_utils import get_scaled_urdf_string
@@ -669,7 +733,7 @@ def drone_vehicle_node_launch(context):
                 Node(
                     package='waywiser_core',
                     executable='waywiser_copter_node',
-                    name=LaunchConfiguration('control_vehicle_node_name'),
+                    name=node_name,
                     parameters=[
                         node_params,
                         {
@@ -678,10 +742,7 @@ def drone_vehicle_node_launch(context):
                             'urdf_file': urdf_string,
                         },
                     ],
-                    remappings=[
-                        ('/cmd_vel_in', 'twist_safety_vel'),
-                        ('/cmd_vel_out', 'cmd_vel_out'),
-                    ],
+                    remappings=remappings,
                     output='screen',
                 ),
             ]
