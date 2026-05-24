@@ -55,6 +55,7 @@ try:
             QDialog,
             QGraphicsOpacityEffect,
             QHBoxLayout,
+            QLabel,
             QMainWindow,
             QMenu,
             QMessageBox,
@@ -103,6 +104,7 @@ except ImportError:
 
 from waywiser_core.msg import (  # noqa: E402
     BatteryState,
+    HeartbeatRxState,
     MissionState,
     NavSatFixExtended,
     PathWithTwists,
@@ -257,6 +259,7 @@ class ControlTower(Node):
         self.arm_command_topic = ''
         self.quadcopter_state_topic = ''
         self.mission_status_topic = ''
+        self.control_tower_heartbeat_rx_state_topic = ''
         self.nav_sat_fix_extended_topic = ''
         self.emergency_stop_status_topic = ''
         self.emergency_stop_update_topic = ''
@@ -273,6 +276,7 @@ class ControlTower(Node):
         self.battery_state_subscriber = None
         self.quadcopter_state_subscriber = None
         self.mission_status_subscriber = None
+        self.control_tower_heartbeat_rx_state_subscriber = None
         self.nav_sat_fix_extended_subscriber = None
         self.emergency_stop_state_subscriber = None
         self.robot_description_subscriber = None
@@ -349,6 +353,10 @@ class ControlTower(Node):
 
         # State variables
         self.last_emergency_stop_state = {'msg': None, 'stamp': self.get_clock().now()}
+        self.last_control_tower_heartbeat_rx_state = {
+            'msg': None,
+            'stamp': self.get_clock().now(),
+        }
         self.last_odom = {
             'pose': None,
             'twist': None,
@@ -425,6 +433,7 @@ class ControlTower(Node):
             'autopilot_state_control_topic',
             'joint_states_topic',
             'mission_status_topic',
+            'control_tower_heartbeat_rx_state_topic',
         ]
 
         future = client.call_async(request)
@@ -467,6 +476,12 @@ class ControlTower(Node):
                     if len(vals) >= 11 and vals[10].string_value
                     else 'mission_status'
                 )
+                if len(vals) >= 12:
+                    self.control_tower_heartbeat_rx_state_topic = (
+                        self._prefix_with_vehicle_namespace(vals[11].string_value)
+                        if vals[11].string_value
+                        else ''
+                    )
 
                 if self.waywise_object_type == 'quadcopter':
                     qc_request = GetParameters.Request()
@@ -665,6 +680,16 @@ class ControlTower(Node):
                 RELIABLE_TRANSIENT_LOCAL_QOS,
             )
 
+        if self.control_tower_heartbeat_rx_state_topic:
+            if self.control_tower_heartbeat_rx_state_subscriber:
+                self.destroy_subscription(self.control_tower_heartbeat_rx_state_subscriber)
+            self.control_tower_heartbeat_rx_state_subscriber = self.create_subscription(
+                HeartbeatRxState,
+                self.control_tower_heartbeat_rx_state_topic,
+                self.control_tower_heartbeat_rx_state_callback,
+                RELIABLE_TRANSIENT_LOCAL_QOS,
+            )
+
         if self.nav_sat_fix_extended_topic:
             if self.nav_sat_fix_extended_subscriber:
                 self.destroy_subscription(self.nav_sat_fix_extended_subscriber)
@@ -711,7 +736,7 @@ class ControlTower(Node):
         self.marker_subscribers = []
         self.visual_marker_store.clear()
         self.visual_markers = []
-        for topic in ('waypoint_markers', 'autopilot_markers'):
+        for topic in ('waypoint_markers', 'autopilot_markers', 'home_markers'):
             topic_with_ns = self._prefix_with_vehicle_namespace(topic)
             self.marker_subscribers.append(
                 self.create_subscription(
@@ -921,6 +946,11 @@ class ControlTower(Node):
         """Handle mission state updates."""
         self.last_mission_state['msg'] = msg
         self.last_mission_state['stamp'] = self.get_clock().now()
+
+    def control_tower_heartbeat_rx_state_callback(self, msg):
+        """Handle vehicle-side Control Tower heartbeat receive state updates."""
+        self.last_control_tower_heartbeat_rx_state['msg'] = msg
+        self.last_control_tower_heartbeat_rx_state['stamp'] = self.get_clock().now()
 
     def nav_sat_fix_extended_callback(self, msg):
         """Handle extended GPS/FIX messages."""
@@ -1440,6 +1470,7 @@ class ControlTowerUI(QMainWindow):
 
         # Recompose loaded UI into a control-tower layout with route planning on the left.
         self.setup_route_planner_shell()
+        self.setup_heartbeat_status_row()
 
         # Setup audio for low battery warning
         self.setup_audio()
@@ -1533,6 +1564,23 @@ class ControlTowerUI(QMainWindow):
         self.setCentralWidget(central_widget)
         self._update_right_pane_min_width(force=True)
         QTimer.singleShot(0, self._try_load_startup_route)
+
+    def setup_heartbeat_status_row(self):
+        """Add operator heartbeat status to the General vehicle status group."""
+        label_style = 'color: #9ca3af; font-weight: 600;'
+        value_style = 'color: #6b7280; font-weight: 700;'
+        time_style = 'color: #6b7280; font-size: 9pt;'
+
+        self.heartbeat_rx_static_label = QLabel('Heartbeat Rx State:')
+        self.heartbeat_rx_static_label.setStyleSheet(label_style)
+        self.heartbeat_rx_label = QLabel('UNKNOWN')
+        self.heartbeat_rx_label.setStyleSheet(value_style)
+        self.heartbeat_rx_time_label = QLabel('Last updated: N/A')
+        self.heartbeat_rx_time_label.setStyleSheet(time_style)
+
+        self.gridLayout_5.addWidget(self.heartbeat_rx_static_label, 7, 0)
+        self.gridLayout_5.addWidget(self.heartbeat_rx_label, 7, 1)
+        self.gridLayout_5.addWidget(self.heartbeat_rx_time_label, 7, 2)
 
     def _setup_map_config_button(self):
         self.map_config_button = UpMenuButton('MAP CONFIG')
@@ -1714,6 +1762,12 @@ class ControlTowerUI(QMainWindow):
 
     def on_plan_route_toggled(self, checked):
         """Enable or disable waypoint editing on the map."""
+        if not self.node.vehicle_control_enabled:
+            self.plan_route_button.blockSignals(True)
+            self.plan_route_button.setChecked(False)
+            self.plan_route_button.blockSignals(False)
+            self.route_planner.set_planning_enabled(False)
+            return
         self.route_planner.set_planning_enabled(checked)
         self.plan_route_button.setText('MISSION PLANNER')
 
@@ -1833,7 +1887,11 @@ class ControlTowerUI(QMainWindow):
         has_vehicle_selected = bool(self.node.control_vehicle_node_fqn.strip())
         control_enabled = has_vehicle_selected and self.node.vehicle_control_enabled
         if hasattr(self, 'route_planner'):
-            self.route_planner.set_vehicle_connected(self.node.vehicle_connected)
+            self.route_planner.set_vehicle_connected(
+                self.node.vehicle_connected and self.node.vehicle_control_enabled
+            )
+            if not control_enabled:
+                self.route_planner.set_planning_enabled(False)
 
         # Control group dimming
         self.control_group.setEnabled(control_enabled)
@@ -1845,6 +1903,14 @@ class ControlTowerUI(QMainWindow):
         else:
             control_tooltip = ''
         self.control_group.setToolTip(control_tooltip)
+
+        if hasattr(self, 'plan_route_button'):
+            self.plan_route_button.setEnabled(control_enabled)
+            if not control_enabled and self.plan_route_button.isChecked():
+                self.plan_route_button.blockSignals(True)
+                self.plan_route_button.setChecked(False)
+                self.plan_route_button.blockSignals(False)
+            self.plan_route_button.setToolTip(control_tooltip)
 
         # Status group dimming
         self.status_group.setEnabled(has_vehicle_selected)
@@ -1982,6 +2048,7 @@ class ControlTowerUI(QMainWindow):
         self.enuref_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
 
         self._update_estop_display()
+        self._update_heartbeat_rx_display()
         self._update_quadcopter_state_display()
         self._update_mission_state_display()
         self._update_speed_display()
@@ -2103,6 +2170,56 @@ class ControlTowerUI(QMainWindow):
                 self.estop_label.setText('[?] UNKNOWN')
                 self.estop_label.setStyleSheet(f'color: {self.gray_color}; font-weight: 700;')
 
+    def _update_heartbeat_rx_display(self):
+        """Update vehicle-reported Control Tower heartbeat receive state."""
+        rx_msg = self.node.last_control_tower_heartbeat_rx_state.get('msg')
+
+        if rx_msg is None:
+            state_text = 'UNKNOWN'
+            color = self.gray_color
+            tooltip = 'No vehicle heartbeat receive state has been received.'
+            time_text = 'Last updated: N/A'
+            time_color = self.gray_color
+        elif rx_msg.state == HeartbeatRxState.TIMEOUT:
+            state_text = 'TIMEOUT'
+            color = self.red_color
+            tooltip = 'Vehicle has timed out receiving Control Tower heartbeat.'
+        elif rx_msg.state == HeartbeatRxState.DISABLED:
+            state_text = 'DISABLED'
+            color = self.gray_color
+            tooltip = 'Vehicle heartbeat receive monitoring is disabled.'
+        elif rx_msg.state == HeartbeatRxState.NO_HEARTBEAT:
+            state_text = 'NO HEARTBEAT'
+            color = self.gray_color
+            tooltip = 'Vehicle has not received a Control Tower heartbeat yet.'
+        elif rx_msg.state == HeartbeatRxState.STALE:
+            state_text = 'STALE'
+            color = self.yellow_color
+            tooltip = 'Vehicle is receiving Control Tower heartbeat, but it is close to timeout.'
+        elif rx_msg.state == HeartbeatRxState.ACTIVE:
+            state_text = 'ACTIVE'
+            color = self.green_color
+            tooltip = 'Vehicle is receiving Control Tower heartbeat normally.'
+        else:
+            state_text = rx_msg.state_str.upper() if rx_msg.state_str else 'UNKNOWN'
+            color = self.yellow_color
+            tooltip = 'Vehicle reported an unknown heartbeat receive state.'
+
+        if rx_msg is not None:
+            time_str, time_color = self._get_time_ago_and_color(
+                self.node.last_control_tower_heartbeat_rx_state['stamp']
+            )
+            age_text = 'never' if rx_msg.age_s < 0.0 else f'{rx_msg.age_s:.2f}s'
+            state_text = f'{state_text} | age: {age_text}'
+            time_text = f'Last updated: {time_str}'
+
+        self.heartbeat_rx_label.setText(state_text)
+        self.heartbeat_rx_label.setStyleSheet(f'color: {color}; font-weight: 700;')
+        self.heartbeat_rx_label.setToolTip(tooltip)
+        self.heartbeat_rx_time_label.setText(time_text)
+        self.heartbeat_rx_time_label.setStyleSheet(f'color: {time_color}; font-size: 9pt;')
+        self.heartbeat_rx_time_label.setToolTip(tooltip)
+
     def _set_indicator_light(self, widget, is_on):
         """Set a status light to green, red, or gray."""
         if is_on is None:
@@ -2181,6 +2298,7 @@ class ControlTowerUI(QMainWindow):
         MissionState.WAITING_FOR_VEHICLE_INIT: ('Waiting for init', '#60a5fa'),
         MissionState.WAITING_FOR_EMERGENCY_STOP_CLEAR: ('Waiting for E-stop', '#fbbf24'),
         MissionState.WAITING_FOR_GNSS_ACCURACY: ('Waiting for GNSS', '#fbbf24'),
+        MissionState.WAITING_FOR_HEARTBEAT: ('Waiting for heartbeat', '#fbbf24'),
         MissionState.FOLLOW_ROUTE_INIT: ('Route: Init', '#60a5fa'),
         MissionState.FOLLOW_ROUTE_GOTO_BEGIN: ('Route: Go to start', '#60a5fa'),
         MissionState.FOLLOW_ROUTE_FOLLOWING: ('Following route', None),

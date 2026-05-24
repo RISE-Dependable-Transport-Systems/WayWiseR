@@ -21,6 +21,7 @@
   <test_depend>ament_lint_common</test_depend>
 
   <depend>rclcpp</depend>
+  <depend>builtin_interfaces</depend>
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
@@ -31,7 +32,6 @@
   <depend>twist_mux</depend>
   <depend>rclpy</depend>
   <depend>waywiser_twist_safety</depend>
-  <depend>waywiser_core</depend>
   <exec_depend>python3-pyqt5</exec_depend>
   <exec_depend>python3-pyqt5.qtmultimedia</exec_depend>
   <exec_depend>waywiser</exec_depend>

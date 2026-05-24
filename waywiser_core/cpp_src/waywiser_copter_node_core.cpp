@@ -116,6 +116,8 @@ void WaywiserCopter::setup_parameters()
   mission_status_topic_ = declare_parameter("mission_status_topic", "/mission_status");
   control_tower_heartbeat_topic_ =
     declare_parameter("control_tower_heartbeat_topic", "control_tower_heartbeat");
+  control_tower_heartbeat_rx_state_topic_ = declare_parameter(
+    "control_tower_heartbeat_rx_state_topic", "control_tower_heartbeat_rx_state");
   joint_states_topic_ = declare_parameter("joint_states_topic", "/joint_states");
 
   publish_odom_to_baselink_tf_ = declare_parameter("publish_odom_to_baselink_tf", true);
@@ -238,6 +240,8 @@ void WaywiserCopter::setup_publishers()
       "/fmu/in/offboard_control_mode", offboard_qos);
     trajectory_setpoint_pub_ = create_publisher<px4_msgs::msg::TrajectorySetpoint>(
       "/fmu/in/trajectory_setpoint", offboard_qos);
+    home_marker_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>(
+      "home_markers", QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
   }
   if (!quadcopter_state_topic_.empty()) {
     quadcopter_state_pub_ = create_publisher<waywiser_core::msg::QuadcopterState>(
@@ -249,10 +253,18 @@ void WaywiserCopter::setup_publishers()
       create_publisher<waywiser_twist_safety::msg::EmergencyStopState>(
       emergency_stop_update_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
   }
-  if (enable_autopilot_component_ && !mission_status_topic_.empty()) {
+  if (!mission_status_topic_.empty()) {
     mission_status_pub_ =
       create_publisher<waywiser_core::msg::MissionState>(
       mission_status_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
+  }
+  if (!control_tower_heartbeat_rx_state_topic_.empty()) {
+    control_tower_heartbeat_rx_state_pub_ =
+      create_publisher<waywiser_core::msg::HeartbeatRxState>(
+      control_tower_heartbeat_rx_state_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
+  }
+
+  if (enable_autopilot_component_ && mission_status_pub_) {
 
     QObject::connect(
       mCopterAutopilotComponent.get(), &CopterAutopilotComponent::gnssFixAccuracyAssertionFailed,
@@ -336,6 +348,9 @@ void WaywiserCopter::setup_subscribers()
     px4_vehicle_status_sub_ = create_subscription<px4_msgs::msg::VehicleStatus>(
       "/fmu/out/vehicle_status", px4_qos,
       std::bind(&WaywiserCopter::px4_vehicle_status_callback, this, _1));
+    px4_home_position_sub_ = create_subscription<px4_msgs::msg::HomePosition>(
+      "/fmu/out/home_position", px4_qos,
+      std::bind(&WaywiserCopter::px4_home_position_callback, this, _1));
     px4_vehicle_command_ack_sub_ = create_subscription<px4_msgs::msg::VehicleCommandAck>(
       "/fmu/out/vehicle_command_ack", px4_qos,
       std::bind(&WaywiserCopter::px4_vehicle_command_ack_callback, this, _1));
@@ -345,7 +360,7 @@ void WaywiserCopter::setup_subscribers()
         range_topic_, 10, std::bind(&WaywiserCopter::range_callback, this, _1));
     }
 
-    if (return_home_on_control_tower_timeout_ && !control_tower_heartbeat_topic_.empty()) {
+    if (!control_tower_heartbeat_topic_.empty()) {
       control_tower_heartbeat_sub_ = create_subscription<std_msgs::msg::Header>(
         control_tower_heartbeat_topic_, 10,
         std::bind(&WaywiserCopter::control_tower_heartbeat_callback, this, _1));
@@ -422,6 +437,7 @@ void WaywiserCopter::node_management_timer_callback()
   update_control_tower_heartbeat_failsafe();
   publish_command();
   publish_quadcopter_state();
+  publish_control_tower_heartbeat_rx_state();
 
   const bool has_fused_pose = !mCopterState->getPosition(PosType::fused).getTime().isNull();
   if (has_fused_pose || received_first_odom_msg_) {
@@ -441,8 +457,26 @@ void WaywiserCopter::node_management_timer_callback()
 
   if (enable_autopilot_component_ && mission_status_pub_) {
     waywiser_core::msg::MissionState missionStateMsg;
-    missionStateMsg.state =
-      static_cast<uint8_t>(mCopterAutopilotComponent->getCurrentMissionState());
+    const auto current_mission_state = mCopterAutopilotComponent->getCurrentMissionState();
+    if (control_tower_timeout_return_home_active_ &&
+      current_mission_state != MissionState::Idle &&
+      current_mission_state != MissionState::FollowRouteFinished)
+    {
+      missionStateMsg.state =
+        static_cast<uint8_t>(MissionState::WaitingForHeartbeat);
+    } else {
+      missionStateMsg.state =
+        static_cast<uint8_t>(current_mission_state);
+    }
+    mission_status_pub_->publish(missionStateMsg);
+  } else if (
+    !enable_autopilot_component_ &&
+    control_tower_timeout_return_home_active_ &&
+    waiting_for_heartbeat_mission_active_ &&
+    mission_status_pub_)
+  {
+    waywiser_core::msg::MissionState missionStateMsg;
+    missionStateMsg.state = static_cast<uint8_t>(MissionState::WaitingForHeartbeat);
     mission_status_pub_->publish(missionStateMsg);
   }
 
@@ -641,6 +675,11 @@ void WaywiserCopter::px4_vehicle_status_callback(
   ready_to_arm_ = msg->pre_flight_checks_pass;
   refresh_in_flight_status();
   publish_quadcopter_state();
+}
+
+void WaywiserCopter::px4_home_position_callback(const px4_msgs::msg::HomePosition::SharedPtr msg)
+{
+  publish_home_marker(*msg);
 }
 
 void WaywiserCopter::arm_command_callback(const std_msgs::msg::Bool::SharedPtr msg)
@@ -926,6 +965,45 @@ void WaywiserCopter::publish_quadcopter_state()
   quadcopter_state_pub_->publish(msg);
 }
 
+void WaywiserCopter::publish_control_tower_heartbeat_rx_state()
+{
+  if (!control_tower_heartbeat_rx_state_pub_) {
+    return;
+  }
+
+  waywiser_core::msg::HeartbeatRxState msg;
+  msg.stamp = get_clock()->now();
+  msg.timeout_s = static_cast<float>(control_tower_heartbeat_timeout_);
+  msg.received_count = control_tower_heartbeat_rx_count_;
+
+  if (received_control_tower_heartbeat_) {
+    msg.last_rx_stamp = last_control_tower_heartbeat_time_;
+    msg.age_s = static_cast<float>((get_clock()->now() - last_control_tower_heartbeat_time_).seconds());
+  } else {
+    msg.last_rx_stamp = rclcpp::Time(0, 0, get_clock()->get_clock_type());
+    msg.age_s = -1.0F;
+  }
+
+  if (!return_home_on_control_tower_timeout_) {
+    msg.state = waywiser_core::msg::HeartbeatRxState::DISABLED;
+    msg.state_str = "Disabled";
+  } else if (!received_control_tower_heartbeat_) {
+    msg.state = waywiser_core::msg::HeartbeatRxState::NO_HEARTBEAT;
+    msg.state_str = "No heartbeat";
+  } else if (control_tower_timeout_return_home_active_) {
+    msg.state = waywiser_core::msg::HeartbeatRxState::TIMEOUT;
+    msg.state_str = "Timeout";
+  } else if (msg.age_s > msg.timeout_s * 0.5F) {
+    msg.state = waywiser_core::msg::HeartbeatRxState::STALE;
+    msg.state_str = "Stale";
+  } else {
+    msg.state = waywiser_core::msg::HeartbeatRxState::ACTIVE;
+    msg.state_str = "Active";
+  }
+
+  control_tower_heartbeat_rx_state_pub_->publish(msg);
+}
+
 void WaywiserCopter::twist_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg)
 {
   if (mCopterAutopilotComponent && mCopterAutopilotComponent->isActive()) {
@@ -956,9 +1034,11 @@ void WaywiserCopter::control_tower_heartbeat_callback(const std_msgs::msg::Heade
 {
   last_control_tower_heartbeat_time_ = get_clock()->now();
   received_control_tower_heartbeat_ = true;
+  ++control_tower_heartbeat_rx_count_;
 
   if (control_tower_timeout_return_home_active_) {
     control_tower_timeout_return_home_active_ = false;
+    waiting_for_heartbeat_mission_active_ = false;
     has_last_return_home_request_time_ = false;
     if (armed_ && in_flight_) {
       send_offboard_mode_command();
@@ -968,6 +1048,7 @@ void WaywiserCopter::control_tower_heartbeat_callback(const std_msgs::msg::Heade
       "Control tower heartbeat restored. Cancelling return-to-home failsafe.");
     publish_quadcopter_state();
   }
+  publish_control_tower_heartbeat_rx_state();
 }
 
 void WaywiserCopter::path_with_twists_callback(
@@ -1159,6 +1240,7 @@ void WaywiserCopter::update_control_tower_heartbeat_failsafe()
 
   if (!received_control_tower_heartbeat_ || !armed_) {
     control_tower_timeout_return_home_active_ = false;
+    waiting_for_heartbeat_mission_active_ = false;
     return;
   }
 
@@ -1171,6 +1253,7 @@ void WaywiserCopter::update_control_tower_heartbeat_failsafe()
   if (heartbeat_age <= control_tower_heartbeat_timeout_) {
     if (control_tower_timeout_return_home_active_) {
       control_tower_timeout_return_home_active_ = false;
+      waiting_for_heartbeat_mission_active_ = false;
       has_last_return_home_request_time_ = false;
       if (in_flight_) {
         send_offboard_mode_command();
@@ -1188,6 +1271,12 @@ void WaywiserCopter::update_control_tower_heartbeat_failsafe()
 
   if (!control_tower_timeout_return_home_active_) {
     control_tower_timeout_return_home_active_ = true;
+    waiting_for_heartbeat_mission_active_ =
+      enable_autopilot_component_
+      ? (mCopterAutopilotComponent &&
+      mCopterAutopilotComponent->getCurrentMissionState() != MissionState::Idle &&
+      mCopterAutopilotComponent->getCurrentMissionState() != MissionState::FollowRouteFinished)
+      : received_active_mission_status_;
     RCLCPP_WARN(
       get_logger(),
       "Control tower heartbeat timed out after %.2f s. Requesting return-to-home.",
@@ -1235,6 +1324,7 @@ rcl_interfaces::msg::SetParametersResult WaywiserCopter::on_parameter_set(
       return_home_on_control_tower_timeout_ = parameter.as_bool();
       if (!return_home_on_control_tower_timeout_) {
         control_tower_timeout_return_home_active_ = false;
+        waiting_for_heartbeat_mission_active_ = false;
         has_last_return_home_request_time_ = false;
       }
     } else if (parameter.get_name() == "control_tower_heartbeat_timeout") {
@@ -1695,4 +1785,47 @@ void WaywiserCopter::publish_autopilot_markers()
   marker_array.markers.push_back(target_marker);
 
   autopilot_marker_pub_->publish(marker_array);
+}
+
+void WaywiserCopter::publish_home_marker(const px4_msgs::msg::HomePosition & home_position)
+{
+  if (!home_marker_pub_) {
+    return;
+  }
+
+  if (!home_position.valid_hpos && !home_position.valid_lpos) {
+    return;
+  }
+
+  visualization_msgs::msg::MarkerArray marker_array;
+  visualization_msgs::msg::Marker marker;
+  marker.header.frame_id = world_frame_;
+  marker.header.stamp = this->get_clock()->now();
+  marker.ns = std::string(this->get_name()) + "/home_markers";
+  marker.id = 0;
+  marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
+  marker.action = visualization_msgs::msg::Marker::ADD;
+  marker.pose.orientation.w = 1.0;
+  marker.text = "H";
+
+  if (home_position.valid_hpos && mCopterState->isEnuReferenceSet()) {
+    const xyz_t home_enu = coordinateTransforms::llhToEnu(
+      mCopterState->getEnuRef(),
+      {home_position.lat, home_position.lon, home_position.alt});
+    marker.pose.position.x = home_enu.x;
+    marker.pose.position.y = home_enu.y;
+    marker.pose.position.z = home_enu.z;
+  } else {
+    marker.pose.position.x = home_position.x;
+    marker.pose.position.y = home_position.y;
+    marker.pose.position.z = -home_position.z;
+  }
+
+  marker.scale.z = 2.0;
+  marker.color.r = 0.0f;
+  marker.color.g = 0.45f;
+  marker.color.b = 1.0f;
+  marker.color.a = 0.45f;
+  marker_array.markers.push_back(marker);
+  home_marker_pub_->publish(marker_array);
 }

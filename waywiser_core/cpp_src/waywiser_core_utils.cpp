@@ -91,6 +91,8 @@ std::string CoreUtils::missionStateToString(MissionState state)
       return "Waiting For Emergency Stop Clear";
     case MissionState::WaitingForGnssAccuracy:
       return "Waiting For GNSS Accuracy";
+    case MissionState::WaitingForHeartbeat:
+      return "Waiting For Heartbeat";
     case MissionState::FollowRouteInit:
       return "Follow Route Init";
     case MissionState::FollowRouteGotoBegin:

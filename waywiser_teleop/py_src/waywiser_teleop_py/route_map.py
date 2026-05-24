@@ -307,6 +307,22 @@ class RouteMapCanvas(QWidget):
         self.zoom_changed.emit(self._osm_zoom_level())
         self.update()
 
+    def center_on(self, x, y):
+        """Pan the map center without changing the current zoom."""
+        self.center_x = float(x)
+        self.center_y = float(y)
+        self.update()
+
+    def center_on_vehicle(self):
+        if self.vehicle_pose is None:
+            return False
+        self.center_on(self.vehicle_pose[0], self.vehicle_pose[1])
+        return True
+
+    def center_on_home(self):
+        self.center_on(0.0, 0.0)
+        return True
+
     def screen_to_world(self, pos):
         x = self.center_x + (pos.x() - self.width() * 0.5) / self.px_per_meter
         y = self.center_y - (pos.y() - self.height() * 0.5) / self.px_per_meter
@@ -1187,6 +1203,8 @@ class RouteMapCanvas(QWidget):
                 self._draw_marker_solid(painter, marker, pose, color)
             elif marker_type == 0:  # ARROW
                 self._draw_marker_arrow(painter, marker, pose, color)
+            elif marker_type == 9:  # TEXT_VIEW_FACING
+                self._draw_marker_text(painter, marker, pose, color)
 
     def _draw_marker_line_strip(self, painter, marker, color):
         points = getattr(marker, 'points', [])
@@ -1239,6 +1257,23 @@ class RouteMapCanvas(QWidget):
         painter.setPen(QPen(color.darker(130), 1))
         painter.setBrush(color)
         painter.drawPolygon(QPolygonF([tip, left, right]))
+
+    def _draw_marker_text(self, painter, marker, pose, color):
+        text = getattr(marker, 'text', '')
+        if not text:
+            return
+
+        center = self.world_to_screen(RoutePoint(pose.position.x, pose.position.y))
+        height_px = max(14.0, getattr(marker.scale, 'z', 1.0) * self.px_per_meter)
+        font = QFont(painter.font())
+        font.setBold(True)
+        font.setPointSizeF(max(10.0, height_px * 0.75))
+        painter.save()
+        painter.setFont(font)
+        painter.setPen(QPen(color, 2))
+        rect = QRectF(center.x() - height_px, center.y() - height_px, height_px * 2, height_px * 2)
+        painter.drawText(rect, Qt.AlignCenter, text)
+        painter.restore()
 
     def _vehicle_local_to_screen(self, vehicle_x, vehicle_y, vehicle_yaw, local_x, local_y):
         cos_yaw = math.cos(vehicle_yaw)

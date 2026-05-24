@@ -64,6 +64,7 @@ enum class MissionState : int8_t
   WaitingForEmergencyStopClear  =
     waywiser_core::msg::MissionState::WAITING_FOR_EMERGENCY_STOP_CLEAR,
   WaitingForGnssAccuracy        = waywiser_core::msg::MissionState::WAITING_FOR_GNSS_ACCURACY,
+  WaitingForHeartbeat           = waywiser_core::msg::MissionState::WAITING_FOR_HEARTBEAT,
   FollowRouteInit               = waywiser_core::msg::MissionState::FOLLOW_ROUTE_INIT,
   FollowRouteGotoBegin          = waywiser_core::msg::MissionState::FOLLOW_ROUTE_GOTO_BEGIN,
   FollowRouteFollowing          = waywiser_core::msg::MissionState::FOLLOW_ROUTE_FOLLOWING,

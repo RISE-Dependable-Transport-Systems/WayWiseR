@@ -14,6 +14,7 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "px4_msgs/msg/actuator_armed.hpp"
 #include "px4_msgs/msg/health_report.hpp"
+#include "px4_msgs/msg/home_position.hpp"
 #include "px4_msgs/msg/offboard_control_mode.hpp"
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
 #include "px4_msgs/msg/vehicle_command.hpp"
@@ -31,6 +32,7 @@
 #include "tf2_ros/transform_listener.h"
 #include "visualization_msgs/msg/marker_array.hpp"
 #include "waywiser_core/msg/battery_state.hpp"
+#include "waywiser_core/msg/heartbeat_rx_state.hpp"
 #include "waywiser_core/msg/mission_state.hpp"
 #include "waywiser_core/msg/nav_sat_fix_extended.hpp"
 #include "waywiser_core/msg/path_with_twists.hpp"
@@ -93,6 +95,7 @@ protected:
   void px4_vehicle_local_position_callback(
     const px4_msgs::msg::VehicleLocalPosition::SharedPtr msg);
   void px4_vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
+  void px4_home_position_callback(const px4_msgs::msg::HomePosition::SharedPtr msg);
   void arm_command_callback(const std_msgs::msg::Bool::SharedPtr msg);
   void autopilot_state_control_callback(const std_msgs::msg::Bool::SharedPtr bool_msg);
   void mission_status_callback(const waywiser_core::msg::MissionState::SharedPtr msg);
@@ -113,10 +116,12 @@ protected:
   void refresh_in_flight_status();
   void publish_odom();
   void publish_quadcopter_state();
+  void publish_control_tower_heartbeat_rx_state();
   void publish_tfs();
   void publish_world_pose();
   void publish_route_markers();
   void publish_autopilot_markers();
+  void publish_home_marker(const px4_msgs::msg::HomePosition & home_position);
   static void qtMessageHandler(
     QtMsgType type, const QMessageLogContext &, const QString & msg);
 
@@ -154,6 +159,7 @@ protected:
   std::string autopilot_state_control_topic_;
   std::string mission_status_topic_;
   std::string control_tower_heartbeat_topic_;
+  std::string control_tower_heartbeat_rx_state_topic_;
   std::string joint_states_topic_;
 
   bool enable_autopilot_component_ = false;
@@ -178,8 +184,11 @@ protected:
     emergency_stop_update_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_out_pub_;
   rclcpp::Publisher<waywiser_core::msg::MissionState>::SharedPtr mission_status_pub_;
+  rclcpp::Publisher<waywiser_core::msg::HeartbeatRxState>::SharedPtr
+    control_tower_heartbeat_rx_state_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr route_marker_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr autopilot_marker_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr home_marker_pub_;
 
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_command_sub_;
@@ -191,6 +200,7 @@ protected:
   rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr
     px4_vehicle_local_position_sub_;
   rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr px4_vehicle_status_sub_;
+  rclcpp::Subscription<px4_msgs::msg::HomePosition>::SharedPtr px4_home_position_sub_;
   rclcpp::Subscription<px4_msgs::msg::VehicleCommandAck>::SharedPtr px4_vehicle_command_ack_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Range>::SharedPtr range_sub_;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr twist_sub_;
@@ -254,6 +264,8 @@ protected:
   double return_home_command_retry_period_ = 2.0;
   bool received_control_tower_heartbeat_ = false;
   bool control_tower_timeout_return_home_active_ = false;
+  bool waiting_for_heartbeat_mission_active_ = false;
+  uint32_t control_tower_heartbeat_rx_count_ = 0;
   bool has_last_return_home_request_time_ = false;
   rclcpp::Time last_control_tower_heartbeat_time_;
   rclcpp::Time last_return_home_request_time_;

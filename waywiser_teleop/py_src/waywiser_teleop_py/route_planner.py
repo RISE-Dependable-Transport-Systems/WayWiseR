@@ -27,6 +27,11 @@ ACTIVE_BUTTON_STYLE = (
     ' color: white;'
     ' border: 1px solid #1d4ed8;'
     '}'
+    'QPushButton:disabled {'
+    ' background-color: #374151;'
+    ' color: #9ca3af;'
+    ' border: 1px solid #4b5563;'
+    '}'
 )
 
 OPENSTREETMAP_TILE_SERVER_URL = 'http://c.osm.rrze.fau.de/osmhd'
@@ -191,10 +196,31 @@ class RoutePlannerWidget(QWidget):
         self.route_controls_layout.addLayout(self.map_status_layout, 3, 0, 1, 7)
 
     def _setup_osm_config_controls(self):
+        self.osm_url_button = UpMenuButton('OSM URL')
+        self.osm_url_button.setCheckable(True)
+        self.osm_url_button.setFixedWidth(96)
+        self.osm_url_button.setToolTip('Show OSM tile server URL')
+        self.osm_url_button.clicked.connect(self.toggle_osm_url_edit)
         self.osm_url_label = QLabel('OSM URL')
+        self.osm_url_label.hide()
         self.osm_url_edit = QLineEdit()
         self.osm_url_edit.setMinimumWidth(260)
         self.osm_url_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.osm_url_edit.hide()
+        self.reset_view_button = UpMenuButton('Reset view')
+        self.reset_view_button.setFixedWidth(112)
+        self.reset_view_button.setToolTip('Center the map without changing zoom')
+        self.reset_view_menu = QMenu(self.reset_view_button)
+        self.reset_view_menu.setStyleSheet(POPUP_MENU_STYLE)
+        self.reset_view_vehicle_action = self.reset_view_menu.addAction('Vehicle')
+        self.reset_view_home_action = self.reset_view_menu.addAction('Home')
+        self.reset_view_vehicle_action.triggered.connect(
+            lambda checked=False: self.center_map_on_vehicle()
+        )
+        self.reset_view_home_action.triggered.connect(
+            lambda checked=False: self.center_map_on_home()
+        )
+        self.reset_view_button.clicked.connect(self.show_reset_view_menu)
         self.osm_server_status_label = QLabel('Ready')
         self.osm_server_status_label.setFixedWidth(48)
         self.osm_server_status_label.setAlignment(Qt.AlignCenter)
@@ -211,11 +237,13 @@ class RoutePlannerWidget(QWidget):
         self.osm_refresh_button.setToolTip('Refresh local OSM tiles')
         self.osm_refresh_button.hide()
         self.osm_refresh_button.clicked.connect(self.osm_refresh_requested.emit)
-        self.map_config_layout.addWidget(self.osm_refresh_button)
+        self.map_config_layout.addWidget(self.osm_url_button)
+        self.map_config_layout.addWidget(self.reset_view_button)
         self.map_config_layout.addWidget(self.osm_url_label)
         self.map_config_layout.addWidget(self.osm_url_edit, 1)
         self.map_config_layout.addWidget(self.osm_server_status_label)
         self.map_config_layout.addWidget(self.osm_cache_browse_button)
+        self.map_config_layout.addWidget(self.osm_refresh_button)
         self.osm_url_edit.editingFinished.connect(self.apply_osm_config_edits)
         self.osm_cache_edit.editingFinished.connect(self.apply_osm_config_edits)
         self.osm_cache_browse_button.clicked.connect(self.browse_osm_cache_dir)
@@ -224,8 +252,10 @@ class RoutePlannerWidget(QWidget):
         is_openstreetmap = map_source == 'OpenStreetMap'
         is_local_osm = map_source == 'Local OSM server'
         show_osm_controls = is_openstreetmap or is_local_osm
-        self.osm_url_label.setVisible(show_osm_controls)
-        self.osm_url_edit.setVisible(show_osm_controls)
+        self.osm_url_button.setVisible(show_osm_controls)
+        if not show_osm_controls:
+            self.osm_url_button.setChecked(False)
+        self._update_osm_url_edit_visibility()
         self.osm_server_status_label.setVisible(is_local_osm)
         self.osm_url_edit.setReadOnly(is_openstreetmap)
         self.osm_cache_browse_button.setVisible(is_local_osm)
@@ -234,6 +264,28 @@ class RoutePlannerWidget(QWidget):
         self.osm_cache_edit.setVisible(False)
         if not is_local_osm:
             self.set_osm_server_status('Ready')
+
+    def toggle_osm_url_edit(self):
+        self._update_osm_url_edit_visibility()
+
+    def _update_osm_url_edit_visibility(self):
+        show_url_edit = (
+            not self.osm_url_button.isHidden() and self.osm_url_button.isChecked()
+        )
+        self.osm_url_edit.setVisible(show_url_edit)
+        self.osm_url_label.setVisible(False)
+
+    def show_reset_view_menu(self):
+        self.reset_view_vehicle_action.setEnabled(self.map_canvas.vehicle_pose is not None)
+        menu_size = self.reset_view_menu.sizeHint()
+        popup_pos = self.reset_view_button.mapToGlobal(QPoint(0, -menu_size.height()))
+        self.reset_view_menu.exec_(popup_pos)
+
+    def center_map_on_vehicle(self):
+        self.map_canvas.center_on_vehicle()
+
+    def center_map_on_home(self):
+        self.map_canvas.center_on_home()
 
     def set_osm_server_status(self, status):
         status = 'Busy' if str(status).lower() == 'busy' else 'Ready'
@@ -324,8 +376,10 @@ class RoutePlannerWidget(QWidget):
         self.map_canvas.refresh_tiles()
 
     def set_osm_controls_visible(self, visible):
-        self.osm_url_label.setVisible(bool(visible))
-        self.osm_url_edit.setVisible(bool(visible))
+        self.osm_url_button.setVisible(bool(visible))
+        if not visible:
+            self.osm_url_button.setChecked(False)
+        self._update_osm_url_edit_visibility()
         self.osm_cache_browse_button.setVisible(bool(visible))
         self.osm_refresh_button.setVisible(bool(visible))
         self.osm_cache_label.setVisible(False)

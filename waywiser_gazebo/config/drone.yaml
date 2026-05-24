@@ -59,6 +59,7 @@ waywiser_drone_node:
     emergency_stop_update_topic: "emergency_stop/target_state"
     mission_status_topic: "mission_status"
     autopilot_state_control_topic: "autopilot_state_control"
+    control_tower_heartbeat_rx_state_topic: "control_tower_heartbeat_rx_state"
     joint_states_topic: "joint_states"
     publish_odom_to_baselink_tf: true
     publish_world_to_odom_tf: true
