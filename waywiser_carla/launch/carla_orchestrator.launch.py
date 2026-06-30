@@ -25,7 +25,7 @@ def generate_launch_description():
     # create nodes
     carla_orchestrator = Node(
         package='waywiser_carla',
-        executable='carla_orchestrator.py',
+        executable='carla_orchestrator_node.py',
         name='carla_orchestrator_node',
         output='screen',
         parameters=[

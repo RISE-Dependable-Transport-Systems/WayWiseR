@@ -28,8 +28,8 @@ find_package(OpenCV REQUIRED)
 find_package(waywiser REQUIRED)
 
 # C++ targets
-add_executable(emulated_angle_sensor cpp_src/emulated_angle_sensor.cpp)
-ament_target_dependencies(emulated_angle_sensor
+add_executable(emulated_angle_sensor_node cpp_src/emulated_angle_sensor_node.cpp)
+ament_target_dependencies(emulated_angle_sensor_node
   rclcpp
   tf2
   tf2_ros
@@ -40,19 +40,19 @@ ament_target_dependencies(emulated_angle_sensor
 )
 
 # Add the EmulatedRangeSensor executable
-add_executable(emulated_range_sensor_array cpp_src/emulated_range_sensor_array.cpp)
-target_include_directories(emulated_range_sensor_array PUBLIC ${OpenCV_INCLUDE_DIRS})
-ament_target_dependencies(emulated_range_sensor_array
+add_executable(emulated_range_sensor_array_node cpp_src/emulated_range_sensor_array_node.cpp)
+target_include_directories(emulated_range_sensor_array_node PUBLIC ${OpenCV_INCLUDE_DIRS})
+ament_target_dependencies(emulated_range_sensor_array_node
   rclcpp
   sensor_msgs
   std_msgs
   cv_bridge
 )
-target_link_libraries(emulated_range_sensor_array ${OpenCV_LIBRARIES})
+target_link_libraries(emulated_range_sensor_array_node ${OpenCV_LIBRARIES})
 
 # Install targets
 install(
-  TARGETS emulated_angle_sensor emulated_range_sensor_array
+  TARGETS emulated_angle_sensor_node emulated_range_sensor_array_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -63,9 +63,9 @@ ament_python_install_package(${PROJECT_NAME}_py
 
 install(
   PROGRAMS
-  py_src/waywiser_carla_py/carla_osm_tile_server.py
-  py_src/waywiser_carla_py/waywiser_to_carla_control.py
-  py_src/waywiser_carla_py/carla_orchestrator.py
+  py_src/waywiser_carla_py/carla_osm_tile_server_node.py
+  py_src/waywiser_carla_py/waywiser_to_carla_control_node.py
+  py_src/waywiser_carla_py/carla_orchestrator_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

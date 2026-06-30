@@ -15,13 +15,13 @@
 
 namespace waywiser_perception
 {
-class PointCloudTransformer : public rclcpp::Node
+class PointCloudTransformerNode : public rclcpp::Node
 {
   // Transforms point cloud data to a specific frame either by using desired static transformation or by looking up tranform.
 
 public:
-  explicit PointCloudTransformer(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
-  ~PointCloudTransformer() {}
+  explicit PointCloudTransformerNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
+  ~PointCloudTransformerNode() {}
 
 private:
   void pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);

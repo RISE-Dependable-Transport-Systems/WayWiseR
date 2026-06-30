@@ -90,6 +90,44 @@ info() { echo "  $*"; }
 warn() { echo "  WARNING: $*" >&2; }
 die() { echo "ERROR: $*" >&2; exit 1; }
 
+run_uv_install() {
+    if [[ ! -t 2 || "${TERM:-dumb}" == "dumb" ]]; then
+        UV_NO_PROGRESS=1 uv "$@"
+        return
+    fi
+
+    local log_file pid rc=0 frame_index=0 latest_status="Installing Python dependencies"
+    local frames=('|' '/' '-' '\')
+    log_file="$(mktemp "${TMPDIR:-/tmp}/waywiser-uv.XXXXXX")"
+
+    UV_NO_PROGRESS=1 uv --color never "$@" >"$log_file" 2>&1 &
+    pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        latest_status="$(
+            grep -E '^[[:space:]]*(Building|Downloading|Preparing|Installing) ' "$log_file" \
+                | tail -n 1 \
+                | sed 's/^[[:space:]]*//' \
+                || true
+        )"
+        [[ -n "$latest_status" ]] || latest_status="Installing Python dependencies"
+        printf '\r\033[2K  %s... %s' \
+            "${latest_status%...}" "${frames[$frame_index]}" >&2
+        frame_index=$(( (frame_index + 1) % ${#frames[@]} ))
+        sleep 0.1
+    done
+
+    wait "$pid" || rc=$?
+    printf '\r\033[2K' >&2
+    if (( rc != 0 )); then
+        cat "$log_file" >&2
+        rm -f "$log_file"
+        return "$rc"
+    fi
+
+    awk '!/^[[:space:]]*(Building|Downloading|Preparing|Installing) /' "$log_file" >&2
+    rm -f "$log_file"
+}
+
 find_pyproject() {
     local candidate
     for candidate in \
@@ -204,8 +242,32 @@ fi
 if ${source_workspace_install} && [ -n "\${WAYWISER_WS:-}" ] && [ -f "\$WAYWISER_WS/install/setup.bash" ]; then
     set +u; source "\$WAYWISER_WS/install/setup.bash"; set -u
 fi
+if [ -n "\${VIRTUAL_ENV:-}" ]; then
+    export PATH="\$VIRTUAL_ENV/bin:\$PATH"
+fi
 $marker_end
 EOF
+}
+
+install_ros2_wrapper() {
+    local wrapper="$venv_dir/bin/ros2"
+
+    cat > "$wrapper" <<EOF
+#!/usr/bin/env bash
+set -e
+
+venv_bin="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+ros_distro="\${ROS_DISTRO:-$ros_distro}"
+ros2_script="/opt/ros/\$ros_distro/bin/ros2"
+
+if [[ ! -f "\$ros2_script" ]]; then
+    echo "ERROR: ROS 2 CLI not found at \$ros2_script" >&2
+    exit 1
+fi
+
+exec "\$venv_bin/python" "\$ros2_script" "\$@"
+EOF
+    chmod +x "$wrapper"
 }
 
 extra_exists() {
@@ -297,7 +359,7 @@ install_cpu_only_torch() {
     needs_cpu_only_torch || return 0
 
     info "Preinstalling CPU-only torch/torchvision from $torch_cpu_index"
-    uv pip install \
+    run_uv_install pip install \
         --python "$venv_dir/bin/python" \
         --default-index "$torch_cpu_index" \
         torch torchvision
@@ -378,8 +440,9 @@ fi
 for extra in $extras; do
     [[ "$editable" == true ]] || install_args+=(--extra "$extra")
 done
-uv pip install "${install_args[@]}"
+run_uv_install pip install "${install_args[@]}"
 install_activate_hook
+install_ros2_wrapper
 
 info "WayWiseR venv ready. Activate it with:"
 info "source $venv_dir/bin/activate"

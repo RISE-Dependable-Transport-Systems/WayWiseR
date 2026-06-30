@@ -85,7 +85,7 @@ def rgbd_to_pointcloud_launch(context):
 
     rgbd_to_pointcloud_node = Node(
         package='waywiser_perception',
-        executable='rgbd_to_pointcloud.py',
+        executable='rgbd_to_pointcloud_node.py',
         name=node_name,
         parameters=[
             {

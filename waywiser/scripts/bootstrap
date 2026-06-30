@@ -43,6 +43,43 @@ header() { echo; echo "===> $*"; echo; }
 die()    { echo "ERROR: $*" >&2; exit 1; }
 info()   { echo "  $*"; }
 warn()   { echo "  WARNING: $*" >&2; }
+run_uv_install() {
+    if [[ ! -t 2 || "${TERM:-dumb}" == "dumb" ]]; then
+        UV_NO_PROGRESS=1 uv "$@"
+        return
+    fi
+
+    local log_file pid rc=0 frame_index=0 latest_status="Installing Python dependencies"
+    local frames=('|' '/' '-' '\')
+    log_file="$(mktemp "${TMPDIR:-/tmp}/waywiser-uv.XXXXXX")"
+
+    UV_NO_PROGRESS=1 uv --color never "$@" >"$log_file" 2>&1 &
+    pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        latest_status="$(
+            grep -E '^[[:space:]]*(Building|Downloading|Preparing|Installing) ' "$log_file" \
+                | tail -n 1 \
+                | sed 's/^[[:space:]]*//' \
+                || true
+        )"
+        [[ -n "$latest_status" ]] || latest_status="Installing Python dependencies"
+        printf '\r\033[2K  %s... %s' \
+            "${latest_status%...}" "${frames[$frame_index]}" >&2
+        frame_index=$(( (frame_index + 1) % ${#frames[@]} ))
+        sleep 0.1
+    done
+
+    wait "$pid" || rc=$?
+    printf '\r\033[2K' >&2
+    if (( rc != 0 )); then
+        cat "$log_file" >&2
+        rm -f "$log_file"
+        return "$rc"
+    fi
+
+    awk '!/^[[:space:]]*(Building|Downloading|Preparing|Installing) /' "$log_file" >&2
+    rm -f "$log_file"
+}
 yes_args() {
     [[ "$OPT_YES" == true ]] && printf '%s\n' "$@"
     return 0
@@ -973,6 +1010,7 @@ build_workspace() {
 
     local skipped="${WAYWISER_SKIPPED_PACKAGES:-}"
     local selected="${WAYWISER_BUILD_PACKAGES:-}"
+    local up_to="${WAYWISER_PACKAGES_UP_TO:-}"
     local -a base_paths=("$WAYWISER_WS/src")
     local -a extra_args=()
     local -a allow_overriding=()
@@ -1010,12 +1048,40 @@ build_workspace() {
     # Suppress per-package stderr recap blocks from successful legacy packages.
     extra_args+=(--event-handlers "${event_handlers[@]}")
 
-    if [[ -n "$selected" ]]; then
+    if [[ -n "$up_to" ]]; then
+        # shellcheck disable=SC2206
+        package_args=(--packages-up-to $up_to)
+        # shellcheck disable=SC2206
+        allow_overriding+=($up_to)
+        info "Building up to packages (incl. deps): $up_to"
+    elif [[ -n "$selected" ]]; then
         # shellcheck disable=SC2206
         package_args=(--packages-select $selected)
         # shellcheck disable=SC2206
         allow_overriding+=($selected)
         info "Building selected packages: $selected"
+    fi
+
+    if [[ ${#package_args[@]} -gt 0 ]] && colcon_supports_allow_overriding; then
+        local colcon_list_output=""
+        if [[ -n "$skipped" ]]; then
+            # shellcheck disable=SC2086
+            colcon_list_output=$(
+                colcon list --base-paths "${base_paths[@]}" "${package_args[@]}" \
+                    --packages-skip $skipped --names-only 2>/dev/null || true
+            )
+        else
+            colcon_list_output=$(
+                colcon list --base-paths "${base_paths[@]}" "${package_args[@]}" \
+                    --names-only 2>/dev/null || true
+            )
+        fi
+        if [[ -n "$colcon_list_output" ]]; then
+            mapfile -t allow_overriding < <(
+                printf '%s\n' "${allow_overriding[@]}" $colcon_list_output \
+                    | awk 'NF && !seen[$0]++'
+            )
+        fi
     fi
 
     if [[ ${#allow_overriding[@]} -gt 0 ]] && colcon_supports_allow_overriding; then
@@ -1091,7 +1157,7 @@ presim_setup() {
     info "Ensuring PX4 Python requirements from pyproject extra are installed..."
     activate_env
     cd "$WAYWISER_WS"
-    uv pip install -e "$REPO_DIR[px4]"
+    run_uv_install pip install -e "$REPO_DIR[px4]"
 
     if [[ " $skipped " != *" waywiser_carla "* ]]; then
         header "Pre-setup: waywiser_carla"
@@ -1101,7 +1167,7 @@ presim_setup() {
         activate_env
         cd "$WAYWISER_WS"
         info "Ensuring CARLA Python requirements from pyproject extra are installed..."
-        uv pip install -e "$REPO_DIR[waywiser_carla]"
+        run_uv_install pip install -e "$REPO_DIR[waywiser_carla]"
     fi
 
     if [[ " $skipped " != *" waywiser_gazebo "* ]]; then
@@ -1138,7 +1204,7 @@ presim_setup() {
                 libavformat-dev \
                 libswscale-dev
             info "Installing pycuda..."
-            uv pip install pycuda
+            run_uv_install pip install pycuda
             warn "torch and torchvision for Jetson must be installed manually."
             warn "Follow the NVIDIA instructions at:"
             warn "  https://forums.developer.nvidia.com/t/pytorch-for-jetson/"
@@ -1159,7 +1225,7 @@ presim_setup() {
             fi
             if [[ -n "$nvcc_bin" ]]; then
                 info "CUDA toolkit detected ($nvcc_bin). Installing pycuda..."
-                uv pip install pycuda
+                run_uv_install pip install pycuda
             else
                 info "CUDA toolkit not found — skipping pycuda."
                 info "To enable GPU acceleration later, install the CUDA toolkit:"

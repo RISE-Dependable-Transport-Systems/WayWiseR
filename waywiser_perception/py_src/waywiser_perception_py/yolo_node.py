@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 from dataclasses import dataclass
+import importlib
 import logging
 from pathlib import Path
 from typing import Optional
@@ -54,9 +55,9 @@ class YoloNode(Node):
         self.declare_parameter('detections_topic', 'detections')
 
         self.model_name = self.get_parameter('model_file_path').get_parameter_value().string_value
-        self.model = YOLO(self.model_name)
-        if Path(self.model_name).suffix == '.pt':
-            self.model.fuse()
+        self.model_name = self.resolve_model_name(self.model_name)
+        self.engine_fallback_attempted = False
+        self.load_model(self.model_name)
         self.confidence_threshold = (
             self.get_parameter('confidence_threshold').get_parameter_value().double_value
         )
@@ -179,6 +180,77 @@ class YoloNode(Node):
                 10,
             )
 
+    def resolve_model_name(self, model_name: str) -> str:
+        model_path = Path(model_name)
+        if model_path.suffix != '.engine':
+            return model_name
+
+        try:
+            importlib.import_module('tensorrt')
+            return model_name
+        except (ImportError, OSError) as exc:
+            pytorch_model_path = model_path.with_suffix('.pt')
+            if pytorch_model_path.exists():
+                self.get_logger().warning(
+                    f"Cannot load TensorRT for model '{model_path}': {exc}. "
+                    f"Falling back to PyTorch model '{pytorch_model_path}'."
+                )
+                return str(pytorch_model_path)
+
+            raise RuntimeError(
+                f"Cannot load TensorRT for model '{model_path}', and fallback "
+                f"'{pytorch_model_path}' does not exist: {exc}"
+            ) from exc
+
+    def load_model(self, model_name: str) -> None:
+        self.model_name = model_name
+        self.model = YOLO(model_name)
+        if Path(model_name).suffix == '.pt':
+            self.model.fuse()
+
+    def run_inference(self, cv_image: np.ndarray) -> list[Results]:
+        try:
+            return list(self.run_inference_once(cv_image))
+        except Exception as exc:
+            model_path = Path(self.model_name)
+            if model_path.suffix != '.engine' or self.engine_fallback_attempted:
+                raise
+
+            self.engine_fallback_attempted = True
+            pytorch_model_path = model_path.with_suffix('.pt')
+            if not pytorch_model_path.exists():
+                raise RuntimeError(
+                    f"TensorRT model '{model_path}' failed to load, and fallback "
+                    f"'{pytorch_model_path}' does not exist: {exc}"
+                ) from exc
+
+            self.get_logger().error(
+                f"TensorRT model '{model_path}' failed during inference: {exc}. "
+                f"Falling back to PyTorch model '{pytorch_model_path}'. Re-export the "
+                "TensorRT engine with the installed TensorRT version before using it again."
+            )
+            self.load_model(str(pytorch_model_path))
+            return list(self.run_inference_once(cv_image))
+
+    def run_inference_once(self, cv_image: np.ndarray):
+        if self.use_tracker:
+            return self.model.track(
+                source=cv_image,
+                verbose=self.prediction_verbose,
+                stream=self.color_image_topic_as_stream,
+                persist=True,
+                conf=self.confidence_threshold,
+                device=self.device,
+            )
+
+        return self.model.predict(
+            source=cv_image,
+            verbose=self.prediction_verbose,
+            stream=self.color_image_topic_as_stream,
+            conf=self.confidence_threshold,
+            device=self.device,
+        )
+
     def color_image_callback(self, msg: Image) -> None:
         cv_image = self.cv_bridge.imgmsg_to_cv2(msg)
         detection_array = Detection3DArray()
@@ -195,24 +267,7 @@ class YoloNode(Node):
         else:
             object_mask = None
 
-        if self.use_tracker:
-            results = self.model.track(
-                source=cv_image,
-                verbose=self.prediction_verbose,
-                stream=self.color_image_topic_as_stream,
-                persist=True,
-                conf=self.confidence_threshold,
-                device=self.device,
-            )
-        else:
-            results = self.model.predict(
-                source=cv_image,
-                verbose=self.prediction_verbose,
-                stream=self.color_image_topic_as_stream,
-                conf=self.confidence_threshold,
-                device=self.device,
-            )
-        results_list: list[Results] = list(results)
+        results_list = self.run_inference(cv_image)
         results: Results = results_list[0].cpu()
 
         if results.boxes is not None:

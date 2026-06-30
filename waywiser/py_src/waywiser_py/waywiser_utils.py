@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import ctypes
 import os
 import signal
 import subprocess
@@ -118,9 +119,19 @@ class ProcessUtils:
         stderr=subprocess.DEVNULL,
         text=False,
     ):
+        def _set_pdeathsig():
+            # Linux: send SIGTERM to this child process when its parent exits
+            # (PR_SET_PDEATHSIG = 1).  This runs in the forked child before exec,
+            # so it covers even the case where the parent is SIGKILL'd.
+            try:
+                ctypes.CDLL('libc.so.6').prctl(1, signal.SIGTERM)
+            except Exception:
+                pass
+
         subprocess_ = subprocess.Popen(
             command,
             start_new_session=True,
+            preexec_fn=_set_pdeathsig,
             stdout=stdout,
             stderr=stderr,
             text=text,

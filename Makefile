@@ -7,8 +7,10 @@
 #   make configure               — (re-)configure .env interactively
 #   make setup                   — install prereqs + venv + rosdep
 #   make build                   — colcon build only
+#   make build waywiser_core [pkg2 ...] — build up to package(s) and their deps
 #   make post-build              — run post-build setup hooks only
 #   make rebuild                 — remove build/, install/, log*/ then build
+#   make rebuild waywiser_core [pkg2 ...] — rebuild up to package(s) and their deps
 #
 # Cleanup:
 #   make clean                   — remove build*/, install*/, log*/, deb_*/ and .venv/
@@ -31,6 +33,17 @@ CONFIGURE_ENV  := $(dir $(MAKEFILE_REAL))waywiser/scripts/configure_env.bash
 PACKAGE_SCRIPT := $(dir $(MAKEFILE_REAL))waywiser/scripts/package
 ARGS           ?=
 
+# Allow positional package args: make build waywiser_core
+# Any goals following 'build' or 'rebuild' are treated as package names.
+_BUILD_LIKE := build rebuild
+_FIRST_GOAL := $(firstword $(MAKECMDGOALS))
+ifeq ($(_FIRST_GOAL),$(filter $(_FIRST_GOAL),$(_BUILD_LIKE)))
+  PACKAGES ?= $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  ifneq ($(PACKAGES),)
+    $(eval $(PACKAGES):;@true)
+  endif
+endif
+
 # First-party packages — mirrors build.yaml package-name; used by 'make test'
 # to avoid descending into submodules (PX4-Autopilot, ros_gz_harmonic, etc.).
 WAYWISER_PACKAGES := \
@@ -39,7 +52,7 @@ WAYWISER_PACKAGES := \
   waywiser_perception waywiser_rviz2 waywiser_slam waywiser_teleop \
   waywiser_test_runner waywiser_twist_safety
 
-.PHONY: help all configure setup build post-build rebuild test package package-amd64 package-arm64 clean
+.PHONY: help all configure setup build post-build rebuild test package package-amd64 package-arm64 clean list-packages
 .DEFAULT_GOAL := help
 
 help:
@@ -52,8 +65,10 @@ help:
 	@echo "  make configure       — (re-)configure .env interactively"
 	@echo "  make setup           — install prereqs + venv + rosdep"
 	@echo "  make build           — colcon build only"
+	@echo "  make build waywiser_core [pkg2 ...] — build up to package(s) and their deps"
 	@echo "  make post-build      — run post-build setup hooks only"
 	@echo "  make rebuild         — remove build/, install/, log*/ then build"
+	@echo "  make rebuild waywiser_core [pkg2 ...] — rebuild up to package(s) and their deps"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test            — colcon test (WayWiseR packages only) + show results"
@@ -73,6 +88,9 @@ help:
 	@echo "  make package ARGS='amd64 arm64' 	— package selected architectures"
 	@echo "  make clean ARGS='--skip-venv'  	— skip removing .venv/"
 
+list-packages:
+	@printf '%s\n' $(WAYWISER_PACKAGES)
+
 all:
 	@WAYWISER_WS=$(WAYWISER_WS) bash $(BOOTSTRAP) $(ARGS)
 
@@ -87,7 +105,7 @@ setup:
 	@WAYWISER_WS=$(WAYWISER_WS) bash $(BOOTSTRAP) --setup-only $(ARGS)
 
 build:
-	@WAYWISER_WS=$(WAYWISER_WS) bash $(BOOTSTRAP) --build-only $(ARGS)
+	@$(if $(PACKAGES),WAYWISER_PACKAGES_UP_TO="$(PACKAGES)") WAYWISER_WS=$(WAYWISER_WS) bash $(BOOTSTRAP) --build-only $(ARGS)
 
 post-build:
 	@WAYWISER_WS=$(WAYWISER_WS) bash $(BOOTSTRAP) --post-build-only $(ARGS)
@@ -95,7 +113,7 @@ post-build:
 rebuild:
 	@echo "Removing build/, install/, log/ ..."
 	@rm -rf $(WAYWISER_WS)/build $(WAYWISER_WS)/install $(WAYWISER_WS)/log
-	@WAYWISER_WS=$(WAYWISER_WS) bash $(BOOTSTRAP) --build-only $(ARGS)
+	@$(if $(PACKAGES),WAYWISER_PACKAGES_UP_TO="$(PACKAGES)") WAYWISER_WS=$(WAYWISER_WS) bash $(BOOTSTRAP) --build-only $(ARGS)
 
 test:
 	$(eval SKIPPED := $(shell grep '^WAYWISER_SKIPPED_PACKAGES=' $(dir $(MAKEFILE_REAL)).env 2>/dev/null | sed 's/^WAYWISER_SKIPPED_PACKAGES=//;s/"//g'))

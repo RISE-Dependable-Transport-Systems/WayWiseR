@@ -54,8 +54,8 @@ rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME}
   rosidl_typesupport_cpp
 )
 
-add_executable(emergency_stop_monitor cpp_src/emergency_stop_monitor.cpp)
-ament_target_dependencies(emergency_stop_monitor
+add_executable(emergency_stop_monitor_node cpp_src/emergency_stop_monitor_node.cpp)
+ament_target_dependencies(emergency_stop_monitor_node
   geometry_msgs
   rclcpp
   sensor_msgs
@@ -63,10 +63,10 @@ ament_target_dependencies(emergency_stop_monitor
   waywiser
 )
 
-target_link_libraries(emergency_stop_monitor ${cpp_typesupport_target})
+target_link_libraries(emergency_stop_monitor_node ${cpp_typesupport_target})
 
 install(
-  TARGETS emergency_stop_monitor
+  TARGETS emergency_stop_monitor_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 

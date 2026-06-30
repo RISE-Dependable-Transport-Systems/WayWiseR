@@ -48,7 +48,7 @@ def emulated_angle_sensor_launch(context):
     nodes.append(
         Node(
             package='waywiser_carla',
-            executable='emulated_angle_sensor',
+            executable='emulated_angle_sensor_node',
             name='emulated_angle_sensor_node',
             parameters=[
                 node_params_dict,

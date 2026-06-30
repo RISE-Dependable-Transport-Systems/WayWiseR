@@ -114,7 +114,7 @@ def camera_launch(context):
         ),
         ComposableNode(
             package='waywiser_perception',
-            plugin='waywiser_perception::PointCloudTransformer',
+            plugin='waywiser_perception::PointCloudTransformerNode',
             name='point_cloud_transformer_node',
             namespace=[namespace_with_camera_name, '/depth'],
             condition=IfCondition(str(enable_pointcloud_tranformation)),

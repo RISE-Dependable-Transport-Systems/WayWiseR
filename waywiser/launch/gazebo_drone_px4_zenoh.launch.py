@@ -1,4 +1,3 @@
-import importlib.util
 import json
 import os
 from pathlib import Path
@@ -11,6 +10,7 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     EmitEvent,
+    ExecuteProcess,
     GroupAction,
     IncludeLaunchDescription,
     LogInfo,
@@ -26,6 +26,7 @@ from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node, PushRosNamespace, SetRemap
+from waywiser_gazebo_py import px4_sitl_utils
 
 from waywiser_description_py.waywiser_description_utils import (
     get_robot_state_publisher_node,
@@ -131,7 +132,7 @@ def generate_launch_description():
     )
     startup_route_file_la = DeclareLaunchArgument(
         'startup_route_file',
-        default_value='$WAYWISER_WS/resources/zigzag.xml',
+        default_value='$WAYWISER_WS/resources/forest.xml',
         description='Route file to load in Control Tower at startup',
     )
     use_nvidia_gpu_la = DeclareLaunchArgument(
@@ -156,12 +157,22 @@ def generate_launch_description():
     )
     drone_vehicle_node_enable_autopilot_la = DeclareLaunchArgument(
         'drone_vehicle_node_enable_autopilot',
-        default_value='True',
+        default_value='False',
         description='Enable the waypoint follower inside the main drone vehicle node',
+    )
+    drone_control_tower_heartbeat_topic_la = DeclareLaunchArgument(
+        'drone_control_tower_heartbeat_topic',
+        default_value='',
+        description='Override the drone node Control Tower heartbeat input topic when non-empty',
+    )
+    drone_cmd_vel_out_topic_la = DeclareLaunchArgument(
+        'drone_cmd_vel_out_topic',
+        default_value='waypoint_follower_vel',
+        description='Override the drone node cmd_vel_out publisher topic',
     )
     drone_waypoint_follower_la = DeclareLaunchArgument(
         'drone_waypoint_follower',
-        default_value='False',
+        default_value='True',
         description='Launch a command-side copter waypoint follower that publishes velocity commands',
     )
     control_vehicle_node_name_la = DeclareLaunchArgument(
@@ -209,37 +220,20 @@ def generate_launch_description():
         default_value='7.0',
         description='Delay (seconds) before starting PX4 after Gazebo starts.',
     )
+    launch_gazebo_orchestrator_la = DeclareLaunchArgument(
+        'launch_gazebo_orchestrator',
+        default_value='True',
+        description='Launch the Gazebo setup/reset orchestrator',
+    )
+    gazebo_orchestrator_config_la = DeclareLaunchArgument(
+        'gazebo_orchestrator_config',
+        default_value=os.path.join(waywiser_gazebo_dir, 'config/gazebo_orchestrator.yaml'),
+        description='Full path to Gazebo orchestrator config file',
+    )
     drone_name = LaunchConfiguration('drone_name')
     frame_prefix = [drone_name, '/']
 
-    px4_sitl = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                os.path.join(
-                    waywiser_gazebo_dir,
-                    'launch',
-                    'px4_sitl.launch.py',
-                )
-            ]
-        ),
-        launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'world': LaunchConfiguration('world'),
-            'default_gazebo_bridge': os.path.join(
-                waywiser_gazebo_dir, 'config', 'default_gazebo_bridges.yaml'
-            ),
-            'gazebo_bridge': os.path.join(
-                waywiser_gazebo_dir, 'config', 'drone_gazebo_bridges.yaml'
-            ),
-            'drone_config': LaunchConfiguration('drone_config'),
-            'drone_name': LaunchConfiguration('drone_name'),
-            'px4_sys_autostart': LaunchConfiguration('px4_sys_autostart'),
-            'px4_start_delay': LaunchConfiguration('px4_start_delay'),
-            'use_nvidia_gpu': LaunchConfiguration('use_nvidia_gpu'),
-        }.items(),
-    )
-
-    drone_gazebo_spawn = OpaqueFunction(function=drone_gazebo_spawn_launch)
+    px4_sitl = OpaqueFunction(function=px4_sitl_launch)
 
     # teleop_rviz2
     teleop_rviz2 = IncludeLaunchDescription(
@@ -415,7 +409,6 @@ def generate_launch_description():
         actions=[
             px4_sitl,
             OpaqueFunction(function=normalize_gazebo_osm_tile_cache_dir),
-            drone_gazebo_spawn,
             gazebo_osm_tile_server,
             drone_twist_safety,
             drone_navsatfix_extended_wrapper,
@@ -453,6 +446,8 @@ def generate_launch_description():
     ld.add_action(drone_config_la)
     ld.add_action(drone_vehicle_node_la)
     ld.add_action(drone_vehicle_node_enable_autopilot_la)
+    ld.add_action(drone_control_tower_heartbeat_topic_la)
+    ld.add_action(drone_cmd_vel_out_topic_la)
     ld.add_action(drone_waypoint_follower_la)
     ld.add_action(control_vehicle_node_name_la)
     ld.add_action(drone_spawn_config_file_la)
@@ -463,6 +458,8 @@ def generate_launch_description():
     ld.add_action(drone_spawn_delay_la)
     ld.add_action(drone_spawn_service_timeout_la)
     ld.add_action(px4_start_delay_la)
+    ld.add_action(launch_gazebo_orchestrator_la)
+    ld.add_action(gazebo_orchestrator_config_la)
     ld.add_action(RegisterEventHandler(OnProcessExit(on_exit=shutdown_on_process_error)))
 
     # start nodes
@@ -486,6 +483,250 @@ def generate_launch_description():
     )
 
     return ld
+
+
+def launch_config_as_bool(context, name: str) -> bool:
+    return LaunchConfiguration(name).perform(context).strip().lower() in (
+        '1',
+        'true',
+        'yes',
+        'on',
+    )
+
+
+def create_bridge_action(config_file, use_sim_time, bridge_install_prefix=''):
+    bridge_binary = px4_sitl_utils.resolve_bridge_executable(bridge_install_prefix)
+
+    if not bridge_binary:
+        return Node(
+            package='ros_gz_bridge',
+            executable='parameter_bridge',
+            output='log',
+            arguments=[
+                '--ros-args',
+                '-p',
+                ['config_file:=', config_file],
+            ],
+            parameters=[{'use_sim_time': use_sim_time}],
+        )
+
+    bridge_env = {}
+    if bridge_install_prefix:
+        bridge_env = {
+            'LD_LIBRARY_PATH': px4_sitl_utils.prepend_env_path(
+                os.environ.get('LD_LIBRARY_PATH', ''),
+                str(Path(bridge_install_prefix) / 'lib'),
+            ),
+            'AMENT_PREFIX_PATH': px4_sitl_utils.prepend_env_path(
+                os.environ.get('AMENT_PREFIX_PATH', ''), bridge_install_prefix
+            ),
+        }
+
+    return ExecuteProcess(
+        cmd=[
+            str(bridge_binary),
+            '--ros-args',
+            '-p',
+            f'config_file:={config_file}',
+            '-p',
+            f'use_sim_time:={use_sim_time}',
+        ],
+        additional_env=bridge_env,
+        output='log',
+    )
+
+
+def px4_sitl_launch(context):
+    gazebo_dir = get_package_share_directory('waywiser_gazebo')
+    world_path = Path(LaunchConfiguration('world').perform(context)).resolve()
+    drone_config_path = Path(LaunchConfiguration('drone_config').perform(context)).resolve()
+    drone_name = LaunchConfiguration('drone_name').perform(context)
+    px4_sys_autostart = LaunchConfiguration('px4_sys_autostart').perform(context)
+    px4_start_delay = float(LaunchConfiguration('px4_start_delay').perform(context))
+    bridge_install_prefix = px4_sitl_utils.get_vendored_harmonic_bridge_install_prefix()
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    use_sim_time_value = LaunchConfiguration('use_sim_time').perform(context)
+    gz_world_name = px4_sitl_utils.read_world_name(world_path)
+    gazebo_world_path = (
+        px4_sitl_utils.create_harmonic_compatible_sdf(world_path)
+        if px4_sitl_utils.is_ignition_sdf(world_path)
+        else world_path
+    )
+
+    px4_sitl_dir = Path(gazebo_dir) / 'px4_sitl_zenoh'
+    px4_models_dir = px4_sitl_dir / 'Tools' / 'simulation' / 'gz' / 'models'
+    px4_worlds_dir = px4_sitl_dir / 'Tools' / 'simulation' / 'gz' / 'worlds'
+    waywiser_description_dir = Path(get_package_share_directory('waywiser_description'))
+
+    enuref = px4_sitl_utils.read_enuref(drone_config_path)
+    existing_gz_resource_path = os.environ.get('GZ_SIM_RESOURCE_PATH', '')
+    gz_resource_entries = [entry for entry in existing_gz_resource_path.split(':') if entry]
+    gz_resource_entries.extend(
+        [
+            str(px4_models_dir),
+            str(px4_worlds_dir),
+            str(world_path.parent),
+            str(gazebo_world_path.parent),
+            str(waywiser_description_dir / 'sdf'),
+            str(waywiser_description_dir.parent),
+        ]
+    )
+
+    deduped_resource_entries = []
+    for entry in gz_resource_entries:
+        if entry not in deduped_resource_entries:
+            deduped_resource_entries.append(entry)
+
+    px4_build_dir = px4_sitl_utils.prepare_writable_px4_runtime_dir(px4_sitl_dir)
+    px4_rootfs_dir = px4_build_dir / 'rootfs'
+    px4_binary = px4_build_dir / 'bin' / 'px4'
+
+    if not px4_binary.is_file():
+        raise RuntimeError(
+            f"PX4 binary not found at '{px4_binary}'. Build waywiser_gazebo first so "
+            'PX4 SITL Zenoh artifacts are generated.'
+        )
+
+    px4_sitl_utils.validate_gazebo_compatibility(px4_binary, px4_sitl_dir, bridge_install_prefix)
+
+    px4_param_overrides = {
+        'NAV_DLL_ACT': '0',
+        'COM_DLL_EXCEPT': '4',
+        'COM_RCL_EXCEPT': '4',
+        'COM_ARM_WO_GPS': '1',
+        'COM_ARM_CHK_ESCS': '0',
+        'FD_ESCS_EN': '0',
+        'SYS_FAILURE_EN': '0',
+        'CBRK_FLIGHTTERM': '121212',
+        'CBRK_SUPPLY_CHK': '894281',
+        'COM_DISARM_PRFLT': '-1',
+        'COM_DISARM_LAND': '2',
+        'COM_LOW_BAT_ACT': '0',
+        'SIM_GZ_EN': '1',
+        'SIM_GZ_EC_FUNC1': '101',
+        'SIM_GZ_EC_FUNC2': '102',
+        'SIM_GZ_EC_FUNC3': '103',
+        'SIM_GZ_EC_FUNC4': '104',
+        'SIM_GZ_EC_MIN1': '150',
+        'SIM_GZ_EC_MIN2': '150',
+        'SIM_GZ_EC_MIN3': '150',
+        'SIM_GZ_EC_MIN4': '150',
+        'SIM_GZ_EC_MAX1': '1000',
+        'SIM_GZ_EC_MAX2': '1000',
+        'SIM_GZ_EC_MAX3': '1000',
+        'SIM_GZ_EC_MAX4': '1000',
+    }
+    drone_config_data = yaml_to_dict(drone_config_path)
+    drone_node_params = drone_config_data.get('waywiser_drone_node', {}).get('ros__parameters', {})
+    rtl_horizontal_velocity = drone_node_params.get('mission_cruise_speed')
+    if rtl_horizontal_velocity is not None:
+        px4_param_overrides['MPC_XY_CRUISE'] = str(max(0.0, float(rtl_horizontal_velocity)))
+    rtl_max_horizontal_velocity = drone_node_params.get('mission_max_speed')
+    if rtl_max_horizontal_velocity is not None:
+        px4_param_overrides['MPC_XY_VEL_MAX'] = str(max(0.0, float(rtl_max_horizontal_velocity)))
+    px4_sitl_utils.refresh_px4_zenoh_runtime_config(
+        px4_build_dir,
+        px4_rootfs_dir,
+        px4_sys_autostart,
+        px4_param_overrides,
+    )
+
+    px4_env = {
+        'PX4_GZ_WORLDS': str(world_path.parent),
+        'PX4_GZ_WORLD': gz_world_name,
+        'PX4_GZ_MODELS': str(px4_models_dir),
+        'GZ_SIM_RESOURCE_PATH': ':'.join(deduped_resource_entries),
+        'PX4_HOME_LAT': str(enuref[0]),
+        'PX4_HOME_LON': str(enuref[1]),
+        'PX4_HOME_ALT': str(enuref[2]),
+        'PX4_SYS_AUTOSTART': str(px4_sys_autostart),
+        'PX4_GZ_STANDALONE': '1',
+        'PX4_PARAM_ZENOH_ENABLE': '1',
+        'PX4_PARAM_ZENOH_DOMAIN_ID': os.environ.get('ROS_DOMAIN_ID', '0'),
+        'PX4_GZ_MODEL_NAME': drone_name,
+    }
+    px4_env.update({f'PX4_PARAM_{name}': value for name, value in px4_param_overrides.items()})
+
+    default_bridge_config = px4_sitl_utils.create_runtime_bridge_config(
+        os.path.join(gazebo_dir, 'config', 'default_gazebo_bridges.yaml'), gz_world_name
+    )
+    model_bridge_config = px4_sitl_utils.create_runtime_bridge_config(
+        os.path.join(gazebo_dir, 'config', 'drone_gazebo_bridges.yaml'), gz_world_name
+    )
+    spawn_config_file = prepare_drone_spawn_config(context)
+
+    gazebo = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [os.path.join(gazebo_dir, 'launch', 'gazebo_orchestrator.launch.py')]
+        ),
+        launch_arguments={
+            'use_sim_time': use_sim_time,
+            'world': str(gazebo_world_path),
+            'launch_bridge': 'False',
+            'launch_map_frame_transform': 'False',
+            'gazebo_sim_version': '8',
+            'use_nvidia_gpu': LaunchConfiguration('use_nvidia_gpu'),
+            'launch_gazebo_orchestrator': LaunchConfiguration('launch_gazebo_orchestrator'),
+            'gazebo_orchestrator_config': LaunchConfiguration('gazebo_orchestrator_config'),
+            'manage_px4_process': 'True',
+            'px4_command_json': json.dumps([str(px4_binary), str(px4_build_dir / 'etc')]),
+            'px4_working_directory': str(px4_rootfs_dir),
+            'px4_environment_json': json.dumps(px4_env),
+            'px4_start_delay_sec': str(px4_start_delay),
+            'service_timeout_ms': LaunchConfiguration('drone_spawn_service_timeout'),
+            'spawn_config_file': spawn_config_file,
+            'spawn_on_startup': 'True',
+            'spawn_start_delay_sec': LaunchConfiguration('drone_spawn_delay'),
+            'spawn_backend': 'gz_service',
+            'start_gazebo_bridge': 'False',
+            'gz_service_suppress_output': 'True',
+        }.items(),
+    )
+
+    map_frame_transform = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=[
+            '--x',
+            '0',
+            '--y',
+            '0',
+            '--z',
+            '0',
+            '--roll',
+            '0',
+            '--pitch',
+            '0',
+            '--yaw',
+            '0',
+            '--frame-id',
+            gz_world_name,
+            '--child-frame-id',
+            'map',
+        ],
+        parameters=[{'use_sim_time': use_sim_time}],
+        output='screen',
+    )
+
+    px4_sitl_process = ExecuteProcess(
+        cmd=[str(px4_binary), str(px4_build_dir / 'etc')],
+        cwd=str(px4_rootfs_dir),
+        additional_env=px4_env,
+        output='screen',
+        emulate_tty=True,
+    )
+
+    actions = [
+        SetEnvironmentVariable('GZ_SIM_RESOURCE_PATH', ':'.join(deduped_resource_entries)),
+        SetEnvironmentVariable('IGN_GAZEBO_RESOURCE_PATH', ':'.join(deduped_resource_entries)),
+        gazebo,
+        map_frame_transform,
+        create_bridge_action(default_bridge_config, use_sim_time_value, bridge_install_prefix),
+        create_bridge_action(model_bridge_config, use_sim_time_value, bridge_install_prefix),
+    ]
+    if not launch_config_as_bool(context, 'launch_gazebo_orchestrator'):
+        actions.append(TimerAction(period=px4_start_delay, actions=[px4_sitl_process]))
+    return actions
 
 
 def normalize_gazebo_osm_tile_cache_dir(context):
@@ -573,29 +814,24 @@ def resolve_resource_path(path, base_dir):
     return str(base_dir / candidate)
 
 
-def drone_gazebo_spawn_launch(context):
-    waywiser_gazebo_dir = get_package_share_directory('waywiser_gazebo')
-
-    # Load PX4 SDF transform utilities from px4_sitl.launch.py.
-    px4_sitl_path = os.path.join(waywiser_gazebo_dir, 'launch', 'px4_sitl.launch.py')
-    spec = importlib.util.spec_from_file_location('px4_sitl_launch', px4_sitl_path)
-    px4_sitl = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(px4_sitl)
-
+def prepare_drone_spawn_config(context):
+    """Create the PX4-compatible spawn config consumed by the orchestrator."""
     config_path = LaunchConfiguration('drone_spawn_config_file').perform(context)
+    drone_name = LaunchConfiguration('drone_name').perform(context)
     config_dir = Path(config_path).resolve().parent
     with open(config_path) as f:
         config = json.load(f)
 
     # Apply PX4-specific SDF transforms to each model before spawning.
     for model in config.get('sdf_models', []):
+        model.setdefault('name', drone_name)
         path = model.get('path')
         if path:
             sdf_path = resolve_resource_path(path, config_dir)
-            sdf_path = px4_sitl.create_sdf_without_multicopter_velocity_control(sdf_path)
-            sdf_path = px4_sitl.create_sdf_with_px4_sim_sensors(sdf_path)
-            sdf_path = px4_sitl.create_sdf_with_px4_motor_joint_names(sdf_path)
-            sdf_path = px4_sitl.create_model_sdf_with_harmonic_plugins(sdf_path)
+            sdf_path = px4_sitl_utils.create_sdf_without_multicopter_velocity_control(sdf_path)
+            sdf_path = px4_sitl_utils.create_sdf_with_px4_sim_sensors(sdf_path)
+            sdf_path = px4_sitl_utils.create_sdf_with_px4_motor_joint_names(sdf_path)
+            sdf_path = px4_sitl_utils.create_model_sdf_with_harmonic_plugins(sdf_path)
             model['path'] = sdf_path
 
     temp_config = tempfile.NamedTemporaryFile(
@@ -603,36 +839,7 @@ def drone_gazebo_spawn_launch(context):
     )
     with temp_config:
         json.dump(config, temp_config)
-
-    return [
-        TimerAction(
-            period=float(LaunchConfiguration('drone_spawn_delay').perform(context)),
-            actions=[
-                IncludeLaunchDescription(
-                    PythonLaunchDescriptionSource(
-                        [
-                            os.path.join(
-                                waywiser_gazebo_dir,
-                                'launch',
-                                'spawn.launch.py',
-                            )
-                        ]
-                    ),
-                    launch_arguments={
-                        'use_sim_time': LaunchConfiguration('use_sim_time').perform(context),
-                        'world': LaunchConfiguration('world').perform(context),
-                        'spawn_config_file': temp_config.name,
-                        'start_gazebo_bridge': 'False',
-                        'spawn_backend': 'gz_service',
-                        'gz_service_timeout': LaunchConfiguration(
-                            'drone_spawn_service_timeout'
-                        ).perform(context),
-                        'gz_service_suppress_output': 'True',
-                    }.items(),
-                )
-            ],
-        )
-    ]
+    return temp_config.name
 
 
 def gazebo_osm_tile_server_launch(context):
@@ -651,7 +858,7 @@ def gazebo_osm_tile_server_launch(context):
     return [
         Node(
             package='waywiser_gazebo',
-            executable='gazebo_osm_tile_server.py',
+            executable='gazebo_osm_tile_server_node.py',
             name='gazebo_osm_tile_server_node',
             parameters=[node_params],
             arguments=['--ros-args', '--log-level', 'info'],
@@ -690,45 +897,71 @@ def drone_vehicle_node_launch(context):
     enable_autopilot = LaunchConfiguration('drone_vehicle_node_enable_autopilot').perform(
         context
     ).lower() in ['true', '1', 'yes']
+    parameter_overrides = {
+        'enable_autopilot_component': enable_autopilot,
+        'enable_px4_bridge': True,
+    }
+    control_tower_heartbeat_topic = LaunchConfiguration(
+        'drone_control_tower_heartbeat_topic'
+    ).perform(context)
+    if control_tower_heartbeat_topic:
+        parameter_overrides['control_tower_heartbeat_topic'] = control_tower_heartbeat_topic
+
+    cmd_vel_out_topic = LaunchConfiguration('drone_cmd_vel_out_topic').perform(context)
+
+    remappings = [
+        ('/cmd_vel_in', 'twist_safety_vel'),
+        ('/cmd_vel_out', cmd_vel_out_topic),
+    ]
+    use_waypoint_follower = LaunchConfiguration('drone_waypoint_follower').perform(
+        context
+    ).lower() in ['true', '1', 'yes']
+    if not enable_autopilot and not use_waypoint_follower:
+        # No autopilot component and no separate waypoint follower: nobody publishes
+        # mission_status, so redirect the subscriber to a dummy topic.
+        remappings.append(('mission_status', 'mission_status_dummy'))
 
     return create_drone_vehicle_node(
         context,
         node_name=LaunchConfiguration('control_vehicle_node_name'),
-        parameter_overrides={
-            'enable_autopilot_component': enable_autopilot,
-            'enable_px4_bridge': True,
-        },
-        remappings=[
-            ('/cmd_vel_in', 'twist_safety_vel'),
-            ('/cmd_vel_out', 'cmd_vel_out'),
-        ],
+        parameter_overrides=parameter_overrides,
+        remappings=remappings,
     )
 
 
 def drone_waypoint_follower_launch(context):
+    control_tower_heartbeat_topic = LaunchConfiguration(
+        'drone_control_tower_heartbeat_topic'
+    ).perform(context)
+    parameter_overrides = {
+        'enable_autopilot_component': True,
+        'enable_px4_bridge': False,
+        'auto_arm': False,
+        'auto_lift_off': False,
+        'input_odom_topic': 'odometry',
+        'odom_topic': '',
+        'vehicle_pose_topic': '',
+        'quadcopter_state_topic': '',
+        'battery_state_topic': '',
+        'arm_command_topic': '',
+        'emergency_stop_update_topic': '',
+        'control_tower_heartbeat_rx_state_topic': '',
+        'joint_states_topic': '',
+        'min_steering_height': 0.0,
+        'publish_odom_to_baselink_tf': False,
+        'publish_world_to_odom_tf': False,
+    }
+    if control_tower_heartbeat_topic:
+        parameter_overrides['control_tower_heartbeat_topic'] = control_tower_heartbeat_topic
+
+    cmd_vel_out_topic = LaunchConfiguration('drone_cmd_vel_out_topic').perform(context)
     return create_drone_vehicle_node(
         context,
         node_name='waywiser_drone_waypoint_follower',
-        parameter_overrides={
-            'enable_autopilot_component': True,
-            'enable_px4_bridge': False,
-            'auto_arm': False,
-            'auto_lift_off': False,
-            'input_odom_topic': 'odometry',
-            'odom_topic': '',
-            'vehicle_pose_topic': '',
-            'quadcopter_state_topic': '',
-            'battery_state_topic': '',
-            'arm_command_topic': '',
-            'emergency_stop_update_topic': '',
-            'joint_states_topic': '',
-            'min_steering_height': 0.0,
-            'publish_odom_to_baselink_tf': False,
-            'publish_world_to_odom_tf': False,
-        },
+        parameter_overrides=parameter_overrides,
         remappings=[
             ('/cmd_vel_in', 'waypoint_follower_cmd_vel_in'),
-            ('/cmd_vel_out', 'waypoint_follower_vel'),
+            ('/cmd_vel_out', cmd_vel_out_topic),
         ],
     )
 
@@ -748,7 +981,9 @@ def create_drone_vehicle_node(context, node_name, parameter_overrides, remapping
     node_params = {**shared_params, **node_specific_params, **parameter_overrides}
 
     # Get the processed URDF string for the vehicle node as well
-    from waywiser_description_py.waywiser_description_utils import get_scaled_urdf_string
+    from waywiser_description_py.waywiser_description_utils import (
+        get_scaled_urdf_string,
+    )
 
     urdf_scale = node_params.get('urdf_scale', 1.0)
     urdf_extra_args = node_params.get('urdf_extra_args', '')

@@ -81,7 +81,7 @@ def simulator_launch(context):
 
     sim_orchestrator_node = Node(
         package='waywiser_agrarsense',
-        executable='agrarsense_orchestrator.py',
+        executable='agrarsense_orchestrator_node.py',
         name='agrarsense_orchestrator_node',
         parameters=[sim_parameters],
         arguments=['--ros-args', '--log-level', 'info'],

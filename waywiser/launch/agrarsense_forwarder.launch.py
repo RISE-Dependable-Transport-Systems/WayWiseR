@@ -339,7 +339,7 @@ def waywiser_to_agrarsense_control_launch(context):
     return [
         Node(
             package='waywiser_agrarsense',
-            executable='waywiser_to_agrarsense_control.py',
+            executable='waywiser_to_agrarsense_control_node.py',
             name='waywiser_to_agrarsense_control',
             namespace=ego_vehicle_role_name,
             parameters=[

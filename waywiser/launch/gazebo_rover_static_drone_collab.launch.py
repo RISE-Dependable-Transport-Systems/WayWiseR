@@ -1,9 +1,11 @@
 import os
+import json
 
 from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
+    ExecuteProcess,
     GroupAction,
     IncludeLaunchDescription,
     OpaqueFunction,
@@ -36,6 +38,16 @@ def generate_launch_description():
         'world',
         default_value=os.path.join(waywiser_gazebo_dir, 'worlds/car_world.sdf'),
         description='Full path to gazebo sdf file',
+    )
+    launch_gazebo_orchestrator_la = DeclareLaunchArgument(
+        'launch_gazebo_orchestrator',
+        default_value='True',
+        description='Launch the Gazebo setup/reset orchestrator',
+    )
+    gazebo_orchestrator_config_la = DeclareLaunchArgument(
+        'gazebo_orchestrator_config',
+        default_value=os.path.join(waywiser_gazebo_dir, 'config/gazebo_orchestrator.yaml'),
+        description='Full path to Gazebo orchestrator config file',
     )
     rover_enable_collision_monitor_la = DeclareLaunchArgument(
         'rover_enable_collision_monitor',
@@ -157,6 +169,8 @@ def generate_launch_description():
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'world': LaunchConfiguration('world'),
+            'launch_gazebo_orchestrator': LaunchConfiguration('launch_gazebo_orchestrator'),
+            'gazebo_orchestrator_config': LaunchConfiguration('gazebo_orchestrator_config'),
             'rover_enable_collision_monitor': LaunchConfiguration(
                 'rover_enable_collision_monitor'
             ),
@@ -271,28 +285,7 @@ def generate_launch_description():
         ]
     )
 
-    drone_gazebo_spawn = TimerAction(
-        period=3.0,
-        actions=[
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    [
-                        os.path.join(
-                            waywiser_gazebo_dir,
-                            'launch',
-                            'spawn.launch.py',
-                        )
-                    ]
-                ),
-                launch_arguments={
-                    'use_sim_time': LaunchConfiguration('use_sim_time'),
-                    'world': LaunchConfiguration('world'),
-                    'spawn_config_file': LaunchConfiguration('drone_spawn_config_file'),
-                    'spawn_interval': '1.0',
-                }.items(),
-            )
-        ],
-    )
+    drone_gazebo_spawn = OpaqueFunction(function=drone_spawn_request_launch)
 
     drone_state_publisher = OpaqueFunction(function=drone_state_publisher_launch)
 
@@ -302,6 +295,8 @@ def generate_launch_description():
     # declare launch args
     ld.add_action(use_sim_time_la)
     ld.add_action(gazebo_world_la)
+    ld.add_action(launch_gazebo_orchestrator_la)
+    ld.add_action(gazebo_orchestrator_config_la)
     ld.add_action(rover_enable_collision_monitor_la)
     ld.add_action(rover_config_la)
     ld.add_action(rviz_config_la)
@@ -361,6 +356,35 @@ def drone_state_publisher_launch(context):
                 SetRemap(src='/tf_static', dst='/tf_static'),
                 rsp_node,
             ]
+        )
+    ]
+
+
+def drone_spawn_request_launch(context):
+    request = {
+        'reset_gazebo': False,
+        'spawn_models': True,
+        'spawn_config_file': LaunchConfiguration('drone_spawn_config_file').perform(context),
+        'spawn_interval_sec': 1.0,
+        'spawn_backend': 'ros_gz_sim',
+    }
+    return [
+        TimerAction(
+            period=3.0,
+            actions=[
+                ExecuteProcess(
+                    cmd=[
+                        'ros2',
+                        'topic',
+                        'pub',
+                        '--once',
+                        '/setup_request',
+                        'std_msgs/msg/String',
+                        f"{{data: '{json.dumps(request)}'}}",
+                    ],
+                    output='log',
+                )
+            ],
         )
     ]
 

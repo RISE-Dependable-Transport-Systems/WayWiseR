@@ -27,9 +27,9 @@ install(
 
 install(
   PROGRAMS
-  py_src/waywiser_agrarsense_py/agrarsense_orchestrator.py
-  py_src/waywiser_agrarsense_py/vehicle_tf_publisher.py
-  py_src/waywiser_agrarsense_py/waywiser_to_agrarsense_control.py
+  py_src/waywiser_agrarsense_py/agrarsense_orchestrator_node.py
+  py_src/waywiser_agrarsense_py/vehicle_tf_publisher_node.py
+  py_src/waywiser_agrarsense_py/waywiser_to_agrarsense_control_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

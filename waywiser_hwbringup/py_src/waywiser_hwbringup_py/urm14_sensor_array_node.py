@@ -14,7 +14,7 @@ from waywiser_hwbringup_py.urm14_sensor_array_manager import (
 )
 
 
-class URM1SensorArrayNode(Node):
+class URM14SensorArrayNode(Node):
     """
     ROS 2 node for managing an array of URM14 ultrasonic sensors.
 
@@ -174,7 +174,7 @@ def main(args=None):
     node = None
     try:
         # Create and run the node
-        node = URM1SensorArrayNode()
+        node = URM14SensorArrayNode()
 
         if node.sensor_configs:  # Only spin if we have sensors
             rclpy.spin(node)

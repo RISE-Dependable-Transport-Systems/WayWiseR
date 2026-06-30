@@ -85,7 +85,7 @@ def waywiser_to_carla_control_launch(context):
     nodes.append(
         Node(
             package='waywiser_carla',
-            executable='waywiser_to_carla_control.py',
+            executable='waywiser_to_carla_control_node.py',
             name='waywiser_to_carla_control_node',
             parameters=[
                 node_params_dict,
