@@ -19,6 +19,7 @@
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
 #include "px4_msgs/msg/vehicle_command.hpp"
 #include "px4_msgs/msg/vehicle_command_ack.hpp"
+#include "px4_msgs/msg/vehicle_global_position.hpp"
 #include "px4_msgs/msg/vehicle_land_detected.hpp"
 #include "px4_msgs/msg/vehicle_local_position.hpp"
 #include "px4_msgs/msg/vehicle_odometry.hpp"
@@ -72,7 +73,8 @@ public:
     IDLE_DESCENT = waywiser_core::msg::QuadcopterState::IDLE_DESCENT,
     AUTO_LIFTING_OFF = waywiser_core::msg::QuadcopterState::AUTO_LIFTING_OFF,
     ON_MISSION = waywiser_core::msg::QuadcopterState::ON_MISSION,
-    RETURNING_HOME = waywiser_core::msg::QuadcopterState::RETURNING_HOME
+    LANDED = waywiser_core::msg::QuadcopterState::LANDED,
+    RETURNING_HOME = 13
   };
 
   void initialize_node();
@@ -92,6 +94,8 @@ protected:
   void px4_vehicle_land_detected_callback(
     const px4_msgs::msg::VehicleLandDetected::SharedPtr msg);
   void px4_vehicle_odometry_callback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg);
+  void px4_vehicle_global_position_callback(
+    const px4_msgs::msg::VehicleGlobalPosition::SharedPtr msg);
   void px4_vehicle_local_position_callback(
     const px4_msgs::msg::VehicleLocalPosition::SharedPtr msg);
   void px4_vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
@@ -107,13 +111,30 @@ protected:
   void range_callback(const sensor_msgs::msg::Range::SharedPtr msg);
 
   void request_arm_state(bool arm);
-  void send_arm_command(bool arm);
+  void send_arm_command(bool arm, bool force = false);
   void send_offboard_mode_command();
-  void send_return_home_command();
+  bool send_return_home_command();
+  bool send_px4_land_at_current_position_command();
+  bool send_waywiser_return_home_command();
+  bool return_home_landed_at_home() const;
+  bool return_home_position_reached() const;
+  bool return_home_ready_to_land() const;
+  void clear_return_home_failsafe();
+  void cancel_return_home_failsafe_on_heartbeat_restore();
+  bool configure_px4_global_origin();
+  void configure_px4_home_position();
+  void update_home_position_parameters(double x, double y);
   void process_twist_msg(const geometry_msgs::msg::Twist::SharedPtr twist_msg);
   void publish_command();
   void update_control_tower_heartbeat_failsafe();
+  MissionState derive_return_home_mission_state() const;
+  void publish_control_tower_timeout_emergency_stop(double heartbeat_age);
   void refresh_in_flight_status();
+  HighLevelState derive_quadcopter_state();
+  waywiser_core::msg::HeartbeatRxState derive_control_tower_heartbeat_rx_state();
+  bool control_tower_heartbeat_timed_out();
+  double control_tower_heartbeat_monitor_age();
+  bool manual_arm_heartbeat_grace_active();
   void publish_odom();
   void publish_quadcopter_state();
   void publish_control_tower_heartbeat_rx_state();
@@ -121,7 +142,8 @@ protected:
   void publish_world_pose();
   void publish_route_markers();
   void publish_autopilot_markers();
-  void publish_home_marker(const px4_msgs::msg::HomePosition & home_position);
+  void publish_home_pose();
+  void publish_px4_aux_global_position();
   static void qtMessageHandler(
     QtMsgType type, const QMessageLogContext &, const QString & msg);
 
@@ -151,6 +173,7 @@ protected:
   std::string arm_command_topic_;
   std::string fused_nav_sat_fix_extended_topic_;
   std::string vehicle_pose_topic_;
+  std::string home_pose_topic_;
   std::string range_topic_;
   std::string quadcopter_state_topic_;
   std::string battery_state_topic_;
@@ -179,6 +202,7 @@ protected:
   rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr px4_vehicle_command_pub_;
   rclcpp::Publisher<px4_msgs::msg::OffboardControlMode>::SharedPtr offboard_control_mode_pub_;
   rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr trajectory_setpoint_pub_;
+  rclcpp::Publisher<px4_msgs::msg::VehicleGlobalPosition>::SharedPtr px4_aux_global_position_pub_;
   rclcpp::Publisher<waywiser_core::msg::QuadcopterState>::SharedPtr quadcopter_state_pub_;
   rclcpp::Publisher<waywiser_twist_safety::msg::EmergencyStopState>::SharedPtr
     emergency_stop_update_pub_;
@@ -188,7 +212,7 @@ protected:
     control_tower_heartbeat_rx_state_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr route_marker_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr autopilot_marker_pub_;
-  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr home_marker_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr home_pose_pub_;
 
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_command_sub_;
@@ -197,6 +221,8 @@ protected:
   rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr
     px4_vehicle_land_detected_sub_;
   rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr px4_vehicle_odometry_sub_;
+  rclcpp::Subscription<px4_msgs::msg::VehicleGlobalPosition>::SharedPtr
+    px4_vehicle_global_position_sub_;
   rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr
     px4_vehicle_local_position_sub_;
   rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr px4_vehicle_status_sub_;
@@ -216,6 +242,8 @@ protected:
   rclcpp::TimerBase::SharedPtr node_management_timer_;
   rclcpp::TimerBase::SharedPtr autopilot_state_machine_timer_;
   rclcpp::TimerBase::SharedPtr setpoint_timer_;
+  bool has_last_node_management_time_ = false;
+  rclcpp::Time last_node_management_time_;
 
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_pub_;
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
@@ -251,6 +279,7 @@ protected:
 
   bool auto_arm_enabled_ = true;
   bool auto_landing_active_ = false;
+  double auto_landing_descent_velocity_ = 0.3;
   bool hover_hold_on_idle_ = true;
   HighLevelState current_state_ = HighLevelState::STARTING_UP;
   OnSetParametersCallbackHandle::SharedPtr parameter_callback_handle_;
@@ -260,20 +289,50 @@ protected:
   double mission_state_timeout_ = 1.0;
 
   bool return_home_on_control_tower_timeout_ = true;
+  bool configure_px4_home_on_lift_off_ = true;
+  bool publish_px4_aux_global_position_ = true;
+  double px4_aux_global_position_eph_ = 0.05;
+  double px4_aux_global_position_epv_ = 0.05;
+  double return_home_x_ = 0.0;
+  double return_home_y_ = 0.0;
+  double return_home_height_ = 10.0;
+  double home_position_x_ = 0.0;
+  double home_position_y_ = 0.0;
+  bool home_position_initialized_ = false;
+  bool home_position_x_configured_ = false;
+  bool home_position_y_configured_ = false;
+  bool updating_home_position_parameters_ = false;
+  bool return_home_x_configured_ = false;
+  bool return_home_y_configured_ = false;
+  double lift_off_position_x_ = 0.0;
+  double lift_off_position_y_ = 0.0;
+  bool has_lift_off_position_ = false;
+  bool has_landed_after_lift_off_ = false;
   double control_tower_heartbeat_timeout_ = 2.0;
   double return_home_command_retry_period_ = 2.0;
   bool received_control_tower_heartbeat_ = false;
   bool control_tower_timeout_return_home_active_ = false;
   bool waiting_for_heartbeat_mission_active_ = false;
-  uint32_t control_tower_heartbeat_rx_count_ = 0;
+  bool return_home_completed_ = false;
+  bool control_tower_heartbeat_timeout_emergency_stop_active_ = false;
+  bool return_home_disarm_requested_ = false;
+  bool has_last_return_home_disarm_request_time_ = false;
   bool has_last_return_home_request_time_ = false;
-  rclcpp::Time last_control_tower_heartbeat_time_;
+  bool return_home_request_sent_ = false;
+  bool return_home_land_request_sent_ = false;
+  bool return_home_landing_phase_active_ = false;
+  bool heartbeat_monitor_started_ = false;
+  rclcpp::Time last_control_tower_heartbeat_stamp_;
+  rclcpp::Time heartbeat_monitor_start_time_;
   rclcpp::Time last_return_home_request_time_;
+  rclcpp::Time last_return_home_disarm_request_time_;
 
   bool last_arm_request_value_ = false;
   double last_arm_request_time_ = 0.0;
   double last_input_command_time_ = 0.0;
   const double arm_request_debounce_period_ = 1.0;
+  const double arm_transition_grace_period_ = 30.0;
+  const double manual_arm_heartbeat_grace_period_ = 1.0;
 
   // Extended local position state (for setpoint publishing)
   bool has_vehicle_local_position_ = false;
@@ -283,8 +342,15 @@ protected:
   float local_position_z_ = 0.0F;
   bool local_position_xy_valid_ = false;
   bool local_position_z_valid_ = false;
+  bool local_position_xy_global_ = false;
+  bool local_position_z_global_ = false;
   bool local_position_v_xy_valid_ = false;
   bool local_position_v_z_valid_ = false;
+  bool global_position_lat_lon_valid_ = false;
+  bool global_position_alt_valid_ = false;
+  bool px4_home_position_hpos_valid_ = false;
+  bool px4_home_position_alt_valid_ = false;
+  bool px4_home_position_set_ = false;
   bool has_local_position_ready_since_ = false;
   rclcpp::Time local_position_ready_since_;
   uint8_t px4_nav_state_ = 0;
@@ -293,6 +359,8 @@ protected:
   int setpoint_count_ = 0;
   int required_setpoint_count_ = 40;
   bool was_command_active_ = false;
+  bool liftoff_active_ = false;          // true once armed+z>thresh, cleared on in_flight or disarm
+  float liftoff_saved_v_up_ = 0.0F;      // last non-zero upward velocity seen during liftoff
   bool has_hold_position_ = false;
   std::array<float, 3> hold_position_ned_{};
   bool has_last_mode_request_time_ = false;

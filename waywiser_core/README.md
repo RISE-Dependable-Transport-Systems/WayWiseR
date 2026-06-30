@@ -10,7 +10,7 @@ The package uses a component-based architecture with two main components:
 
 - **Autopilot Component** – Implements onboard autopilot using WayWise's route-following controllers (e.g., Pure Pursuit). This component enables autonomous driving by generating velocity commands based on:
   - a target path generated dynamically by a higher-level ROS2-based path planner (e.g. Nav2)
-  - a list of waypoints (set manually or using automated scripts) comminicated thorugh MAVLINK, using [ControlTower](https://github.com/das-rise/ControlTower).
+  - a list of waypoints (set manually or using automated scripts) comminicated thorugh MAVLINK, using [ControlTowerNode](https://github.com/das-rise/ControlTowerNode).
 
 ## Available Nodes
 

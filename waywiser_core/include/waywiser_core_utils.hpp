@@ -66,11 +66,16 @@ enum class MissionState : int8_t
   WaitingForGnssAccuracy        = waywiser_core::msg::MissionState::WAITING_FOR_GNSS_ACCURACY,
   WaitingForHeartbeat           = waywiser_core::msg::MissionState::WAITING_FOR_HEARTBEAT,
   FollowRouteInit               = waywiser_core::msg::MissionState::FOLLOW_ROUTE_INIT,
+  FollowRouteLiftOff            = waywiser_core::msg::MissionState::FOLLOW_ROUTE_LIFT_OFF,
   FollowRouteGotoBegin          = waywiser_core::msg::MissionState::FOLLOW_ROUTE_GOTO_BEGIN,
   FollowRouteFollowing          = waywiser_core::msg::MissionState::FOLLOW_ROUTE_FOLLOWING,
   FollowRouteApproachingEndGoal =
     waywiser_core::msg::MissionState::FOLLOW_ROUTE_APPROACHING_END_GOAL,
-  FollowRouteFinished           = waywiser_core::msg::MissionState::FOLLOW_ROUTE_FINISHED
+  FollowRouteFinished           = waywiser_core::msg::MissionState::FOLLOW_ROUTE_FINISHED,
+  ReturnHomeInit                = waywiser_core::msg::MissionState::RETURN_HOME_INIT,
+  ReturnHomeLiftOff             = waywiser_core::msg::MissionState::RETURN_HOME_LIFT_OFF,
+  ReturnHomeCruising            = waywiser_core::msg::MissionState::RETURN_HOME_CRUISING,
+  ReturnHomeLanding             = waywiser_core::msg::MissionState::RETURN_HOME_LANDING
 };
 
 class EmergencyStopState

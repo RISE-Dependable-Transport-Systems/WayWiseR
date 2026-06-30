@@ -95,6 +95,8 @@ std::string CoreUtils::missionStateToString(MissionState state)
       return "Waiting For Heartbeat";
     case MissionState::FollowRouteInit:
       return "Follow Route Init";
+    case MissionState::FollowRouteLiftOff:
+      return "Follow Route Lift Off";
     case MissionState::FollowRouteGotoBegin:
       return "Follow Route Goto Begin";
     case MissionState::FollowRouteFollowing:
@@ -103,6 +105,14 @@ std::string CoreUtils::missionStateToString(MissionState state)
       return "Follow Route Approaching End Goal";
     case MissionState::FollowRouteFinished:
       return "Follow Route Finished";
+    case MissionState::ReturnHomeInit:
+      return "Return Home Init";
+    case MissionState::ReturnHomeLiftOff:
+      return "Return Home Lift Off";
+    case MissionState::ReturnHomeCruising:
+      return "Return Home Cruising";
+    case MissionState::ReturnHomeLanding:
+      return "Return Home Landing";
     default:
       return "Unknown MissionState";
   }
@@ -135,6 +145,7 @@ WayPointFollowerSTMstates CoreUtils::convertToWayPointFollowerSTMstates(MissionS
     case MissionState::Idle:
       return WayPointFollowerSTMstates::NONE;
     case MissionState::FollowRouteInit:
+    case MissionState::FollowRouteLiftOff:
       return WayPointFollowerSTMstates::FOLLOW_ROUTE_INIT;
     case MissionState::FollowRouteGotoBegin:
       return WayPointFollowerSTMstates::FOLLOW_ROUTE_GOTO_BEGIN;

@@ -1,14 +1,11 @@
 builtin_interfaces/Time stamp
-builtin_interfaces/Time last_rx_stamp
+# Generation timestamp copied from the most recently accepted heartbeat Header.
+builtin_interfaces/Time last_heartbeat_stamp
 
-uint8 DISABLED = 0
-uint8 NO_HEARTBEAT = 1
-uint8 ACTIVE = 2
-uint8 STALE = 3
-uint8 TIMEOUT = 4
+uint8 NO_HEARTBEAT = 0
+uint8 ACTIVE = 1
+uint8 TIMEOUT = 2
 
 uint8 state
-string state_str
+# Seconds elapsed since last_heartbeat_stamp; -1 when no stamped heartbeat was accepted.
 float32 age_s
-float32 timeout_s
-uint32 received_count

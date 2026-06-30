@@ -40,11 +40,23 @@ public:
   void setEndGoalAlignmentThreshold(double value) {mEndGoalAlignmentThreshold = value;}
   void setCruiseSpeed(double value) {mCruiseSpeed = value;}
   void setMaxMissionSpeed(double value) {mMaxMissionSpeed = value;}
+  void setDescentSpeed(double value)
+  {
+    mDescentSpeed = value;
+    if (mWaypointFollower) {
+      mWaypointFollower->setDescentSpeed(value);
+    }
+  }
   void setMinApproachSpeed(double value) {mMinApproachSpeed = value;}
   void setApproachSlowdownRadius(double value) {mApproachSlowdownRadius = value;}
   void setFaceTravelDirection(bool value) {mFaceTravelDirection = value;}
   void setYawGain(double value) {mYawGain = value;}
   void setMaxYawRate(double value) {mMaxYawRate = value;}
+  void setVerticalHeightTolerance(double value) {mVerticalHeightTolerance = value;}
+  void setVerticalProportionalGain(double value) {mVerticalProportionalGain = value;}
+  void setVerticalIntegralGain(double value) {mVerticalIntegralGain = value;}
+  void setVerticalDerivativeGain(double value) {mVerticalDerivativeGain = value;}
+  void setVerticalIntegralLimit(double value) {mVerticalIntegralLimit = value;}
   void setPositionAccuracyThresholdForMission(float value)
   {
     mPositionAccuracyThresholdForMission = value;
@@ -53,8 +65,6 @@ public:
   void setAutoLiftOffEnabled(bool value);
   void setAutoLiftOffActive(bool value);
   void setAutoLiftOffHeight(double value) {mAutoLiftOffHeight = value;}
-  void setAutoLiftOffSpeed(double value) {mAutoLiftOffSpeed = value;}
-  void setAutoLiftOffTolerance(double value) {mAutoLiftOffTolerance = value;}
 
   // Getters
   int getAutopilotTimerRate() const {return mAutopilotTimerRate;}
@@ -75,26 +85,33 @@ public:
   double getEndGoalAlignmentThreshold() const {return mEndGoalAlignmentThreshold;}
   double getCruiseSpeed() const {return mCruiseSpeed;}
   double getMaxMissionSpeed() const {return mMaxMissionSpeed;}
+  double getDescentSpeed() const {return mDescentSpeed;}
   double getMinApproachSpeed() const {return mMinApproachSpeed;}
   double getApproachSlowdownRadius() const {return mApproachSlowdownRadius;}
   bool getFaceTravelDirection() const {return mFaceTravelDirection;}
   double getYawGain() const {return mYawGain;}
   double getMaxYawRate() const {return mMaxYawRate;}
+  double getVerticalHeightTolerance() const {return mVerticalHeightTolerance;}
+  double getVerticalProportionalGain() const {return mVerticalProportionalGain;}
+  double getVerticalIntegralGain() const {return mVerticalIntegralGain;}
+  double getVerticalDerivativeGain() const {return mVerticalDerivativeGain;}
+  double getVerticalIntegralLimit() const {return mVerticalIntegralLimit;}
   bool getAutoLiftOffEnabled() const {return mAutoLiftOffEnabled;}
   bool getAutoLiftOffActive() const {return mAutoLiftOffActive;}
   double getAutoLiftOffHeight() const {return mAutoLiftOffHeight;}
-  double getAutoLiftOffSpeed() const {return mAutoLiftOffSpeed;}
-  double getAutoLiftOffTolerance() const {return mAutoLiftOffTolerance;}
+  bool getRouteLiftOffActive() const;
 
   // Utility methods
   virtual void provideParametersToParameterServer();
   void switchAutopilot(bool enable);
   void updateWaypointFollowerRoute(QList<PosPoint> & waypointList);
+  void startWaypointFollowerRouteFromBeginning(QList<PosPoint> & waypointList);
   void processMissionStateMachine();
   bool isActive();
   virtual void stopWaypointFollower();
+  void clearWaypointFollowerRoute();
   void cancelAutoLiftOff();
-  bool updateAutoLiftOffCommand(geometry_msgs::msg::Twist & output, bool armed, bool inFlight);
+  bool startAutoLiftOffWithWaypointFollower();
 
 signals:
   void updatedMissionState(MissionState state);
@@ -103,6 +120,7 @@ signals:
 protected:
   virtual void updateMissionState(MissionState state);
   virtual void startWaypointFollower(QList<PosPoint> & waypointList);
+  MissionState deriveWaypointFollowerMissionState() const;
   bool assertGnssFixAccuracy();
 
   int mAutopilotTimerRate = 10; // [hz]
@@ -115,18 +133,22 @@ protected:
   double mEndGoalAlignmentThreshold = 0.25;
   double mCruiseSpeed = 1.0;
   double mMaxMissionSpeed = 2.0;
+  double mDescentSpeed = 0.3;
   double mMinApproachSpeed = 0.1;
   double mApproachSlowdownRadius = 1.5;
   bool mFaceTravelDirection = true;
   double mYawGain = 1.5;
   double mMaxYawRate = 1.0;
+  double mVerticalHeightTolerance = 0.10;
+  double mVerticalProportionalGain = 0.8;
+  double mVerticalIntegralGain = 0.04;
+  double mVerticalDerivativeGain = 0.5;
+  double mVerticalIntegralLimit = 2.0;
   float mPositionAccuracyThresholdForMission = 0.5; // [m]
   float mYawAccuracyThresholdForMission = 5.0; // [deg]
   bool mAutoLiftOffEnabled = false;
   bool mAutoLiftOffActive = false;
   double mAutoLiftOffHeight = 2.0;
-  double mAutoLiftOffSpeed = 0.5;
-  double mAutoLiftOffTolerance = 0.05;
 
   QSharedPointer<CopterState> mCopterState;
   QSharedPointer<EmergencyStopState> mEmergencyStopState;

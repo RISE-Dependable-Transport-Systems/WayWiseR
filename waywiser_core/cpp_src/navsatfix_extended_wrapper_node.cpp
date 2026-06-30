@@ -17,10 +17,10 @@
 
 using namespace std::placeholders;
 
-class NavSatFixExtendedWrapper : public rclcpp::Node
+class NavSatFixExtendedWrapperNode : public rclcpp::Node
 {
 public:
-  NavSatFixExtendedWrapper(
+  NavSatFixExtendedWrapperNode(
     const rclcpp::NodeOptions & options = rclcpp::NodeOptions(),
     const std::string & node_name = "navsatfix_extended_wrapper_node")
   : Node(node_name, options)
@@ -127,7 +127,7 @@ private:
       this->get_node_timers_interface(),
       this->get_clock(), // uses sim time if enabled
       std::chrono::milliseconds(1000 / gnss_message_rate_),
-      std::bind(&NavSatFixExtendedWrapper::tf_timer_callback, this)
+      std::bind(&NavSatFixExtendedWrapperNode::tf_timer_callback, this)
     );
 
     RCLCPP_INFO(
@@ -142,7 +142,7 @@ private:
 
     nav_sat_fix_sub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>(
       nav_sat_fix_input_topic_, 10,
-      std::bind(&NavSatFixExtendedWrapper::navsat_fix_callback, this, _1));
+      std::bind(&NavSatFixExtendedWrapperNode::navsat_fix_callback, this, _1));
 
     RCLCPP_INFO(
       get_logger(), "NavSatFix mode: converting %s to NavSatFixExtended",
@@ -245,7 +245,7 @@ private:
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<NavSatFixExtendedWrapper>();
+  auto node = std::make_shared<NavSatFixExtendedWrapperNode>();
   rclcpp::spin(node->get_node_base_interface());
   rclcpp::shutdown();
   return 0;

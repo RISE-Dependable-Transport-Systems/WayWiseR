@@ -1,6 +1,11 @@
 #include "waywiser_car_node_core.hpp"
 #include "moc_waywiser_car_node_core.cpp"
 
+#include <algorithm>
+#include <cmath>
+#include <iomanip>
+#include <sstream>
+
 #include "waywiser/waywiser_utils.hpp"
 
 rclcpp::Logger WaywiserCar::node_logger_ = rclcpp::get_logger("waywiser_car_node");
@@ -61,7 +66,9 @@ void WaywiserCar::initialize_node(
   setup_subscribers();
   setup_timers();
 
-  mCarAutopilotComponent->reset();
+  if (mCarAutopilotComponent) {
+    mCarAutopilotComponent->reset();
+  }
   mCarInterfaceComponent->reset();
 
   RCLCPP_INFO(get_logger(), "%s is initialized!", this->get_name());
@@ -139,6 +146,15 @@ void WaywiserCar::setup_parameters()
     "/waywiser_joint_states");
 
   mission_status_topic_ = declare_parameter("mission_status_topic", "/mission_status");
+  declare_parameter("control_tower_selectable", true);
+  control_tower_heartbeat_topic_ =
+    declare_parameter("control_tower_heartbeat_topic", "control_tower_heartbeat");
+  control_tower_heartbeat_rx_state_topic_ = declare_parameter(
+    "control_tower_heartbeat_rx_state_topic", "control_tower_heartbeat_rx_state");
+  emergency_stop_on_control_tower_timeout_ =
+    declare_parameter("emergency_stop_on_control_tower_timeout", true);
+  control_tower_heartbeat_timeout_ =
+    std::max(0.1, declare_parameter("control_tower_heartbeat_timeout", 2.0));
   vehicle_alignment_reference_point_topic_ = declare_parameter(
     "vehicle_alignment_reference_point_topic", "/vehicle_alignment_reference_point");
   autopilot_center_pose_topic_ = declare_parameter(
@@ -366,6 +382,11 @@ void WaywiserCar::setup_publishers()
   car_control_command_pub_ = create_publisher<waywiser_core::msg::CarControlCommand>(
     vehicle_control_command_topic_, 10);
   cmd_vel_out_pub_ = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel_out", 10);
+  if (!control_tower_heartbeat_rx_state_topic_.empty()) {
+    control_tower_heartbeat_rx_state_pub_ =
+      create_publisher<waywiser_core::msg::HeartbeatRxState>(
+      control_tower_heartbeat_rx_state_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
+  }
   for (const auto & tof_sensor_name : tof_sensor_names_) {
     tof_pubs_[tof_sensor_name] =
       create_publisher<std_msgs::msg::Float32>(tof_sensor_topics_[tof_sensor_name], 10);
@@ -480,14 +501,21 @@ void WaywiserCar::setup_subscribers()
       "waywiser_path", QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS,
       std::bind(&WaywiserCar::path_with_twists_callback, this, _1));
   }
+
+  if (!control_tower_heartbeat_topic_.empty()) {
+    control_tower_heartbeat_sub_ = this->create_subscription<std_msgs::msg::Header>(
+      control_tower_heartbeat_topic_, 10,
+      std::bind(&WaywiserCar::control_tower_heartbeat_callback, this, _1));
+  }
 }
 
 void WaywiserCar::setup_timers()
 {
   // Timers
-  auto timer_rate_ = std::max(
-    mCarInterfaceComponent->getVehicleStatePollRate(),
-    mCarAutopilotComponent->getAutopilotTimerRate());
+  auto timer_rate_ = mCarInterfaceComponent->getVehicleStatePollRate();
+  if (enable_autopilot_component_ && mCarAutopilotComponent) {
+    timer_rate_ = std::max(timer_rate_, mCarAutopilotComponent->getAutopilotTimerRate());
+  }
   if (timer_rate_ > 0) {
     node_management_timer_ = rclcpp::create_timer(
       this->get_node_base_interface(),
@@ -520,8 +548,13 @@ void WaywiserCar::node_management_timer_callback()
   if (timePassedSinceLastCall_ms < 0.0) {
     RCLCPP_WARN(
       this->get_logger(), "Clock reset detected! Resetting interface and autopilot componenets.");
-    mCarAutopilotComponent->reset();
+    if (mCarAutopilotComponent) {
+      mCarAutopilotComponent->reset();
+    }
     mCarInterfaceComponent->reset();
+    received_control_tower_heartbeat_ = false;
+    control_tower_heartbeat_stale_stop_active_ = false;
+    control_tower_heartbeat_timeout_emergency_stop_active_ = false;
     previousTimeCalled = thisTimeCalled;
     return;
   }
@@ -531,6 +564,9 @@ void WaywiserCar::node_management_timer_callback()
   {
     return;
   }
+
+  update_control_tower_heartbeat_failsafe();
+  publish_control_tower_heartbeat_rx_state();
 
   // publish world pose
   publish_world_pose();
@@ -548,7 +584,7 @@ void WaywiserCar::node_management_timer_callback()
       if (vehicleAlignmentReferencePosPoint) {
         // Publish autopilot twist
         auto autopilot_twist_msg = std::make_shared<geometry_msgs::msg::Twist>();
-        if (mEmergencyStopState->is_clear()) {
+        if (mEmergencyStopState->is_clear() && !should_stop_for_control_tower_heartbeat()) {
           auto autopilotMovementController =
             mCarAutopilotComponent->getAutopilotMovementController();
           double mDesiredSpeed = autopilotMovementController->getDesiredSpeed();                       // [m/s]
@@ -615,7 +651,9 @@ void WaywiserCar::node_management_timer_callback()
 void WaywiserCar::autopilot_state_control_callback(
   const std_msgs::msg::Bool::SharedPtr bool_msg)
 {
-  mCarAutopilotComponent->switchAutopilot(bool_msg->data);
+  if (mCarAutopilotComponent) {
+    mCarAutopilotComponent->switchAutopilot(bool_msg->data);
+  }
 }
 
 void WaywiserCar::emergency_stop_status_callback(
@@ -625,7 +663,37 @@ void WaywiserCar::emergency_stop_status_callback(
     mCarInterfaceComponent->activate_emergency_stop(emergency_stop_msg->sender_id);
   } else if (emergency_stop_msg->state == waywiser_twist_safety::msg::EmergencyStopState::CLEAR) {
     mCarInterfaceComponent->clear_emergency_stop(emergency_stop_msg->sender_id);
+    if (control_tower_heartbeat_timeout_emergency_stop_active_ &&
+      emergency_stop_msg->sender_id != this->get_name())
+    {
+      control_tower_heartbeat_timeout_emergency_stop_active_ = false;
+    }
   }
+}
+
+void WaywiserCar::control_tower_heartbeat_callback(const std_msgs::msg::Header::SharedPtr msg)
+{
+  if (msg->stamp.sec == 0 && msg->stamp.nanosec == 0U) {
+    RCLCPP_WARN_THROTTLE(
+      get_logger(), *get_clock(), 5000,
+      "Ignoring Control Tower heartbeat without a valid generation timestamp.");
+    return;
+  }
+  const auto now_time = get_clock()->now();
+  last_control_tower_heartbeat_stamp_ =
+    rclcpp::Time(msg->stamp, get_clock()->get_clock_type());
+  received_control_tower_heartbeat_ = true;
+
+  const double heartbeat_age =
+    std::max(0.0, (now_time - last_control_tower_heartbeat_stamp_).seconds());
+  if (control_tower_heartbeat_stale_stop_active_ &&
+    !control_tower_heartbeat_timeout_emergency_stop_active_ &&
+    heartbeat_age <= control_tower_heartbeat_timeout_ * 0.5)
+  {
+    RCLCPP_INFO(get_logger(), "Control tower heartbeat restored. Releasing temporary stop.");
+    control_tower_heartbeat_stale_stop_active_ = false;
+  }
+  publish_control_tower_heartbeat_rx_state();
 }
 
 void WaywiserCar::twist_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg)
@@ -798,7 +866,9 @@ void WaywiserCar::fused_nav_sat_fix_extended_callback(
   gnssFixStatus.headingAccuracy = msg->heading_accuracy;
   gnssFixStatus.lastRtcmCorrectionAge = msg->last_rtcm_correction_age;
   gnssFixStatus.numSatellites = msg->num_satellites;
-  mCarAutopilotComponent->setGnssFixStatus(gnssFixStatus);
+  if (mCarAutopilotComponent) {
+    mCarAutopilotComponent->setGnssFixStatus(gnssFixStatus);
+  }
 }
 
 // ----------------- Publish helper methods -----------------
@@ -1088,6 +1158,36 @@ void WaywiserCar::publish_joint_states(double timePassedSinceLastCall_ms)
   }
 }
 
+void WaywiserCar::publish_control_tower_heartbeat_rx_state()
+{
+  if (!control_tower_heartbeat_rx_state_pub_) {
+    return;
+  }
+
+  waywiser_core::msg::HeartbeatRxState msg;
+  msg.stamp = get_clock()->now();
+
+  if (received_control_tower_heartbeat_) {
+    msg.last_heartbeat_stamp = last_control_tower_heartbeat_stamp_;
+    const auto now_time = get_clock()->now();
+    msg.age_s = static_cast<float>(
+      std::max(0.0, (now_time - last_control_tower_heartbeat_stamp_).seconds()));
+  } else {
+    msg.last_heartbeat_stamp = rclcpp::Time(0, 0, get_clock()->get_clock_type());
+    msg.age_s = -1.0F;
+  }
+
+  if (!received_control_tower_heartbeat_) {
+    msg.state = waywiser_core::msg::HeartbeatRxState::NO_HEARTBEAT;
+  } else if (control_tower_heartbeat_timeout_emergency_stop_active_) {
+    msg.state = waywiser_core::msg::HeartbeatRxState::TIMEOUT;
+  } else {
+    msg.state = waywiser_core::msg::HeartbeatRxState::ACTIVE;
+  }
+
+  control_tower_heartbeat_rx_state_pub_->publish(msg);
+}
+
 void WaywiserCar::publish_imu_data()
 {
   sensor_msgs::msg::Imu imu_msg;
@@ -1105,6 +1205,76 @@ void WaywiserCar::publish_imu_data()
 }
 
 // ----------------- Utility methods -----------------
+void WaywiserCar::update_control_tower_heartbeat_failsafe()
+{
+  if (!received_control_tower_heartbeat_) {
+    control_tower_heartbeat_stale_stop_active_ = false;
+    control_tower_heartbeat_timeout_emergency_stop_active_ = false;
+    return;
+  }
+
+  const auto now_time = get_clock()->now();
+  const double heartbeat_age =
+    std::max(0.0, (now_time - last_control_tower_heartbeat_stamp_).seconds());
+  if (heartbeat_age <= control_tower_heartbeat_timeout_ * 0.5) {
+    if (control_tower_heartbeat_stale_stop_active_) {
+      RCLCPP_INFO(get_logger(), "Control tower heartbeat restored. Releasing temporary stop.");
+    }
+    control_tower_heartbeat_stale_stop_active_ = false;
+    return;
+  }
+
+  if (heartbeat_age <= control_tower_heartbeat_timeout_) {
+    if (!control_tower_heartbeat_stale_stop_active_) {
+      RCLCPP_WARN(
+        get_logger(),
+        "Control tower heartbeat stale after %.2f s. Temporarily stopping vehicle.",
+        heartbeat_age);
+    }
+    control_tower_heartbeat_stale_stop_active_ = true;
+    auto zero_twist = std::make_shared<geometry_msgs::msg::Twist>();
+    process_twist_msg(zero_twist);
+    return;
+  }
+
+  control_tower_heartbeat_stale_stop_active_ = true;
+  if (!control_tower_heartbeat_timeout_emergency_stop_active_) {
+    publish_control_tower_timeout_emergency_stop(heartbeat_age);
+    control_tower_heartbeat_timeout_emergency_stop_active_ = true;
+  }
+  auto zero_twist = std::make_shared<geometry_msgs::msg::Twist>();
+  process_twist_msg(zero_twist);
+}
+
+void WaywiserCar::publish_control_tower_timeout_emergency_stop(double heartbeat_age)
+{
+  if (!emergency_stop_update_pub_) {
+    return;
+  }
+
+  std::stringstream emergency_stop_reason;
+  emergency_stop_reason << "Control tower heartbeat timed out after " <<
+    std::fixed << std::setprecision(2) << heartbeat_age << " s.";
+
+  auto emergency_stop_msg = waywiser_twist_safety::msg::EmergencyStopState();
+  emergency_stop_msg.state = waywiser_twist_safety::msg::EmergencyStopState::ACTIVE;
+  emergency_stop_msg.sender_id = this->get_name();
+  emergency_stop_msg.stamp = this->get_clock()->now();
+  emergency_stop_msg.reason = emergency_stop_reason.str();
+  emergency_stop_update_pub_->publish(emergency_stop_msg);
+
+  RCLCPP_WARN(
+    get_logger(),
+    "Control tower heartbeat timed out after %.2f s. Activating emergency stop.",
+    heartbeat_age);
+}
+
+bool WaywiserCar::should_stop_for_control_tower_heartbeat() const
+{
+  return control_tower_heartbeat_stale_stop_active_ ||
+         control_tower_heartbeat_timeout_emergency_stop_active_;
+}
+
 void WaywiserCar::process_twist_msg(const geometry_msgs::msg::Twist::SharedPtr twist_msg)
 {
   static auto previousTimeCalled = this->get_clock()->now();
@@ -1113,7 +1283,10 @@ void WaywiserCar::process_twist_msg(const geometry_msgs::msg::Twist::SharedPtr t
   previousTimeCalled = thisTimeCalled;
 
   if (dt > 0.0) {
-    mCarInterfaceComponent->updateControlCommand(twist_msg->linear.x, twist_msg->angular.z, dt);
+    const bool force_stop = should_stop_for_control_tower_heartbeat();
+    const double desired_linear_speed = force_stop ? 0.0 : twist_msg->linear.x;
+    const double desired_angular_speed = force_stop ? 0.0 : twist_msg->angular.z;
+    mCarInterfaceComponent->updateControlCommand(desired_linear_speed, desired_angular_speed, dt);
     mCarInterfaceComponent->executeControlCommand();
     car_control_command_pub_->publish(mCarInterfaceComponent->getCarControlCommand().to_msg());
 
