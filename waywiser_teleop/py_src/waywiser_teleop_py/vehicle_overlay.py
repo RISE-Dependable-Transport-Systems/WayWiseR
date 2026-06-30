@@ -39,6 +39,7 @@ class OverlayShape:
     length: float = 0.0
     color: str = '#111827'
     points: list = field(default_factory=list)
+    role: str = ''
 
 
 class VehicleOverlayModel:
@@ -55,7 +56,8 @@ class VehicleOverlayModel:
         self.joint_types = {}
         self.ignored_joint_names = set()
         self._rotor_joint_names = []  # rotor/propeller joints eligible for animation
-        self._rotor_animation = []  # per-rotor entry: shape_indices + origin_xy
+        self._joint_name_aliases = {}
+        self._rotor_animation = []  # per-rotor entry: joint_name + shape_indices + origin_xy
         self.version = 0
 
     def load_urdf(self, xml_text):
@@ -64,6 +66,7 @@ class VehicleOverlayModel:
         self.materials = self._parse_materials(root)
         self.joint_types = {}
         self.ignored_joint_names = set()
+        self._joint_name_aliases = {}
         links = {link.get('name'): link for link in root.findall('link') if link.get('name')}
         joints = []
         child_links = set()
@@ -91,6 +94,9 @@ class VehicleOverlayModel:
                 }
             )
             self.joint_types[joint_name] = joint_type
+            if joint_name:
+                self._joint_name_aliases[joint_name] = joint_name
+                self._joint_name_aliases[joint_name.rsplit('/', 1)[-1]] = joint_name
             if self._is_spin_joint(joint_name, child_name, links.get(child_name)):
                 self.ignored_joint_names.add(joint_name)
             child_links.add(child_name)
@@ -102,8 +108,8 @@ class VehicleOverlayModel:
         for joint in joints:
             self.children_by_parent.setdefault(joint['parent'], []).append(joint)
 
-        # Collect joints that drive rotors/propellers (subset of ignored_joint_names)
-        # so tick() can animate them independently of incoming JointState messages.
+        # Collect joints that drive rotors/propellers so incoming JointState messages
+        # can animate them at the simulator-reported speed without rebuilding all shapes.
         self._rotor_joint_names = [
             j['name']
             for j in joints
@@ -119,42 +125,43 @@ class VehicleOverlayModel:
 
     def update_joint_states(self, names, positions):
         changed = False
+        rotor_changed = False
         next_positions = dict(self.joint_positions)
         for name, position in zip(names, positions):
-            if self._ignore_joint_state(name):
+            joint_name = self._canonical_joint_name(name)
+            if joint_name in self._rotor_joint_names:
+                position = float(position)
+                old_position = next_positions.get(joint_name, 0.0)
+                delta = position - old_position
+                if abs(delta) > 1e-4 and self._apply_rotor_joint_delta(joint_name, delta):
+                    rotor_changed = True
+                next_positions[joint_name] = position
+                continue
+            if self._ignore_joint_state(joint_name):
                 continue
             position = float(position)
-            if abs(next_positions.get(name, 0.0) - position) > 1e-3:
-                next_positions[name] = position
+            if abs(next_positions.get(joint_name, 0.0) - position) > 1e-3:
+                next_positions[joint_name] = position
                 changed = True
-        if not changed:
+        if not changed and not rotor_changed:
             return
         self.joint_positions = next_positions
-        self.shapes = self._build_shapes()
+        if changed:
+            self.shapes = self._build_shapes()
         self.version += 1
 
-    def tick(self, time_sec, spin_hz=3.0):
-        """Advance rotor/propeller animation to wall-clock time *time_sec*.
-
-        Applies a 2-D delta rotation to the pre-computed hull vertices of every
-        rotor shape.  This is O(hull_vertices) — no mesh transforms or convex-hull
-        recomputation — so it is safe to call at the full display refresh rate.
-        Returns True when the version was incremented.
-        """
-        if not self._rotor_joint_names or not self._rotor_animation:
-            return False
-
-        new_angle = (time_sec * spin_hz * 2.0 * math.pi) % (2.0 * math.pi)
-        old_angle = self.joint_positions.get(self._rotor_joint_names[0], 0.0)
-        delta = new_angle - old_angle
-        # Skip if effectively no movement (wrap-around safe check)
-        if abs(delta) < 1e-4 and abs(abs(delta) - 2.0 * math.pi) > 1e-4:
+    def _apply_rotor_joint_delta(self, joint_name, delta):
+        """Rotate cached rotor overlay geometry by an incoming JointState delta."""
+        if not self._rotor_animation:
             return False
 
         cos_d = math.cos(delta)
         sin_d = math.sin(delta)
+        changed = False
 
         for entry in self._rotor_animation:
+            if entry['joint_name'] != joint_name:
+                continue
             cx, cy = entry['origin_xy']
             for idx in entry['shape_indices']:
                 if idx >= len(self.shapes):
@@ -169,11 +176,16 @@ class VehicleOverlayModel:
                     )
                     for px, py in shape.points
                 ]
+                changed = True
 
-        for name in self._rotor_joint_names:
-            self.joint_positions[name] = new_angle
-        self.version += 1
-        return True
+        return changed
+
+    def _canonical_joint_name(self, name):
+        if not name:
+            return name
+        return self._joint_name_aliases.get(
+            name, self._joint_name_aliases.get(name.rsplit('/', 1)[-1], name)
+        )
 
     def _ignore_joint_state(self, name):
         if not name:
@@ -234,8 +246,11 @@ class VehicleOverlayModel:
                 self._walk_link(joint['child'], child_transform, shapes, set(), [])
                 end = len(shapes)
                 if end > start:
+                    for shape in shapes[start:end]:
+                        shape.role = 'rotor'
                     rotor_anim.append(
                         {
+                            'joint_name': joint['name'],
                             'shape_indices': list(range(start, end)),
                             'origin_xy': (joint_transform.xyz[0], joint_transform.xyz[1]),
                         }

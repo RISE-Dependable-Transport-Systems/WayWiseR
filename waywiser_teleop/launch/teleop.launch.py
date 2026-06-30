@@ -87,7 +87,7 @@ def generate_launch_description():
 
     twist_angular_correction_node = Node(
         package='waywiser_teleop',
-        executable='twist_angular_correction',
+        executable='twist_angular_correction_node',
         name='twist_angular_correction',
         parameters=[
             LaunchConfiguration('teleop_config'),
@@ -165,7 +165,7 @@ def control_tower_conditional_launch(context):
                 if 'DISPLAY' in os.environ:
                     control_tower_node = Node(
                         package='waywiser_teleop',
-                        executable='control_tower.py',
+                        executable='control_tower_node.py',
                         name='control_tower',
                         output='screen',
                         parameters=[

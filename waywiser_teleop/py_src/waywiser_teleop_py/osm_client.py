@@ -1,4 +1,4 @@
-"""OpenStreetMap tile fetching and coordinate helpers for control tower maps."""
+"""Generic OSM tile client and coordinate helpers for Control Tower maps."""
 
 import math
 import os
@@ -147,7 +147,7 @@ class OsmTileClient(QObject):
 
         url = f'{self.tile_server_url}/{zoom}/{tile_x}/{tile_y}.png'
         request = QNetworkRequest(QUrl(url))
-        request.setRawHeader(b'User-Agent', b'Waywiser-ControlTower/1.0')
+        request.setRawHeader(b'User-Agent', b'Waywiser-ControlTowerNode/1.0')
         reply = self.network.get(request)
         self.downloading.add(key)
         reply.finished.connect(

@@ -2,6 +2,7 @@
 """ROS 2 node for vehicle teleoperation using a keyboard and PyQt5 GUI."""
 
 from contextlib import contextmanager
+from datetime import datetime
 import json
 import os
 import subprocess
@@ -35,9 +36,10 @@ with suppress_stderr():
     import numpy as np
     from rcl_interfaces.msg import Parameter as ParameterMsg
     from rcl_interfaces.msg import ParameterType, ParameterValue
-    from rcl_interfaces.srv import GetParameters, SetParameters
+    from rcl_interfaces.srv import GetParameters, ListParameters, SetParameters
     import rclpy
     from rclpy.node import Node
+    from rosgraph_msgs.msg import Clock
     from sensor_msgs.msg import JointState, Joy
     from std_msgs.msg import Bool, Header, String
     import tf2_ros
@@ -46,14 +48,17 @@ with suppress_stderr():
 
 try:
     with suppress_stderr():
-        from PyQt5.QtCore import QPoint, Qt, QTimer, QUrl
+        from PyQt5.QtCore import QEvent, QPoint, Qt, QTimer, QUrl
+        from PyQt5.QtGui import QKeySequence
         from PyQt5.QtMultimedia import QAudio, QAudioDeviceInfo, QSoundEffect
         from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
         from PyQt5.QtWidgets import (
             QActionGroup,
             QApplication,
             QDialog,
+            QFrame,
             QGraphicsOpacityEffect,
+            QGridLayout,
             QHBoxLayout,
             QLabel,
             QMainWindow,
@@ -62,6 +67,7 @@ try:
             QPushButton,
             QSizePolicy,
             QSplitter,
+            QToolTip,
             QWidget,
         )
         from PyQt5.uic import loadUi
@@ -81,8 +87,12 @@ except ImportError:
             raise RuntimeError('PyQt5 is not installed. Install python3-pyqt5 to use this class.')
 
     QDialog = _QtStub  # type: ignore[misc,assignment]
+    QFrame = _QtStub  # type: ignore[misc,assignment]
+    QGridLayout = _QtStub  # type: ignore[misc,assignment]
     QMainWindow = _QtStub  # type: ignore[misc,assignment]
     QWidget = _QtStub  # type: ignore[misc,assignment]
+    QEvent = None
+    QKeySequence = None
     QPoint = _QtStub  # type: ignore[misc,assignment]
     Qt = None
     QTimer = _QtStub  # type: ignore[misc,assignment]
@@ -99,6 +109,7 @@ except ImportError:
     QMessageBox = _QtStub  # type: ignore[misc,assignment]
     QSizePolicy = None
     QSplitter = _QtStub  # type: ignore[misc,assignment]
+    QToolTip = _QtStub  # type: ignore[misc,assignment]
     loadUi = None
 
 
@@ -111,7 +122,6 @@ from waywiser_core.msg import (  # noqa: E402
     QuadcopterState,
 )
 from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS, RosUtils  # noqa: E402
-from waywiser_teleop_py.route_messages import build_path_with_twists  # noqa: E402
 from waywiser_twist_safety.msg import EmergencyStopState  # noqa: E402
 
 try:
@@ -136,27 +146,29 @@ if _PYQT5_AVAILABLE:
     UI_BASE_PATH = os.path.join(
         get_package_share_directory('waywiser_teleop'), 'user_interface', 'control_tower'
     )
-    from waywiser_teleop_py.route_planner import (  # noqa: E402
+    from waywiser_teleop_py.mission_planner import (  # noqa: E402
         ACTIVE_BUTTON_STYLE,
+        build_path_with_twists,
+        MissionPlannerWidget,
         OPENSTREETMAP_CACHE_DIR,
         OPENSTREETMAP_TILE_SERVER_URL,
         POPUP_MENU_STYLE,
-        RoutePlannerWidget,
         UpMenuButton,
     )
 else:
     UI_BASE_PATH = None
-    RoutePlannerWidget = None
+    MissionPlannerWidget = None
     UpMenuButton = None
     ACTIVE_BUTTON_STYLE = ''
     OPENSTREETMAP_CACHE_DIR = ''
     OPENSTREETMAP_TILE_SERVER_URL = ''
     POPUP_MENU_STYLE = ''
+    build_path_with_twists = None
 
 AUTOPILOT_MARKER_TTL_SECONDS = 1.0
 
 
-class ControlTower(Node):
+class ControlTowerNode(Node):
     """Publish twist messages using keypresses from the keyboard."""
 
     def __init__(self):
@@ -172,9 +184,7 @@ class ControlTower(Node):
         self.control_vehicle_node_fqn = (
             self.get_parameter('control_vehicle_node_fqn').get_parameter_value().string_value
         )
-        self.vehicle_namespace = RosUtils.parent_namespace_from_fqn(
-            self.control_vehicle_node_fqn
-        )
+        self.vehicle_namespace = RosUtils.parent_namespace_from_fqn(self.control_vehicle_node_fqn)
 
         self.declare_parameter('max_linear_speed', 2.0)
         self.declare_parameter('max_angular_speed', 2.0)
@@ -237,14 +247,12 @@ class ControlTower(Node):
         )
         self.control_tower_heartbeat_rate = max(
             0.1,
-            self.get_parameter('control_tower_heartbeat_rate')
-            .get_parameter_value()
-            .double_value,
+            self.get_parameter('control_tower_heartbeat_rate').get_parameter_value().double_value,
         )
 
         # Wait for sim time if needed
-        use_sim_time = self.get_parameter('use_sim_time').get_parameter_value().bool_value
-        if use_sim_time:
+        self.use_sim_time = self.get_parameter('use_sim_time').get_parameter_value().bool_value
+        if self.use_sim_time:
             if rclpy.ok() and self.get_clock().now().nanoseconds == 0:
                 self.get_logger().warn('Waiting for /clock to be published...')
             while rclpy.ok() and self.get_clock().now().nanoseconds == 0:
@@ -260,10 +268,12 @@ class ControlTower(Node):
         self.quadcopter_state_topic = ''
         self.mission_status_topic = ''
         self.control_tower_heartbeat_rx_state_topic = ''
+        self.control_tower_heartbeat_timeout = 0.0
         self.nav_sat_fix_extended_topic = ''
         self.emergency_stop_status_topic = ''
         self.emergency_stop_update_topic = ''
         self.joint_states_topic = ''
+        self.home_pose_topic = ''
         self.route_topic = ''
         self.autopilot_state_control_topic = ''
         self.enuref = [57.71495867, 12.89134921, 0.0]
@@ -273,6 +283,7 @@ class ControlTower(Node):
         # Subscribers (will be created after fetching topics)
         self.odom_subscriber = None
         self.vehicle_pose_subscriber = None
+        self.home_pose_subscriber = None
         self.battery_state_subscriber = None
         self.quadcopter_state_subscriber = None
         self.mission_status_subscriber = None
@@ -334,8 +345,30 @@ class ControlTower(Node):
         self.world_frame = self.get_parameter('world_frame').get_parameter_value().string_value
 
         # TF2 buffer and listener for transforming vehicle poses to world_frame
-        self._tf_buffer = tf2_ros.Buffer()
-        self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self)
+        self._tf_listener = None
+        self._tf_listener_suspended = False
+        self._tf_resume_timer = None
+        self._create_tf_listener()
+        self._last_clock_msg_ns = None
+        self._waiting_for_sim_time_reset = False
+        self._clock_reset_subscriber = None
+        if self.use_sim_time:
+            self._clock_reset_subscriber = self.create_subscription(
+                Clock,
+                '/clock',
+                self.clock_callback,
+                10,
+            )
+        self.declare_parameter('setup_request_topic', '/setup_request')
+        self.setup_request_topic = (
+            self.get_parameter('setup_request_topic').get_parameter_value().string_value
+        )
+        self.setup_request_subscriber = self.create_subscription(
+            String,
+            self.setup_request_topic,
+            self.setup_request_callback,
+            10,
+        )
 
         self.mux_sources = {}  # source_name -> {topic, priority, timeout, last_msg, last_stamp}
         self.mux_source_subscribers = []
@@ -363,14 +396,24 @@ class ControlTower(Node):
             'stamp': self.get_clock().now(),
             'frame_id': '',
         }
-        self.last_vehicle_pose = {'pose': None, 'stamp': self.get_clock().now(), 'frame_id': ''}
+        self.last_vehicle_pose = {
+            'pose': None,
+            'stamp': self.get_clock().now(),
+            'frame_id': '',
+        }
+        self.last_home_pose = {'pose': None, 'stamp': self.get_clock().now(), 'frame_id': ''}
         self.last_battery_state = {'msg': None, 'stamp': self.get_clock().now()}
         self.last_quadcopter_state = {'msg': None, 'stamp': self.get_clock().now()}
+        self.last_quadcopter_state_code = None
         self.last_mission_state = {'msg': None, 'stamp': self.get_clock().now()}
         self.last_nav_sat_fix_extended = {'msg': None, 'stamp': self.get_clock().now()}
+        self.last_robot_description = ''
         self.vehicle_overlay_model = VehicleOverlayModel()
         self.visual_marker_store = {}
         self.visual_markers = []
+        self.vehicle_status_reset_pending = False
+        self.vehicle_status_cleared = False
+        self.vehicle_status_reset_generation = 0
 
         # Current twist command
         self.current_twist = Twist()
@@ -405,6 +448,109 @@ class ControlTower(Node):
             12: '≥120 s',
         }
 
+    def clock_callback(self, msg):
+        clock_ns = msg.clock.sec * 1_000_000_000 + msg.clock.nanosec
+        if self._last_clock_msg_ns is not None and clock_ns < self._last_clock_msg_ns:
+            self.handle_sim_time_reset(self._last_clock_msg_ns, clock_ns)
+            self._waiting_for_sim_time_reset = False
+        self._last_clock_msg_ns = clock_ns
+
+    def setup_request_callback(self, msg):
+        try:
+            request = json.loads(msg.data) if msg.data else {}
+        except json.JSONDecodeError:
+            request = {}
+        reset_all = self._request_bool(request, 'reset_all', False)
+        if reset_all and self.use_sim_time:
+            self.get_logger().warn(
+                'Gazebo full reset requested. Suspending Control Tower TF listener '
+                'until simulation time restarts.'
+            )
+            self.suspend_tf_listener()
+            self._waiting_for_sim_time_reset = True
+            self.reset_runtime_state_after_time_reset()
+            self.schedule_tf_listener_resume(12.0)
+
+    def handle_sim_time_reset(self, previous_clock_ns, current_clock_ns):
+        self.get_logger().warn(
+            'Simulation time moved backwards from '
+            f'{previous_clock_ns / 1e9:.3f} s to {current_clock_ns / 1e9:.3f} s. '
+            'Clearing Control Tower TF and runtime state.'
+        )
+        self.reset_runtime_state_after_time_reset()
+        self.schedule_tf_listener_resume(0.5)
+
+    def reset_runtime_state_after_time_reset(self):
+        self._tf_buffer.clear()
+        now = self.get_clock().now()
+        self.last_emergency_stop_state = {'msg': None, 'stamp': now}
+        self.last_control_tower_heartbeat_rx_state = {'msg': None, 'stamp': now}
+        self.last_odom = {
+            'pose': None,
+            'twist': None,
+            'stamp': now,
+            'frame_id': '',
+        }
+        self.last_vehicle_pose = {'pose': None, 'stamp': now, 'frame_id': ''}
+        self.last_home_pose = {'pose': None, 'stamp': now, 'frame_id': ''}
+        self.last_battery_state = {'msg': None, 'stamp': now}
+        self.last_quadcopter_state = {'msg': None, 'stamp': now}
+        self.last_quadcopter_state_code = None
+        self.last_mission_state = {'msg': None, 'stamp': now}
+        self.last_nav_sat_fix_extended = {'msg': None, 'stamp': now}
+        self.current_twist = Twist()
+        self.auto_landing_active = False
+        self.auto_lift_off_active = False
+        self.vehicle_status_reset_pending = True
+        self.vehicle_status_cleared = True
+        self.vehicle_status_reset_generation += 1
+        self._reset_vehicle_overlay_model()
+        self.visual_marker_store.clear()
+        self.visual_markers = []
+
+    def _create_tf_listener(self):
+        try:
+            self._tf_buffer = tf2_ros.Buffer(node=self)
+        except TypeError:
+            self._tf_buffer = tf2_ros.Buffer()
+        self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self)
+        self._tf_listener_suspended = False
+
+    def suspend_tf_listener(self):
+        if self._tf_listener is not None:
+            try:
+                self._tf_listener.unregister()
+            except Exception as exc:
+                self.get_logger().warn(f'Could not unregister Control Tower TF listener: {exc}')
+            self._tf_listener = None
+        self._tf_buffer.clear()
+        self._tf_listener_suspended = True
+
+    def schedule_tf_listener_resume(self, delay_sec):
+        if self._tf_resume_timer is not None:
+            self.destroy_timer(self._tf_resume_timer)
+        self._tf_resume_timer = self.create_timer(
+            max(0.1, float(delay_sec)),
+            self.resume_tf_listener_once,
+        )
+
+    def resume_tf_listener_once(self):
+        if self._tf_resume_timer is not None:
+            self.destroy_timer(self._tf_resume_timer)
+            self._tf_resume_timer = None
+        if self._tf_listener is None:
+            self.get_logger().info('Resuming Control Tower TF listener after simulation reset.')
+            self._create_tf_listener()
+        else:
+            self._tf_buffer.clear()
+
+    @staticmethod
+    def _request_bool(request, name, default):
+        value = request.get(name, default) if isinstance(request, dict) else default
+        if isinstance(value, str):
+            return value.strip().lower() in ('1', 'true', 'yes', 'on')
+        return bool(value)
+
     def request_params_from_vehicle_node(self):
         """Request params from the current vehicle node."""
         self.vehicle_connected = False
@@ -434,6 +580,8 @@ class ControlTower(Node):
             'joint_states_topic',
             'mission_status_topic',
             'control_tower_heartbeat_rx_state_topic',
+            'control_tower_heartbeat_timeout',
+            'home_pose_topic',
         ]
 
         future = client.call_async(request)
@@ -482,7 +630,13 @@ class ControlTower(Node):
                         if vals[11].string_value
                         else ''
                     )
-
+                if len(vals) >= 13 and vals[12].type == ParameterType.PARAMETER_DOUBLE:
+                    self.control_tower_heartbeat_timeout = vals[12].double_value
+                self.home_pose_topic = self._prefix_with_vehicle_namespace(
+                    vals[13].string_value
+                    if len(vals) >= 14 and vals[13].string_value
+                    else 'home_pose'
+                )
                 if self.waywise_object_type == 'quadcopter':
                     qc_request = GetParameters.Request()
                     qc_request.names = [
@@ -633,7 +787,7 @@ class ControlTower(Node):
 
     def _create_subscribers(self):
         """Create or recreate subscribers based on topic names."""
-        self.vehicle_overlay_model = VehicleOverlayModel()
+        self._reset_vehicle_overlay_model()
 
         if self.odom_topic:
             self.get_logger().info(f'Creating subscriber for odom topic {self.odom_topic}')
@@ -648,6 +802,16 @@ class ControlTower(Node):
                 self.destroy_subscription(self.vehicle_pose_subscriber)
             self.vehicle_pose_subscriber = self.create_subscription(
                 PoseStamped, self.vehicle_pose_topic, self.vehicle_pose_callback, 10
+            )
+
+        if self.home_pose_topic:
+            if self.home_pose_subscriber:
+                self.destroy_subscription(self.home_pose_subscriber)
+            self.home_pose_subscriber = self.create_subscription(
+                PoseStamped,
+                self.home_pose_topic,
+                self.home_pose_callback,
+                RELIABLE_TRANSIENT_LOCAL_QOS,
             )
 
         if self.battery_state_topic:
@@ -736,7 +900,7 @@ class ControlTower(Node):
         self.marker_subscribers = []
         self.visual_marker_store.clear()
         self.visual_markers = []
-        for topic in ('waypoint_markers', 'autopilot_markers', 'home_markers'):
+        for topic in ('waypoint_markers', 'autopilot_markers'):
             topic_with_ns = self._prefix_with_vehicle_namespace(topic)
             self.marker_subscribers.append(
                 self.create_subscription(
@@ -812,35 +976,41 @@ class ControlTower(Node):
         msg.frame_id = self.get_name()
         self.control_tower_heartbeat_publisher.publish(msg)
 
-    def publish_route(self, route_points, altitude, speed):
-        """Publish a planned route to the selected vehicle and request autopilot enable."""
+    def publish_mission(self, mission_points, altitude, speed):
+        """Publish a planned mission to the selected vehicle and enable autopilot."""
         if not self.vehicle_control_enabled:
             self.get_logger().warn('Vehicle control is disabled in passive monitoring mode.')
             return False
 
         if not self.vehicle_connected:
-            self.get_logger().warn('Connect a vehicle node before sending a route.')
+            self.get_logger().warn('Connect a vehicle node before sending a mission.')
             return False
 
-        if len(route_points) < 1:
-            self.get_logger().warn('Route is empty. Add at least one waypoint before sending.')
+        if len(mission_points) < 1:
+            self.get_logger().warn('Mission is empty. Add at least one waypoint before sending.')
+            return False
+
+        if self.waywise_object_type == 'quadcopter' and self._vehicle_heartbeat_timed_out():
+            self.get_logger().warn(
+                'Ignoring mission request: vehicle reports Control Tower heartbeat timeout.'
+            )
             return False
 
         if self.route_publisher is None or self.autopilot_state_control_publisher is None:
             self._create_publishers()
 
         if self.route_publisher is None:
-            self.get_logger().warn('Route publisher is not available.')
+            self.get_logger().warn('Mission route publisher is not available.')
             return False
 
-        route_altitude = float(altitude) if self.waywise_object_type == 'quadcopter' else 0.0
-        route_speed = max(float(speed), 0.0)
+        mission_altitude = float(altitude) if self.waywise_object_type == 'quadcopter' else 0.0
+        mission_speed = max(float(speed), 0.0)
         msg = build_path_with_twists(
-            route_points,
+            mission_points,
             self.get_clock().now().to_msg(),
             frame_id='map',
-            altitude=route_altitude,
-            speed=route_speed,
+            altitude=mission_altitude,
+            speed=mission_speed,
         )
         self.route_publisher.publish(msg)
 
@@ -850,8 +1020,8 @@ class ControlTower(Node):
             self.autopilot_state_control_publisher.publish(autopilot_msg)
 
         self.get_logger().info(
-            f'Sent route with {len(route_points)} waypoint(s), speed={route_speed:.2f} m/s, '
-            f'z={route_altitude:.2f} m to {self._prefix_with_vehicle_namespace(self.route_topic)}'
+            f'Sent mission with {len(mission_points)} waypoint(s), speed={mission_speed:.2f} m/s, '
+            f'z={mission_altitude:.2f} m to {self._prefix_with_vehicle_namespace(self.route_topic)}'
         )
         return True
 
@@ -869,8 +1039,15 @@ class ControlTower(Node):
         }
         return source_by_key.get(str(source).strip().lower(), 'OpenStreetMap')
 
+    def _vehicle_heartbeat_timed_out(self):
+        rx_msg = self.last_control_tower_heartbeat_rx_state.get('msg')
+        return rx_msg is not None and rx_msg.state == HeartbeatRxState.TIMEOUT
+
     def odom_callback(self, msg):
         """Handle odometry messages."""
+        if self._waiting_for_sim_time_reset:
+            return
+        self.vehicle_status_cleared = False
         # Nav_msgs/Odometry: pose and twist are nested in PoseWithCovariance / TwistWithCovariance
         self.last_odom['pose'] = msg.pose.pose
         self.last_odom['twist'] = msg.twist.twist
@@ -879,17 +1056,38 @@ class ControlTower(Node):
 
     def vehicle_pose_callback(self, msg):
         """Handle vehicle pose messages."""
+        if self._waiting_for_sim_time_reset:
+            return
+        self.vehicle_status_cleared = False
         # Geometry_msgs/PoseStamped: world pose is in the 'pose' field
         self.last_vehicle_pose['pose'] = msg.pose
         self.last_vehicle_pose['stamp'] = self.get_clock().now()
         self.last_vehicle_pose['frame_id'] = msg.header.frame_id
 
+    def home_pose_callback(self, msg):
+        """Handle the vehicle's reported home pose."""
+        if self._waiting_for_sim_time_reset:
+            return
+        self.vehicle_status_cleared = False
+        self.last_home_pose['pose'] = msg.pose
+        self.last_home_pose['stamp'] = self.get_clock().now()
+        self.last_home_pose['frame_id'] = msg.header.frame_id
+
     def robot_description_callback(self, msg):
         """Parse robot_description into a top-view overlay model."""
         if not msg.data:
             return
+        self.last_robot_description = msg.data
+        self._load_vehicle_overlay_model(msg.data)
+
+    def _reset_vehicle_overlay_model(self):
+        self.vehicle_overlay_model = VehicleOverlayModel()
+        if self.last_robot_description:
+            self._load_vehicle_overlay_model(self.last_robot_description)
+
+    def _load_vehicle_overlay_model(self, robot_description):
         try:
-            self.vehicle_overlay_model.load_urdf(msg.data)
+            self.vehicle_overlay_model.load_urdf(robot_description)
         except Exception as exc:
             self.get_logger().warn(f'Could not parse robot_description for map overlay: {exc}')
 
@@ -898,7 +1096,7 @@ class ControlTower(Node):
         self.vehicle_overlay_model.update_joint_states(msg.name, msg.position)
 
     def visual_marker_array_callback(self, msg):
-        """Cache vehicle visualization markers for drawing on the route map."""
+        """Cache vehicle visualization markers for drawing on the mission map."""
         stamp = self.get_clock().now()
         for marker in msg.markers:
             action = marker.action
@@ -930,13 +1128,18 @@ class ControlTower(Node):
 
     def battery_state_callback(self, msg):
         """Handle battery state messages."""
+        self.vehicle_status_cleared = False
         self.last_battery_state['msg'] = msg
         self.last_battery_state['stamp'] = self.get_clock().now()
 
     def quadcopter_state_callback(self, msg):
         """Handle quadcopter high-level state updates."""
+        self.vehicle_status_cleared = False
+        previous_state_code = self.last_quadcopter_state_code
+        now = self.get_clock().now()
         self.last_quadcopter_state['msg'] = msg
-        self.last_quadcopter_state['stamp'] = self.get_clock().now()
+        self.last_quadcopter_state['stamp'] = now
+        self.last_quadcopter_state_code = msg.state_code
 
         # Sync auto landing state from vehicle node
         self.auto_landing_active = msg.state_code == QuadcopterState.LANDING
@@ -944,21 +1147,25 @@ class ControlTower(Node):
 
     def mission_status_callback(self, msg):
         """Handle mission state updates."""
+        self.vehicle_status_cleared = False
         self.last_mission_state['msg'] = msg
         self.last_mission_state['stamp'] = self.get_clock().now()
 
     def control_tower_heartbeat_rx_state_callback(self, msg):
         """Handle vehicle-side Control Tower heartbeat receive state updates."""
+        self.vehicle_status_cleared = False
         self.last_control_tower_heartbeat_rx_state['msg'] = msg
         self.last_control_tower_heartbeat_rx_state['stamp'] = self.get_clock().now()
 
     def nav_sat_fix_extended_callback(self, msg):
         """Handle extended GPS/FIX messages."""
+        self.vehicle_status_cleared = False
         self.last_nav_sat_fix_extended['msg'] = msg
         self.last_nav_sat_fix_extended['stamp'] = self.get_clock().now()
 
     def emergency_stop_state_subscriber_callback(self, msg):
         """Handle emergency stop state updates."""
+        self.vehicle_status_cleared = False
         self.last_emergency_stop_state['msg'] = msg
         self.last_emergency_stop_state['stamp'] = self.get_clock().now()
 
@@ -1017,9 +1224,7 @@ class ControlTower(Node):
                 if not self.has_parameter(f'mux_input.{name}.priority'):
                     self.declare_parameter(f'mux_input.{name}.priority', 0)
                 if not self.has_parameter(f'mux_input.{name}.prepend_vehicle_namespace'):
-                    self.declare_parameter(
-                        f'mux_input.{name}.prepend_vehicle_namespace', False
-                    )
+                    self.declare_parameter(f'mux_input.{name}.prepend_vehicle_namespace', False)
                 topic = (
                     self.get_parameter(f'mux_input.{name}.topic')
                     .get_parameter_value()
@@ -1209,6 +1414,11 @@ class ControlTower(Node):
             return
 
         if arm:
+            if self._vehicle_heartbeat_timed_out():
+                self.get_logger().warn(
+                    'Ignoring arm request: vehicle reports Control Tower heartbeat timeout.'
+                )
+                return
             # Check if PX4 is ready for takeoff before requesting arm
             state_msg = self.last_quadcopter_state.get('msg')
             if not state_msg or state_msg.state_code != QuadcopterState.READY_TO_ARM:
@@ -1356,34 +1566,50 @@ class VehicleNodeDialog(QDialog):
 
     def check_node_has_vehicle_param(self, node_name):
         """Check if a node has the vehicle_interface_type parameter."""
+        parameter_names = self.list_node_parameters(node_name)
+        if parameter_names is None or 'vehicle_interface_type' not in parameter_names:
+            return False
+        if 'control_tower_selectable' not in parameter_names:
+            return True
+
+        request = GetParameters.Request()
+        request.names = ['control_tower_selectable']
+        response = self.call_parameter_service(node_name, 'get_parameters', GetParameters, request)
+        if response is None or not response.values:
+            return False
+        value = response.values[0]
+        return value.type != ParameterType.PARAMETER_NOT_SET and value.bool_value
+
+    def list_node_parameters(self, node_name):
+        """List a node's declared parameters without requesting undeclared values."""
+        request = ListParameters.Request()
+        request.depth = ListParameters.Request.DEPTH_RECURSIVE
+        response = self.call_parameter_service(
+            node_name, 'list_parameters', ListParameters, request
+        )
+        return None if response is None else set(response.result.names)
+
+    def call_parameter_service(self, node_name, service_suffix, service_type, request):
+        """Call a parameter service and cleanly cancel requests that time out."""
+        service_name = f'/{node_name}/{service_suffix}'.replace('//', '/')
+        client = self.node.create_client(service_type, service_name)
+        future = None
         try:
-            service_name = f'/{node_name}/get_parameters'
-            client = self.node.create_client(GetParameters, service_name)
-
-            # Wait briefly for service
             if not client.wait_for_service(timeout_sec=0.5):
-                self.node.destroy_client(client)
-                return False
-
-            # Request the vehicle_interface_type parameter
-            request = GetParameters.Request()
-            request.names = ['vehicle_interface_type']
+                return None
 
             future = client.call_async(request)
             rclpy.spin_until_future_complete(self.node, future, timeout_sec=0.5)
-
-            self.node.destroy_client(client)
-
-            if future.result() is not None:
-                values = future.result().values
-                # Check if parameter exists and has a value
-                if len(values) > 0 and values[0].type != 0:  # type 0 means NOT_SET
-                    return True
-
-            return False
-
+            if not future.done():
+                future.cancel()
+                return None
+            return future.result()
         except Exception:
-            return False
+            if future is not None and not future.done():
+                future.cancel()
+            return None
+        finally:
+            self.node.destroy_client(client)
 
     def highlight_default_node(self):
         """Highlight the default node name in the list if it exists."""
@@ -1457,20 +1683,24 @@ class UsageGuideDialog(QDialog):
 
 
 class ControlTowerUI(QMainWindow):
-    """PyQt5 GUI for ControlTower node using .ui file."""
+    """PyQt5 GUI for ControlTowerNode node using .ui file."""
 
-    def __init__(self, node: ControlTower):
+    def __init__(self, node: ControlTowerNode):
         super().__init__()
         self.node = node
-        self._startup_route_loaded = False
+        self._startup_mission_loaded = False
+        self._handled_vehicle_status_reset_generation = node.vehicle_status_reset_generation
 
         # Load the main UI from file
         ui_path = os.path.join(UI_BASE_PATH, 'twist_control.ui')
         loadUi(ui_path, self)
 
-        # Recompose loaded UI into a control-tower layout with route planning on the left.
-        self.setup_route_planner_shell()
+        # Recompose loaded UI into a control-tower layout with mission planning on the left.
+        self.setup_mission_planner_shell()
         self.setup_heartbeat_status_row()
+        self.setup_vehicle_status_layout()
+        self.setup_status_copy_buttons()
+        self.setup_selectable_status_values()
 
         # Setup audio for low battery warning
         self.setup_audio()
@@ -1517,14 +1747,52 @@ class ControlTowerUI(QMainWindow):
         if self.node.control_vehicle_node_fqn.strip():
             QTimer.singleShot(100, lambda: self.show_vehicle_node_dialog(auto_connect=True))
 
-    def setup_route_planner_shell(self):
-        """Mount the route planner next to the existing twist control panel."""
+    def setup_mission_planner_shell(self):
+        """Mount the mission planner next to the existing twist control panel."""
         self._move_button_layout_to_top()
 
-        self.plan_route_button = QPushButton('MISSION PLANNER')
-        self.plan_route_button.setCheckable(True)
-        self.plan_route_button.setStyleSheet(ACTIVE_BUTTON_STYLE)
-        self.button_layout.insertWidget(1, self.plan_route_button)
+        self.mission_planner_button = QPushButton('MISSION PLANNER')
+        self.mission_planner_button.setCheckable(True)
+        self.mission_planner_button.setStyleSheet(ACTIVE_BUTTON_STYLE)
+        self.button_layout.insertWidget(1, self.mission_planner_button)
+
+        self.fit_right_panel_button = QPushButton('FIT WIDTH')
+        self.fit_right_panel_button.setCheckable(True)
+        self.fit_right_panel_button.setFixedHeight(22)
+        self.fit_right_panel_button.setMinimumWidth(78)
+        self.fit_right_panel_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.fit_right_panel_button.setStyleSheet(
+            'QPushButton {'
+            ' font-size: 9pt; font-weight: 600; padding: 2px 8px;'
+            '}' + ACTIVE_BUTTON_STYLE
+        )
+        self.fit_right_panel_button.setToolTip(
+            'Keep the control panel wide enough to show its complete contents'
+        )
+        self.ros_time_label = QLabel('ROS Time: [N/A]')
+        self.ros_time_label.setStyleSheet(
+            'QLabel {'
+            ' color: #d1d5db; font-size: 9pt; font-weight: 600;'
+            ' background: transparent; border: none; padding: 0 6px;'
+            '}'
+        )
+        self.ros_time_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.fit_right_panel_layout = QHBoxLayout()
+        self.fit_right_panel_layout.setContentsMargins(2, 0, 2, 0)
+        self.fit_right_panel_layout.setSpacing(8)
+        self.fit_right_panel_layout.addWidget(self.fit_right_panel_button)
+        self.fit_right_panel_layout.addSpacing(14)
+        self.fit_right_panel_layout.addWidget(self.ros_time_label)
+        self.fit_right_panel_layout.addStretch(1)
+        self.verticalLayout_2.insertLayout(0, self.fit_right_panel_layout)
+        self._fitting_right_panel = False
+        self._right_panel_fit_initialized = False
+        self._right_panel_fit_padding = 36
+        self._right_panel_fit_grow_threshold = 14
+        self._right_panel_fit_shrink_threshold = 52
+        self.right_panel_fit_timer = QTimer(self)
+        self.right_panel_fit_timer.setInterval(250)
+        self.right_panel_fit_timer.timeout.connect(self._fit_right_panel_width)
 
         twist_control_widget = self.takeCentralWidget()
         self.twist_control_widget = twist_control_widget
@@ -1533,37 +1801,49 @@ class ControlTowerUI(QMainWindow):
         central_layout.setContentsMargins(0, 0, 0, 0)
 
         self.main_splitter = QSplitter(Qt.Horizontal, central_widget)
-        self.route_planner = RoutePlannerWidget(UI_BASE_PATH, self.main_splitter)
-        self.route_planner.set_vehicle_type(self.node.waywise_object_type)
-        self.route_planner.set_vehicle_connected(self.node.vehicle_connected)
-        self.route_planner.set_tile_server_url(self.node.osm_tile_server_url)
-        self.route_planner.set_tile_cache_dir(self.node.osm_tile_cache_dir)
+        self._main_splitter_handle_width = self.main_splitter.handleWidth()
+        self.mission_planner = MissionPlannerWidget(UI_BASE_PATH, self.main_splitter)
+        self.mission_planner.set_vehicle_type(self.node.waywise_object_type)
+        self.mission_planner.set_vehicle_connected(self.node.vehicle_connected)
+        self.mission_planner.set_tile_server_url(self.node.osm_tile_server_url)
+        self.mission_planner.set_tile_cache_dir(self.node.osm_tile_cache_dir)
+        self.local_osm_tile_server_url = self.node.osm_tile_server_url
+        self.local_osm_tile_cache_dir = self.node.osm_tile_cache_dir
+        self.openstreetmap_tile_cache_dir = (
+            self.node.osm_tile_cache_dir
+            if self.node.map_source == 'OpenStreetMap'
+            else OPENSTREETMAP_CACHE_DIR
+        )
         self.osm_status_network = QNetworkAccessManager(self)
         self.osm_status_timer = QTimer(self)
         self.osm_status_timer.setInterval(1000)
         self.osm_status_timer.timeout.connect(self.poll_osm_server_status)
         self.osm_status_reply = None
         self.osm_server_status = None
+        self.osm_ready_refresh_pending = False
         self._setup_map_config_button()
         self.node.get_logger().info(
             f'Control Tower map source: {self.node.map_source}; '
             f'OSM tile server: {self.node.osm_tile_server_url}'
         )
         self.on_map_source_selected(self.node.map_source)
-        self.route_planner.setMinimumWidth(120)
-        self.main_splitter.addWidget(self.route_planner)
+        self.mission_planner.setMinimumWidth(120)
+        self.main_splitter.addWidget(self.mission_planner)
         self.main_splitter.addWidget(twist_control_widget)
         self.main_splitter.setStretchFactor(0, 1)
         self.main_splitter.setStretchFactor(1, 0)
         self.main_splitter.setCollapsible(0, True)
         self.main_splitter.setCollapsible(1, False)
 
-        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         twist_control_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         central_layout.addWidget(self.main_splitter)
         self.setCentralWidget(central_widget)
         self._update_right_pane_min_width(force=True)
-        QTimer.singleShot(0, self._try_load_startup_route)
+        self._schedule_panel_fit()
+        QTimer.singleShot(0, self._try_load_startup_mission)
 
     def setup_heartbeat_status_row(self):
         """Add operator heartbeat status to the General vehicle status group."""
@@ -1581,6 +1861,386 @@ class ControlTowerUI(QMainWindow):
         self.gridLayout_5.addWidget(self.heartbeat_rx_static_label, 7, 0)
         self.gridLayout_5.addWidget(self.heartbeat_rx_label, 7, 1)
         self.gridLayout_5.addWidget(self.heartbeat_rx_time_label, 7, 2)
+
+    def setup_vehicle_status_layout(self):
+        """Reflow vehicle status groups for the compact control-tower panel."""
+        compact_group_style_template = (
+            'QGroupBox#GROUP_NAME {'
+            ' border: 1px solid #2d3748; border-radius: 12px;'
+            ' margin-top: 16px; padding-top: 10px;'
+            ' font-weight: 600;'
+            ' background: qlineargradient(x1:0, y1:0, x2:0, y2:1,'
+            ' stop:0 #232936, stop:1 #1a1d29);'
+            ' font-size: 11pt;'
+            '}'
+            'QGroupBox#GROUP_NAME::title {'
+            ' subcontrol-origin: margin; left: 20px; padding: 0 8px;'
+            ' color: #60a5fa;'
+            '}'
+        )
+        self.control_group.setStyleSheet(
+            compact_group_style_template.replace('GROUP_NAME', 'control_group')
+        )
+        self.status_group.setStyleSheet(
+            compact_group_style_template.replace('GROUP_NAME', 'status_group')
+        )
+        self.general_group.setTitle('')
+        self.general_group.setFlat(True)
+        self.general_group.setStyleSheet(
+            'QGroupBox#general_group {'
+            ' border: 0px; margin-top: 0px; padding-top: 0px; background: transparent;'
+            '}'
+            'QGroupBox#general_group::title {'
+            ' height: 0px; margin: 0px; padding: 0px;'
+            '}'
+        )
+        for group in (
+            self.general_group,
+            self.odom_group,
+            self.world_pose_group,
+            self.gnssfix_group,
+        ):
+            self.gridLayout_4.removeWidget(group)
+
+        self.gridLayout_4.addWidget(self.general_group, 0, 0, 1, 2)
+        self.odom_group.hide()
+        self.world_pose_group.hide()
+        self.gnssfix_group.hide()
+
+        self.gridLayout_4.setContentsMargins(10, 0, 10, 10)
+        self.gridLayout_4.setHorizontalSpacing(10)
+        self.gridLayout_4.setVerticalSpacing(10)
+
+        self.odom_vel_time_label = QLabel('Last updated: N/A')
+        self.odom_vel_time_label.setStyleSheet('color: #6b7280; font-size: 9pt;')
+        self.home_pose_static_label = QLabel('Home Pose [(x, y, z); (r, p, y)]:')
+        self.home_pose_static_label.setStyleSheet('color: #9ca3af; font-weight: 600;')
+        self.home_pose_label = QLabel('N/A')
+
+        self.gridLayout_5.setHorizontalSpacing(14)
+        self.gridLayout_5.setContentsMargins(0, 0, 0, 0)
+        self.gridLayout_5.setColumnStretch(0, 0)
+        self.gridLayout_5.setColumnStretch(1, 1)
+        self.gridLayout_5.setColumnStretch(2, 0)
+
+        general_static_labels = (
+            self.node_static_label,
+            self.type_static_label,
+            self.enuref_static_label,
+            self.home_pose_static_label,
+            self.estop_static_label,
+            self.battery_static_label,
+            self.copter_state_static_label,
+            self.mission_state_static_label,
+            self.heartbeat_rx_static_label,
+            self.world_pose_static_label,
+            self.odom_pos_static_label,
+            self.odom_vel_static_label,
+        )
+        general_value_labels = (
+            self.vehicle_node_label,
+            self.vehicle_type_label,
+            self.enuref_label,
+            self.home_pose_label,
+            self.estop_label,
+            self.battery_label,
+            self.copter_state_label,
+            self.mission_state_label,
+            self.heartbeat_rx_label,
+            self.world_pose_pos_label,
+            self.odom_pos_label,
+            self.odom_vel_label,
+        )
+        general_time_labels = (
+            self.estop_time_label,
+            self.battery_time_label,
+            self.copter_state_time_label,
+            self.mission_state_time_label,
+            self.heartbeat_rx_time_label,
+            self.world_pose_time_label,
+            self.odom_time_label,
+            self.odom_vel_time_label,
+        )
+        for label in general_static_labels + general_time_labels:
+            label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+            label.setContentsMargins(2, 0, 2, 0)
+        for label in general_value_labels:
+            label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+            label.setMinimumWidth(0)
+
+        for row, widgets in enumerate(
+            (
+                (self.node_static_label, self.vehicle_node_label, None),
+                (self.type_static_label, self.vehicle_type_label, None),
+                (self.enuref_static_label, self.enuref_label, None),
+                (self.home_pose_static_label, self.home_pose_label, None),
+                (self.estop_static_label, self.estop_label, self.estop_time_label),
+                (self.battery_static_label, self.battery_label, self.battery_time_label),
+                (
+                    self.copter_state_static_label,
+                    self.copter_state_label,
+                    self.copter_state_time_label,
+                ),
+                (
+                    self.mission_state_static_label,
+                    self.mission_state_label,
+                    self.mission_state_time_label,
+                ),
+                (
+                    self.heartbeat_rx_static_label,
+                    self.heartbeat_rx_label,
+                    self.heartbeat_rx_time_label,
+                ),
+            )
+        ):
+            static_label, value_label, time_label = widgets
+            self.gridLayout_5.addWidget(static_label, row, 0)
+            value_column_span = 2 if time_label is None else 1
+            self.gridLayout_5.addWidget(value_label, row, 1, 1, value_column_span)
+            if time_label is not None:
+                self.gridLayout_5.addWidget(time_label, row, 2)
+
+        odom_widgets = (
+            self.odom_pos_static_label,
+            self.odom_pos_label,
+            self.odom_yaw_static_label,
+            self.odom_yaw_label,
+            self.odom_vel_static_label,
+            self.odom_vel_label,
+            self.odom_time_static_label,
+            self.odom_time_label,
+        )
+        for widget in odom_widgets:
+            self.gridLayout_8.removeWidget(widget)
+        self.odom_pos_static_label.setText('Odom Pose [(x, y, z); (r, p, y)]:')
+        self.odom_pos_label.setWordWrap(False)
+        self.odom_pos_label.setMinimumWidth(0)
+        self.odom_yaw_static_label.hide()
+        self.odom_yaw_label.hide()
+        self.odom_time_static_label.hide()
+        self.odom_time_label.setText('Last updated: N/A')
+        self.odom_time_label.setStyleSheet('color: #6b7280; font-size: 9pt;')
+        self.odom_time_label.show()
+        self.odom_vel_static_label.setText(
+            'Odom Velocity [(v<sub>x</sub>, v<sub>y</sub>, v<sub>z</sub>); v<sub>yaw</sub>]:'
+        )
+        self.gridLayout_5.addWidget(self.odom_pos_static_label, 10, 0)
+        self.gridLayout_5.addWidget(self.odom_pos_label, 10, 1)
+        self.gridLayout_5.addWidget(self.odom_time_label, 10, 2)
+        self.gridLayout_5.addWidget(self.odom_vel_static_label, 11, 0)
+        self.gridLayout_5.addWidget(self.odom_vel_label, 11, 1)
+        self.gridLayout_5.addWidget(self.odom_vel_time_label, 11, 2)
+
+        self.gnss_title_label = QLabel('GNSS (fused)')
+        self.gnss_title_label.setStyleSheet('color: #60a5fa; font-weight: 700;')
+        self.gnss_time_label.setText('Last updated: N/A')
+        self.gnss_time_label.setStyleSheet('color: #6b7280; font-size: 9pt;')
+        self.gnss_fused_on_chip_static_label = QLabel('Fused on chip:')
+        self.gnss_fused_on_chip_static_label.setStyleSheet('color: #9ca3af; font-weight: 600;')
+        self.gnss_fused_on_chip_label = QLabel('N/A')
+        self.gnss_fused_on_chip_label.setStyleSheet('color: #6b7280; font-weight: 700;')
+
+        self.gnss_top_separator = QFrame()
+        self.gnss_top_separator.setFrameShape(QFrame.HLine)
+        self.gnss_top_separator.setFrameShadow(QFrame.Plain)
+        self.gnss_top_separator.setStyleSheet('color: #2d3748; background-color: #2d3748;')
+        self.gnss_bottom_separator = QFrame()
+        self.gnss_bottom_separator.setFrameShape(QFrame.HLine)
+        self.gnss_bottom_separator.setFrameShadow(QFrame.Plain)
+        self.gnss_bottom_separator.setStyleSheet('color: #2d3748; background-color: #2d3748;')
+        self.gnss_fields_widget = QWidget()
+        self.gnss_fields_widget.setObjectName('gnss_fields_widget')
+        self.gnss_fields_widget.setStyleSheet(
+            'QWidget#gnss_fields_widget {'
+            ' border: 1px solid #2d3748; border-radius: 12px;'
+            ' background: qlineargradient(x1:0, y1:0, x2:0, y2:1,'
+            ' stop:0 #232936, stop:1 #1a1d29);'
+            '}'
+        )
+        self.gnss_fields_layout = QGridLayout(self.gnss_fields_widget)
+        self.gnss_fields_layout.setContentsMargins(10, 10, 10, 10)
+        self.gnss_fields_layout.setHorizontalSpacing(14)
+        self.gnss_fields_layout.setVerticalSpacing(10)
+
+        gnss_fields = (
+            (self.gnss_fix_static_label, self.gnss_fix_label, 0, 0),
+            (self.gnss_pos_static_label, self.gnss_pos_label, 0, 2),
+            (
+                self.gnss_last_rtcm_static_label,
+                self.gnss_last_rtcm_correction_label,
+                1,
+                0,
+            ),
+            (
+                self.gnss_accuracy_static_label,
+                self.gnss_accuracy_label,
+                1,
+                2,
+            ),
+            (self.gnss_num_satellites_static_label, self.gnss_num_satellites_label, 2, 0),
+            (self.gnss_fused_on_chip_static_label, self.gnss_fused_on_chip_label, 2, 2),
+        )
+        self.gnss_pos_static_label.setText('Position (lat, lon, alt, yaw):')
+        self.gnss_accuracy_static_label.setText('Accuracy (horiz, vert, yaw):')
+        self.gnss_head_static_label.hide()
+        self.gnss_head_label.hide()
+        self.gnss_time_static_label.hide()
+        self.gridLayout_7.removeWidget(self.gnss_head_static_label)
+        self.gridLayout_7.removeWidget(self.gnss_head_label)
+        self.gridLayout_7.removeWidget(self.gnss_time_static_label)
+        self.gridLayout_7.removeWidget(self.gnss_time_label)
+        self.gridLayout_5.addWidget(self.gnss_top_separator, 12, 0, 1, 3)
+        self.gridLayout_5.addWidget(self.gnss_title_label, 13, 0, 1, 2)
+        self.gridLayout_5.addWidget(self.gnss_time_label, 13, 2)
+        for static_label, value_label, row, column in gnss_fields:
+            static_label.setStyleSheet('color: #9ca3af; font-weight: 600;')
+            value_label.setStyleSheet('color: #6b7280; font-weight: 700;')
+            static_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+            value_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+            static_label.setContentsMargins(2, 0, 2, 0)
+            self.gridLayout_7.removeWidget(static_label)
+            self.gridLayout_7.removeWidget(value_label)
+            self.gnss_fields_layout.addWidget(static_label, row, column)
+            self.gnss_fields_layout.addWidget(value_label, row, column + 1)
+        self.gridLayout_5.addWidget(self.gnss_fields_widget, 14, 0, 1, 3)
+        self.gridLayout_5.addWidget(self.gnss_bottom_separator, 15, 0, 1, 3)
+        self.gnss_time_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.gnss_time_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+        self.gnss_time_label.setContentsMargins(2, 0, 2, 0)
+        self.gnss_fields_layout.setColumnStretch(0, 0)
+        self.gnss_fields_layout.setColumnStretch(1, 1)
+        self.gnss_fields_layout.setColumnStretch(2, 0)
+        self.gnss_fields_layout.setColumnStretch(3, 1)
+
+        world_pose_widgets = (
+            self.world_pose_static_label,
+            self.world_pose_pos_label,
+            self.world_pose_yaw_static_label,
+            self.world_pose_yaw_label,
+            self.world_pose_time_static_label,
+            self.world_pose_time_label,
+        )
+        for widget in world_pose_widgets:
+            self.gridLayout_6.removeWidget(widget)
+        self.world_pose_static_label.setText('World Pose [(x, y, z); (r, p, y)]:')
+        self.world_pose_pos_label.setWordWrap(False)
+        self.world_pose_pos_label.setMinimumWidth(0)
+        self.world_pose_yaw_static_label.hide()
+        self.world_pose_yaw_label.hide()
+        self.world_pose_time_static_label.hide()
+        self.world_pose_time_label.setText('Last updated: N/A')
+        self.world_pose_time_label.setStyleSheet('color: #6b7280; font-size: 9pt;')
+        self.world_pose_time_label.show()
+        self.gridLayout_5.addWidget(self.world_pose_static_label, 9, 0)
+        self.gridLayout_5.addWidget(self.world_pose_pos_label, 9, 1)
+        self.gridLayout_5.addWidget(self.world_pose_time_label, 9, 2)
+
+    def setup_status_copy_buttons(self):
+        """Add compact copy buttons beside high-value position fields."""
+        for label in (
+            self.enuref_label,
+            self.home_pose_label,
+            self.world_pose_pos_label,
+            self.odom_pos_label,
+            self.gnss_pos_label,
+        ):
+            self._wrap_label_with_copy_button(label)
+
+    def _wrap_label_with_copy_button(self, value_label):
+        target_layout = None
+        target_position = None
+        for layout in (self.gridLayout_5, self.gnss_fields_layout):
+            index = layout.indexOf(value_label)
+            if index < 0:
+                continue
+            target_layout = layout
+            target_position = layout.getItemPosition(index)
+            break
+        if target_layout is None or target_position is None:
+            return
+
+        row, column, row_span, column_span = target_position
+        target_layout.removeWidget(value_label)
+
+        wrapper = QWidget()
+        wrapper_layout = QHBoxLayout(wrapper)
+        wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        wrapper_layout.setSpacing(4)
+        wrapper_layout.addWidget(value_label, 1)
+
+        copy_button = QPushButton('⧉')
+        copy_button.setFixedSize(20, 18)
+        copy_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        copy_button.setToolTip('Copy value')
+        copy_button.setStyleSheet(
+            'QPushButton {'
+            ' color: #d1d5db; background-color: #374151; border: 1px solid #4b5563;'
+            ' border-radius: 4px; padding: 0px; font-size: 10pt; font-weight: 600;'
+            '}'
+            'QPushButton:hover { background-color: #4b5563; }'
+            'QPushButton:pressed { background-color: #1f2937; }'
+        )
+
+        copy_button.clicked.connect(
+            lambda checked=False, label=value_label, button=copy_button: (
+                self._copy_status_label_text(label, button)
+            )
+        )
+        wrapper_layout.addWidget(copy_button)
+        target_layout.addWidget(wrapper, row, column, row_span, column_span)
+
+    def _copy_status_label_text(self, value_label, copy_button):
+        copy_text = value_label.property('copy_text') or value_label.text()
+        QApplication.clipboard().setText(copy_text)
+        popup_position = copy_button.mapToGlobal(QPoint(copy_button.width() // 2, 0))
+        QToolTip.showText(popup_position, 'copied', copy_button, copy_button.rect(), 1000)
+
+    def setup_selectable_status_values(self):
+        """Allow copying vehicle-status values without making field labels selectable."""
+        value_label_names = (
+            'vehicle_node_label',
+            'vehicle_type_label',
+            'enuref_label',
+            'home_pose_label',
+            'estop_label',
+            'battery_label',
+            'copter_state_label',
+            'mission_state_label',
+            'heartbeat_rx_label',
+            'odom_pos_label',
+            'odom_vel_label',
+            'odom_yaw_label',
+            'world_pose_pos_label',
+            'world_pose_yaw_label',
+            'gnss_fix_label',
+            'gnss_pos_label',
+            'gnss_head_label',
+            'gnss_accuracy_label',
+            'gnss_last_rtcm_correction_label',
+            'gnss_num_satellites_label',
+            'gnss_fused_on_chip_label',
+        )
+        for name in value_label_names:
+            label = getattr(self, name, None)
+            if label is None:
+                continue
+            label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            label.setCursor(Qt.IBeamCursor)
+            label.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if (
+            QEvent is not None
+            and QKeySequence is not None
+            and event.type() == QEvent.KeyPress
+            and event.matches(QKeySequence.Copy)
+        ):
+            copy_text = watched.property('copy_text') if hasattr(watched, 'property') else None
+            selected_text = watched.selectedText() if hasattr(watched, 'selectedText') else ''
+            if copy_text and selected_text:
+                QApplication.clipboard().setText(copy_text)
+                return True
+        return super().eventFilter(watched, event)
 
     def _setup_map_config_button(self):
         self.map_config_button = UpMenuButton('MAP CONFIG')
@@ -1601,11 +2261,11 @@ class ControlTowerUI(QMainWindow):
             )
             self.map_source_action_group.addAction(action)
         self.map_config_button.clicked.connect(self.show_map_config_menu)
-        self.route_planner.set_map_config_widget(self.map_config_button)
-        self.route_planner.osm_url_edit.editingFinished.connect(self.on_osm_config_edited)
-        self.route_planner.osm_cache_edit.editingFinished.connect(self.on_osm_config_edited)
-        self.route_planner.osm_cache_browse_button.clicked.connect(self.on_osm_config_edited)
-        self.route_planner.osm_refresh_requested.connect(self.on_osm_refresh_requested)
+        self.mission_planner.set_map_config_widget(self.map_config_button)
+        self.mission_planner.osm_url_edit.editingFinished.connect(self.on_osm_config_edited)
+        self.mission_planner.osm_cache_edit.editingFinished.connect(self.on_osm_config_edited)
+        self.mission_planner.osm_cache_browse_button.clicked.connect(self.on_osm_config_edited)
+        self.mission_planner.osm_refresh_requested.connect(self.on_osm_refresh_requested)
 
     def show_map_config_menu(self):
         menu_size = self.map_config_menu.sizeHint()
@@ -1614,15 +2274,21 @@ class ControlTowerUI(QMainWindow):
 
     def on_osm_config_edited(self):
         if self.node.map_source == 'Local OSM server':
-            self.node.osm_tile_server_url = self.route_planner.osm_url_edit.text()
-            self.node.osm_tile_cache_dir = self.route_planner.osm_cache_edit.text()
+            self.node.osm_tile_server_url = self.mission_planner.osm_url_edit.text()
+            self.node.osm_tile_cache_dir = self.mission_planner.osm_cache_edit.text()
+            self.local_osm_tile_server_url = self.node.osm_tile_server_url
+            self.local_osm_tile_cache_dir = self.node.osm_tile_cache_dir
             self.poll_osm_server_status()
+        elif self.node.map_source == 'OpenStreetMap':
+            self.node.osm_tile_server_url = OPENSTREETMAP_TILE_SERVER_URL
+            self.node.osm_tile_cache_dir = self.mission_planner.osm_cache_edit.text()
+            self.openstreetmap_tile_cache_dir = self.node.osm_tile_cache_dir
 
     def on_osm_refresh_requested(self):
-        if self.node.map_source != 'Local OSM server':
+        if self.node.map_source not in ('Local OSM server', 'OpenStreetMap'):
             return
         self.on_osm_config_edited()
-        self.route_planner.refresh_tiles(clear_disk=False)
+        self.mission_planner.refresh_tiles(clear_disk=False)
 
     def poll_osm_server_status(self):
         if (
@@ -1633,7 +2299,7 @@ class ControlTowerUI(QMainWindow):
             return
         metadata_url = self.node.osm_tile_server_url.rstrip('/') + '/metadata'
         request = QNetworkRequest(QUrl(metadata_url))
-        request.setRawHeader(b'User-Agent', b'Waywiser-ControlTower/1.0')
+        request.setRawHeader(b'User-Agent', b'Waywiser-ControlTowerNode/1.0')
         self.osm_status_reply = self.osm_status_network.get(request)
         self.osm_status_reply.finished.connect(self.on_osm_status_reply)
 
@@ -1648,60 +2314,81 @@ class ControlTowerUI(QMainWindow):
                 payload = json.loads(bytes(reply.readAll()).decode('utf-8'))
                 status = payload.get('status', 'Ready')
                 if status == 'Ready' and self.osm_server_status != 'Ready':
-                    self.route_planner.refresh_tiles(clear_disk=True)
                     self.osm_status_timer.stop()
-            self.route_planner.set_osm_server_status(status)
+                    self.schedule_osm_ready_refresh()
+            self.mission_planner.set_osm_server_status(status)
             self.osm_server_status = status
         except Exception:
-            self.route_planner.set_osm_server_status('Busy')
+            self.mission_planner.set_osm_server_status('Busy')
             self.osm_server_status = 'Busy'
         finally:
             reply.deleteLater()
 
-    def _try_load_startup_route(self):
-        if self._startup_route_loaded:
+    def schedule_osm_ready_refresh(self):
+        if self.osm_ready_refresh_pending:
+            return
+        self.osm_ready_refresh_pending = True
+        # Delay by 1 s so the vehicle's enuref is received and applied to the canvas
+        # before tile coordinates are computed.  Firing immediately (0 ms) caused
+        # the refresh to use the canvas default enuref (Gothenburg placeholder)
+        # rather than the actual simulation location, resulting in 404 tile
+        # responses that blocked the correct tiles for 30 s.
+        QTimer.singleShot(1000, self.refresh_osm_tiles_after_ready)
+
+    def refresh_osm_tiles_after_ready(self):
+        self.osm_ready_refresh_pending = False
+        if self.node.map_source != 'Local OSM server' or self.osm_server_status != 'Ready':
+            return
+        self.mission_planner.refresh_tiles(clear_disk=False)
+        self.node.get_logger().info('OSM tile server is ready; refreshing visible map tiles.')
+
+    def _try_load_startup_mission(self):
+        if self._startup_mission_loaded:
             return
 
-        route_file = self.node.startup_route_file.strip()
-        if not route_file:
-            self._startup_route_loaded = True
+        mission_file = self.node.startup_route_file.strip()
+        if not mission_file:
+            self._startup_mission_loaded = True
             return
 
         if self.node.control_vehicle_node_fqn.strip() and not self.node.vehicle_connected:
             return
 
-        route_file = os.path.expanduser(os.path.expandvars(route_file))
+        mission_file = os.path.expanduser(os.path.expandvars(mission_file))
         try:
-            self.route_planner.set_enu_ref(self.node.enuref)
-            loaded_count = self.route_planner.load_route_file(route_file)
-            self._startup_route_loaded = True
+            self.mission_planner.set_enu_ref(self.node.enuref)
+            loaded_count = self.mission_planner.load_mission_file(mission_file)
+            self._startup_mission_loaded = True
             self.node.get_logger().info(
-                f'Loaded startup route with {loaded_count} points from: {route_file}'
+                f'Loaded startup mission with {loaded_count} points from: {mission_file}'
             )
         except Exception as exc:
-            self._startup_route_loaded = True
+            self._startup_mission_loaded = True
             self.node.get_logger().error(str(exc))
 
     def on_map_source_selected(self, source):
-        """Switch the route planner map background source."""
-        if not hasattr(self, 'route_planner'):
+        """Switch the Mission Planner map background source."""
+        if not hasattr(self, 'mission_planner'):
             return
         source = self.node._normalize_map_source(source)
         self.node.map_source = source
         if source == 'OpenStreetMap':
             self.node.osm_tile_server_url = OPENSTREETMAP_TILE_SERVER_URL
-            self.node.osm_tile_cache_dir = OPENSTREETMAP_CACHE_DIR
+            self.node.osm_tile_cache_dir = self.openstreetmap_tile_cache_dir
+        elif source == 'Local OSM server':
+            self.node.osm_tile_server_url = self.local_osm_tile_server_url
+            self.node.osm_tile_cache_dir = self.local_osm_tile_cache_dir
         self._set_checked_map_source(source)
-        self.route_planner.set_tile_server_url(self.node.osm_tile_server_url)
-        self.route_planner.set_tile_cache_dir(self.node.osm_tile_cache_dir)
-        self.route_planner.set_map_source(source)
-        self.route_planner.set_osm_config_mode(source)
+        self.mission_planner.set_tile_server_url(self.node.osm_tile_server_url)
+        self.mission_planner.set_tile_cache_dir(self.node.osm_tile_cache_dir)
+        self.mission_planner.set_map_source(source)
+        self.mission_planner.set_osm_config_mode(source)
         if source == 'Local OSM server':
-            self.route_planner.set_osm_server_status('Busy')
+            self.mission_planner.set_osm_server_status('Busy')
             self.osm_server_status = 'Busy'
             self.osm_status_timer.start()
             self.poll_osm_server_status()
-            self.route_planner.refresh_tiles()
+            self.mission_planner.refresh_tiles()
         else:
             self.osm_status_timer.stop()
 
@@ -1715,16 +2402,22 @@ class ControlTowerUI(QMainWindow):
         """Keep the control pane wide enough; grow the window minimum if needed."""
         if not hasattr(self, 'twist_control_widget') or not hasattr(self, 'main_splitter'):
             return
+        if hasattr(self, 'fit_right_panel_button') and self.fit_right_panel_button.isChecked():
+            self._fit_right_panel_width()
+            return
 
         total_width = max(
             self.centralWidget().width() if self.centralWidget() else self.width(), 1
         )
-        content_width = max(self.scrollAreaWidgetContents.minimumSizeHint().width(), 480)
-        margin_and_scrollbar_width = 56
-        right_min_width = max(int(total_width * 0.4), content_width + margin_and_scrollbar_width)
-        map_min_width = self.route_planner.minimumWidth()
+        right_min_width = max(int(total_width * 0.25), 320)
+        right_preferred_width = max(
+            right_min_width,
+            self.scrollAreaWidgetContents.minimumSizeHint().width() + 56,
+        )
+        map_min_width = self.mission_planner.minimumWidth()
         splitter_handle_width = max(self.main_splitter.handleWidth(), 1)
-        required_window_width = right_min_width + map_min_width + splitter_handle_width
+        target_right_width = right_preferred_width if force else right_min_width
+        required_window_width = target_right_width + map_min_width + splitter_handle_width
 
         self.twist_control_widget.setMinimumWidth(right_min_width)
         self.twist_control_widget.setMaximumWidth(16777215)
@@ -1734,8 +2427,145 @@ class ControlTowerUI(QMainWindow):
         if force or (len(sizes) >= 2 and sizes[1] < right_min_width):
             available = max(sum(sizes), total_width, required_window_width)
             self.main_splitter.setSizes(
-                [max(map_min_width, available - right_min_width), right_min_width]
+                [max(map_min_width, available - target_right_width), target_right_width]
             )
+
+    def _right_panel_required_width(self):
+        """Return the width needed by the control panel's current contents."""
+        contents_layout = self.scrollAreaWidgetContents.layout()
+        if contents_layout is not None:
+            contents_layout.activate()
+
+        contents_width = max(
+            self.scrollAreaWidgetContents.sizeHint().width(),
+            self.scrollAreaWidgetContents.minimumSizeHint().width(),
+            contents_layout.sizeHint().width() if contents_layout is not None else 0,
+        )
+        scroll_chrome_width = self.scrollArea.frameWidth() * 2 + 12
+        if self.scrollArea.verticalScrollBarPolicy() != Qt.ScrollBarAlwaysOff:
+            scroll_chrome_width += self.scrollArea.verticalScrollBar().sizeHint().width()
+
+        top_layout_width = self.button_layout.sizeHint().width()
+        outer_layout = self.twist_control_widget.layout()
+        if outer_layout is not None:
+            margins = outer_layout.contentsMargins()
+            top_layout_width += margins.left() + margins.right()
+
+        return max(320, contents_width + scroll_chrome_width, top_layout_width) + (
+            self._right_panel_fit_padding
+        )
+
+    def _fit_right_panel_width(self):
+        """Fit and maintain the control pane width while its toggle is latched."""
+        if (
+            self._fitting_right_panel
+            or not hasattr(self, 'fit_right_panel_button')
+            or not self.fit_right_panel_button.isChecked()
+            or not hasattr(self, 'main_splitter')
+        ):
+            return
+
+        self._fitting_right_panel = True
+        try:
+            desired_width = self._right_panel_required_width()
+            map_min_width = max(self.mission_planner.minimumWidth(), 120)
+            handle_width = max(self.main_splitter.handleWidth(), 1)
+
+            sizes = self.main_splitter.sizes()
+            current_width = sizes[1] if len(sizes) >= 2 else 0
+            width_delta = desired_width - current_width
+            should_resize = (
+                not self._right_panel_fit_initialized
+                or width_delta > self._right_panel_fit_grow_threshold
+                or width_delta < -self._right_panel_fit_shrink_threshold
+            )
+            fitted_width = desired_width if should_resize else current_width
+            required_window_width = fitted_width + map_min_width + handle_width
+
+            screen = QApplication.primaryScreen()
+            if screen is not None:
+                required_window_width = min(
+                    required_window_width, screen.availableGeometry().width()
+                )
+
+            if self.width() < required_window_width:
+                self.resize(required_window_width, self.height())
+
+            available_width = max(self.main_splitter.width(), 1)
+            fitted_width = min(
+                fitted_width,
+                max(320, available_width - map_min_width - handle_width),
+            )
+            self.twist_control_widget.setMinimumWidth(fitted_width)
+            self.setMinimumWidth(fitted_width + map_min_width + handle_width)
+            if should_resize:
+                self.main_splitter.setSizes(
+                    [max(map_min_width, available_width - fitted_width), fitted_width]
+                )
+            self._right_panel_fit_initialized = True
+        finally:
+            self._fitting_right_panel = False
+
+    def on_fit_right_panel_toggled(self, checked):
+        """Latch automatic control-panel width fitting on or off."""
+        if checked:
+            self.fit_right_panel_button.setToolTip(
+                'Automatic control-panel width fitting is enabled'
+            )
+            self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            self.scrollArea.horizontalScrollBar().setValue(0)
+            self.main_splitter.setHandleWidth(0)
+            self._right_panel_fit_initialized = False
+            self._fit_right_panel_width()
+            self.right_panel_fit_timer.start()
+            return
+
+        self.right_panel_fit_timer.stop()
+        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.fit_right_panel_button.setToolTip(
+            'Keep the control panel wide enough to show its complete contents'
+        )
+        self.main_splitter.setHandleWidth(self._main_splitter_handle_width)
+        self._right_panel_fit_initialized = False
+        self._update_right_pane_min_width()
+
+    def _fit_startup_panel_sizes(self):
+        """Fit startup panes after Qt has computed real size hints."""
+        if not hasattr(self, 'twist_control_widget') or not hasattr(self, 'main_splitter'):
+            return
+        if self.fit_right_panel_button.isChecked():
+            self._fit_right_panel_width()
+            return
+
+        QApplication.processEvents()
+        total_width = max(
+            self.centralWidget().width() if self.centralWidget() else self.width(), 1
+        )
+        right_width = max(
+            int(total_width * 0.25),
+            320,
+            self.scrollAreaWidgetContents.minimumSizeHint().width() + 72,
+        )
+        map_width = max(self.mission_planner.minimumWidth(), 120)
+        required_width = right_width + map_width + max(self.main_splitter.handleWidth(), 1)
+
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            required_width = min(required_width, screen.availableGeometry().width())
+
+        if self.width() < required_width:
+            self.resize(required_width, self.height())
+
+        available = max(self.main_splitter.width(), required_width)
+        right_width = min(right_width, max(320, available - map_width))
+        self.main_splitter.setSizes([max(map_width, available - right_width), right_width])
+        self.mission_planner.adjust_mission_controls_height()
+
+    def _schedule_panel_fit(self):
+        QTimer.singleShot(0, self._fit_startup_panel_sizes)
+        QTimer.singleShot(150, self._fit_startup_panel_sizes)
+        QTimer.singleShot(500, self._fit_startup_panel_sizes)
+        QTimer.singleShot(1000, self._fit_startup_panel_sizes)
 
     def _move_button_layout_to_top(self):
         """Move the existing bottom button row above the control/status panels."""
@@ -1754,27 +2584,30 @@ class ControlTowerUI(QMainWindow):
         """Connect UI signals to slots."""
         self.vehicle_node_button.clicked.connect(self.show_vehicle_node_dialog)
         self.usage_button.clicked.connect(self.show_usage_guide)
-        self.plan_route_button.toggled.connect(self.on_plan_route_toggled)
-        self.route_planner.send_route_requested.connect(self.on_send_route_requested)
+        self.mission_planner_button.toggled.connect(self.on_mission_planner_toggled)
+        self.fit_right_panel_button.toggled.connect(self.on_fit_right_panel_toggled)
+        self.fit_right_panel_button.setChecked(True)
+        self.mission_planner.send_mission_requested.connect(self.on_send_mission_requested)
         self.auto_arm_checkbox.stateChanged.connect(self.on_auto_arm_changed)
         self.hover_hold_checkbox.stateChanged.connect(self.on_hover_hold_changed)
         self.auto_lift_off_checkbox.stateChanged.connect(self.on_auto_lift_off_changed)
 
-    def on_plan_route_toggled(self, checked):
+    def on_mission_planner_toggled(self, checked):
         """Enable or disable waypoint editing on the map."""
         if not self.node.vehicle_control_enabled:
-            self.plan_route_button.blockSignals(True)
-            self.plan_route_button.setChecked(False)
-            self.plan_route_button.blockSignals(False)
-            self.route_planner.set_planning_enabled(False)
+            self.mission_planner_button.blockSignals(True)
+            self.mission_planner_button.setChecked(False)
+            self.mission_planner_button.blockSignals(False)
+            self.mission_planner.set_planning_enabled(False)
             return
-        self.route_planner.set_planning_enabled(checked)
-        self.plan_route_button.setText('MISSION PLANNER')
+        self.mission_planner.set_planning_enabled(checked)
+        self.mission_planner.adjust_mission_controls_height()
+        self.mission_planner_button.setText('MISSION PLANNER')
 
-    def on_send_route_requested(self, points, altitude, speed):
-        """Send the route shown in the map to the selected vehicle."""
-        if self.node.publish_route(points, altitude, speed):
-            self.plan_route_button.setChecked(False)
+    def on_send_mission_requested(self, points, altitude, speed):
+        """Send the mission shown in the map to the selected vehicle."""
+        if self.node.publish_mission(points, altitude, speed):
+            self.mission_planner_button.setChecked(False)
 
     def on_auto_arm_changed(self, state):
         """Handle auto arm checkbox state change."""
@@ -1872,6 +2705,23 @@ class ControlTowerUI(QMainWindow):
             vehicle_node = dialog.get_vehicle_node_name()
             if vehicle_node:
                 self.node.control_vehicle_node_fqn = vehicle_node
+                self.node.last_vehicle_pose = {
+                    'pose': None,
+                    'stamp': self.node.get_clock().now(),
+                    'frame_id': '',
+                }
+                self.node.last_odom = {
+                    'pose': None,
+                    'twist': None,
+                    'stamp': self.node.get_clock().now(),
+                    'frame_id': '',
+                }
+                self.node.last_home_pose = {
+                    'pose': None,
+                    'stamp': self.node.get_clock().now(),
+                    'frame_id': '',
+                }
+                self.mission_planner.prepare_for_selected_vehicle()
                 self.node.vehicle_namespace = RosUtils.parent_namespace_from_fqn(
                     self.node.control_vehicle_node_fqn
                 )
@@ -1880,18 +2730,19 @@ class ControlTowerUI(QMainWindow):
                 self.sync_control_options_from_node()
                 self.update_ui_for_vehicle_type()
                 self.update_control_group_state()
-                self._try_load_startup_route()
+                self._schedule_panel_fit()
+                self._try_load_startup_mission()
 
     def update_control_group_state(self):
         """Reflect whether the control pane has an active vehicle target."""
         has_vehicle_selected = bool(self.node.control_vehicle_node_fqn.strip())
         control_enabled = has_vehicle_selected and self.node.vehicle_control_enabled
-        if hasattr(self, 'route_planner'):
-            self.route_planner.set_vehicle_connected(
+        if hasattr(self, 'mission_planner'):
+            self.mission_planner.set_vehicle_connected(
                 self.node.vehicle_connected and self.node.vehicle_control_enabled
             )
             if not control_enabled:
-                self.route_planner.set_planning_enabled(False)
+                self.mission_planner.set_planning_enabled(False)
 
         # Control group dimming
         self.control_group.setEnabled(control_enabled)
@@ -1904,13 +2755,13 @@ class ControlTowerUI(QMainWindow):
             control_tooltip = ''
         self.control_group.setToolTip(control_tooltip)
 
-        if hasattr(self, 'plan_route_button'):
-            self.plan_route_button.setEnabled(control_enabled)
-            if not control_enabled and self.plan_route_button.isChecked():
-                self.plan_route_button.blockSignals(True)
-                self.plan_route_button.setChecked(False)
-                self.plan_route_button.blockSignals(False)
-            self.plan_route_button.setToolTip(control_tooltip)
+        if hasattr(self, 'mission_planner_button'):
+            self.mission_planner_button.setEnabled(control_enabled)
+            if not control_enabled and self.mission_planner_button.isChecked():
+                self.mission_planner_button.blockSignals(True)
+                self.mission_planner_button.setChecked(False)
+                self.mission_planner_button.blockSignals(False)
+            self.mission_planner_button.setToolTip(control_tooltip)
 
         # Status group dimming
         self.status_group.setEnabled(has_vehicle_selected)
@@ -1927,7 +2778,7 @@ class ControlTowerUI(QMainWindow):
 
     def update_ui_for_vehicle_type(self):
         """Update UI elements based on the waywise_object_type."""
-        self.route_planner.set_vehicle_type(self.node.waywise_object_type)
+        self.mission_planner.set_vehicle_type(self.node.waywise_object_type)
         if self.node.waywise_object_type == 'quadcopter':
             self.auto_arm_status_box.show()
             self.hover_hold_status_box.show()
@@ -2031,6 +2882,16 @@ class ControlTowerUI(QMainWindow):
         has_vehicle_selected = bool(self.node.control_vehicle_node_fqn.strip())
         self.update_control_group_state()
 
+        if (
+            self._handled_vehicle_status_reset_generation
+            != self.node.vehicle_status_reset_generation
+        ):
+            self._reset_vehicle_status_fields()
+            self._handled_vehicle_status_reset_generation = (
+                self.node.vehicle_status_reset_generation
+            )
+            self.node.vehicle_status_reset_pending = False
+
         self.vehicle_node_label.setText(
             self.node.control_vehicle_node_fqn if has_vehicle_selected else 'No vehicle selected'
         )
@@ -2042,10 +2903,28 @@ class ControlTowerUI(QMainWindow):
         self.vehicle_type_label.setText(self.node.waywise_object_type.replace('_', ' ').title())
         self.vehicle_type_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
 
-        self.enuref_label.setText(
-            f'({self.node.enuref[0]:.6f}°, {self.node.enuref[1]:.6f}°, {self.node.enuref[2]:.2f}m)'
-        )
-        self.enuref_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
+        if self.node.vehicle_status_cleared:
+            self.enuref_label.setText('N/A')
+            self.enuref_label.setProperty('copy_text', '')
+            self.enuref_label.setStyleSheet(f'color: {self.gray_color}; font-weight: 700;')
+        else:
+            self.enuref_label.setText(
+                f'({self.node.enuref[0]:.6f}°, {self.node.enuref[1]:.6f}°, {self.node.enuref[2]:.2f}m)'
+            )
+            self.enuref_label.setProperty(
+                'copy_text',
+                f'({self.node.enuref[0]:.15g}°, {self.node.enuref[1]:.15g}°, {self.node.enuref[2]:.15g}m)',
+            )
+            self.enuref_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
+
+        self._update_home_pose_display()
+
+        if self.node.vehicle_status_reset_pending:
+            self._reset_vehicle_status_fields()
+            self._handled_vehicle_status_reset_generation = (
+                self.node.vehicle_status_reset_generation
+            )
+            self.node.vehicle_status_reset_pending = False
 
         self._update_estop_display()
         self._update_heartbeat_rx_display()
@@ -2056,7 +2935,8 @@ class ControlTowerUI(QMainWindow):
         self._update_odom_display()
         self._update_world_pose_display()
         self._update_gnss_display()
-        self._update_route_planner_display()
+        self._update_mission_planner_display()
+        self._update_ros_time_display()
         self._update_right_pane_min_width()
 
         # Show/hide low battery warning
@@ -2073,23 +2953,89 @@ class ControlTowerUI(QMainWindow):
             self.warning_label.hide()
             self.last_battery_warning = False
 
-    def _update_route_planner_display(self):
-        """Update route planner context from the active vehicle state."""
-        self.route_planner.set_vehicle_type(self.node.waywise_object_type)
-        self.route_planner.set_enu_ref(self.node.enuref)
-        self._try_load_startup_route()
-        self.route_planner.set_vehicle_overlay_model(self.node.vehicle_overlay_model)
-        self.node._refresh_visual_markers()
-        self.route_planner.set_visual_markers(self.node.visual_markers)
+    def _update_ros_time_display(self):
+        """Show the current ROS clock in simulation or wall-clock form."""
+        now_seconds = self.node.get_clock().now().nanoseconds / 1e9
+        if self.node.use_sim_time:
+            text = f'ROS Time: [{now_seconds:.3f} s]'
+            tooltip = 'Current ROS simulation timestamp in seconds.'
+        else:
+            timestamp = datetime.fromtimestamp(now_seconds)
+            text = f'ROS Time: [{timestamp:%Y-%m-%d %H:%M:%S}]'
+            tooltip = 'Current ROS wall-clock timestamp.'
+        self.ros_time_label.setText(text)
+        self.ros_time_label.setToolTip(tooltip)
 
-        # Animate rotor/propeller joints when the drone is armed or in-flight.
-        # STARTING_UP and READY_TO_ARM are the only states where motors are still.
-        qc_msg = self.node.last_quadcopter_state.get('msg')
-        if qc_msg is not None and qc_msg.state_code not in (
-            QuadcopterState.STARTING_UP,
-            QuadcopterState.READY_TO_ARM,
+    def _reset_vehicle_status_fields(self):
+        """Clear vehicle runtime status fields after a simulation reset."""
+        value_style = f'color: {self.gray_color}; font-weight: 700;'
+        time_style = f'color: {self.gray_color}; font-size: 9pt;'
+
+        for label, text in (
+            (self.enuref_label, 'N/A'),
+            (self.home_pose_label, 'N/A'),
+            (self.estop_label, 'UNKNOWN'),
+            (self.battery_label, 'N/A'),
+            (self.copter_state_label, 'UNKNOWN'),
+            (self.mission_state_label, 'UNKNOWN'),
+            (self.heartbeat_rx_label, 'UNKNOWN'),
+            (self.world_pose_pos_label, 'N/A'),
+            (self.odom_pos_label, 'N/A'),
+            (self.odom_vel_label, 'N/A'),
+            (self.gnss_fix_label, 'UNKNOWN'),
+            (self.gnss_pos_label, 'N/A'),
+            (self.gnss_accuracy_label, 'N/A'),
+            (self.gnss_last_rtcm_correction_label, 'N/A'),
+            (self.gnss_num_satellites_label, 'N/A'),
+            (self.gnss_fused_on_chip_label, 'N/A'),
         ):
-            self.node.vehicle_overlay_model.tick(time.time())
+            label.setText(text)
+            label.setStyleSheet(value_style)
+            label.setProperty('copy_text', '')
+
+        self.world_pose_yaw_label.setText('')
+        self.odom_yaw_label.setText('')
+        self.gnss_head_label.setText('')
+        for label in (
+            self.estop_time_label,
+            self.battery_time_label,
+            self.copter_state_time_label,
+            self.mission_state_time_label,
+            self.heartbeat_rx_time_label,
+            self.world_pose_time_label,
+            self.odom_time_label,
+            self.odom_vel_time_label,
+            self.gnss_time_label,
+        ):
+            label.setText('Last updated: N/A')
+            label.setStyleSheet(time_style)
+
+        self.warning_label.hide()
+        self.last_battery_warning = False
+        self.mission_planner.clear_vehicle_overlay()
+        self.mission_planner.clear_home_position()
+        self.mission_planner.set_visual_markers([])
+
+    def _update_mission_planner_display(self):
+        """Update Mission Planner context from the active vehicle state."""
+        self.mission_planner.set_vehicle_type(self.node.waywise_object_type)
+        self.mission_planner.set_enu_ref(self.node.enuref)
+        if self.node.vehicle_status_cleared:
+            self.mission_planner.clear_vehicle_overlay()
+            self.mission_planner.clear_home_position()
+            self.mission_planner.set_visual_markers([])
+            return
+        if self.node.last_home_pose['pose'] is not None:
+            self.mission_planner.set_home_position(
+                self.node.last_home_pose['pose'].position.x,
+                self.node.last_home_pose['pose'].position.y,
+            )
+        else:
+            self.mission_planner.clear_home_position()
+        self._try_load_startup_mission()
+        self.mission_planner.set_vehicle_overlay_model(self.node.vehicle_overlay_model)
+        self.node._refresh_visual_markers()
+        self.mission_planner.set_visual_markers(self.node.visual_markers)
 
         pose = None
         frame_id = ''
@@ -2101,6 +3047,7 @@ class ControlTowerUI(QMainWindow):
             frame_id = self.node.last_odom['frame_id']
 
         if pose is None:
+            self.mission_planner.clear_vehicle_pose()
             return
 
         orientation = pose.orientation
@@ -2138,7 +3085,7 @@ class ControlTowerUI(QMainWindow):
             ):
                 pass  # No transform available yet — render at raw pose
 
-        self.route_planner.set_vehicle_pose(x, y, yaw)
+        self.mission_planner.set_vehicle_pose(x, y, yaw)
 
     def _get_time_ago_and_color(self, stamp):
         """Format time since stamp and return a corresponding UI color."""
@@ -2152,70 +3099,79 @@ class ControlTowerUI(QMainWindow):
 
     def _update_estop_display(self):
         """Update the emergency stop status on the UI."""
-        if self.node.last_emergency_stop_state['msg'] is not None:
-            time_label, time_based_color = self._get_time_ago_and_color(
-                self.node.last_emergency_stop_state['stamp']
-            )
-            self.estop_time_label.setText(f'Last updated: {time_label}')
-            self.estop_time_label.setStyleSheet(f'color: {time_based_color}; font-size: 9pt;')
+        if self.node.last_emergency_stop_state['msg'] is None:
+            self.estop_label.setText('UNKNOWN')
+            self.estop_label.setStyleSheet(f'color: {self.gray_color}; font-weight: 700;')
+            self.estop_time_label.setText('Last updated: N/A')
+            self.estop_time_label.setStyleSheet(f'color: {self.gray_color}; font-size: 9pt;')
+            return
 
-            state = self.node.last_emergency_stop_state['msg'].state
-            if state == EmergencyStopState.ACTIVE:
-                self.estop_label.setText('[!] ACTIVE')
-                self.estop_label.setStyleSheet(f'color: {self.red_color}; font-weight: 700;')
-            elif state == EmergencyStopState.CLEAR:
-                self.estop_label.setText('CLEAR')
-                self.estop_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
-            else:
-                self.estop_label.setText('[?] UNKNOWN')
-                self.estop_label.setStyleSheet(f'color: {self.gray_color}; font-weight: 700;')
+        time_label, time_based_color = self._get_time_ago_and_color(
+            self.node.last_emergency_stop_state['stamp']
+        )
+        self.estop_time_label.setText(f'Last updated: {time_label}')
+        self.estop_time_label.setStyleSheet(f'color: {time_based_color}; font-size: 9pt;')
+
+        state = self.node.last_emergency_stop_state['msg'].state
+        if state == EmergencyStopState.ACTIVE:
+            self.estop_label.setText('[!] ACTIVE')
+            self.estop_label.setStyleSheet(f'color: {self.red_color}; font-weight: 700;')
+        elif state == EmergencyStopState.CLEAR:
+            self.estop_label.setText('CLEAR')
+            self.estop_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
+        else:
+            self.estop_label.setText('[?] UNKNOWN')
+            self.estop_label.setStyleSheet(f'color: {self.gray_color}; font-weight: 700;')
 
     def _update_heartbeat_rx_display(self):
         """Update vehicle-reported Control Tower heartbeat receive state."""
         rx_msg = self.node.last_control_tower_heartbeat_rx_state.get('msg')
+        time_text = 'Last updated: N/A'
+        time_color = self.gray_color
 
         if rx_msg is None:
             state_text = 'UNKNOWN'
             color = self.gray_color
             tooltip = 'No vehicle heartbeat receive state has been received.'
-            time_text = 'Last updated: N/A'
-            time_color = self.gray_color
         elif rx_msg.state == HeartbeatRxState.TIMEOUT:
             state_text = 'TIMEOUT'
             color = self.red_color
             tooltip = 'Vehicle has timed out receiving Control Tower heartbeat.'
-        elif rx_msg.state == HeartbeatRxState.DISABLED:
-            state_text = 'DISABLED'
-            color = self.gray_color
-            tooltip = 'Vehicle heartbeat receive monitoring is disabled.'
         elif rx_msg.state == HeartbeatRxState.NO_HEARTBEAT:
             state_text = 'NO HEARTBEAT'
             color = self.gray_color
             tooltip = 'Vehicle has not received a Control Tower heartbeat yet.'
-        elif rx_msg.state == HeartbeatRxState.STALE:
-            state_text = 'STALE'
-            color = self.yellow_color
-            tooltip = 'Vehicle is receiving Control Tower heartbeat, but it is close to timeout.'
         elif rx_msg.state == HeartbeatRxState.ACTIVE:
             state_text = 'ACTIVE'
             color = self.green_color
             tooltip = 'Vehicle is receiving Control Tower heartbeat normally.'
         else:
-            state_text = rx_msg.state_str.upper() if rx_msg.state_str else 'UNKNOWN'
+            state_text = 'UNKNOWN'
             color = self.yellow_color
             tooltip = 'Vehicle reported an unknown heartbeat receive state.'
 
         if rx_msg is not None:
-            time_str, time_color = self._get_time_ago_and_color(
-                self.node.last_control_tower_heartbeat_rx_state['stamp']
-            )
-            age_text = 'never' if rx_msg.age_s < 0.0 else f'{rx_msg.age_s:.2f}s'
+            report_stamp = self.node.last_control_tower_heartbeat_rx_state['stamp']
+            time_str, time_color = self._get_time_ago_and_color(report_stamp)
+            if rx_msg.age_s < 0.0:
+                age_text = 'never'
+            else:
+                elapsed_since_report = max(
+                    0.0,
+                    (self.node.get_clock().now() - report_stamp).nanoseconds / 1e9,
+                )
+                estimated_age = rx_msg.age_s + elapsed_since_report
+                age_text = f'{estimated_age:.2f}s'
             state_text = f'{state_text} | age: {age_text}'
             time_text = f'Last updated: {time_str}'
 
         self.heartbeat_rx_label.setText(state_text)
         self.heartbeat_rx_label.setStyleSheet(f'color: {color}; font-weight: 700;')
-        self.heartbeat_rx_label.setToolTip(tooltip)
+        self.heartbeat_rx_label.setToolTip(
+            f'{tooltip} Age is measured from the heartbeat generation timestamp and '
+            'extrapolated between vehicle state updates. '
+            f'Vehicle timeout: {self.node.control_tower_heartbeat_timeout:.2f}s.'
+        )
         self.heartbeat_rx_time_label.setText(time_text)
         self.heartbeat_rx_time_label.setStyleSheet(f'color: {time_color}; font-size: 9pt;')
         self.heartbeat_rx_time_label.setToolTip(tooltip)
@@ -2272,9 +3228,9 @@ class ControlTowerUI(QMainWindow):
                 QuadcopterState.LANDING,
                 QuadcopterState.LIFTING_OFF,
                 QuadcopterState.AUTO_LIFTING_OFF,
-                QuadcopterState.RETURNING_HOME,
+                getattr(QuadcopterState, 'RETURNING_HOME', 13),
             ]:
-                color = '#fbbf24'  # Amber
+                color = '#EFA90B'
             else:
                 color = '#60a5fa'  # Blue
             self.copter_state_label.setStyleSheet(f'color: {color}; font-weight: 700;')
@@ -2299,11 +3255,16 @@ class ControlTowerUI(QMainWindow):
         MissionState.WAITING_FOR_EMERGENCY_STOP_CLEAR: ('Waiting for E-stop', '#fbbf24'),
         MissionState.WAITING_FOR_GNSS_ACCURACY: ('Waiting for GNSS', '#fbbf24'),
         MissionState.WAITING_FOR_HEARTBEAT: ('Waiting for heartbeat', '#fbbf24'),
-        MissionState.FOLLOW_ROUTE_INIT: ('Route: Init', '#60a5fa'),
-        MissionState.FOLLOW_ROUTE_GOTO_BEGIN: ('Route: Go to start', '#60a5fa'),
+        MissionState.FOLLOW_ROUTE_INIT: ('Route: Init', None),
+        MissionState.FOLLOW_ROUTE_LIFT_OFF: ('Route: Lift off', None),
+        MissionState.FOLLOW_ROUTE_GOTO_BEGIN: ('Route: Go to start', None),
         MissionState.FOLLOW_ROUTE_FOLLOWING: ('Following route', None),
-        MissionState.FOLLOW_ROUTE_APPROACHING_END_GOAL: ('Route: Approaching end', '#fbbf24'),
-        MissionState.FOLLOW_ROUTE_FINISHED: ('Route: Finished', '#60a5fa'),
+        MissionState.FOLLOW_ROUTE_APPROACHING_END_GOAL: ('Route: Approaching end', None),
+        MissionState.FOLLOW_ROUTE_FINISHED: ('Route: Finished', None),
+        MissionState.RETURN_HOME_INIT: ('RTH: Init', '#EFA90B'),
+        MissionState.RETURN_HOME_LIFT_OFF: ('RTH: Lift off', '#EFA90B'),
+        MissionState.RETURN_HOME_CRUISING: ('RTH: Cruising', '#EFA90B'),
+        MissionState.RETURN_HOME_LANDING: ('RTH: Landing', '#EFA90B'),
     }
 
     def _update_mission_state_display(self):
@@ -2320,16 +3281,15 @@ class ControlTowerUI(QMainWindow):
         if msg is None:
             self.mission_state_label.setText('UNKNOWN')
             self.mission_state_label.setStyleSheet(f'color: {self.gray_color}; font-weight: 700;')
-            self.mission_state_time_label.setText('Last updated: never')
-            self.mission_state_time_label.setStyleSheet(
-                f'color: {self.gray_color}; font-size: 9pt;'
-            )
+            self.mission_state_time_label.setText('Last updated: N/A')
+            self.mission_state_time_label.setStyleSheet('color: #6b7280; font-size: 9pt;')
             return
 
-        state_text, _ = self._MISSION_STATE_STRINGS.get(msg.state, ('Unknown', None))
+        state_text, state_color = self._MISSION_STATE_STRINGS.get(msg.state, ('Unknown', None))
         time_str, time_color = self._get_time_ago_and_color(self.node.last_mission_state['stamp'])
+        label_color = state_color or time_color
         self.mission_state_label.setText(state_text.upper())
-        self.mission_state_label.setStyleSheet(f'color: {time_color}; font-weight: 700;')
+        self.mission_state_label.setStyleSheet(f'color: {label_color}; font-weight: 700;')
         self.mission_state_time_label.setText(f'Last updated: {time_str}')
         self.mission_state_time_label.setStyleSheet(f'color: {time_color}; font-size: 9pt;')
 
@@ -2430,28 +3390,44 @@ class ControlTowerUI(QMainWindow):
 
     def _update_battery_display(self):
         """Update battery information on the UI."""
-        if self.node.last_battery_state['msg'] is not None:
-            time_label, time_based_color = self._get_time_ago_and_color(
-                self.node.last_battery_state['stamp']
-            )
-            self.battery_time_label.setText(f'Last updated: {time_label}')
-            self.battery_time_label.setStyleSheet(f'color: {time_based_color}; font-size: 9pt;')
+        if self.node.last_battery_state['msg'] is None:
+            self.battery_label.setText('N/A')
+            self.battery_label.setStyleSheet(f'color: {self.gray_color}; font-weight: 700;')
+            self.battery_time_label.setText('Last updated: N/A')
+            self.battery_time_label.setStyleSheet(f'color: {self.gray_color}; font-size: 9pt;')
+            return
 
-            voltage = self.node.last_battery_state['msg'].voltage
-            is_low = self.node.last_battery_state['msg'].state == BatteryState.LOW_VOLTAGE
-            txt = f'[!] {voltage:.2f} V' if is_low else f'{voltage:.2f} V'
-            clr = self.red_color if is_low else time_based_color
+        time_label, time_based_color = self._get_time_ago_and_color(
+            self.node.last_battery_state['stamp']
+        )
+        self.battery_time_label.setText(f'Last updated: {time_label}')
+        self.battery_time_label.setStyleSheet(f'color: {time_based_color}; font-size: 9pt;')
 
-            self.battery_label.setText(txt)
-            self.battery_label.setStyleSheet(f'color: {clr}; font-weight: 700;')
+        voltage = self.node.last_battery_state['msg'].voltage
+        is_low = self.node.last_battery_state['msg'].state == BatteryState.LOW_VOLTAGE
+        txt = f'[!] {voltage:.2f} V' if is_low else f'{voltage:.2f} V'
+        clr = self.red_color if is_low else time_based_color
+
+        self.battery_label.setText(txt)
+        self.battery_label.setStyleSheet(f'color: {clr}; font-weight: 700;')
 
     def _update_odom_display(self):
         """Update odometry information on the UI."""
-        if self.node.last_odom['pose'] is not None:
-            time_label, time_based_color = self._get_time_ago_and_color(
-                self.node.last_odom['stamp']
-            )
-            self._set_odom_ui_values(time_label, time_based_color)
+        if self.node.last_odom['pose'] is None:
+            self.odom_pos_label.setText('N/A')
+            self.odom_pos_label.setProperty('copy_text', '')
+            self.odom_vel_label.setText('N/A')
+            self.odom_vel_label.setProperty('copy_text', '')
+            self.odom_yaw_label.setText('')
+            for label in (self.odom_pos_label, self.odom_vel_label):
+                label.setStyleSheet(f'color: {self.gray_color}; font-weight: 700;')
+            for label in (self.odom_time_label, self.odom_vel_time_label):
+                label.setText('Last updated: N/A')
+                label.setStyleSheet(f'color: {self.gray_color}; font-size: 9pt;')
+            return
+
+        time_label, time_based_color = self._get_time_ago_and_color(self.node.last_odom['stamp'])
+        self._set_odom_ui_values(time_label, time_based_color)
 
     def _set_odom_ui_values(self, time_label, time_based_color):
         """Set odometry UI labels and styles."""
@@ -2459,45 +3435,69 @@ class ControlTowerUI(QMainWindow):
         roll, pitch, yaw = euler_from_quaternion(
             [p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w]
         )
+        roll_deg = roll * 180.0 / 3.14159
+        pitch_deg = pitch * 180.0 / 3.14159
+        yaw_deg = yaw * 180.0 / 3.14159
 
         self.odom_pos_label.setText(
-            f'({p.position.x:.2f}, {p.position.y:.2f}, {p.position.z:.2f}) m'
+            f'[({p.position.x:.2f}, {p.position.y:.2f}, {p.position.z:.2f})m; '
+            f'({roll_deg:.1f}, {pitch_deg:.1f}, {yaw_deg:.1f})°]'
         )
-        self.odom_yaw_label.setText(
-            f'({roll * 180.0 / 3.14159:.1f}, {pitch * 180.0 / 3.14159:.1f}, '
-            f'{yaw * 180.0 / 3.14159:.1f})°'
+        self.odom_pos_label.setProperty(
+            'copy_text',
+            f'[({p.position.x:.15g}, {p.position.y:.15g}, {p.position.z:.15g})m; '
+            f'({roll_deg:.15g}, {pitch_deg:.15g}, {yaw_deg:.15g})°]',
         )
+        self.odom_pos_label.setMinimumWidth(self.odom_pos_label.sizeHint().width())
+        self.odom_yaw_label.setText('')
 
         if self.node.last_odom['twist'] is not None:
-            vx = self.node.last_odom['twist'].linear.x
-            vy = self.node.last_odom['twist'].linear.y
-            vz = self.node.last_odom['twist'].linear.z
+            twist = self.node.last_odom['twist']
+            vx = twist.linear.x
+            vy = twist.linear.y
+            vz = twist.linear.z
+            yaw_rate_deg = twist.angular.z * 180.0 / 3.14159
         else:
             vx = 0.0
             vy = 0.0
             vz = 0.0
-        self.odom_vel_label.setText(f'({vx:.2f}, {vy:.2f}, {vz:.2f}) m/s')
-        self.odom_time_label.setText(time_label)
+            yaw_rate_deg = 0.0
+        self.odom_vel_label.setText(f'[({vx:.2f}, {vy:.2f}, {vz:.2f}) m/s; {yaw_rate_deg:.2f}°/s]')
+        self.odom_vel_label.setProperty(
+            'copy_text',
+            f'[({vx:.15g}, {vy:.15g}, {vz:.15g}) m/s; {yaw_rate_deg:.15g}°/s]',
+        )
+        odom_time_text = f'Last updated: {time_label}'
+        self.odom_time_label.setText(odom_time_text)
+        self.odom_vel_time_label.setText(odom_time_text)
 
         style = f'color: {time_based_color}; font-weight: 700;'
         for lbl in [
             self.odom_pos_label,
             self.odom_yaw_label,
             self.odom_vel_label,
-            self.odom_time_label,
         ]:
             lbl.setStyleSheet(style)
+        time_style = f'color: {time_based_color}; font-size: 9pt;'
+        self.odom_time_label.setStyleSheet(time_style)
+        self.odom_vel_time_label.setStyleSheet(time_style)
 
     def _update_world_pose_display(self):
         """Update world pose labels (ENU position and roll/pitch/yaw)."""
         if self.node.last_vehicle_pose['pose'] is None:
+            self.world_pose_pos_label.setText('N/A')
+            self.world_pose_pos_label.setProperty('copy_text', '')
+            self.world_pose_yaw_label.setText('')
+            self.world_pose_pos_label.setStyleSheet(f'color: {self.gray_color}; font-weight: 700;')
+            self.world_pose_time_label.setText('Last updated: N/A')
+            self.world_pose_time_label.setStyleSheet(f'color: {self.gray_color}; font-size: 9pt;')
             return
 
         time_label, time_based_color = self._get_time_ago_and_color(
             self.node.last_vehicle_pose['stamp']
         )
-        self.world_pose_time_label.setText(time_label)
-        self.world_pose_time_label.setStyleSheet(f'color: {time_based_color}; font-weight: 700;')
+        self.world_pose_time_label.setText(f'Last updated: {time_label}')
+        self.world_pose_time_label.setStyleSheet(f'color: {time_based_color}; font-size: 9pt;')
 
         pose = self.node.last_vehicle_pose['pose']
         roll_rad, pitch_rad, yaw_rad = euler_from_quaternion(
@@ -2513,25 +3513,79 @@ class ControlTowerUI(QMainWindow):
         yaw_deg = yaw_rad * 180.0 / 3.14159265359
 
         self.world_pose_pos_label.setText(
-            f'({pose.position.x:.2f}, {pose.position.y:.2f}, {pose.position.z:.2f}) m'
+            f'[({pose.position.x:.2f}, {pose.position.y:.2f}, {pose.position.z:.2f})m; '
+            f'({roll_deg:.1f}, {pitch_deg:.1f}, {yaw_deg:.1f})°]'
         )
-        self.world_pose_yaw_label.setText(f'({roll_deg:.1f}, {pitch_deg:.1f}, {yaw_deg:.1f})°')
+        self.world_pose_pos_label.setProperty(
+            'copy_text',
+            f'[({pose.position.x:.15g}, {pose.position.y:.15g}, {pose.position.z:.15g})m; '
+            f'({roll_deg:.15g}, {pitch_deg:.15g}, {yaw_deg:.15g})°]',
+        )
+        self.world_pose_pos_label.setMinimumWidth(self.world_pose_pos_label.sizeHint().width())
+        self.world_pose_yaw_label.setText('')
 
         style = f'color: {time_based_color}; font-weight: 700;'
         self.world_pose_pos_label.setStyleSheet(style)
         self.world_pose_yaw_label.setStyleSheet(style)
 
+    def _update_home_pose_display(self):
+        """Update the drone-published home pose displayed under ENU reference."""
+        pose = self.node.last_home_pose['pose']
+        if self.node.vehicle_status_cleared or pose is None:
+            self.home_pose_label.setText('N/A')
+            self.home_pose_label.setProperty('copy_text', '')
+            self.home_pose_label.setStyleSheet(f'color: {self.gray_color}; font-weight: 700;')
+            return
+
+        x, y, z = pose.position.x, pose.position.y, pose.position.z
+        roll_rad, pitch_rad, yaw_rad = euler_from_quaternion(
+            [
+                pose.orientation.x,
+                pose.orientation.y,
+                pose.orientation.z,
+                pose.orientation.w,
+            ]
+        )
+        roll_deg = roll_rad * 180.0 / 3.14159265359
+        pitch_deg = pitch_rad * 180.0 / 3.14159265359
+        yaw_deg = yaw_rad * 180.0 / 3.14159265359
+
+        self.home_pose_label.setText(
+            f'[({x:.2f}, {y:.2f}, {z:.2f})m; ({roll_deg:.1f}, {pitch_deg:.1f}, {yaw_deg:.1f})°]'
+        )
+        self.home_pose_label.setProperty(
+            'copy_text',
+            f'[({x:.15g}, {y:.15g}, {z:.15g})m; '
+            f'({roll_deg:.15g}, {pitch_deg:.15g}, {yaw_deg:.15g})°]',
+        )
+        self.home_pose_label.setMinimumWidth(self.home_pose_label.sizeHint().width())
+        self.home_pose_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
+
     def _update_gnss_display(self):
         """Update GNSS fix and accuracy information on the UI."""
         if self.node.last_nav_sat_fix_extended['msg'] is None:
+            for label, text in (
+                (self.gnss_fix_label, 'UNKNOWN'),
+                (self.gnss_pos_label, 'N/A'),
+                (self.gnss_accuracy_label, 'N/A'),
+                (self.gnss_last_rtcm_correction_label, 'N/A'),
+                (self.gnss_num_satellites_label, 'N/A'),
+                (self.gnss_fused_on_chip_label, 'N/A'),
+            ):
+                label.setText(text)
+                label.setStyleSheet(f'color: {self.gray_color}; font-weight: 700;')
+            self.gnss_pos_label.setProperty('copy_text', '')
+            self.gnss_head_label.setText('')
+            self.gnss_time_label.setText('Last updated: N/A')
+            self.gnss_time_label.setStyleSheet(f'color: {self.gray_color}; font-size: 9pt;')
             return
 
         msg = self.node.last_nav_sat_fix_extended['msg']
         time_label, time_based_color = self._get_time_ago_and_color(
             self.node.last_nav_sat_fix_extended['stamp']
         )
-        self.gnss_time_label.setText(time_label)
-        self.gnss_time_label.setStyleSheet(f'color: {time_based_color}; font-weight: 700;')
+        self.gnss_time_label.setText(f'Last updated: {time_label}')
+        self.gnss_time_label.setStyleSheet(f'color: {time_based_color}; font-size: 9pt;')
 
         fix_type = msg.fix_type
         fix_text = 'UNKNOWN'
@@ -2560,11 +3614,16 @@ class ControlTowerUI(QMainWindow):
         self.gnss_fix_label.setStyleSheet(f'color: {fix_color}; font-weight: 700;')
 
         self.gnss_pos_label.setText(
-            f'({msg.latitude:.6f}°, {msg.longitude:.6f}°, {msg.altitude:.2f}m)'
+            f'({msg.latitude:.2f}°, {msg.longitude:.2f}°, {msg.altitude:.2f}m, {msg.yaw:.1f}°)'
+        )
+        self.gnss_pos_label.setProperty(
+            'copy_text',
+            f'({msg.latitude:.15g}°, {msg.longitude:.15g}°, {msg.altitude:.15g}m, '
+            f'{msg.yaw:.15g}°)',
         )
         self.gnss_pos_label.setStyleSheet(f'color: {time_based_color}; font-weight: 700;')
 
-        self.gnss_head_label.setText(f'{self.node.last_nav_sat_fix_extended["msg"].yaw:.1f}°')
+        self.gnss_head_label.setText('')
         self.gnss_head_label.setStyleSheet(f'color: {time_based_color}; font-weight: 700;')
 
         self.gnss_accuracy_label.setText(
@@ -2585,6 +3644,10 @@ class ControlTowerUI(QMainWindow):
         self.gnss_num_satellites_label.setText(f'{msg.num_satellites}')
         self.gnss_num_satellites_label.setStyleSheet(
             f'color: {self.green_color}; font-weight: 700;'
+        )
+        self.gnss_fused_on_chip_label.setText('YES' if msg.is_fused_on_chip else 'NO')
+        self.gnss_fused_on_chip_label.setStyleSheet(
+            f'color: {time_based_color}; font-weight: 700;'
         )
 
     def start_estop_blink(self):
@@ -2642,6 +3705,11 @@ class ControlTowerUI(QMainWindow):
         super().resizeEvent(event)
         self._update_right_pane_min_width()
 
+    def showEvent(self, event):
+        """Re-fit panes once the window is actually shown."""
+        super().showEvent(event)
+        self._schedule_panel_fit()
+
 
 def check_pulseaudio():
     """Check if PulseAudio is running and reachable."""
@@ -2673,7 +3741,7 @@ def main():
         rclpy.init()
         app = QApplication(sys.argv)
 
-    node = ControlTower()
+    node = ControlTowerNode()
     gui = ControlTowerUI(node)
 
     # Handle Ctrl+C gracefully

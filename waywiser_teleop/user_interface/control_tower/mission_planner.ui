@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <ui version="4.0">
- <class>RoutePlannerWidget</class>
- <widget class="QWidget" name="RoutePlannerWidget">
-  <layout class="QVBoxLayout" name="route_planner_layout">
+ <class>MissionPlannerWidget</class>
+ <widget class="QWidget" name="MissionPlannerWidget">
+  <layout class="QVBoxLayout" name="mission_planner_layout">
    <property name="leftMargin">
     <number>0</number>
    </property>
@@ -37,11 +37,11 @@
     </widget>
    </item>
    <item>
-    <widget class="QFrame" name="route_controls_frame">
+    <widget class="QFrame" name="mission_controls_frame">
      <property name="frameShape">
       <enum>QFrame::NoFrame</enum>
      </property>
-     <layout class="QGridLayout" name="route_controls_layout">
+     <layout class="QGridLayout" name="mission_controls_layout">
       <property name="leftMargin">
        <number>8</number>
       </property>
@@ -55,16 +55,16 @@
        <number>8</number>
       </property>
       <item row="0" column="0">
-       <widget class="QLabel" name="route_status_label">
+       <widget class="QLabel" name="mission_summary_label">
         <property name="text">
-         <string>Route: 0 points</string>
+         <string>Mission: 0 points</string>
         </property>
        </widget>
       </item>
       <item row="0" column="1">
        <widget class="QLabel" name="speed_label">
         <property name="text">
-         <string>Route speed [m/s]</string>
+         <string>Mission speed [m/s]</string>
         </property>
        </widget>
       </item>
@@ -97,7 +97,7 @@
       <item row="0" column="4">
        <widget class="QLabel" name="height_label">
         <property name="text">
-         <string>Route z [m]</string>
+         <string>Mission z [m]</string>
         </property>
        </widget>
       </item>
@@ -130,28 +130,28 @@
       <item row="1" column="0" colspan="7">
        <layout class="QHBoxLayout" name="buttons_layout">
         <item>
-         <widget class="QPushButton" name="load_route_button">
+         <widget class="QPushButton" name="load_mission_button">
           <property name="text">
            <string>Load</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="clear_route_button">
+         <widget class="QPushButton" name="clear_mission_button">
           <property name="text">
            <string>Clear</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="save_route_button">
+         <widget class="QPushButton" name="save_mission_button">
           <property name="text">
            <string>Save</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="send_route_button">
+         <widget class="QPushButton" name="send_mission_button">
           <property name="text">
            <string>Send</string>
           </property>

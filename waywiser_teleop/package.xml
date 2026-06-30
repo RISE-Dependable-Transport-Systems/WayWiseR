@@ -24,11 +24,13 @@
   <depend>builtin_interfaces</depend>
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>rosgraph_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>visualization_msgs</depend>
 
   <depend>joy</depend>
   <depend>teleop_twist_joy</depend>
+  <depend>tf2_ros</depend>
   <depend>tf_transformations</depend>
   <depend>twist_mux</depend>
   <depend>rclpy</depend>

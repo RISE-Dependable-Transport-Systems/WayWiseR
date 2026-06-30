@@ -1,33 +1,142 @@
-"""Interactive route planning map widgets for the control tower."""
+"""Mission planning, map interaction, route files, and route message helpers."""
 
 from dataclasses import dataclass
 import math
+import os
+import xml.etree.ElementTree as ET
 
-from PyQt5.QtCore import pyqtSignal, QPointF, QRectF, Qt
-from PyQt5.QtGui import QColor, QCursor, QFont, QPainter, QPen, QPixmap, QPolygonF
-from PyQt5.QtWidgets import QDoubleSpinBox, QHBoxLayout, QLabel, QMenu, QWidget, QWidgetAction
+from geometry_msgs.msg import PoseStamped, Twist
+from nav_msgs.msg import Path
+from PyQt5.QtCore import pyqtSignal, QPoint, QPointF, QRectF, Qt, QTimer
+from PyQt5.QtGui import (
+    QColor,
+    QCursor,
+    QFont,
+    QPainter,
+    QPen,
+    QPixmap,
+    QPolygon,
+    QPolygonF,
+)
+from PyQt5.QtWidgets import (
+    QDoubleSpinBox,
+    QFileDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMenu,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QSplitter,
+    QVBoxLayout,
+    QWidget,
+    QWidgetAction,
+)
+from PyQt5.uic import loadUi
 
-from waywiser_teleop_py.osm_tiles import (
+from waywiser_core.msg import PathWithTwists
+from waywiser_teleop_py.osm_client import (
     draw_tile_placeholder,
     enu_to_llh,
     lat_to_tile_y,
     llh_to_enu,
     lon_to_tile_x,
     OsmTileClient,
-    TILE_SIZE_PX,
     tile_x_to_lon,
     tile_y_to_lat,
 )
 
 
+@dataclass
+class MissionFilePoint:
+    """A loaded mission waypoint transformed into the active map ENU frame."""
+
+    x: float
+    y: float
+    z: float = 0.0
+    speed: float = 1.0
+
+
+def read_waywise_route_xml(filename, target_enuref):
+    """Read a WayWise XML route and transform it into the target ENU frame."""
+    tree = ET.parse(filename)
+    root = tree.getroot()
+    if root.tag != 'routes':
+        raise ValueError('Expected a WayWise route XML file with <routes> as root.')
+
+    imported_enuref = _read_enuref(root, target_enuref)
+    points = []
+    route_elem = root.find('route')
+    if route_elem is None:
+        return points
+
+    for point_elem in route_elem.findall('point'):
+        source_x = _read_float(point_elem, 'x', 0.0)
+        source_y = _read_float(point_elem, 'y', 0.0)
+        source_z = _read_float(point_elem, 'z', 0.0)
+        speed = _read_float(point_elem, 'speed', 1.0)
+
+        lat, lon, _ = enu_to_llh(source_x, source_y, imported_enuref)
+        target_x, target_y = llh_to_enu(lat, lon, target_enuref)
+        target_z = source_z + imported_enuref[2] - target_enuref[2]
+        points.append(MissionFilePoint(target_x, target_y, target_z, speed))
+
+    return points
+
+
+def _read_enuref(root, fallback):
+    enuref_elem = root.find('enuref')
+    if enuref_elem is None:
+        return [float(fallback[0]), float(fallback[1]), float(fallback[2])]
+    return [
+        _read_float(enuref_elem, 'Latitude', fallback[0]),
+        _read_float(enuref_elem, 'Longitude', fallback[1]),
+        _read_float(enuref_elem, 'Height', fallback[2]),
+    ]
+
+
+def _read_float(parent, tag, default):
+    elem = parent.find(tag)
+    if elem is None or elem.text is None:
+        return float(default)
+    return float(elem.text.strip())
+
+
+def build_path_with_twists(points, stamp, frame_id='map', altitude=0.0, speed=1.0):
+    """Create a PathWithTwists message from iterable objects with x/y fields."""
+    msg = PathWithTwists()
+    msg.path = Path()
+    msg.path.header.stamp = stamp
+    msg.path.header.frame_id = frame_id
+
+    for point in points:
+        pose = PoseStamped()
+        pose.header = msg.path.header
+        pose.pose.position.x = float(point.x)
+        pose.pose.position.y = float(point.y)
+        pose.pose.position.z = float(altitude)
+        pose.pose.orientation.w = 1.0
+        msg.path.poses.append(pose)
+
+        twist = Twist()
+        twist.linear.x = float(speed)
+        msg.twists.append(twist)
+
+    return msg
+
+
 OSM_TILE_ZOOM_LEVEL_RANGE = (3, 19)
 WHEEL_ZOOM_LEVEL_RANGE = (3, 24)
 VEHICLE_OVERLAY_OPACITY = 0.4
+VEHICLE_ROTOR_OVERLAY_OPACITY = 0.95
+VEHICLE_ROTOR_OVERLAY_COLOR = '#dc2626'
 
 
 @dataclass
-class RoutePoint:
-    """A planned route point in local ENU meters."""
+class MissionPoint:
+    """A planned mission waypoint in local ENU meters."""
 
     x: float
     y: float
@@ -37,7 +146,7 @@ class RoutePoint:
 
 @dataclass
 class ZigZagArea:
-    """Editable rectangle that defines a generated zig-zag route."""
+    """Editable rectangle that defines a generated zig-zag mission."""
 
     center_x: float
     center_y: float
@@ -50,10 +159,10 @@ class ZigZagArea:
     start_y_sign: float = -1.0
 
 
-class RouteMapCanvas(QWidget):
+class MissionMapCanvas(QWidget):
     """Metric ENU map canvas with pan/zoom and waypoint editing."""
 
-    route_changed = pyqtSignal()
+    mission_changed = pyqtSignal()
     hover_changed = pyqtSignal(float, float)
     zoom_changed = pyqtSignal(int)
 
@@ -64,6 +173,8 @@ class RouteMapCanvas(QWidget):
         self.setMinimumSize(120, 420)
 
         self.points = []
+        self.loaded_routes = {}
+        self.active_route_id = None
         self.planning_enabled = False
         self.map_source = 'OpenStreetMap'
         self.px_per_meter = 8.0
@@ -72,16 +183,19 @@ class RouteMapCanvas(QWidget):
         self.dragging_view = False
         self.dragging_point_index = None
         self.last_mouse_pos = None
-        self.hover_world = RoutePoint(0.0, 0.0)
+        self.hover_world = MissionPoint(0.0, 0.0)
         self.default_point_z = 0.0
         self.default_point_speed = 1.0
         self.vehicle_pose = None
+        self.vehicle_poses = {}
+        self.fit_selected_on_next_vehicle_pose = False
         self.vehicle_overlay_model = None
         self.visual_markers = []
+        self.home_point = None
         self.active_tool = None
         self.manual_points = []
         self.zigzag_areas = []
-        self.route_items = []
+        self.mission_items = []
         self.selected_zigzag_index = None
         self.default_zigzag_lane_spacing = 2.0
         self.default_zigzag_turn_radius = 1.0
@@ -204,7 +318,7 @@ class RouteMapCanvas(QWidget):
         self.update()
 
     def set_active_tool(self, tool_name):
-        """Select an optional route generation tool."""
+        """Select an optional mission generation tool."""
         self.active_tool = tool_name if tool_name == 'zigzag' else None
         self.zigzag_drag_mode = None
         if self.active_tool != 'zigzag':
@@ -217,9 +331,9 @@ class RouteMapCanvas(QWidget):
         if speed is not None:
             self.default_point_speed = float(speed)
 
-    def set_route_points(self, points):
+    def set_mission_points(self, points, route_id='active', retain_loaded_routes=False):
         self.points = [
-            RoutePoint(
+            MissionPoint(
                 float(point.x),
                 float(point.y),
                 float(getattr(point, 'z', 0.0)),
@@ -227,27 +341,69 @@ class RouteMapCanvas(QWidget):
             )
             for point in points
         ]
+        if not retain_loaded_routes:
+            self.loaded_routes.clear()
+        self.active_route_id = str(route_id)
+        self.loaded_routes[self.active_route_id] = self.points
         self.manual_points = list(self.points)
         self.zigzag_areas.clear()
-        self.route_items = [('manual', index) for index in range(len(self.manual_points))]
+        self.mission_items = [('manual', index) for index in range(len(self.manual_points))]
         self.selected_zigzag_index = None
-        self.route_changed.emit()
+        self.mission_changed.emit()
         self.update()
 
-    def get_route_points(self):
+    def get_mission_points(self):
         return list(self.points)
 
-    def clear_route(self):
+    def clear_mission(self):
+        self.loaded_routes.clear()
+        self.active_route_id = None
         self.points.clear()
         self.manual_points.clear()
         self.zigzag_areas.clear()
-        self.route_items.clear()
+        self.mission_items.clear()
         self.selected_zigzag_index = None
-        self.route_changed.emit()
+        self.mission_changed.emit()
         self.update()
 
-    def set_vehicle_pose(self, x, y, yaw_rad=0.0):
-        self.vehicle_pose = (float(x), float(y), float(yaw_rad))
+    def set_vehicle_pose(self, x, y, yaw_rad=0.0, vehicle_id='active'):
+        pose = (float(x), float(y), float(yaw_rad))
+        self.vehicle_poses[str(vehicle_id)] = pose
+        if vehicle_id == 'active':
+            self.vehicle_pose = pose
+            if self.fit_selected_on_next_vehicle_pose:
+                self.fit_selected_on_next_vehicle_pose = False
+                self.fit_all_routes_and_selected_vehicle()
+                return
+        self.update()
+
+    def clear_vehicle_pose(self, vehicle_id='active'):
+        self.vehicle_poses.pop(str(vehicle_id), None)
+        if vehicle_id == 'active':
+            self.vehicle_pose = None
+        self.update()
+
+    def clear_vehicle_overlay(self):
+        self.vehicle_pose = None
+        self.vehicle_poses.clear()
+        self.vehicle_overlay_model = None
+        self.update()
+
+    def prepare_for_selected_vehicle(self):
+        """Discard the old selected pose and fit after the replacement first reports."""
+        self.vehicle_pose = None
+        self.vehicle_poses.pop('active', None)
+        self.home_point = None
+        self.fit_selected_on_next_vehicle_pose = True
+        self.update()
+
+    def set_vehicle_poses(self, vehicle_poses):
+        """Store vehicle poses used by content fitting and future fleet rendering."""
+        self.vehicle_poses = {
+            str(vehicle_id): (float(pose[0]), float(pose[1]), float(pose[2]))
+            for vehicle_id, pose in dict(vehicle_poses).items()
+        }
+        self.vehicle_pose = self.vehicle_poses.get('active', self.vehicle_pose)
         self.update()
 
     def set_vehicle_overlay_model(self, model):
@@ -258,20 +414,24 @@ class RouteMapCanvas(QWidget):
         self.visual_markers = list(markers)
         self.update()
 
+    def set_home_position(self, x, y):
+        self.home_point = MissionPoint(float(x), float(y))
+        self.update()
+
+    def clear_home_position(self):
+        self.home_point = None
+        self.update()
+
     def set_enu_ref(self, enuref):
         if len(enuref) < 3:
             return
 
-        is_zero = (
-            float(enuref[0]) == 0.0 and float(enuref[1]) == 0.0 and float(enuref[2]) == 0.0
-        )
+        is_zero = float(enuref[0]) == 0.0 and float(enuref[1]) == 0.0 and float(enuref[2]) == 0.0
         is_default = (
-            abs(float(enuref[0]) - 57.708870) < 1e-6
-            and abs(float(enuref[1]) - 11.974560) < 1e-6
+            abs(float(enuref[0]) - 57.708870) < 1e-6 and abs(float(enuref[1]) - 11.974560) < 1e-6
         )
         has_connected_vehicle = self.enuref != [0.0, 0.0, 0.0] and not (
-            abs(self.enuref[0] - 57.708870) < 1e-6
-            and abs(self.enuref[1] - 11.974560) < 1e-6
+            abs(self.enuref[0] - 57.708870) < 1e-6 and abs(self.enuref[1] - 11.974560) < 1e-6
         )
 
         if has_connected_vehicle and (is_zero or is_default):
@@ -280,10 +440,39 @@ class RouteMapCanvas(QWidget):
         self.enuref = [float(enuref[0]), float(enuref[1]), float(enuref[2])]
         self.update()
 
-    def fit_route(self):
+    def fit_content(self):
+        """Center and zoom the map to include every loaded route and vehicle."""
+        bounds_points = self._all_route_points()
+        vehicle_poses = dict(self.vehicle_poses)
+        if self.vehicle_pose is not None:
+            vehicle_poses.setdefault('active', self.vehicle_pose)
+        bounds_points.extend(MissionPoint(pose[0], pose[1]) for pose in vehicle_poses.values())
+        self._fit_points(bounds_points)
+
+    def fit_active_route_and_selected_vehicle(self):
+        """Fit only the active route and currently selected vehicle."""
         bounds_points = list(self.points)
         if self.vehicle_pose is not None:
-            bounds_points.append(RoutePoint(self.vehicle_pose[0], self.vehicle_pose[1]))
+            bounds_points.append(MissionPoint(self.vehicle_pose[0], self.vehicle_pose[1]))
+        self._fit_points(bounds_points)
+
+    def fit_all_routes_and_selected_vehicle(self):
+        """Fit every loaded route together with only the selected vehicle."""
+        bounds_points = self._all_route_points()
+        if self.vehicle_pose is not None:
+            bounds_points.append(MissionPoint(self.vehicle_pose[0], self.vehicle_pose[1]))
+        self._fit_points(bounds_points)
+
+    def _all_route_points(self):
+        return [point for route in self.loaded_routes.values() for point in route]
+
+    def _sync_active_route(self):
+        if self.active_route_id is None and self.points:
+            self.active_route_id = 'draft'
+        if self.active_route_id is not None:
+            self.loaded_routes[self.active_route_id] = self.points
+
+    def _fit_points(self, bounds_points):
         if not bounds_points:
             self.center_x = 0.0
             self.center_y = 0.0
@@ -320,13 +509,15 @@ class RouteMapCanvas(QWidget):
         return True
 
     def center_on_home(self):
-        self.center_on(0.0, 0.0)
+        if self.home_point is None:
+            return False
+        self.center_on(self.home_point.x, self.home_point.y)
         return True
 
     def screen_to_world(self, pos):
         x = self.center_x + (pos.x() - self.width() * 0.5) / self.px_per_meter
         y = self.center_y - (pos.y() - self.height() * 0.5) / self.px_per_meter
-        return RoutePoint(x, y, self.default_point_z, self.default_point_speed)
+        return MissionPoint(x, y, self.default_point_z, self.default_point_speed)
 
     def world_to_screen(self, point):
         x = self.width() * 0.5 + (point.x - self.center_x) * self.px_per_meter
@@ -402,9 +593,9 @@ class RouteMapCanvas(QWidget):
         if self.planning_enabled and event.button() == Qt.LeftButton:
             if event.modifiers() & Qt.ControlModifier:
                 self.manual_points.append(world_point)
-                self.route_items.append(('manual', len(self.manual_points) - 1))
-                self._rebuild_route_points()
-                self.route_changed.emit()
+                self.mission_items.append(('manual', len(self.manual_points) - 1))
+                self._rebuild_mission_points()
+                self.mission_changed.emit()
                 self.dragging_point_index = None
                 self.update()
                 return
@@ -419,9 +610,9 @@ class RouteMapCanvas(QWidget):
             index = self._nearest_manual_point_index(world_point)
             if index is not None:
                 self.manual_points.pop(index)
-                self._remove_route_item('manual', index)
-                self._rebuild_route_points()
-                self.route_changed.emit()
+                self._remove_mission_item('manual', index)
+                self._rebuild_mission_points()
+                self.mission_changed.emit()
                 self.update()
             return
 
@@ -444,8 +635,8 @@ class RouteMapCanvas(QWidget):
             existing_point = self.manual_points[self.dragging_point_index]
             existing_point.x = world_point.x
             existing_point.y = world_point.y
-            self._rebuild_route_points()
-            self.route_changed.emit()
+            self._rebuild_mission_points()
+            self.mission_changed.emit()
             self.update()
             return
 
@@ -506,10 +697,40 @@ class RouteMapCanvas(QWidget):
             self._draw_osm_tiles(painter)
 
         self._draw_grid(painter)
+        self._draw_home_helipad(painter)
         self._draw_zigzag_area(painter)
-        self._draw_route(painter)
+        self._draw_loaded_routes(painter)
+        self._draw_mission(painter)
         self._draw_visual_markers(painter)
         self._draw_vehicle(painter)
+
+    def _draw_home_helipad(self, painter):
+        if self.home_point is None:
+            return
+
+        center = self.world_to_screen(self.home_point)
+        radius = 10.0
+        rect = QRectF(center.x() - radius, center.y() - radius, radius * 2.0, radius * 2.0)
+
+        painter.save()
+        painter.setPen(QPen(QColor(17, 24, 39, 210), 1))
+        painter.setBrush(QColor(255, 255, 255, 215))
+        painter.drawEllipse(rect)
+
+        painter.setPen(QPen(QColor(220, 38, 38, 230), 2))
+        painter.drawLine(
+            QPointF(center.x() - radius * 0.38, center.y() - radius * 0.48),
+            QPointF(center.x() - radius * 0.38, center.y() + radius * 0.48),
+        )
+        painter.drawLine(
+            QPointF(center.x() + radius * 0.38, center.y() - radius * 0.48),
+            QPointF(center.x() + radius * 0.38, center.y() + radius * 0.48),
+        )
+        painter.drawLine(
+            QPointF(center.x() - radius * 0.38, center.y()),
+            QPointF(center.x() + radius * 0.38, center.y()),
+        )
+        painter.restore()
 
     def _draw_osm_tiles(self, painter):
         zoom = self._osm_zoom_level()
@@ -551,8 +772,8 @@ class RouteMapCanvas(QWidget):
                 east = tile_x_to_lon(tile_x + 1, zoom)
                 west_x, north_y = llh_to_enu(north, west, self.enuref)
                 east_x, south_y = llh_to_enu(south, east, self.enuref)
-                top_left = self.world_to_screen(RoutePoint(west_x, north_y))
-                bottom_right = self.world_to_screen(RoutePoint(east_x, south_y))
+                top_left = self.world_to_screen(MissionPoint(west_x, north_y))
+                bottom_right = self.world_to_screen(MissionPoint(east_x, south_y))
                 rect = QRectF(top_left, bottom_right).normalized()
 
                 pixmap = self.osm_tiles.get_tile(zoom, tile_x, tile_y)
@@ -579,18 +800,18 @@ class RouteMapCanvas(QWidget):
         painter.setPen(QPen(QColor(31, 41, 55, 80), 1))
         x = math.floor(left / grid_spacing_m) * grid_spacing_m
         while x <= right:
-            sx = self.world_to_screen(RoutePoint(x, 0.0)).x()
+            sx = self.world_to_screen(MissionPoint(x, 0.0)).x()
             painter.drawLine(int(sx), 0, int(sx), self.height())
             x += grid_spacing_m
 
         y = math.floor(bottom / grid_spacing_m) * grid_spacing_m
         while y <= top:
-            sy = self.world_to_screen(RoutePoint(0.0, y)).y()
+            sy = self.world_to_screen(MissionPoint(0.0, y)).y()
             painter.drawLine(0, int(sy), self.width(), int(sy))
             y += grid_spacing_m
 
         painter.setPen(QPen(QColor(31, 41, 55, 150), 2))
-        origin = self.world_to_screen(RoutePoint(0.0, 0.0))
+        origin = self.world_to_screen(MissionPoint(0.0, 0.0))
         painter.drawLine(int(origin.x()), 0, int(origin.x()), self.height())
         painter.drawLine(0, int(origin.y()), self.width(), int(origin.y()))
 
@@ -605,7 +826,7 @@ class RouteMapCanvas(QWidget):
                 return spacing
         return 10 * base
 
-    def _draw_route(self, painter):
+    def _draw_mission(self, painter):
         if len(self.points) > 1:
             painter.setPen(QPen(QColor('#facc15'), 3))
             for start, end in zip(self.points[:-1], self.points[1:]):
@@ -650,6 +871,15 @@ class RouteMapCanvas(QWidget):
             painter.drawRect(QRectF(screen.x() - half, screen.y() - half, half * 2, half * 2))
         painter.setOpacity(1.0)
 
+    def _draw_loaded_routes(self, painter):
+        """Draw non-active routes without obscuring the editable route."""
+        painter.setPen(QPen(QColor(51, 65, 85, 190), 2))
+        for route_id, route in self.loaded_routes.items():
+            if route_id == self.active_route_id or len(route) < 2:
+                continue
+            for start, end in zip(route[:-1], route[1:]):
+                painter.drawLine(self.world_to_screen(start), self.world_to_screen(end))
+
     def _nearest_manual_point_index(self, world_point, max_px=18.0):
         if not self.manual_points:
             return None
@@ -672,7 +902,7 @@ class RouteMapCanvas(QWidget):
             return
 
         handle = self._zigzag_hit_test(world_point)
-        self.zigzag_drag_start = RoutePoint(world_point.x, world_point.y)
+        self.zigzag_drag_start = MissionPoint(world_point.x, world_point.y)
         self.zigzag_area_start = None
 
         if handle is not None:
@@ -703,10 +933,10 @@ class RouteMapCanvas(QWidget):
             )
         )
         self.selected_zigzag_index = len(self.zigzag_areas) - 1
-        self.route_items.append(('zigzag', self.selected_zigzag_index))
+        self.mission_items.append(('zigzag', self.selected_zigzag_index))
         self.zigzag_drag_mode = 'draw'
         self.zigzag_area_start = self._copy_zigzag_area()
-        self._update_zigzag_routes()
+        self._update_zigzag_missions()
 
     def _zigzag_mouse_move(self, world_point):
         area = self._selected_zigzag_area()
@@ -729,14 +959,17 @@ class RouteMapCanvas(QWidget):
                 self.zigzag_area_start.center_y + world_point.y - self.zigzag_drag_start.y
             )
         elif self.zigzag_drag_mode == 'rotate':
-            area.yaw = math.atan2(
-                world_point.y - area.center_y,
-                world_point.x - area.center_x,
-            ) - math.pi * 0.5
+            area.yaw = (
+                math.atan2(
+                    world_point.y - area.center_y,
+                    world_point.x - area.center_x,
+                )
+                - math.pi * 0.5
+            )
         elif self.zigzag_drag_mode.startswith('resize') and self.zigzag_resize_anchor:
             self._resize_zigzag_area(world_point)
 
-        self._update_zigzag_routes()
+        self._update_zigzag_missions()
 
     def _zigzag_mouse_release(self):
         self.zigzag_drag_mode = None
@@ -841,8 +1074,7 @@ class RouteMapCanvas(QWidget):
         handles = []
         for area_index in range(len(self.zigzag_areas) - 1, -1, -1):
             handles.extend(
-                (area_index, name, point)
-                for name, point in self._zigzag_handle_points(area_index)
+                (area_index, name, point) for name, point in self._zigzag_handle_points(area_index)
             )
         max_distance = 14.0 / self.px_per_meter
         for area_index, name, point in handles:
@@ -881,7 +1113,9 @@ class RouteMapCanvas(QWidget):
         return None
 
     def _zigzag_handle_points(self, area_index=None):
-        area = self._selected_zigzag_area() if area_index is None else self.zigzag_areas[area_index]
+        area = (
+            self._selected_zigzag_area() if area_index is None else self.zigzag_areas[area_index]
+        )
         if area is None:
             return []
         half_l = area.length * 0.5
@@ -897,10 +1131,7 @@ class RouteMapCanvas(QWidget):
             ('left', -half_l, 0.0),
             ('rotate', 0.0, half_w + max(24.0 / self.px_per_meter, 0.5)),
         ]
-        return [
-            (name, self._zigzag_local_to_world(x, y, area))
-            for name, x, y in local_handles
-        ]
+        return [(name, self._zigzag_local_to_world(x, y, area)) for name, x, y in local_handles]
 
     def _zigzag_area_at(self, world_point):
         for area_index in range(len(self.zigzag_areas) - 1, -1, -1):
@@ -916,13 +1147,13 @@ class RouteMapCanvas(QWidget):
         dy = world_point.y - area.center_y
         cos_yaw = math.cos(area.yaw)
         sin_yaw = math.sin(area.yaw)
-        return RoutePoint(dx * cos_yaw + dy * sin_yaw, -dx * sin_yaw + dy * cos_yaw)
+        return MissionPoint(dx * cos_yaw + dy * sin_yaw, -dx * sin_yaw + dy * cos_yaw)
 
     def _zigzag_local_to_world(self, x, y, area=None):
         area = area or self._selected_zigzag_area()
         cos_yaw = math.cos(area.yaw)
         sin_yaw = math.sin(area.yaw)
-        return RoutePoint(
+        return MissionPoint(
             area.center_x + x * cos_yaw - y * sin_yaw,
             area.center_y + x * sin_yaw + y * cos_yaw,
             self.default_point_z,
@@ -930,7 +1161,9 @@ class RouteMapCanvas(QWidget):
         )
 
     def _zigzag_corners(self, area_index=None):
-        area = self._selected_zigzag_area() if area_index is None else self.zigzag_areas[area_index]
+        area = (
+            self._selected_zigzag_area() if area_index is None else self.zigzag_areas[area_index]
+        )
         if area is None:
             return []
         half_l = area.length * 0.5
@@ -942,30 +1175,31 @@ class RouteMapCanvas(QWidget):
             self._zigzag_local_to_world(-half_l, half_w, area),
         ]
 
-    def _update_zigzag_routes(self):
-        self._rebuild_route_points()
-        self.route_changed.emit()
+    def _update_zigzag_missions(self):
+        self._rebuild_mission_points()
+        self.mission_changed.emit()
         self.update()
 
-    def _rebuild_route_points(self):
+    def _rebuild_mission_points(self):
         points = []
-        for item_type, index in self.route_items:
+        for item_type, index in self.mission_items:
             if item_type == 'manual' and 0 <= index < len(self.manual_points):
                 points.append(self.manual_points[index])
             elif item_type == 'zigzag' and 0 <= index < len(self.zigzag_areas):
                 points.extend(self._generate_zigzag_points(self.zigzag_areas[index]))
         self.points = points
+        self._sync_active_route()
 
-    def _remove_route_item(self, item_type, removed_index):
+    def _remove_mission_item(self, item_type, removed_index):
         updated_items = []
-        for route_item_type, index in self.route_items:
-            if route_item_type == item_type:
+        for mission_item_type, index in self.mission_items:
+            if mission_item_type == item_type:
                 if index == removed_index:
                     continue
                 if index > removed_index:
                     index -= 1
-            updated_items.append((route_item_type, index))
-        self.route_items = updated_items
+            updated_items.append((mission_item_type, index))
+        self.mission_items = updated_items
 
     def _generate_zigzag_points(self, area):
         if area is None or area.length < 0.1 or area.width < 0.1:
@@ -1082,9 +1316,9 @@ class RouteMapCanvas(QWidget):
         selected_action = menu.exec_(global_pos)
         if selected_action == delete_action:
             self.zigzag_areas.pop(area_index)
-            self._remove_route_item('zigzag', area_index)
+            self._remove_mission_item('zigzag', area_index)
             self.selected_zigzag_index = None
-            self._update_zigzag_routes()
+            self._update_zigzag_missions()
 
     def _create_context_spin_box(self, value, minimum, maximum, step):
         spin_box = QDoubleSpinBox()
@@ -1110,20 +1344,27 @@ class RouteMapCanvas(QWidget):
         if 0 <= area_index < len(self.zigzag_areas):
             self.zigzag_areas[area_index].lane_spacing = max(0.1, float(value))
             self.default_zigzag_lane_spacing = self.zigzag_areas[area_index].lane_spacing
-            self._update_zigzag_routes()
+            self._update_zigzag_missions()
 
     def _set_zigzag_turn_radius(self, area_index, value):
         if 0 <= area_index < len(self.zigzag_areas):
             self.zigzag_areas[area_index].turn_radius = max(0.0, float(value))
             self.default_zigzag_turn_radius = self.zigzag_areas[area_index].turn_radius
-            self._update_zigzag_routes()
+            self._update_zigzag_missions()
 
     def _draw_vehicle(self, painter):
+        painter.setPen(QPen(QColor('#1e3a8a'), 2))
+        painter.setBrush(QColor('#60a5fa'))
+        for vehicle_id, (x, y, _yaw) in self.vehicle_poses.items():
+            if vehicle_id == 'active':
+                continue
+            painter.drawEllipse(self.world_to_screen(MissionPoint(x, y)), 5.0, 5.0)
+
         if self.vehicle_pose is None:
             return
 
         x, y, yaw = self.vehicle_pose
-        center = self.world_to_screen(RoutePoint(x, y))
+        center = self.world_to_screen(MissionPoint(x, y))
 
         self._draw_vehicle_urdf_overlay(painter, x, y, yaw)
 
@@ -1150,6 +1391,14 @@ class RouteMapCanvas(QWidget):
         painter.save()
         painter.setOpacity(VEHICLE_OVERLAY_OPACITY)
         for shape in shapes:
+            is_rotor = getattr(shape, 'role', '') == 'rotor'
+            if is_rotor:
+                painter.setOpacity(VEHICLE_ROTOR_OVERLAY_OPACITY)
+            else:
+                painter.setOpacity(VEHICLE_OVERLAY_OPACITY)
+
+            shape_color = VEHICLE_ROTOR_OVERLAY_COLOR if is_rotor else shape.color
+            outline_color = VEHICLE_ROTOR_OVERLAY_COLOR if is_rotor else '#111827'
             if shape.kind == 'polygon':
                 polygon = QPolygonF(
                     [
@@ -1158,16 +1407,16 @@ class RouteMapCanvas(QWidget):
                     ]
                 )
                 if len(polygon) >= 3:
-                    painter.setPen(QPen(QColor('#111827'), 1))
-                    painter.setBrush(QColor(shape.color))
+                    painter.setPen(QPen(QColor(outline_color), 1))
+                    painter.setBrush(QColor(shape_color))
                     painter.drawPolygon(polygon)
             elif shape.kind == 'circle':
                 center = self._vehicle_local_to_screen(
                     vehicle_x, vehicle_y, vehicle_yaw, shape.x, shape.y
                 )
                 radius = max(shape.width, shape.length) * 0.5 * self.px_per_meter
-                painter.setPen(QPen(QColor('#111827'), 1))
-                painter.setBrush(QColor(shape.color))
+                painter.setPen(QPen(QColor(outline_color), 1))
+                painter.setBrush(QColor(shape_color))
                 painter.drawEllipse(center, radius, radius)
             else:
                 polygon = self._vehicle_rect_to_screen_polygon(
@@ -1180,8 +1429,8 @@ class RouteMapCanvas(QWidget):
                     shape.width,
                     shape.yaw,
                 )
-                painter.setPen(QPen(QColor('#111827'), 1))
-                painter.setBrush(QColor(shape.color))
+                painter.setPen(QPen(QColor(outline_color), 1))
+                painter.setBrush(QColor(shape_color))
                 painter.drawPolygon(polygon)
         painter.restore()
 
@@ -1214,13 +1463,13 @@ class RouteMapCanvas(QWidget):
         painter.setPen(QPen(color, width_px))
         previous = None
         for point in points:
-            screen = self.world_to_screen(RoutePoint(point.x, point.y))
+            screen = self.world_to_screen(MissionPoint(point.x, point.y))
             if previous is not None:
                 painter.drawLine(previous, screen)
             previous = screen
 
     def _draw_marker_solid(self, painter, marker, pose, color):
-        center = self.world_to_screen(RoutePoint(pose.position.x, pose.position.y))
+        center = self.world_to_screen(MissionPoint(pose.position.x, pose.position.y))
         width_px = max(4.0, getattr(marker.scale, 'x', 0.2) * self.px_per_meter)
         height_px = max(4.0, getattr(marker.scale, 'y', 0.2) * self.px_per_meter)
         painter.setPen(QPen(color.darker(130), 1))
@@ -1244,7 +1493,7 @@ class RouteMapCanvas(QWidget):
         yaw = self._yaw_from_orientation(pose.orientation)
         length_px = max(14.0, getattr(marker.scale, 'x', 0.4) * self.px_per_meter)
         width_px = max(8.0, getattr(marker.scale, 'y', 0.2) * self.px_per_meter)
-        center = self.world_to_screen(RoutePoint(pose.position.x, pose.position.y))
+        center = self.world_to_screen(MissionPoint(pose.position.x, pose.position.y))
         tip = center + QPointF(math.cos(yaw) * length_px, -math.sin(yaw) * length_px)
         left = center + QPointF(
             math.cos(yaw + 2.45) * width_px,
@@ -1263,7 +1512,7 @@ class RouteMapCanvas(QWidget):
         if not text:
             return
 
-        center = self.world_to_screen(RoutePoint(pose.position.x, pose.position.y))
+        center = self.world_to_screen(MissionPoint(pose.position.x, pose.position.y))
         height_px = max(14.0, getattr(marker.scale, 'z', 1.0) * self.px_per_meter)
         font = QFont(painter.font())
         font.setBold(True)
@@ -1280,10 +1529,18 @@ class RouteMapCanvas(QWidget):
         sin_yaw = math.sin(vehicle_yaw)
         world_x = vehicle_x + local_x * cos_yaw - local_y * sin_yaw
         world_y = vehicle_y + local_x * sin_yaw + local_y * cos_yaw
-        return self.world_to_screen(RoutePoint(world_x, world_y))
+        return self.world_to_screen(MissionPoint(world_x, world_y))
 
     def _vehicle_rect_to_screen_polygon(
-        self, vehicle_x, vehicle_y, vehicle_yaw, local_x, local_y, length, width, local_yaw
+        self,
+        vehicle_x,
+        vehicle_y,
+        vehicle_yaw,
+        local_x,
+        local_y,
+        length,
+        width,
+        local_yaw,
     ):
         points = []
         for px, py in (
@@ -1311,7 +1568,7 @@ class RouteMapCanvas(QWidget):
         ):
             world_x = center_x + px * math.cos(yaw) - py * math.sin(yaw)
             world_y = center_y + px * math.sin(yaw) + py * math.cos(yaw)
-            points.append(self.world_to_screen(RoutePoint(world_x, world_y)))
+            points.append(self.world_to_screen(MissionPoint(world_x, world_y)))
         return QPolygonF(points)
 
     @staticmethod
@@ -1334,3 +1591,720 @@ class RouteMapCanvas(QWidget):
         z = getattr(orientation, 'z', 0.0)
         w = getattr(orientation, 'w', 1.0)
         return math.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+
+
+ACTIVE_BUTTON_STYLE = (
+    'QPushButton:checked {'
+    ' background-color: #2563eb;'
+    ' color: white;'
+    ' border: 1px solid #1d4ed8;'
+    '}'
+    'QPushButton:disabled {'
+    ' background-color: #374151;'
+    ' color: #9ca3af;'
+    ' border: 1px solid #4b5563;'
+    '}'
+)
+
+OPENSTREETMAP_TILE_SERVER_URL = 'http://c.osm.rrze.fau.de/osmhd'
+OPENSTREETMAP_CACHE_DIR = os.path.join(
+    os.environ.get(
+        'WAYWISER_WS',
+        os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../..')),
+    ),
+    'resources',
+    'control_tower',
+    'osm',
+)
+
+POPUP_MENU_STYLE = (
+    'QMenu {'
+    ' background-color: #2563eb;'
+    ' color: white;'
+    ' border: 1px solid #1d4ed8;'
+    '}'
+    'QMenu::item {'
+    ' padding: 5px 18px;'
+    '}'
+    'QMenu::item:selected {'
+    ' background-color: #1d4ed8;'
+    '}'
+    'QMenu::indicator:checked {'
+    ' background-color: white;'
+    '}'
+)
+
+
+class UpMenuButton(QPushButton):
+    """Button with a small top-right popup arrow."""
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setBrush(QColor('#ffffff'))
+        painter.setPen(Qt.NoPen)
+        x = self.width() - 12
+        y = 5
+        painter.drawPolygon(
+            QPolygon(
+                [
+                    QPoint(x, y + 5),
+                    QPoint(x + 4, y),
+                    QPoint(x + 8, y + 5),
+                ]
+            )
+        )
+
+
+class MissionPlannerWidget(QWidget):
+    """Composite widget containing the map canvas and mission settings."""
+
+    send_mission_requested = pyqtSignal(list, float, float)
+    osm_refresh_requested = pyqtSignal()
+
+    def __init__(self, ui_base_path, parent=None):
+        super().__init__(parent)
+        loadUi(os.path.join(ui_base_path, 'mission_planner.ui'), self)
+
+        self.map_canvas = MissionMapCanvas(self)
+        self.map_layout.addWidget(self.map_canvas)
+        self.map_canvas.mission_changed.connect(self.update_mission_status)
+        self.clear_mission_button.clicked.connect(self.map_canvas.clear_mission)
+        self._wrap_mission_controls_in_scroll_area()
+
+        self._setup_tools_menu()
+        self.load_mission_button.setText('Load')
+        self.clear_mission_button.setText('Clear')
+        self.save_mission_button.setText('Save')
+        self.send_mission_button.setText('Send')
+        self._setup_mission_value_row()
+
+        # Connect bottom controls buttons in plan mode
+        self.load_mission_button.clicked.connect(self.load_mission)
+        self.send_mission_button.clicked.connect(self.request_send_mission)
+        self.save_mission_button.clicked.connect(self.save_mission)
+        self.apply_speed_button.clicked.connect(self.apply_mission_values)
+        self.speed_spin_box.valueChanged.connect(self.update_default_mission_point_values)
+        self.height_spin_box.valueChanged.connect(self.update_default_mission_point_values)
+
+        self._is_quadcopter = False
+        self._vehicle_connected = False
+        self.map_config_widget = None
+        self.update_mission_status()
+        self.set_vehicle_type('generic')
+
+        # Connect hover coordinates signal and initialize label text, aligning to left
+        self.map_canvas.hover_changed.connect(self.update_hover_coordinates)
+        self.map_canvas.zoom_changed.connect(self.update_zoom_status)
+        self.hover_coordinates = None
+        self.current_zoom = self.map_canvas._osm_zoom_level()
+        self._update_planning_status_label()
+        self.planning_status_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self._setup_map_config_row()
+        self._setup_osm_config_controls()
+        self.mission_summary_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.map_status_layout.addWidget(
+            self.mission_summary_label, 0, Qt.AlignRight | Qt.AlignVCenter
+        )
+        self.map_status_layout.addWidget(
+            self.osm_server_status_label, 0, Qt.AlignRight | Qt.AlignVCenter
+        )
+        self.map_status_layout.setStretch(0, 1)
+        self.update_default_mission_point_values()
+
+        self.mission_controls_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        for index in range(self.buttons_layout.count()):
+            self.buttons_layout.setStretch(index, 1)
+
+        self._update_controls_visibility()
+        QTimer.singleShot(0, self.adjust_mission_controls_height)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._sync_mission_controls_width()
+
+    def _wrap_mission_controls_in_scroll_area(self):
+        controls_index = self.mission_planner_layout.indexOf(self.mission_controls_frame)
+        if controls_index < 0:
+            return
+
+        map_index = self.mission_planner_layout.indexOf(self.map_frame)
+        self.mission_planner_layout.removeWidget(self.map_frame)
+        self.mission_planner_layout.removeWidget(self.mission_controls_frame)
+        self.mission_controls_scroll_area = QScrollArea(self)
+        self.mission_controls_scroll_area.setWidgetResizable(False)
+        self.mission_controls_scroll_area.setFrameShape(QFrame.NoFrame)
+        self.mission_controls_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.mission_controls_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.mission_controls_scroll_area.setMinimumHeight(0)
+        self.mission_controls_scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
+        self.mission_controls_scroll_area.setWidget(self.mission_controls_frame)
+
+        self.mission_vertical_splitter = QSplitter(Qt.Vertical, self)
+        self.mission_vertical_splitter.setChildrenCollapsible(False)
+        self.mission_vertical_splitter.setHandleWidth(8)
+        self.mission_vertical_splitter.addWidget(self.map_frame)
+        self.mission_vertical_splitter.addWidget(self.mission_controls_scroll_area)
+        self.mission_vertical_splitter.setStretchFactor(0, 1)
+        self.mission_vertical_splitter.setStretchFactor(1, 0)
+        self.mission_planner_layout.insertWidget(
+            map_index if map_index >= 0 else controls_index,
+            self.mission_vertical_splitter,
+        )
+
+    def adjust_mission_controls_height(self):
+        if not hasattr(self, 'mission_vertical_splitter'):
+            return
+
+        total_height = self.mission_vertical_splitter.height()
+        if total_height <= 0:
+            QTimer.singleShot(0, self.adjust_mission_controls_height)
+            return
+
+        self.mission_controls_frame.adjustSize()
+        controls_size = self.mission_controls_frame.sizeHint()
+        viewport_width = max(self.mission_controls_scroll_area.viewport().width(), 1)
+        self.mission_controls_frame.resize(
+            max(controls_size.width(), viewport_width), controls_size.height()
+        )
+        frame = self.mission_controls_scroll_area.frameWidth() * 2
+        needed_height = controls_size.height() + frame + 2
+        max_controls_height = max(needed_height, int(total_height * 0.55))
+        controls_height = min(needed_height, max_controls_height)
+        map_height = max(1, total_height - controls_height)
+        self.mission_vertical_splitter.setSizes([map_height, controls_height])
+
+    def _sync_mission_controls_width(self):
+        if not hasattr(self, 'mission_controls_scroll_area'):
+            return
+        controls_size = self.mission_controls_frame.sizeHint()
+        viewport_width = max(self.mission_controls_scroll_area.viewport().width(), 1)
+        self.mission_controls_frame.resize(
+            max(controls_size.width(), viewport_width),
+            self.mission_controls_frame.height(),
+        )
+
+    def _setup_mission_value_row(self):
+        self.apply_speed_button.setText('Apply')
+        self.apply_speed_button.setMinimumWidth(self.apply_speed_button.sizeHint().width() + 16)
+        self.apply_speed_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.apply_height_button.hide()
+        self.apply_height_button.setVisible(False)
+
+        old_buttons_item = self.mission_controls_layout.itemAtPosition(1, 0)
+        if old_buttons_item is not None and old_buttons_item.layout() is self.buttons_layout:
+            self.mission_controls_layout.removeItem(old_buttons_item)
+        old_status_item = self.mission_controls_layout.itemAtPosition(2, 0)
+        if old_status_item is not None and old_status_item.layout() is self.map_status_layout:
+            self.mission_controls_layout.removeItem(old_status_item)
+
+        self.mission_controls_layout.removeWidget(self.apply_speed_button)
+        self.mission_controls_layout.removeWidget(self.apply_height_button)
+        self.mission_controls_layout.removeWidget(self.mission_summary_label)
+        self.mission_controls_layout.removeWidget(self.height_label)
+        self.mission_controls_layout.removeWidget(self.height_spin_box)
+        self.mission_controls_layout.removeWidget(self.speed_label)
+        self.mission_controls_layout.removeWidget(self.speed_spin_box)
+        self.mission_controls_layout.addWidget(self.speed_label, 1, 0)
+        self.mission_controls_layout.addWidget(self.speed_spin_box, 1, 1)
+        self.mission_controls_layout.addWidget(self.height_label, 1, 3)
+        self.mission_controls_layout.addWidget(self.height_spin_box, 1, 4)
+        self.mission_controls_layout.addWidget(self.apply_speed_button, 1, 6)
+        self.mission_controls_layout.addLayout(self.buttons_layout, 2, 0, 1, 7)
+        self.speed_spin_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.height_spin_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.mission_controls_layout.setColumnStretch(0, 0)
+        self.mission_controls_layout.setColumnStretch(1, 1)
+        self.mission_controls_layout.setColumnStretch(2, 0)
+        self.mission_controls_layout.setColumnStretch(3, 0)
+        self.mission_controls_layout.setColumnStretch(4, 1)
+        self.mission_controls_layout.setColumnStretch(5, 0)
+        self.mission_controls_layout.setColumnStretch(6, 0)
+
+    def _setup_tools_menu(self):
+        self.tools_button = UpMenuButton('Tools')
+        self.tools_button.setCheckable(True)
+        self.tools_button.setToolTip('Mission generation tools')
+        self.tools_menu = QMenu(self.tools_button)
+        self.tools_menu.setStyleSheet(POPUP_MENU_STYLE)
+        self.zigzag_action = self.tools_menu.addAction('Zig-Zag')
+        self.zigzag_action.setCheckable(True)
+        self.zigzag_action.toggled.connect(self.set_zigzag_tool_enabled)
+        self.tools_button.clicked.connect(self.show_tools_menu)
+        self.tools_button.setStyleSheet(ACTIVE_BUTTON_STYLE)
+        self.buttons_layout.insertWidget(0, self.tools_button)
+
+    def _setup_map_config_row(self):
+        self.map_config_layout = QHBoxLayout()
+        self.map_config_layout.setContentsMargins(0, 0, 0, 0)
+        self.mission_controls_layout.addLayout(self.map_config_layout, 0, 0, 1, 7)
+        self.mission_controls_layout.addLayout(self.map_status_layout, 3, 0, 1, 7)
+
+    def _setup_osm_config_controls(self):
+        self.osm_url_button = UpMenuButton('OSM URL')
+        self.osm_url_button.setCheckable(True)
+        self.osm_url_button.setFixedWidth(116)
+        self.osm_url_button.setToolTip('Show OSM tile server URL')
+        self.osm_url_button.clicked.connect(self.show_osm_url_menu)
+        self.osm_url_menu = QMenu(self.osm_url_button)
+        self.osm_url_menu.setStyleSheet(
+            'QMenu { background-color: white; border: 1px solid #cbd5e1; }'
+        )
+        self.osm_url_menu.aboutToHide.connect(lambda: self.osm_url_button.setChecked(False))
+        self.osm_url_popup = QWidget(self.osm_url_menu)
+        self.osm_url_popup.setMinimumWidth(360)
+        osm_url_popup_layout = QVBoxLayout(self.osm_url_popup)
+        osm_url_popup_layout.setContentsMargins(8, 8, 8, 8)
+        osm_url_popup_layout.setSpacing(0)
+        self.osm_url_edit = QLineEdit()
+        self.osm_url_edit.setMinimumWidth(340)
+        self.osm_url_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        osm_url_popup_layout.addWidget(self.osm_url_edit)
+        self.osm_url_action = QWidgetAction(self.osm_url_menu)
+        self.osm_url_action.setDefaultWidget(self.osm_url_popup)
+        self.osm_url_menu.addAction(self.osm_url_action)
+        self.reset_view_button = UpMenuButton('Center View')
+        self.reset_view_button.setMinimumWidth(self.reset_view_button.sizeHint().width() + 16)
+        self.reset_view_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.reset_view_button.setToolTip('Center the map without changing zoom')
+        self.reset_view_menu = QMenu(self.reset_view_button)
+        self.reset_view_menu.setStyleSheet(POPUP_MENU_STYLE)
+        self.reset_view_vehicle_action = self.reset_view_menu.addAction('Vehicle')
+        self.reset_view_home_action = self.reset_view_menu.addAction('Home')
+        self.reset_view_vehicle_action.triggered.connect(
+            lambda checked=False: self.center_map_on_vehicle()
+        )
+        self.reset_view_home_action.triggered.connect(
+            lambda checked=False: self.center_map_on_home()
+        )
+        self.reset_view_button.clicked.connect(self.show_reset_view_menu)
+        self.osm_server_status_label = QLabel('OSM Server: Ready')
+        self.osm_server_status_label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.osm_server_status_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.osm_cache_label = QLabel('Cache dir')
+        self.osm_cache_edit = QLineEdit()
+        self.osm_cache_label.hide()
+        self.osm_cache_edit.hide()
+        self.osm_cache_browse_button = QPushButton('Cache Dir')
+        self.osm_cache_browse_button.setMinimumWidth(104)
+        self.osm_cache_browse_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.osm_cache_browse_button.setToolTip('Select OSM tile cache directory')
+        self.osm_refresh_button = QPushButton('Refresh Map')
+        self.osm_refresh_button.setMinimumWidth(96)
+        self.osm_refresh_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.osm_refresh_button.setToolTip('Refresh local OSM tiles')
+        self.osm_refresh_button.hide()
+        self.osm_refresh_button.clicked.connect(self.osm_refresh_requested.emit)
+        self.fit_content_button = QPushButton('Fit Content')
+        self.fit_content_button.setMinimumWidth(104)
+        self.fit_content_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.fit_content_button.setToolTip(
+            'Center and zoom to show all loaded routes and vehicles'
+        )
+        self.fit_content_button.clicked.connect(self.fit_content)
+        self.map_config_layout.addWidget(self.osm_refresh_button)
+        self.map_config_layout.addWidget(self.fit_content_button)
+        self.map_config_layout.addWidget(self.osm_url_button)
+        self.map_config_layout.addWidget(self.osm_cache_browse_button)
+        self.map_config_layout.addWidget(self.reset_view_button)
+        self.map_config_layout.addStretch(1)
+        self.osm_url_edit.editingFinished.connect(self.apply_osm_config_edits)
+        self.osm_cache_edit.editingFinished.connect(self.apply_osm_config_edits)
+        self.osm_cache_browse_button.clicked.connect(self.browse_osm_cache_dir)
+
+    def set_osm_config_mode(self, map_source):
+        is_openstreetmap = map_source == 'OpenStreetMap'
+        is_local_osm = map_source == 'Local OSM server'
+        show_osm_controls = is_openstreetmap or is_local_osm
+        self.osm_url_button.setVisible(show_osm_controls)
+        if not show_osm_controls:
+            self.osm_url_button.setChecked(False)
+            self.osm_url_menu.hide()
+        self._update_osm_url_edit_visibility()
+        self.osm_server_status_label.setVisible(is_local_osm)
+        self.osm_url_edit.setReadOnly(is_openstreetmap)
+        self.osm_cache_browse_button.setVisible(show_osm_controls)
+        self.osm_refresh_button.setVisible(show_osm_controls)
+        self.osm_cache_label.setVisible(False)
+        self.osm_cache_edit.setVisible(False)
+        if not is_local_osm:
+            self.set_osm_server_status('Ready')
+        QTimer.singleShot(0, self.adjust_mission_controls_height)
+
+    def toggle_osm_url_edit(self):
+        self.show_osm_url_menu()
+
+    def _update_osm_url_edit_visibility(self):
+        if self.osm_url_button.isHidden() or not self.osm_url_button.isChecked():
+            self.osm_url_menu.hide()
+
+    def show_osm_url_menu(self):
+        if self.osm_url_button.isHidden():
+            return
+        self.osm_url_button.setChecked(True)
+        menu_size = self.osm_url_menu.sizeHint()
+        popup_pos = self.osm_url_button.mapToGlobal(QPoint(0, -menu_size.height()))
+        self.osm_url_menu.exec_(popup_pos)
+
+    def show_reset_view_menu(self):
+        self.reset_view_vehicle_action.setEnabled(self.map_canvas.vehicle_pose is not None)
+        menu_size = self.reset_view_menu.sizeHint()
+        popup_pos = self.reset_view_button.mapToGlobal(QPoint(0, -menu_size.height()))
+        self.reset_view_menu.exec_(popup_pos)
+
+    def center_map_on_vehicle(self):
+        self.map_canvas.center_on_vehicle()
+
+    def center_map_on_home(self):
+        self.map_canvas.center_on_home()
+
+    def fit_content(self):
+        self.map_canvas.fit_content()
+
+    def set_osm_server_status(self, status):
+        status = 'Busy' if str(status).lower() == 'busy' else 'Ready'
+        self.osm_server_status_label.setText(f'OSM Server: {status}')
+        self.osm_server_status_label.updateGeometry()
+        if status == 'Busy':
+            self.osm_server_status_label.setStyleSheet('color: #b45309; font-weight: 600;')
+        else:
+            self.osm_server_status_label.setStyleSheet('color: #047857; font-weight: 600;')
+
+    def show_tools_menu(self):
+        menu_size = self.tools_menu.sizeHint()
+        popup_pos = self.tools_button.mapToGlobal(QPoint(0, -menu_size.height()))
+        self.tools_menu.exec_(popup_pos)
+        self.tools_button.setChecked(self.map_canvas.active_tool is not None)
+
+    def set_zigzag_tool_enabled(self, enabled):
+        self.map_canvas.set_active_tool('zigzag' if enabled else None)
+        self.tools_button.setChecked(bool(enabled))
+        self._update_controls_visibility()
+
+    def set_planning_enabled(self, enabled):
+        self.map_canvas.set_planning_enabled(enabled)
+        if not enabled and hasattr(self, 'zigzag_action'):
+            self.zigzag_action.blockSignals(True)
+            self.zigzag_action.setChecked(False)
+            self.zigzag_action.blockSignals(False)
+            self.tools_button.setChecked(False)
+        self._update_controls_visibility()
+        QTimer.singleShot(0, self.adjust_mission_controls_height)
+
+    def set_vehicle_connected(self, connected):
+        """Enable sending missions only when a vehicle node is connected."""
+        self._vehicle_connected = bool(connected)
+        self._update_controls_visibility()
+
+    def update_hover_coordinates(self, x, y):
+        """Update coordinates label with dynamic cursor position and map zoom level."""
+        if not math.isfinite(x) or not math.isfinite(y):
+            self.hover_coordinates = None
+        else:
+            self.hover_coordinates = (x, y)
+        self._update_planning_status_label()
+
+    def update_zoom_status(self, zoom):
+        self.current_zoom = zoom
+        self._update_planning_status_label()
+
+    def _update_planning_status_label(self):
+        status = f'Zoom={self.current_zoom}'
+        if self.hover_coordinates is not None:
+            x, y = self.hover_coordinates
+            status += f'    x={x:+.2f} m  y={y:+.2f} m'
+        self.planning_status_label.setText(status)
+
+    def update_default_mission_point_values(self):
+        self.map_canvas.set_default_point_values(z=self.altitude(), speed=self.speed())
+
+    def _update_controls_visibility(self):
+        """Show mission-planning controls only in planning mode."""
+        enabled = self.is_planning_enabled()
+        self.mission_summary_label.setVisible(enabled)
+        self.tools_button.setVisible(enabled)
+        self.load_mission_button.setVisible(enabled)
+        self.clear_mission_button.setVisible(enabled)
+        self.save_mission_button.setVisible(enabled)
+        self.send_mission_button.setVisible(enabled and self._vehicle_connected)
+        self.send_mission_button.setEnabled(enabled and self._vehicle_connected)
+        self.send_mission_button.setToolTip('')
+        self.speed_label.setVisible(enabled)
+        self.speed_spin_box.setVisible(enabled)
+        self.apply_speed_button.setVisible(enabled)
+        self.height_label.setVisible(enabled)
+        self.height_spin_box.setVisible(enabled)
+        self.apply_height_button.setVisible(False)
+
+    def browse_osm_cache_dir(self):
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            'Select OSM Tile Cache Directory',
+            self.osm_cache_edit.text() or os.path.expanduser('~'),
+        )
+        if directory:
+            self.osm_cache_edit.setText(directory)
+            self.apply_osm_config_edits()
+
+    def apply_osm_config_edits(self):
+        self.set_tile_server_url(self.osm_url_edit.text())
+        self.set_tile_cache_dir(self.osm_cache_edit.text())
+        self.map_canvas.refresh_tiles()
+
+    def set_osm_controls_visible(self, visible):
+        self.osm_url_button.setVisible(bool(visible))
+        if not visible:
+            self.osm_url_button.setChecked(False)
+        self._update_osm_url_edit_visibility()
+        self.osm_cache_browse_button.setVisible(bool(visible))
+        self.osm_refresh_button.setVisible(bool(visible))
+        self.osm_cache_label.setVisible(False)
+        self.osm_cache_edit.setVisible(False)
+
+    def apply_mission_values(self):
+        if not self.map_canvas.points:
+            from PyQt5.QtWidgets import QMessageBox
+
+            QMessageBox.warning(self, 'Apply Mission Values', 'No mission points to update.')
+            return
+        self.apply_speed_to_mission(show_message=False)
+        self.apply_height_to_mission(show_message=False)
+        from PyQt5.QtWidgets import QMessageBox
+
+        QMessageBox.information(
+            self,
+            'Apply Mission Values',
+            f'Updated {len(self.map_canvas.points)} mission points.',
+        )
+
+    def apply_speed_to_mission(self, show_message=True):
+        """Apply the current speed value to every point in the planned mission."""
+        from PyQt5.QtWidgets import QMessageBox
+
+        points = self.map_canvas.points
+        if not points:
+            if show_message:
+                QMessageBox.warning(self, 'Apply Mission speed', 'No mission points to update.')
+            return
+
+        mission_speed = self.speed()
+        for point in points:
+            point.speed = mission_speed
+        self.map_canvas.update()
+        if show_message:
+            QMessageBox.information(
+                self,
+                'Apply Mission speed',
+                f'Updated {len(points)} mission points to speed={mission_speed:.2f} m/s.',
+            )
+
+    def apply_height_to_mission(self, show_message=True):
+        """Apply the current z value to every point in the planned mission."""
+        from PyQt5.QtWidgets import QMessageBox
+
+        points = self.map_canvas.points
+        if not points:
+            if show_message:
+                QMessageBox.warning(self, 'Apply Mission z', 'No mission points to update.')
+            return
+
+        mission_height = self.altitude()
+        for point in points:
+            point.z = mission_height
+        self.map_canvas.update()
+        if show_message:
+            QMessageBox.information(
+                self,
+                'Apply Mission z',
+                f'Updated {len(points)} mission points to z={mission_height:.2f} m.',
+            )
+
+    def load_mission_file(self, filename):
+        """Load a mission from a preplanned WayWise XML route file."""
+        try:
+            points = read_waywise_route_xml(filename, self.map_canvas.enuref)
+            if not points:
+                raise ValueError('The selected mission file has no points.')
+
+            self.map_canvas.set_mission_points(
+                points,
+                route_id=os.path.realpath(filename),
+                retain_loaded_routes=True,
+            )
+            self.height_spin_box.setValue(points[0].z)
+            self.speed_spin_box.setValue(points[0].speed)
+            self.map_canvas.fit_active_route_and_selected_vehicle()
+            return len(points)
+        except Exception as e:
+            raise RuntimeError(f'Failed to load mission from {filename}: {str(e)}') from e
+
+    def load_mission(self):
+        """Load a preplanned mission into the current map frame."""
+        from PyQt5.QtWidgets import QFileDialog, QMessageBox
+
+        filename, _ = QFileDialog.getOpenFileName(
+            self, 'Load Preplanned Mission', '', 'XML Files (*.xml)'
+        )
+        if not filename:
+            return
+
+        try:
+            loaded_count = self.load_mission_file(filename)
+            QMessageBox.information(
+                self, 'Load Mission', f'Loaded {loaded_count} mission points from:\n{filename}'
+            )
+        except Exception as e:
+            QMessageBox.critical(self, 'Load Mission', f'Failed to load mission:\n{str(e)}')
+
+    def save_mission(self):
+        """Export the current mission to an XML file in WayWise format."""
+        from PyQt5.QtWidgets import QFileDialog, QMessageBox
+
+        points = self.mission_points()
+        if not points:
+            QMessageBox.warning(self, 'Save Mission', 'No mission points to save!')
+            return
+
+        filename, _ = QFileDialog.getSaveFileName(
+            self, 'Export Current Mission to File', '', 'XML Files (*.xml)'
+        )
+        if not filename:
+            return
+
+        if not filename.lower().endswith('.xml'):
+            filename += '.xml'
+
+        try:
+            from xml.dom import minidom
+            import xml.etree.ElementTree as ET
+
+            root = ET.Element('routes')
+
+            # 1. Write enuref element
+            enuref_elem = ET.SubElement(root, 'enuref')
+            lat_elem = ET.SubElement(enuref_elem, 'Latitude')
+            lat_elem.text = f'{self.map_canvas.enuref[0]:.15f}'
+            lon_elem = ET.SubElement(enuref_elem, 'Longitude')
+            lon_elem.text = f'{self.map_canvas.enuref[1]:.15f}'
+            height_elem = ET.SubElement(enuref_elem, 'Height')
+            height_elem.text = f'{self.map_canvas.enuref[2]:.15f}'
+
+            # 2. Write route element
+            route_elem = ET.SubElement(root, 'route')
+            for point in points:
+                point_elem = ET.SubElement(route_elem, 'point')
+                x_elem = ET.SubElement(point_elem, 'x')
+                x_elem.text = f'{point.x:.15f}'
+                y_elem = ET.SubElement(point_elem, 'y')
+                y_elem.text = f'{point.y:.15f}'
+                z_elem = ET.SubElement(point_elem, 'z')
+                z_elem.text = f'{getattr(point, "z", self.altitude()):.6f}'
+                speed_elem = ET.SubElement(point_elem, 'speed')
+                speed_elem.text = f'{getattr(point, "speed", self.speed()):.6f}'
+                attr_elem = ET.SubElement(point_elem, 'attributes')
+                attr_elem.text = '0'  # default attribute is 0
+
+            # Pretty print the XML
+            xml_str = ET.tostring(root, encoding='utf-8')
+            parsed = minidom.parseString(xml_str)
+            pretty_xml = parsed.toprettyxml(indent='    ')
+
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(pretty_xml)
+
+            QMessageBox.information(
+                self, 'Save Mission', f'Mission successfully saved to:\n{filename}'
+            )
+        except Exception as e:
+            QMessageBox.critical(self, 'Save Mission', f'Failed to save mission:\n{str(e)}')
+
+    def is_planning_enabled(self):
+        return self.map_canvas.planning_enabled
+
+    def mission_points(self):
+        return self.map_canvas.get_mission_points()
+
+    def clear_mission(self):
+        self.map_canvas.clear_mission()
+
+    def altitude(self):
+        return self.height_spin_box.value()
+
+    def speed(self):
+        return self.speed_spin_box.value()
+
+    def request_send_mission(self):
+        if not self._vehicle_connected:
+            from PyQt5.QtWidgets import QMessageBox
+
+            QMessageBox.warning(
+                self, 'Send Mission', 'Connect a vehicle node before sending a mission.'
+            )
+            return
+        self.send_mission_requested.emit(self.mission_points(), self.altitude(), self.speed())
+
+    def set_vehicle_pose(self, x, y, yaw_rad=0.0):
+        self.map_canvas.set_vehicle_pose(x, y, yaw_rad)
+
+    def clear_vehicle_pose(self):
+        self.map_canvas.clear_vehicle_pose()
+
+    def clear_vehicle_overlay(self):
+        self.map_canvas.clear_vehicle_overlay()
+
+    def set_vehicle_poses(self, vehicle_poses):
+        self.map_canvas.set_vehicle_poses(vehicle_poses)
+
+    def prepare_for_selected_vehicle(self):
+        self.map_canvas.prepare_for_selected_vehicle()
+
+    def set_vehicle_overlay_model(self, model):
+        self.map_canvas.set_vehicle_overlay_model(model)
+
+    def set_visual_markers(self, markers):
+        self.map_canvas.set_visual_markers(markers)
+
+    def set_home_position(self, x, y):
+        self.map_canvas.set_home_position(x, y)
+
+    def clear_home_position(self):
+        self.map_canvas.clear_home_position()
+
+    def set_tile_server_url(self, url):
+        if hasattr(self, 'osm_url_edit') and self.osm_url_edit.text() != url:
+            self.osm_url_edit.setText(url)
+        self.map_canvas.set_tile_server_url(url)
+
+    def set_tile_cache_dir(self, cache_dir):
+        if hasattr(self, 'osm_cache_edit') and self.osm_cache_edit.text() != cache_dir:
+            self.osm_cache_edit.setText(cache_dir)
+        self.map_canvas.set_tile_cache_dir(cache_dir)
+
+    def set_map_source(self, source):
+        self.map_canvas.set_map_source(source)
+
+    def refresh_tiles(self, clear_disk=False):
+        self.map_canvas.refresh_tiles(clear_disk=clear_disk)
+
+    def set_map_config_widget(self, widget):
+        self.map_config_widget = widget
+        self.map_config_layout.insertWidget(0, widget, 0, Qt.AlignLeft)
+
+    def set_vehicle_type(self, waywise_object_type):
+        is_quadcopter = waywise_object_type == 'quadcopter'
+        if self._is_quadcopter == is_quadcopter:
+            return
+        self._is_quadcopter = is_quadcopter
+        self._update_controls_visibility()
+
+    def set_enu_ref(self, enuref):
+        if len(enuref) >= 3:
+            self.map_canvas.set_enu_ref(enuref)
+
+    def update_mission_status(self):
+        points = self.mission_points()
+        distance = 0.0
+        for start, end in zip(points[:-1], points[1:]):
+            distance += math.hypot(end.x - start.x, end.y - start.y)
+        self.mission_summary_label.setText(f'Mission: {len(points)} points, {distance:.1f} m')

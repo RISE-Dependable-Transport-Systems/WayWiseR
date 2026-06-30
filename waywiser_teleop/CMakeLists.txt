@@ -21,8 +21,8 @@ find_package(rclpy REQUIRED)
 find_package(waywiser_twist_safety REQUIRED)
 find_package(waywiser REQUIRED)
 
-add_executable(twist_angular_correction cpp_src/twist_angular_correction.cpp)
-ament_target_dependencies(twist_angular_correction
+add_executable(twist_angular_correction_node cpp_src/twist_angular_correction_node.cpp)
+ament_target_dependencies(twist_angular_correction_node
   geometry_msgs
   rclcpp
   sensor_msgs
@@ -30,7 +30,7 @@ ament_target_dependencies(twist_angular_correction
 )
 
 install(
-  TARGETS twist_angular_correction
+  TARGETS twist_angular_correction_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -44,7 +44,7 @@ ament_python_install_package(${PROJECT_NAME}_py
 )
 
 install(
-  PROGRAMS py_src/waywiser_teleop_py/control_tower.py
+  PROGRAMS py_src/waywiser_teleop_py/control_tower_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
