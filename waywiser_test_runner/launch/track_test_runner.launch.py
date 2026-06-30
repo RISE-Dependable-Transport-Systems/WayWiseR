@@ -28,7 +28,7 @@ def generate_launch_description():
     # create nodes
     track_test_runner_node = Node(
         package='waywiser_test_runner',
-        executable='track_test_runner.py',
+        executable='track_test_runner_node.py',
         name='track_test_runner_node',
         output='screen',
         parameters=[LaunchConfiguration('track_test_runner_config')],

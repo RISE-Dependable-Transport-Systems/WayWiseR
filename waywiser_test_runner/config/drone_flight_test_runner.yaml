@@ -1,0 +1,72 @@
+flight_test_runner:
+  ros__parameters:
+    test_config_start_index: 7  # 1-based inclusive start config index; 0 = run all from first
+    test_config_end_index: 12    # 1-based inclusive end config index; 0 = run all to last
+    test_configurations_json_path: "drone_flight_test_configurations.json"
+    rosbag_output_dir: "flight_test_data"
+    use_rosbag_recording: true
+    quadcopter_state_topic: "quadcopter_state"
+    heartbeat_rx_state_topic: "control_tower_heartbeat_rx_state"
+    control_vehicle_node_fqn: "waywiser_drone_node"
+    arm_command_topic: "arm_command"
+    autopilot_state_control_topic: "autopilot_state_control"
+    route_publish_topic: "waywiser_path"
+    preplanned_route_filepath: "$WAYWISER_WS/resources/forest.xml"
+    publish_route_after_ready: true
+    use_route_start_as_staging_area: true
+    route_start_staging_height: 0.3
+    route_start_staging_yaw_from_route: true
+    enuref: [57.713805, 12.890088, 203.59]
+    orchestrate_test_setup: true
+    setup_request_topic: "/setup_request"
+    setup_status_topic: "/setup_status"
+    setup_request_json: '{"reset_all": true}'
+    staging_entity_name: "drone"
+    # staging_area_pose: "0.217975816633690 14.141065620729639 0.3 0 0 0.0"
+    # staging_area_pose: "0.0 0.0 0.3 0 0 0.0"
+    respawn_vehicle_at_staging_area: true
+    arm_request_retry_period: 1.0
+    ready_state_hold_sec: 3.0
+    trigger_state_hold_sec: 0.5
+    vehicle_parameter_service_timeout_sec: 10.0
+    runner_timer_rate: 5.0
+    test_timeout: 360.0
+    test_cooldown_time: 6.0
+    halt_test_runner_on_timeout: false
+    topic_perturbation:
+      channels: ["heartbeat", "cmd_vel"]
+      heartbeat:
+        message_type: "std_msgs/msg/Header"
+        input_topic: "control_tower_heartbeat"
+        output_topic: "control_tower_heartbeat_perturbed"
+        control_topic: "heartbeat/perturbation_active"
+        profile_topic: "heartbeat/perturbation_profile"
+        start_active: false
+        default_publish_rate_hz: 5.0
+        delay_poll_rate_hz: 50.0
+      cmd_vel:
+        message_type: "geometry_msgs/msg/Twist"
+        input_topic: "waypoint_follower_vel_raw"
+        output_topic: "waypoint_follower_vel"
+        control_topic: "cmd_vel/perturbation_active"
+        profile_topic: "cmd_vel/perturbation_profile"
+        start_active: false
+        default_publish_rate_hz: 10.0
+        delay_poll_rate_hz: 100.0
+    topics_to_record:
+      [
+        "control_tower_heartbeat",
+        "control_tower_heartbeat_perturbed",
+        "control_tower_heartbeat_rx_state",
+        "heartbeat/perturbation_active",
+        "heartbeat/perturbation_profile",
+        "waypoint_follower_vel_raw",
+        "waypoint_follower_vel",
+        "cmd_vel/perturbation_active",
+        "cmd_vel/perturbation_profile",
+        "quadcopter_state",
+        "mission_status",
+        "drone_pose",
+        "odometry",
+        "cmd_vel_out",
+      ]

@@ -1,0 +1,556 @@
+{
+  "flight_test_configurations": [
+    {
+      "name": "heartbeat_delay_0p5s",
+      "iterations": 3,
+      "setup_conditions": {
+        "world_name": "forest",
+        "reset_all": true,
+        "reset_gazebo": true,
+        "respawn_entities": [
+          "drone"
+        ],
+        "clear_actuators": true
+      },
+      "test_profile": {
+        "mission": {
+          "activation_trigger": {
+            "topic": "quadcopter_state",
+            "message_type": "waywiser_core/msg/QuadcopterState",
+            "field": "state_code",
+            "value": [
+              "ARMED",
+              "IN_FLIGHT",
+              "HOVERING"
+            ]
+          },
+          "preplanned_route_filepath": "$WAYWISER_WS/resources/forest.xml"
+        },
+        "topic_perturbation": {
+          "heartbeat": {
+            "duration_s": 8.0,
+            "start_delay_s": 2.0,
+            "activation_trigger": {
+              "topic": "mission_status",
+              "message_type": "waywiser_core/msg/MissionState",
+              "field": "state",
+              "value": [
+                "FOLLOW_ROUTE_FOLLOWING"
+              ]
+            },
+            "mode": "delay",
+            "parameters": {
+              "delay_s": 0.5
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "heartbeat_delay_1p2s",
+      "iterations": 3,
+      "setup_conditions": {
+        "world_name": "forest",
+        "reset_all": true,
+        "reset_gazebo": true,
+        "respawn_entities": [
+          "drone"
+        ],
+        "clear_actuators": true
+      },
+      "test_profile": {
+        "mission": {
+          "activation_trigger": {
+            "topic": "quadcopter_state",
+            "message_type": "waywiser_core/msg/QuadcopterState",
+            "field": "state_code",
+            "value": [
+              "ARMED",
+              "IN_FLIGHT",
+              "HOVERING"
+            ]
+          },
+          "preplanned_route_filepath": "$WAYWISER_WS/resources/forest.xml"
+        },
+        "topic_perturbation": {
+          "heartbeat": {
+            "duration_s": 8.0,
+            "start_delay_s": 2.0,
+            "activation_trigger": {
+              "topic": "mission_status",
+              "message_type": "waywiser_core/msg/MissionState",
+              "field": "state",
+              "value": [
+                "FOLLOW_ROUTE_FOLLOWING"
+              ]
+            },
+            "mode": "delay",
+            "parameters": {
+              "delay_s": 1.2
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "heartbeat_delay_2p5s",
+      "iterations": 3,
+      "setup_conditions": {
+        "world_name": "forest",
+        "reset_all": true,
+        "reset_gazebo": true,
+        "respawn_entities": [
+          "drone"
+        ],
+        "clear_actuators": true
+      },
+      "test_profile": {
+        "mission": {
+          "activation_trigger": {
+            "topic": "quadcopter_state",
+            "message_type": "waywiser_core/msg/QuadcopterState",
+            "field": "state_code",
+            "value": [
+              "ARMED",
+              "IN_FLIGHT",
+              "HOVERING"
+            ]
+          },
+          "preplanned_route_filepath": "$WAYWISER_WS/resources/forest.xml"
+        },
+        "topic_perturbation": {
+          "heartbeat": {
+            "duration_s": 8.0,
+            "start_delay_s": 2.0,
+            "activation_trigger": {
+              "topic": "mission_status",
+              "message_type": "waywiser_core/msg/MissionState",
+              "field": "state",
+              "value": [
+                "FOLLOW_ROUTE_FOLLOWING"
+              ]
+            },
+            "mode": "delay",
+            "parameters": {
+              "delay_s": 2.5
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "heartbeat_dropout_1s",
+      "iterations": 3,
+      "setup_conditions": {
+        "world_name": "forest",
+        "reset_all": true,
+        "reset_gazebo": true,
+        "respawn_entities": [
+          "drone"
+        ],
+        "clear_actuators": true
+      },
+      "test_profile": {
+        "mission": {
+          "activation_trigger": {
+            "topic": "quadcopter_state",
+            "message_type": "waywiser_core/msg/QuadcopterState",
+            "field": "state_code",
+            "value": [
+              "ARMED",
+              "IN_FLIGHT",
+              "HOVERING"
+            ]
+          },
+          "preplanned_route_filepath": "$WAYWISER_WS/resources/forest.xml"
+        },
+        "topic_perturbation": {
+          "heartbeat": {
+            "duration_s": 8.0,
+            "start_delay_s": 2.0,
+            "activation_trigger": {
+              "topic": "mission_status",
+              "message_type": "waywiser_core/msg/MissionState",
+              "field": "state",
+              "value": [
+                "FOLLOW_ROUTE_FOLLOWING"
+              ]
+            },
+            "mode": "dropout",
+            "parameters": {
+              "dropout_duration_s": 1.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "heartbeat_dropout_3s",
+      "iterations": 3,
+      "setup_conditions": {
+        "world_name": "forest",
+        "reset_all": true,
+        "reset_gazebo": true,
+        "respawn_entities": [
+          "drone"
+        ],
+        "clear_actuators": true
+      },
+      "test_profile": {
+        "mission": {
+          "activation_trigger": {
+            "topic": "quadcopter_state",
+            "message_type": "waywiser_core/msg/QuadcopterState",
+            "field": "state_code",
+            "value": [
+              "ARMED",
+              "IN_FLIGHT",
+              "HOVERING"
+            ]
+          },
+          "preplanned_route_filepath": "$WAYWISER_WS/resources/forest.xml"
+        },
+        "topic_perturbation": {
+          "heartbeat": {
+            "duration_s": 8.0,
+            "start_delay_s": 2.0,
+            "activation_trigger": {
+              "topic": "mission_status",
+              "message_type": "waywiser_core/msg/MissionState",
+              "field": "state",
+              "value": [
+                "FOLLOW_ROUTE_FOLLOWING"
+              ]
+            },
+            "mode": "dropout",
+            "parameters": {
+              "dropout_duration_s": 3.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "heartbeat_replay_8s",
+      "iterations": 3,
+      "setup_conditions": {
+        "world_name": "forest",
+        "reset_all": true,
+        "reset_gazebo": true,
+        "respawn_entities": [
+          "drone"
+        ],
+        "clear_actuators": true
+      },
+      "test_profile": {
+        "mission": {
+          "activation_trigger": {
+            "topic": "quadcopter_state",
+            "message_type": "waywiser_core/msg/QuadcopterState",
+            "field": "state_code",
+            "value": [
+              "ARMED",
+              "IN_FLIGHT",
+              "HOVERING"
+            ]
+          },
+          "preplanned_route_filepath": "$WAYWISER_WS/resources/forest.xml"
+        },
+        "topic_perturbation": {
+          "heartbeat": {
+            "duration_s": 8.0,
+            "start_delay_s": 2.0,
+            "activation_trigger": {
+              "topic": "mission_status",
+              "message_type": "waywiser_core/msg/MissionState",
+              "field": "state",
+              "value": [
+                "FOLLOW_ROUTE_FOLLOWING"
+              ]
+            },
+            "mode": "replay",
+            "parameters": {
+              "replay_window_s": 1.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "cmd_vel_delay_0p5s",
+      "iterations": 3,
+      "setup_conditions": {
+        "world_name": "forest",
+        "reset_all": true,
+        "reset_gazebo": true,
+        "respawn_entities": [
+          "drone"
+        ],
+        "clear_actuators": true
+      },
+      "test_profile": {
+        "mission": {
+          "activation_trigger": {
+            "topic": "quadcopter_state",
+            "message_type": "waywiser_core/msg/QuadcopterState",
+            "field": "state_code",
+            "value": [
+              "ARMED",
+              "IN_FLIGHT",
+              "HOVERING"
+            ]
+          },
+          "preplanned_route_filepath": "$WAYWISER_WS/resources/forest.xml"
+        },
+        "topic_perturbation": {
+          "cmd_vel": {
+            "duration_s": 8.0,
+            "start_delay_s": 2.0,
+            "activation_trigger": {
+              "topic": "mission_status",
+              "message_type": "waywiser_core/msg/MissionState",
+              "field": "state",
+              "value": [
+                "FOLLOW_ROUTE_FOLLOWING"
+              ]
+            },
+            "mode": "delay",
+            "parameters": {
+              "delay_s": 0.5
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "cmd_vel_delay_1p2s",
+      "iterations": 3,
+      "setup_conditions": {
+        "world_name": "forest",
+        "reset_all": true,
+        "reset_gazebo": true,
+        "respawn_entities": [
+          "drone"
+        ],
+        "clear_actuators": true
+      },
+      "test_profile": {
+        "mission": {
+          "activation_trigger": {
+            "topic": "quadcopter_state",
+            "message_type": "waywiser_core/msg/QuadcopterState",
+            "field": "state_code",
+            "value": [
+              "ARMED",
+              "IN_FLIGHT",
+              "HOVERING"
+            ]
+          },
+          "preplanned_route_filepath": "$WAYWISER_WS/resources/forest.xml"
+        },
+        "topic_perturbation": {
+          "cmd_vel": {
+            "duration_s": 8.0,
+            "start_delay_s": 2.0,
+            "activation_trigger": {
+              "topic": "mission_status",
+              "message_type": "waywiser_core/msg/MissionState",
+              "field": "state",
+              "value": [
+                "FOLLOW_ROUTE_FOLLOWING"
+              ]
+            },
+            "mode": "delay",
+            "parameters": {
+              "delay_s": 1.2
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "cmd_vel_delay_2p5s",
+      "iterations": 3,
+      "setup_conditions": {
+        "world_name": "forest",
+        "reset_all": true,
+        "reset_gazebo": true,
+        "respawn_entities": [
+          "drone"
+        ],
+        "clear_actuators": true
+      },
+      "test_profile": {
+        "mission": {
+          "activation_trigger": {
+            "topic": "quadcopter_state",
+            "message_type": "waywiser_core/msg/QuadcopterState",
+            "field": "state_code",
+            "value": [
+              "ARMED",
+              "IN_FLIGHT",
+              "HOVERING"
+            ]
+          },
+          "preplanned_route_filepath": "$WAYWISER_WS/resources/forest.xml"
+        },
+        "topic_perturbation": {
+          "cmd_vel": {
+            "duration_s": 8.0,
+            "start_delay_s": 2.0,
+            "activation_trigger": {
+              "topic": "mission_status",
+              "message_type": "waywiser_core/msg/MissionState",
+              "field": "state",
+              "value": [
+                "FOLLOW_ROUTE_FOLLOWING"
+              ]
+            },
+            "mode": "delay",
+            "parameters": {
+              "delay_s": 2.5
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "cmd_vel_dropout_1s",
+      "iterations": 3,
+      "setup_conditions": {
+        "world_name": "forest",
+        "reset_all": true,
+        "reset_gazebo": true,
+        "respawn_entities": [
+          "drone"
+        ],
+        "clear_actuators": true
+      },
+      "test_profile": {
+        "mission": {
+          "activation_trigger": {
+            "topic": "quadcopter_state",
+            "message_type": "waywiser_core/msg/QuadcopterState",
+            "field": "state_code",
+            "value": [
+              "ARMED",
+              "IN_FLIGHT",
+              "HOVERING"
+            ]
+          },
+          "preplanned_route_filepath": "$WAYWISER_WS/resources/forest.xml"
+        },
+        "topic_perturbation": {
+          "cmd_vel": {
+            "duration_s": 8.0,
+            "start_delay_s": 2.0,
+            "activation_trigger": {
+              "topic": "mission_status",
+              "message_type": "waywiser_core/msg/MissionState",
+              "field": "state",
+              "value": [
+                "FOLLOW_ROUTE_FOLLOWING"
+              ]
+            },
+            "mode": "dropout",
+            "parameters": {
+              "dropout_duration_s": 1.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "cmd_vel_dropout_3s",
+      "iterations": 3,
+      "setup_conditions": {
+        "world_name": "forest",
+        "reset_all": true,
+        "reset_gazebo": true,
+        "respawn_entities": [
+          "drone"
+        ],
+        "clear_actuators": true
+      },
+      "test_profile": {
+        "mission": {
+          "activation_trigger": {
+            "topic": "quadcopter_state",
+            "message_type": "waywiser_core/msg/QuadcopterState",
+            "field": "state_code",
+            "value": [
+              "ARMED",
+              "IN_FLIGHT",
+              "HOVERING"
+            ]
+          },
+          "preplanned_route_filepath": "$WAYWISER_WS/resources/forest.xml"
+        },
+        "topic_perturbation": {
+          "cmd_vel": {
+            "duration_s": 8.0,
+            "start_delay_s": 2.0,
+            "activation_trigger": {
+              "topic": "mission_status",
+              "message_type": "waywiser_core/msg/MissionState",
+              "field": "state",
+              "value": [
+                "FOLLOW_ROUTE_FOLLOWING"
+              ]
+            },
+            "mode": "dropout",
+            "parameters": {
+              "dropout_duration_s": 3.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "cmd_vel_replay_8s",
+      "iterations": 3,
+      "setup_conditions": {
+        "world_name": "forest",
+        "reset_all": true,
+        "reset_gazebo": true,
+        "respawn_entities": [
+          "drone"
+        ],
+        "clear_actuators": true
+      },
+      "test_profile": {
+        "mission": {
+          "activation_trigger": {
+            "topic": "quadcopter_state",
+            "message_type": "waywiser_core/msg/QuadcopterState",
+            "field": "state_code",
+            "value": [
+              "ARMED",
+              "IN_FLIGHT",
+              "HOVERING"
+            ]
+          },
+          "preplanned_route_filepath": "$WAYWISER_WS/resources/forest.xml"
+        },
+        "topic_perturbation": {
+          "cmd_vel": {
+            "duration_s": 8.0,
+            "start_delay_s": 2.0,
+            "activation_trigger": {
+              "topic": "mission_status",
+              "message_type": "waywiser_core/msg/MissionState",
+              "field": "state",
+              "value": [
+                "FOLLOW_ROUTE_FOLLOWING"
+              ]
+            },
+            "mode": "replay",
+            "parameters": {
+              "replay_window_s": 1.0
+            }
+          }
+        }
+      }
+    }
+  ]
+}
