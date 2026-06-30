@@ -4,7 +4,7 @@
             "path": "package://waywiser_description/sdf/drone/model.sdf",
             "static": false,
             "bridge_config": "package://waywiser_gazebo/config/drone_gazebo_bridges.yaml",
-            "pose": "0.0 0.0 0.3 0 0.35 0.0"
+            "pose": "0.217975816633690 14.141065620729639 0.3 0 0 0.0"
         }
     ],
     "static_transforms": [

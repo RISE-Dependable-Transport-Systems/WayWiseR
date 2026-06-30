@@ -19,6 +19,7 @@ from launch.actions import (
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from ros2pkg.api import get_package_names
 
 
@@ -64,6 +65,86 @@ def generate_launch_description():
         default_value='True',
         description='Launch static map frame transform',
     )
+    launch_gazebo_orchestrator_la = DeclareLaunchArgument(
+        'launch_gazebo_orchestrator',
+        default_value='True',
+        description='Launch the Gazebo setup/reset orchestrator node',
+    )
+    gazebo_orchestrator_config_la = DeclareLaunchArgument(
+        'gazebo_orchestrator_config',
+        default_value=os.path.join(gazebo_dir, 'config/gazebo_orchestrator.yaml'),
+        description='Full path to Gazebo orchestrator params file',
+    )
+    service_timeout_ms_la = DeclareLaunchArgument(
+        'service_timeout_ms',
+        default_value='5000',
+        description='Timeout for Gazebo service calls in milliseconds',
+    )
+    manage_px4_process_la = DeclareLaunchArgument(
+        'manage_px4_process',
+        default_value='False',
+        description='Let the Gazebo orchestrator own the PX4 process lifecycle',
+    )
+    px4_command_json_la = DeclareLaunchArgument(
+        'px4_command_json',
+        default_value='[]',
+        description='JSON array command used by the orchestrator to start PX4',
+    )
+    px4_working_directory_la = DeclareLaunchArgument(
+        'px4_working_directory',
+        default_value='',
+        description='Working directory used by the orchestrator to start PX4',
+    )
+    px4_environment_json_la = DeclareLaunchArgument(
+        'px4_environment_json',
+        default_value='{}',
+        description='JSON object with environment variables used to start PX4',
+    )
+    px4_start_delay_sec_la = DeclareLaunchArgument(
+        'px4_start_delay_sec',
+        default_value='0.0',
+        description='Delay before the orchestrator starts PX4 at launch',
+    )
+    spawn_config_file_la = DeclareLaunchArgument(
+        'spawn_config_file',
+        default_value='',
+        description='JSON spawn config file owned by the Gazebo orchestrator',
+    )
+    spawn_on_startup_la = DeclareLaunchArgument(
+        'spawn_on_startup',
+        default_value='False',
+        description='Spawn configured Gazebo models when the orchestrator starts',
+    )
+    spawn_on_setup_la = DeclareLaunchArgument(
+        'spawn_on_setup',
+        default_value='False',
+        description='Respawn configured Gazebo models after each setup/reset request',
+    )
+    spawn_start_delay_sec_la = DeclareLaunchArgument(
+        'spawn_start_delay_sec',
+        default_value='0.0',
+        description='Delay before spawning models from the orchestrator',
+    )
+    spawn_interval_sec_la = DeclareLaunchArgument(
+        'spawn_interval_sec',
+        default_value='1.0',
+        description='Delay between Gazebo model spawn requests',
+    )
+    spawn_backend_la = DeclareLaunchArgument(
+        'spawn_backend',
+        default_value='gz_service',
+        description='Gazebo model spawn backend: gz_service or ros_gz_sim',
+    )
+    start_gazebo_bridge_la = DeclareLaunchArgument(
+        'start_gazebo_bridge',
+        default_value='True',
+        description='Start per-model bridge processes from the spawn config',
+    )
+    gz_service_suppress_output_la = DeclareLaunchArgument(
+        'gz_service_suppress_output',
+        default_value='False',
+        description='Suppress output from Gazebo service spawn calls',
+    )
 
     # nvidia GPU offload env vars setup
     use_nvidia_gpu = IfCondition(LaunchConfiguration('use_nvidia_gpu'))
@@ -92,6 +173,10 @@ def generate_launch_description():
         actions=[OpaqueFunction(function=create_map_frame_transform)],
         condition=IfCondition(LaunchConfiguration('launch_map_frame_transform')),
     )
+    gazebo_orchestrator_node = GroupAction(
+        actions=[OpaqueFunction(function=create_gazebo_orchestrator_node)],
+        condition=IfCondition(LaunchConfiguration('launch_gazebo_orchestrator')),
+    )
 
     # create launch description
     ld = LaunchDescription()
@@ -106,6 +191,22 @@ def generate_launch_description():
     ld.add_action(gazebo_sim_version_la)
     ld.add_action(launch_bridge_la)
     ld.add_action(launch_map_frame_transform_la)
+    ld.add_action(launch_gazebo_orchestrator_la)
+    ld.add_action(gazebo_orchestrator_config_la)
+    ld.add_action(service_timeout_ms_la)
+    ld.add_action(manage_px4_process_la)
+    ld.add_action(px4_command_json_la)
+    ld.add_action(px4_working_directory_la)
+    ld.add_action(px4_environment_json_la)
+    ld.add_action(px4_start_delay_sec_la)
+    ld.add_action(spawn_config_file_la)
+    ld.add_action(spawn_on_startup_la)
+    ld.add_action(spawn_on_setup_la)
+    ld.add_action(spawn_start_delay_sec_la)
+    ld.add_action(spawn_interval_sec_la)
+    ld.add_action(spawn_backend_la)
+    ld.add_action(start_gazebo_bridge_la)
+    ld.add_action(gz_service_suppress_output_la)
 
     # run Nvidia GPU setup action
     ld.add_action(nvidia_gpu_env)
@@ -116,6 +217,7 @@ def generate_launch_description():
 
     # setup gazebo bridge
     ld.add_action(ros_gz_bridge_node)
+    ld.add_action(gazebo_orchestrator_node)
 
     return ld
 
@@ -320,6 +422,68 @@ def create_map_frame_transform(context):
     ]
 
 
+def create_gazebo_orchestrator_node(context):
+    world_path = Path(LaunchConfiguration('world').perform(context)).resolve()
+    config_path = LaunchConfiguration('gazebo_orchestrator_config').perform(context)
+    node_params = read_node_params(config_path, 'gazebo_orchestrator_node')
+    node_params['world_name'] = read_world_name(world_path)
+    node_params['service_timeout_ms'] = ParameterValue(
+        LaunchConfiguration('service_timeout_ms'), value_type=int
+    )
+    node_params['manage_px4_process'] = ParameterValue(
+        LaunchConfiguration('manage_px4_process'), value_type=bool
+    )
+    node_params['px4_command_json'] = ParameterValue(
+        LaunchConfiguration('px4_command_json'), value_type=str
+    )
+    node_params['px4_working_directory'] = ParameterValue(
+        LaunchConfiguration('px4_working_directory'), value_type=str
+    )
+    node_params['px4_environment_json'] = ParameterValue(
+        LaunchConfiguration('px4_environment_json'), value_type=str
+    )
+    node_params['px4_start_delay_sec'] = ParameterValue(
+        LaunchConfiguration('px4_start_delay_sec'), value_type=float
+    )
+    node_params['spawn_config_file'] = ParameterValue(
+        LaunchConfiguration('spawn_config_file'), value_type=str
+    )
+    node_params['spawn_on_startup'] = ParameterValue(
+        LaunchConfiguration('spawn_on_startup'), value_type=bool
+    )
+    node_params['spawn_on_setup'] = ParameterValue(
+        LaunchConfiguration('spawn_on_setup'), value_type=bool
+    )
+    node_params['spawn_start_delay_sec'] = ParameterValue(
+        LaunchConfiguration('spawn_start_delay_sec'), value_type=float
+    )
+    node_params['spawn_interval_sec'] = ParameterValue(
+        LaunchConfiguration('spawn_interval_sec'), value_type=float
+    )
+    node_params['spawn_backend'] = ParameterValue(
+        LaunchConfiguration('spawn_backend'), value_type=str
+    )
+    node_params['start_gazebo_bridge'] = ParameterValue(
+        LaunchConfiguration('start_gazebo_bridge'), value_type=bool
+    )
+    node_params['gz_service_suppress_output'] = ParameterValue(
+        LaunchConfiguration('gz_service_suppress_output'), value_type=bool
+    )
+
+    return [
+        Node(
+            package='waywiser_gazebo',
+            executable='gazebo_orchestrator_node.py',
+            name='gazebo_orchestrator_node',
+            output='screen',
+            parameters=[
+                node_params,
+                {'use_sim_time': LaunchConfiguration('use_sim_time')},
+            ],
+        )
+    ]
+
+
 def create_runtime_bridge_config(bridge_config_path, world_name):
     import yaml
 
@@ -344,6 +508,18 @@ def create_runtime_bridge_config(bridge_config_path, world_name):
         yaml.safe_dump(config, temp_config)
 
     return temp_config.name
+
+
+def read_node_params(config_path, node_name):
+    import yaml
+
+    if not config_path:
+        return {}
+
+    with open(config_path, 'r', encoding='utf-8') as config_file:
+        config = yaml.safe_load(config_file) or {}
+
+    return config.get(node_name, {}).get('ros__parameters', {})
 
 
 def read_world_name(world_path: Path):

@@ -1,0 +1,32 @@
+gazebo_orchestrator_node:
+  ros__parameters:
+    world_name: "bounded_world"
+    setup_request_topic: "/setup_request"
+    setup_status_topic: "/setup_status"
+    reset_all: false
+    service_timeout_ms: 5000
+    settle_time_sec: 4.0
+    pause_gazebo_during_setup: true
+    manage_px4_process: false
+    start_px4_on_startup: true
+    restart_px4_on_setup: true
+    respawn_managed_px4_entity_on_setup: false
+    skip_managed_px4_set_pose_after_model_reset: true
+    clear_actuators_on_setup: true
+    actuator_zero_topics:
+      - "/model/{model_name}/command/motor_speed"
+      - "/{model_name}/command/motor_speed"
+    actuator_zero_count: 4
+    px4_start_delay_sec: 0.0
+    px4_shutdown_timeout_sec: 5.0
+    px4_command_json: "[]"
+    px4_working_directory: ""
+    px4_environment_json: "{}"
+    spawn_config_file: ""
+    spawn_on_startup: false
+    spawn_on_setup: false
+    spawn_start_delay_sec: 0.0
+    spawn_interval_sec: 1.0
+    spawn_backend: "gz_service"
+    start_gazebo_bridge: true
+    gz_service_suppress_output: false

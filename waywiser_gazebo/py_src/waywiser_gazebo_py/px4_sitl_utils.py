@@ -7,297 +7,8 @@ import tempfile
 import xml.etree.ElementTree as ET
 
 from ament_index_python import get_package_share_directory
-from launch import LaunchDescription
-from launch.actions import (
-    DeclareLaunchArgument,
-    ExecuteProcess,
-    IncludeLaunchDescription,
-    OpaqueFunction,
-    SetEnvironmentVariable,
-    TimerAction,
-)
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
 
 import yaml
-
-
-def generate_launch_description():
-    gazebo_dir = get_package_share_directory('waywiser_gazebo')
-
-    launch_setup_action = OpaqueFunction(function=launch_setup)
-
-    ld = LaunchDescription()
-    ld.add_action(
-        DeclareLaunchArgument(
-            'world',
-            default_value=os.path.join(gazebo_dir, 'worlds', 'car_world.sdf'),
-            description='Full path to the Gazebo world SDF file PX4 should load.',
-        )
-    )
-    ld.add_action(
-        DeclareLaunchArgument(
-            'gazebo_bridge',
-            default_value=os.path.join(gazebo_dir, 'config', 'drone_gazebo_bridges.yaml'),
-            description='Full path to the model-specific ROS-Gazebo bridge config file.',
-        )
-    )
-    ld.add_action(
-        DeclareLaunchArgument(
-            'default_gazebo_bridge',
-            default_value=os.path.join(gazebo_dir, 'config', 'default_gazebo_bridges.yaml'),
-            description='Full path to the default ROS-Gazebo bridge config file.',
-        )
-    )
-    ld.add_action(
-        DeclareLaunchArgument(
-            'drone_config',
-            default_value=os.path.join(gazebo_dir, 'config', 'drone.yaml'),
-            description='Full path to the drone config YAML.',
-        )
-    )
-    ld.add_action(
-        DeclareLaunchArgument(
-            'drone_name',
-            default_value='drone',
-            description='Existing Gazebo model name PX4 should attach to.',
-        )
-    )
-    ld.add_action(
-        DeclareLaunchArgument(
-            'px4_sys_autostart',
-            default_value='4001',
-            description='PX4 SYS_AUTOSTART airframe id (4001 is Gazebo x500).',
-        )
-    )
-    ld.add_action(
-        DeclareLaunchArgument(
-            'px4_start_delay',
-            default_value='2.0',
-            description='Delay in seconds before starting PX4 after Gazebo starts.',
-        )
-    )
-    ld.add_action(
-        DeclareLaunchArgument(
-            'use_sim_time',
-            default_value='True',
-            description='Use Gazebo simulation time.',
-        )
-    )
-    ld.add_action(
-        DeclareLaunchArgument(
-            'use_nvidia_gpu',
-            default_value='True',
-            description='Use NVIDIA PRIME offload environment variables for Gazebo rendering.',
-        )
-    )
-    ld.add_action(launch_setup_action)
-    return ld
-
-
-def launch_setup(context):
-    gazebo_dir = get_package_share_directory('waywiser_gazebo')
-    world_path = Path(LaunchConfiguration('world').perform(context)).resolve()
-    drone_config_path = Path(LaunchConfiguration('drone_config').perform(context)).resolve()
-    px4_build_dir, px4_assets_dir = resolve_px4_paths(Path(gazebo_dir))
-    drone_name = LaunchConfiguration('drone_name').perform(context)
-    px4_sys_autostart = LaunchConfiguration('px4_sys_autostart').perform(context)
-    px4_start_delay = float(LaunchConfiguration('px4_start_delay').perform(context))
-    bridge_install_prefix = get_vendored_harmonic_bridge_install_prefix()
-    use_sim_time = LaunchConfiguration('use_sim_time')
-    use_sim_time_value = LaunchConfiguration('use_sim_time').perform(context)
-    gz_world_name = read_world_name(world_path)
-    gazebo_world_path = (
-        create_harmonic_compatible_sdf(world_path) if is_ignition_sdf(world_path) else world_path
-    )
-
-    px4_models_dir = px4_assets_dir / 'Tools' / 'simulation' / 'gz' / 'models'
-    px4_worlds_dir = px4_assets_dir / 'Tools' / 'simulation' / 'gz' / 'worlds'
-    waywiser_description_dir = Path(get_package_share_directory('waywiser_description'))
-
-    enuref = read_enuref(drone_config_path)
-    existing_gz_resource_path = os.environ.get('GZ_SIM_RESOURCE_PATH', '')
-    gz_resource_entries = [entry for entry in existing_gz_resource_path.split(':') if entry]
-    gz_resource_entries.extend(
-        [
-            str(px4_models_dir),
-            str(px4_worlds_dir),
-            str(world_path.parent),
-            str(gazebo_world_path.parent),
-            str(waywiser_description_dir / 'sdf'),
-            str(waywiser_description_dir.parent),
-        ]
-    )
-
-    deduped_resource_entries = []
-    for entry in gz_resource_entries:
-        if entry not in deduped_resource_entries:
-            deduped_resource_entries.append(entry)
-
-    px4_build_dir = prepare_writable_px4_runtime_dir(px4_build_dir)
-    px4_rootfs_dir = px4_build_dir / 'rootfs'
-    px4_binary = px4_build_dir / 'bin' / 'px4'
-
-    if not px4_binary.is_file():
-        raise RuntimeError(
-            f"PX4 binary not found at '{px4_binary}'. Build waywiser_gazebo first so "
-            'PX4 SITL Zenoh artifacts are generated.'
-        )
-
-    validate_gazebo_compatibility(px4_binary, px4_assets_dir, bridge_install_prefix)
-
-    px4_param_overrides = {
-        # This launch is intended to run headless with Zenoh offboard control, so
-        # PX4 must be allowed to arm without a QGroundControl/MAVLink GCS heartbeat.
-        'NAV_DLL_ACT': '0',
-        'COM_DLL_EXCEPT': '4',
-        'COM_RCL_EXCEPT': '4',
-        'COM_ARM_WO_GPS': '1',
-        # Waywiser spawns and owns the Gazebo model. The model is not a stock PX4
-        # airframe with ESC telemetry or a simulated power module, so disable the
-        # checks that would otherwise trigger termination immediately after arming.
-        'COM_ARM_CHK_ESCS': '0',
-        'FD_ESCS_EN': '0',
-        'SYS_FAILURE_EN': '0',
-        'CBRK_FLIGHTTERM': '121212',
-        'CBRK_SUPPLY_CHK': '894281',
-        'COM_DISARM_PRFLT': '-1',
-        'COM_DISARM_LAND': '-1',
-        'COM_LOW_BAT_ACT': '0',
-        # PX4's Gazebo bridge drives the model through the SIM_GZ_EC output
-        # group. Keep these explicit so a persisted parameter cache from a
-        # non-Gazebo airframe cannot leave the simulated motors unassigned.
-        'SIM_GZ_EN': '1',
-        'SIM_GZ_EC_FUNC1': '101',
-        'SIM_GZ_EC_FUNC2': '102',
-        'SIM_GZ_EC_FUNC3': '103',
-        'SIM_GZ_EC_FUNC4': '104',
-        'SIM_GZ_EC_MIN1': '150',
-        'SIM_GZ_EC_MIN2': '150',
-        'SIM_GZ_EC_MIN3': '150',
-        'SIM_GZ_EC_MIN4': '150',
-        'SIM_GZ_EC_MAX1': '1000',
-        'SIM_GZ_EC_MAX2': '1000',
-        'SIM_GZ_EC_MAX3': '1000',
-        'SIM_GZ_EC_MAX4': '1000',
-    }
-    refresh_px4_zenoh_runtime_config(
-        px4_build_dir,
-        px4_rootfs_dir,
-        px4_sys_autostart,
-        px4_param_overrides,
-    )
-
-    px4_env = {
-        'PX4_GZ_WORLDS': str(world_path.parent),
-        'PX4_GZ_WORLD': gz_world_name,
-        'PX4_GZ_MODELS': str(px4_models_dir),
-        'GZ_SIM_RESOURCE_PATH': ':'.join(deduped_resource_entries),
-        'PX4_HOME_LAT': str(enuref[0]),
-        'PX4_HOME_LON': str(enuref[1]),
-        'PX4_HOME_ALT': str(enuref[2]),
-        'PX4_SYS_AUTOSTART': str(px4_sys_autostart),
-        'PX4_GZ_STANDALONE': '1',
-        'PX4_PARAM_ZENOH_ENABLE': '1',
-        'PX4_PARAM_ZENOH_DOMAIN_ID': os.environ.get('ROS_DOMAIN_ID', '0'),
-    }
-    px4_env.update({f'PX4_PARAM_{name}': value for name, value in px4_param_overrides.items()})
-
-    # Waywiser owns model spawning; PX4 attaches to that existing Gazebo model.
-    px4_env['PX4_GZ_MODEL_NAME'] = drone_name
-
-    default_bridge_config = create_runtime_bridge_config(
-        LaunchConfiguration('default_gazebo_bridge').perform(context), gz_world_name
-    )
-    model_bridge_config = create_runtime_bridge_config(
-        LaunchConfiguration('gazebo_bridge').perform(context), gz_world_name
-    )
-    default_bridge_node = create_bridge_action(
-        default_bridge_config,
-        use_sim_time_value,
-        bridge_install_prefix,
-    )
-
-    model_bridge_node = create_bridge_action(
-        model_bridge_config,
-        use_sim_time_value,
-        bridge_install_prefix,
-    )
-
-    map_frame_transform = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        arguments=[
-            '--x',
-            '0',
-            '--y',
-            '0',
-            '--z',
-            '0',
-            '--roll',
-            '0',
-            '--pitch',
-            '0',
-            '--yaw',
-            '0',
-            '--frame-id',
-            gz_world_name,
-            '--child-frame-id',
-            'map',
-        ],
-        parameters=[{'use_sim_time': use_sim_time}],
-        output='screen',
-    )
-
-    gazebo = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                os.path.join(
-                    gazebo_dir,
-                    'launch',
-                    'gazebo.launch.py',
-                )
-            ]
-        ),
-        launch_arguments={
-            'use_sim_time': use_sim_time,
-            'world': str(gazebo_world_path),
-            'launch_bridge': 'False',
-            'launch_map_frame_transform': 'False',
-            'gazebo_sim_version': '8',
-            'use_nvidia_gpu': LaunchConfiguration('use_nvidia_gpu'),
-        }.items(),
-    )
-
-    px4_sitl_process = ExecuteProcess(
-        cmd=[str(px4_binary), str(px4_build_dir / 'etc')],
-        cwd=str(px4_rootfs_dir),
-        additional_env=px4_env,
-        output='screen',
-        emulate_tty=True,
-    )
-    delayed_px4_sitl_process = TimerAction(period=px4_start_delay, actions=[px4_sitl_process])
-
-    gazebo_resource_path_env = SetEnvironmentVariable(
-        name='GZ_SIM_RESOURCE_PATH',
-        value=':'.join(deduped_resource_entries),
-    )
-    ign_resource_path_env = SetEnvironmentVariable(
-        name='IGN_GAZEBO_RESOURCE_PATH',
-        value=':'.join(deduped_resource_entries),
-    )
-
-    actions = [
-        gazebo_resource_path_env,
-        ign_resource_path_env,
-        gazebo,
-        map_frame_transform,
-        default_bridge_node,
-        model_bridge_node,
-    ]
-    actions.append(delayed_px4_sitl_process)
-    return actions
 
 
 def refresh_px4_zenoh_runtime_config(
@@ -306,6 +17,8 @@ def refresh_px4_zenoh_runtime_config(
     px4_sys_autostart: str,
     px4_param_overrides,
 ):
+    ensure_px4_aux_global_position_params(px4_param_overrides)
+
     zenoh_dir = px4_rootfs_dir / 'zenoh'
     for csv_name in ('pub.csv', 'sub.csv'):
         csv_path = zenoh_dir / csv_name
@@ -333,13 +46,19 @@ def refresh_px4_zenoh_runtime_config(
             continue
         post_file = Path(str(matching[0]) + '.post')
         post_file.write_text(
-            '# Auto-generated by px4_sitl.launch.py - do not edit manually.\n'
+            '# Auto-generated by px4_sitl_utils.py - do not edit manually.\n'
             '# Re-apply headless Zenoh SITL parameter overrides after the airframe script.\n'
             + ''.join(
                 f'param set {name} {value}\n'
                 for name, value in sorted(px4_param_overrides.items())
             )
         )
+
+
+def ensure_px4_aux_global_position_params(px4_param_overrides):
+    px4_param_overrides.setdefault('EKF2_AGP_CTRL', '3')
+    px4_param_overrides.setdefault('EKF2_AGP_DELAY', '0')
+    px4_param_overrides.setdefault('EKF2_AGP_NOISE', '0.05')
 
 
 def prepare_writable_px4_runtime_dir(px4_build_dir: Path):
@@ -394,202 +113,19 @@ def px4_runtime_source_marker(px4_build_dir: Path):
 
 
 def get_vendored_harmonic_bridge_install_prefix():
-    candidates = []
-
     gazebo_dir = Path(get_package_share_directory('waywiser_gazebo')).resolve()
-    candidates.append(gazebo_dir.parent.parent / 'ros_gz_harmonic')
-
-    install_dir = find_waywiser_install_dir(gazebo_dir)
-    if install_dir:
-        candidates.append(install_dir / 'ros_gz_harmonic')
-
-    candidates.append(gazebo_dir / 'external' / 'ros_gz_harmonic' / 'install')
-
-    source_dir = find_waywiser_source_dir(gazebo_dir)
-    if source_dir:
-        candidates.append(
-            source_dir / 'waywiser_gazebo' / 'external' / 'ros_gz_harmonic' / 'install'
-        )
-
     waywiser_ws = os.environ.get('WAYWISER_WS')
-    if waywiser_ws:
-        candidates.append(Path(waywiser_ws) / 'install' / 'ros_gz_harmonic')
-        candidates.append(
-            Path(waywiser_ws)
-            / 'src'
-            / 'WayWiseR'
-            / 'waywiser_gazebo'
-            / 'external'
-            / 'ros_gz_harmonic'
-            / 'install'
-        )
+    bridge_prefix = (
+        Path(waywiser_ws) / 'install' / 'ros_gz_harmonic'
+        if waywiser_ws
+        else gazebo_dir.parent.parent / 'ros_gz_harmonic'
+    )
 
-    for bridge_prefix in candidates:
-        bridge_executable = bridge_prefix / 'lib' / 'ros_gz_bridge' / 'parameter_bridge'
-        if bridge_executable.is_file():
-            return str(bridge_prefix)
+    bridge_executable = bridge_prefix / 'lib' / 'ros_gz_bridge' / 'parameter_bridge'
+    if bridge_executable.is_file():
+        return str(bridge_prefix)
 
     return ''
-
-
-def find_waywiser_install_dir(start_path: Path):
-    for parent in [start_path, *start_path.parents]:
-        if (parent / 'waywiser_gazebo' / 'share' / 'waywiser_gazebo').is_dir():
-            return parent
-    return None
-
-
-def find_waywiser_source_dir(start_path: Path):
-    for parent in [start_path, *start_path.parents]:
-        px4_source_dir = parent / 'waywiser_core' / 'external' / 'PX4-Autopilot'
-        ros_gz_source_dir = parent / 'waywiser_gazebo' / 'external' / 'ros_gz_harmonic'
-        if px4_source_dir.is_dir() or ros_gz_source_dir.is_dir():
-            return parent
-    return None
-
-
-def resolve_px4_paths(gazebo_dir: Path):
-    build_candidates = []
-    asset_candidates = []
-
-    merged_installed_px4_sitl = gazebo_dir / 'px4_sitl_zenoh'
-    build_candidates.append(merged_installed_px4_sitl)
-    asset_candidates.append(merged_installed_px4_sitl)
-
-    install_dir = find_waywiser_install_dir(gazebo_dir)
-    if install_dir:
-        installed_px4_sitl = (
-            install_dir
-            / 'waywiser_gazebo'
-            / 'share'
-            / 'waywiser_gazebo'
-            / 'px4_sitl_zenoh'
-        )
-        build_candidates.append(installed_px4_sitl)
-        asset_candidates.append(installed_px4_sitl)
-
-        legacy_installed_px4 = (
-            install_dir
-            / 'waywiser_core'
-            / 'share'
-            / 'waywiser_core'
-            / 'external'
-            / 'PX4-Autopilot'
-        )
-        build_candidates.append(legacy_installed_px4 / 'build' / 'px4_sitl_zenoh')
-        asset_candidates.append(legacy_installed_px4)
-
-    source_dir = find_waywiser_source_dir(gazebo_dir)
-    if source_dir:
-        build_candidates.append(
-            source_dir.parent.parent
-            / 'build'
-            / 'waywiser_gazebo'
-            / 'share'
-            / 'waywiser_gazebo'
-            / 'px4_sitl_zenoh'
-        )
-        asset_candidates.append(source_dir / 'waywiser_core' / 'external' / 'PX4-Autopilot')
-
-    waywiser_ws = os.environ.get('WAYWISER_WS')
-    if waywiser_ws:
-        waywiser_ws_path = Path(waywiser_ws)
-        build_candidates.append(
-            waywiser_ws_path
-            / 'build'
-            / 'waywiser_gazebo'
-            / 'share'
-            / 'waywiser_gazebo'
-            / 'px4_sitl_zenoh'
-        )
-        asset_candidates.append(
-            waywiser_ws_path / 'src' / 'WayWiseR' / 'waywiser_core'
-            / 'external' / 'PX4-Autopilot'
-        )
-
-    deduped_build_candidates = []
-    for candidate in build_candidates:
-        resolved = candidate.resolve()
-        if resolved not in deduped_build_candidates:
-            deduped_build_candidates.append(resolved)
-
-    deduped_asset_candidates = []
-    for candidate in asset_candidates:
-        resolved = candidate.resolve()
-        if resolved not in deduped_asset_candidates:
-            deduped_asset_candidates.append(resolved)
-
-    px4_build_dir = None
-    for candidate in deduped_build_candidates:
-        if (candidate / 'bin' / 'px4').is_file():
-            px4_build_dir = candidate
-            break
-
-    if px4_build_dir is None:
-        for candidate in deduped_build_candidates:
-            if candidate.is_dir():
-                px4_build_dir = candidate
-                break
-
-    px4_assets_dir = None
-    for candidate in deduped_asset_candidates:
-        if (candidate / 'Tools' / 'simulation' / 'gz' / 'models').is_dir():
-            px4_assets_dir = candidate
-            break
-
-    if px4_assets_dir is None:
-        for candidate in deduped_asset_candidates:
-            if candidate.is_dir():
-                px4_assets_dir = candidate
-                break
-
-    if px4_build_dir is None and deduped_build_candidates:
-        px4_build_dir = deduped_build_candidates[0]
-    if px4_assets_dir is None and deduped_asset_candidates:
-        px4_assets_dir = deduped_asset_candidates[0]
-
-    return px4_build_dir, px4_assets_dir
-
-
-def create_bridge_action(config_file, use_sim_time, bridge_install_prefix=''):
-    bridge_binary = resolve_bridge_executable(bridge_install_prefix)
-
-    if not bridge_binary:
-        return Node(
-            package='ros_gz_bridge',
-            executable='parameter_bridge',
-            output='log',
-            arguments=[
-                '--ros-args',
-                '-p',
-                ['config_file:=', config_file],
-            ],
-            parameters=[{'use_sim_time': use_sim_time}],
-        )
-
-    bridge_env = {}
-    if bridge_install_prefix:
-        bridge_env = {
-            'LD_LIBRARY_PATH': prepend_env_path(
-                os.environ.get('LD_LIBRARY_PATH', ''), str(Path(bridge_install_prefix) / 'lib')
-            ),
-            'AMENT_PREFIX_PATH': prepend_env_path(
-                os.environ.get('AMENT_PREFIX_PATH', ''), bridge_install_prefix
-            ),
-        }
-
-    return ExecuteProcess(
-        cmd=[
-            str(bridge_binary),
-            '--ros-args',
-            '-p',
-            f'config_file:={config_file}',
-            '-p',
-            f'use_sim_time:={use_sim_time}',
-        ],
-        additional_env=bridge_env,
-        output='log',
-    )
 
 
 def prepend_env_path(current_value, new_value):

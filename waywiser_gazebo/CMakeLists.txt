@@ -141,7 +141,8 @@ ament_python_install_package(${PROJECT_NAME}_py
 
 install(
   PROGRAMS
-  py_src/waywiser_gazebo_py/gazebo_osm_tile_server.py
+  py_src/waywiser_gazebo_py/gazebo_orchestrator_node.py
+  py_src/waywiser_gazebo_py/gazebo_osm_tile_server_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -199,18 +200,14 @@ if(BUILD_TESTING)
   find_package(ament_cmake_pep257 REQUIRED)
 
   ament_flake8(
-    launch/gazebo.launch.py
+    launch/gazebo_orchestrator.launch.py
     launch/gazebo_osm_tile_server.launch.py
-    launch/px4_sitl.launch.py
-    launch/spawn.launch.py
-    py_src/waywiser_gazebo_py/gazebo_osm_tile_server.py
+    py_src/waywiser_gazebo_py/gazebo_osm_tile_server_node.py
   )
   ament_pep257(
-    launch/gazebo.launch.py
+    launch/gazebo_orchestrator.launch.py
     launch/gazebo_osm_tile_server.launch.py
-    launch/px4_sitl.launch.py
-    launch/spawn.launch.py
-    py_src/waywiser_gazebo_py/gazebo_osm_tile_server.py
+    py_src/waywiser_gazebo_py/gazebo_osm_tile_server_node.py
   )
   ament_lint_cmake(CMakeLists.txt)
 endif()

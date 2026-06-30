@@ -34,7 +34,7 @@ def generate_launch_description():
 
     gazebo_osm_tile_server_node = Node(
         package='waywiser_gazebo',
-        executable='gazebo_osm_tile_server.py',
+        executable='gazebo_osm_tile_server_node.py',
         name='gazebo_osm_tile_server_node',
         parameters=[
             {'use_sim_time': LaunchConfiguration('use_sim_time')},

@@ -70,17 +70,31 @@ waywiser_drone_node:
     require_gnss_for_mission: false
     mission_waypoint_proximity: 0.5
     mission_end_goal_alignment_threshold: 0.25
-    mission_cruise_speed: 1.0
+    mission_cruise_speed: 3.0
     mission_max_speed: 2.0
     mission_min_approach_speed: 0.1
     mission_approach_slowdown_radius: 1.5
     mission_face_travel_direction: true
     mission_yaw_gain: 1.5
     mission_max_yaw_rate: 1.0
+    mission_vertical_height_tolerance: 0.5
+    mission_vertical_proportional_gain: 1.6
+    mission_vertical_integral_gain: 0.08
+    mission_vertical_derivative_gain: 0.5
+    mission_vertical_integral_limit: 2.0
     # PX4 offboard setpoint bridge parameters
     command_timeout: 0.5
     mission_state_timeout: 1.0
     return_home_on_control_tower_timeout: true
+    configure_px4_home_on_lift_off: true
+    publish_px4_aux_global_position: true
+    px4_aux_global_position_eph: 0.05
+    px4_aux_global_position_epv: 0.05
+    return_home_height: 10.0 # m above home for WayWiseR return-home cruise altitude
+    auto_landing_descent_velocity: 0.3 # m/s WayWiseR auto_landing descent speed
+    # Optional: set both to override the default return-home XY captured at lift-off.
+    # return_home_x: 0.0
+    # return_home_y: 0.0
     control_tower_heartbeat_topic: control_tower_heartbeat
     control_tower_heartbeat_timeout: 2.0
     return_home_command_retry_period: 2.0
@@ -88,9 +102,7 @@ waywiser_drone_node:
     request_retry_period: 1.0
     auto_arm: true
     require_local_position_before_arm: false
-    auto_lift_off_speed: 1.5 # m/s climb rate during auto lift-off (matches MPC_TKO_SPEED)
-    auto_lift_off_height: 2.0 # m above ground to hover after lift-off
-    auto_lift_off_tolerance: 0.1 # m position tolerance to consider hover reached
+    auto_lift_off_height: 2.0 # m target height for standalone waypoint-follower lift-off
 
 emergency_stop_monitor:
   ros__parameters:
