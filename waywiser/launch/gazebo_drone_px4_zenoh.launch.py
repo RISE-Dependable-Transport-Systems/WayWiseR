@@ -26,11 +26,10 @@ from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node, PushRosNamespace, SetRemap
-from waywiser_gazebo_py import px4_sitl_utils
-
 from waywiser_description_py.waywiser_description_utils import (
     get_robot_state_publisher_node,
 )
+from waywiser_gazebo_py import px4_sitl_utils
 from waywiser_py.waywiser_utils import shutdown_on_process_error
 import yaml
 
@@ -173,7 +172,7 @@ def generate_launch_description():
     drone_waypoint_follower_la = DeclareLaunchArgument(
         'drone_waypoint_follower',
         default_value='True',
-        description='Launch a command-side copter waypoint follower that publishes velocity commands',
+        description='Launch a command-side copter waypoint follower',
     )
     control_vehicle_node_name_la = DeclareLaunchArgument(
         'control_vehicle_node_name',
@@ -802,7 +801,7 @@ def read_world_name(world_path: Path):
 def resolve_resource_path(path, base_dir):
     path = str(path)
     if path.startswith('package://'):
-        package_path = path[len('package://') :]
+        package_path = path[len('package://'):]
         package_name, _, relative_path = package_path.partition('/')
         if not package_name or not relative_path:
             raise RuntimeError(f'Invalid package resource URI: {path}')

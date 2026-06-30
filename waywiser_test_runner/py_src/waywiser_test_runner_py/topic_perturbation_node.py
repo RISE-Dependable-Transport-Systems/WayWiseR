@@ -15,7 +15,8 @@ from waywiser_py.waywiser_utils import RELIABLE_TRANSIENT_LOCAL_QOS
 
 
 class TopicPerturbationNode(Node):
-    """Apply controlled perturbations to a generic ROS topic stream.
+    """
+    Apply controlled perturbations to a generic ROS topic stream.
 
     Supported generic modes are passthrough, delay, dropout, and replay. For
     geometry_msgs/msg/Twist, numeric scale/bias/override transforms are also

@@ -227,7 +227,7 @@ class YoloNode(Node):
             self.get_logger().error(
                 f"TensorRT model '{model_path}' failed during inference: {exc}. "
                 f"Falling back to PyTorch model '{pytorch_model_path}'. Re-export the "
-                "TensorRT engine with the installed TensorRT version before using it again."
+                'TensorRT engine with the installed TensorRT version before using it again.'
             )
             self.load_model(str(pytorch_model_path))
             return list(self.run_inference_once(cv_image))

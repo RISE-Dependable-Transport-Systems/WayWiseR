@@ -1021,7 +1021,7 @@ class ControlTowerNode(Node):
 
         self.get_logger().info(
             f'Sent mission with {len(mission_points)} waypoint(s), speed={mission_speed:.2f} m/s, '
-            f'z={mission_altitude:.2f} m to {self._prefix_with_vehicle_namespace(self.route_topic)}'
+            f'z={mission_altitude:.2f}m to {self.route_topic}'
         )
         return True
 
@@ -1135,7 +1135,6 @@ class ControlTowerNode(Node):
     def quadcopter_state_callback(self, msg):
         """Handle quadcopter high-level state updates."""
         self.vehicle_status_cleared = False
-        previous_state_code = self.last_quadcopter_state_code
         now = self.get_clock().now()
         self.last_quadcopter_state['msg'] = msg
         self.last_quadcopter_state['stamp'] = now
@@ -2908,12 +2907,11 @@ class ControlTowerUI(QMainWindow):
             self.enuref_label.setProperty('copy_text', '')
             self.enuref_label.setStyleSheet(f'color: {self.gray_color}; font-weight: 700;')
         else:
-            self.enuref_label.setText(
-                f'({self.node.enuref[0]:.6f}°, {self.node.enuref[1]:.6f}°, {self.node.enuref[2]:.2f}m)'
-            )
+            e = self.node.enuref
+            self.enuref_label.setText(f'({e[0]:.4f}, {e[1]:.4f}, {e[2]:.1f})')
             self.enuref_label.setProperty(
                 'copy_text',
-                f'({self.node.enuref[0]:.15g}°, {self.node.enuref[1]:.15g}°, {self.node.enuref[2]:.15g}m)',
+                f'({e[0]:.7g}, {e[1]:.7g}, {e[2]:.7g})',
             )
             self.enuref_label.setStyleSheet(f'color: {self.green_color}; font-weight: 700;')
 

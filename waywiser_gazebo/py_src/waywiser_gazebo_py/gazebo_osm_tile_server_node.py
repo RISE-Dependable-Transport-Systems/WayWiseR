@@ -19,14 +19,13 @@ import xml.etree.ElementTree as ET
 
 from PIL import Image, ImageDraw
 from PIL.PngImagePlugin import PngInfo
-import rclpy
-from rclpy.executors import ExternalShutdownException
-from rclpy.node import Node
-
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
 from PyQt5.QtGui import QColor, QImage, QPainter, QPixmap  # noqa: E402
 from PyQt5.QtWidgets import QApplication  # noqa: E402
+import rclpy  # noqa: E402
+from rclpy.executors import ExternalShutdownException  # noqa: E402
+from rclpy.node import Node  # noqa: E402
 
 # Gazebo static-world rendering
 
@@ -77,7 +76,8 @@ def render_static_gazebo_world(
     map_region=None,
     progress_callback=None,
 ):
-    """Render a Gazebo world as a top-down pixmap.
+    """
+    Render a Gazebo world as a top-down pixmap.
 
     This starts a temporary, headless Gazebo instance with a nadir camera injected into
     the world. That produces a real Gazebo render while avoiding objects that are spawned
@@ -512,6 +512,7 @@ def _validate_stitching_plan(
 
 
 class _GazeboImageCapture:
+
     def __init__(self, topic):
         try:
             from gz.msgs10.image_pb2 import Image, PixelFormatType  # noqa: PLC0415
@@ -1053,7 +1054,7 @@ class GazeboOsmTileServerNode(Node):
             metadata.add_text(
                 'requested_camera_height_m', str(float(self.gazebo_bev_view_camera_height))
             )
-            metadata.add_text('map_region', json.dumps([float(value) for value in self.map_region]))
+            metadata.add_text('map_region', json.dumps(self.map_region))
             metadata.add_text('world_bounds', json.dumps(rendered_map.bounds))
             metadata.add_text('camera_fov_deg', str(float(rendered_map.camera_fov_deg)))
             metadata.add_text('camera_height_m', str(float(rendered_map.camera_height_m)))
@@ -1190,7 +1191,7 @@ class GazeboOsmTileServerNode(Node):
     def _send_json_metadata(self, conn):
         import json
 
-        if self.processing_status != 'Ready' or self.map_image is None or self.world_bounds is None:
+        if self.processing_status != 'Ready' or not self.map_image or not self.world_bounds:
             payload = {
                 'status': self.processing_status,
                 'detail': self.processing_detail,

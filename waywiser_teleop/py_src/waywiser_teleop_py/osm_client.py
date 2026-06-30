@@ -6,8 +6,8 @@ import shutil
 import tempfile
 import time
 
-from PyQt5.QtCore import QObject, QStandardPaths, Qt, QUrl, pyqtSignal
-from PyQt5.QtGui import QColor, QPainter, QPen, QPixmap
+from PyQt5.QtCore import pyqtSignal, QObject, QStandardPaths, Qt, QUrl
+from PyQt5.QtGui import QColor, QPen, QPixmap
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 
 

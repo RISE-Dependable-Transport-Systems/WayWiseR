@@ -43,7 +43,8 @@ PointCloudTransformerNode::PointCloudTransformerNode(const rclcpp::NodeOptions &
     std::bind(&PointCloudTransformerNode::pointCloudCallback, this, std::placeholders::_1));
 }
 
-void PointCloudTransformerNode::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+void PointCloudTransformerNode::pointCloudCallback(
+  const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
   try {
     // Lookup transformation from input_frame to output_frame

@@ -533,7 +533,7 @@ class VehicleOverlayModel:
         if not filename:
             return ''
         if filename.startswith('package://'):
-            package_and_path = filename[len('package://') :]
+            package_and_path = filename[len('package://'):]
             package_name, _, relative_path = package_and_path.partition('/')
             if not package_name or not relative_path:
                 return ''
@@ -549,7 +549,7 @@ class VehicleOverlayModel:
                     pass
             return ''
         if filename.startswith('file://'):
-            filename = filename[len('file://') :]
+            filename = filename[len('file://'):]
         return filename if os.path.exists(filename) else ''
 
     def _load_mesh_vertices(self, mesh_path):

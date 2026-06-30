@@ -154,7 +154,7 @@ def generate_launch_description():
     rover_waypoint_follower_la = DeclareLaunchArgument(
         'rover_waypoint_follower',
         default_value='False',
-        description='Launch a command-side rover waypoint follower that publishes velocity commands',
+        description='Launch a command-side rover waypoint follower',
     )
     rover_localization_node_name_la = DeclareLaunchArgument(
         'rover_localization_node_name',

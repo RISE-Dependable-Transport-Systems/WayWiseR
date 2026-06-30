@@ -273,7 +273,8 @@ class TestRunnerBase(Node):
         return []
 
     def reset_topic_perturbation_nodes(self):
-        """Reset perturbation node state for a fresh iteration.
+        """
+        Reset perturbation node state for a fresh iteration.
 
         Sends a reset command to each perturbation node via a latched topic,
         then re-publishes the default profile so the node reconfigures itself.

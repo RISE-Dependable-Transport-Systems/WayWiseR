@@ -25,6 +25,7 @@ PACKAGE_NAME = 'waywiser_test_runner'
 
 
 class FlightTestRunnerNode(TestRunnerBase):
+
     def __init__(self):
         super().__init__('flight_test_runner')
 

@@ -31,7 +31,7 @@ PACKAGE_NAME = 'waywiser_carla'
 
 
 class CarlaOrchestratorNode(Node):
-    """CarlaOrchestratorNode is a ROS2 node that manages the orchestration of the CARLA simulator."""
+    """CarlaOrchestratorNode manages the orchestration of the CARLA simulator."""
 
     def __init__(self):
         super().__init__('carla_orchestrator_node')
