@@ -4,6 +4,7 @@ track_test_runner_node:
     orchestrate_test_setup: true
     track_test_runner_timer_rate: 1.0
     test_config_start_index: 1
+    test_config_end_index: 0
     test_configurations_json_path: "truck_small_scale_track_test_configurations.json"
     rosbag_output_dir: "track_test_data" # relative path
     use_rosbag_recording: true

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Resolve and source the WayWiseR .env file so that WAYWISER_VENV_PATH and
+# other settings are honoured without the caller having to export them.
+_env_file=""
+if [[ -n "${WAYWISER_ENV_FILE:-}" ]]; then
+    _env_file="$WAYWISER_ENV_FILE"
+elif [[ -n "${WAYWISER_WS:-}" && -f "$WAYWISER_WS/src/WayWiseR/.env" ]]; then
+    _env_file="$WAYWISER_WS/src/WayWiseR/.env"
+else
+    # Derive repo root from the script location (waywiser/scripts/ → repo root).
+    _repo_dir="$(cd "$script_dir/../.." && pwd)"
+    if [[ -f "$_repo_dir/.env" ]]; then
+        _env_file="$_repo_dir/.env"
+    elif [[ -f /etc/waywiser/waywiser.env ]]; then
+        _env_file="/etc/waywiser/waywiser.env"
+    fi
+fi
+if [[ -n "$_env_file" ]]; then
+    set -a; source "$_env_file"; set +a
+fi
+
+# Default to reusing an existing venv (--yes suppresses the interactive prompt).
+# Pass --clear explicitly on the command line to force recreation.
+_extra_args=()
+if [[ ! " $* " =~ " --clear " ]]; then
+    _extra_args+=(--yes)
+fi
+
+exec "$script_dir/setup_venv.bash" "${_extra_args[@]}" "$@"

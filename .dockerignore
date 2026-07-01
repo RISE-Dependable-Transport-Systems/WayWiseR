@@ -1,0 +1,46 @@
+# Local runtime/config files
+.env
+.agent/
+.vscode/
+
+# Stale/unused submodule metadata can dwarf the source context. Keep active
+# Git metadata available because the local-copy Docker path still uses it.
+/.git/modules/waywiser_gazebo/external/PX4-Autopilot/
+/.git/modules/waywiser_core/external/px4_msgs/
+
+# Workspace outputs
+/build/
+/build-*/
+/install/
+/install-*/
+/log/
+/log-*/
+/deb_dist/
+/deb_install/
+/deb_stage/
+
+# Python/uv caches and virtual environments
+.venv/
+**/.venv/
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Native build caches
+.ccache/
+**/.ccache/
+**/CMakeCache.txt
+**/CMakeFiles/
+**/cmake_install.cmake
+compile_commands.json
+
+# JS/editor cruft
+node_modules/
+**/node_modules/
+.DS_Store
+*.swp
+*.swo

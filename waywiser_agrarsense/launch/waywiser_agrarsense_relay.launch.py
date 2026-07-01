@@ -78,7 +78,7 @@ def vehicle_tf_publishers_launch(context):
             nodes.append(
                 Node(
                     package='waywiser_agrarsense',
-                    executable='vehicle_tf_publisher.py',
+                    executable='vehicle_tf_publisher_node.py',
                     namespace=vehicle_id,
                     name='tf_publisher',
                     output='screen',
@@ -144,7 +144,7 @@ def camera_publishers_launch(context):
                             nodes.append(
                                 Node(
                                     package='waywiser_perception',
-                                    executable='camera_info_publisher.py',
+                                    executable='camera_info_publisher_node.py',
                                     namespace=role_name,
                                     name=f'{sensor["id"]}_camera_info_publisher',
                                     output='screen',
@@ -162,7 +162,7 @@ def camera_publishers_launch(context):
                                 nodes.append(
                                     Node(
                                         package='waywiser_perception',
-                                        executable='rgb_to_grayscale.py',
+                                        executable='rgb_to_grayscale_node.py',
                                         namespace=role_name,
                                         name=f'{sensor["id"]}_rgb_to_grayscale',
                                         output='screen',

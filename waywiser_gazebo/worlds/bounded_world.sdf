@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <sdf version="1.8">
-  <world name="car_world">
+  <world name="bounded_world">
     <!-- Adapted from the original file:
     https://github.com/berickson/sim_car/blob/main/car_description/worlds/simple.world -->
 

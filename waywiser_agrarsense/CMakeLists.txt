@@ -27,16 +27,27 @@ install(
 
 install(
   PROGRAMS
-  py_src/waywiser_agrarsense_py/agrarsense_orchestrator.py
-  py_src/waywiser_agrarsense_py/vehicle_tf_publisher.py
-  py_src/waywiser_agrarsense_py/waywiser_to_agrarsense_control.py
+  py_src/waywiser_agrarsense_py/agrarsense_orchestrator_node.py
+  py_src/waywiser_agrarsense_py/vehicle_tf_publisher_node.py
+  py_src/waywiser_agrarsense_py/waywiser_to_agrarsense_control_node.py
   DESTINATION lib/${PROJECT_NAME}
+)
+
+install(
+  FILES ros_bridge/Dockerfile
+  DESTINATION "."
+)
+
+install(
+  PROGRAMS ros_bridge/build_docker_container.sh
+  DESTINATION "."
 )
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
+  set(ament_cmake_xmllint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 

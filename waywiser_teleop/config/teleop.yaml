@@ -28,7 +28,7 @@ teleop_twist_joy:
     enable_button: 4
     enable_turbo_button: 6
 
-twist_keyboard:
+control_tower:
   ros__parameters:
     enable: true
     max_linear_speed: 2.0
@@ -39,11 +39,20 @@ twist_keyboard:
     angular_speed_increment: 0.1
     speed_control_rate: 10.0
     publish_rate: 10.0
+    vehicle_control_enabled: true
+    publish_control_tower_heartbeat: true
+    control_tower_heartbeat_topic: control_tower_heartbeat
+    control_tower_heartbeat_rate: 5.0
     emergency_stop_set_joy_button_index: 5
     emergency_stop_clear_joy_button_index: 7
     mux_output_topic: teleop_mux_vel
+    route_topic: waywiser_path
+    startup_route_file: ""
+    autopilot_state_control_topic: /autopilot_state_control
+    osm_tile_server_url: http://c.osm.rrze.fau.de/osmhd
+    map_source: OpenStreetMap
     mux_input:
-      sources: ["joystick", "keyboard", "teleop_nav2"]
+      sources: ["joystick", "keyboard", "waypoint_follower", "teleop_nav2"]
       joystick:
         topic: joy_vel_corrected
         timeout: 0.5
@@ -52,6 +61,11 @@ twist_keyboard:
         topic: key_vel
         timeout: 0.5
         priority: 90
+      waypoint_follower:
+        topic: waypoint_follower_vel
+        timeout: 0.5
+        priority: 60
+        prepend_vehicle_namespace: true
       teleop_nav2:
         topic: teleop_nav2_vel
         timeout: 0.5

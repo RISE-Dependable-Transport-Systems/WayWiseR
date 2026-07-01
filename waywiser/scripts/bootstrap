@@ -1,0 +1,1354 @@
+#!/usr/bin/env bash
+# bootstrap — WayWiseR workspace bootstrap: first-time setup and simulation packages.
+#
+# Usage: make all ARGS="<options>"
+#
+# Options:
+#   --prereqs-only   Only install system prerequisites, then exit
+#   --setup-only     Install prereqs + venv + rosdep, then exit (no build)
+#   --skip-prereqs   Skip system prerequisites (assume already installed)
+#   --skip-mavsdk    Skip MAVSDK check/install
+#   --configure      (Re-)configure .env only, then exit
+#   --build-only     Skip setup; only run colcon build
+#   --post-build-only  Run post-build setup hooks, then exit
+#   -y, --yes, --quiet  Non-interactive: accept all defaults
+#   -h, --help       Show this help and exit
+#
+# Simulation packages are set up automatically from .env (WAYWISER_SKIPPED_PACKAGES).
+# Run 'make configure' to change which packages are built.
+#
+# Environment variables:
+#   WAYWISER_WS   Workspace root (auto-detected from script location if unset)
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+WAYWISER_WS="${WAYWISER_WS:-$(cd "$REPO_DIR/../.." && pwd)}"
+# ENV_FILE resolution order:
+#   1. WAYWISER_ENV_FILE env var (explicit override)
+#   2. <repo>/.env  (source install, the normal case)
+#   3. /etc/waywiser/waywiser.env  (deb install conffile)
+if [[ -n "${WAYWISER_ENV_FILE:-}" ]]; then
+    ENV_FILE="$WAYWISER_ENV_FILE"
+elif [[ -f "$REPO_DIR/.env" ]]; then
+    ENV_FILE="$REPO_DIR/.env"
+else
+    ENV_FILE="/etc/waywiser/waywiser.env"
+fi
+ENV_EXAMPLE="${WAYWISER_ENV_FILE_EXAMPLE:-$REPO_DIR/.env.example}"
+VENV_DIR="${WAYWISER_VENV_PATH:-$WAYWISER_WS/.venv}"
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+header() { echo; echo "===> $*"; echo; }
+die()    { echo "ERROR: $*" >&2; exit 1; }
+info()   { echo "  $*"; }
+warn()   { echo "  WARNING: $*" >&2; }
+run_uv_install() {
+    if [[ ! -t 2 || "${TERM:-dumb}" == "dumb" ]]; then
+        UV_NO_PROGRESS=1 uv "$@"
+        return
+    fi
+
+    local log_file pid rc=0 frame_index=0 latest_status="Installing Python dependencies"
+    local frames=('|' '/' '-' '\')
+    log_file="$(mktemp "${TMPDIR:-/tmp}/waywiser-uv.XXXXXX")"
+
+    UV_NO_PROGRESS=1 uv --color never "$@" >"$log_file" 2>&1 &
+    pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        latest_status="$(
+            grep -E '^[[:space:]]*(Building|Downloading|Preparing|Installing) ' "$log_file" \
+                | tail -n 1 \
+                | sed 's/^[[:space:]]*//' \
+                || true
+        )"
+        [[ -n "$latest_status" ]] || latest_status="Installing Python dependencies"
+        printf '\r\033[2K  %s... %s' \
+            "${latest_status%...}" "${frames[$frame_index]}" >&2
+        frame_index=$(( (frame_index + 1) % ${#frames[@]} ))
+        sleep 0.1
+    done
+
+    wait "$pid" || rc=$?
+    printf '\r\033[2K' >&2
+    if (( rc != 0 )); then
+        cat "$log_file" >&2
+        rm -f "$log_file"
+        return "$rc"
+    fi
+
+    awk '!/^[[:space:]]*(Building|Downloading|Preparing|Installing) /' "$log_file" >&2
+    rm -f "$log_file"
+}
+yes_args() {
+    [[ "$OPT_YES" == true ]] && printf '%s\n' "$@"
+    return 0
+}
+as_root() {
+    if [[ "$(id -u)" -eq 0 ]]; then
+        "$@"
+    else
+        sudo "$@"
+    fi
+}
+
+ensure_git_safe_directory() {
+    command -v git &>/dev/null || return 0
+
+    if [[ "${CI:-}" == "true" ]]; then
+        git config --global --add safe.directory '*' || \
+            warn "Unable to mark Git directories as safe for CI."
+    elif [[ "$(id -u)" -eq 0 ]]; then
+        git config --global --add safe.directory "$REPO_DIR" || \
+            warn "Unable to mark $REPO_DIR as a safe Git directory."
+    fi
+}
+
+ensure_env_file() {
+    if [[ ! -f "$ENV_FILE" ]]; then
+        local env_dir
+        env_dir="$(dirname "$ENV_FILE")"
+        mkdir -p "$env_dir" 2>/dev/null || as_root mkdir -p "$env_dir"
+        if cp "$ENV_EXAMPLE" "$ENV_FILE" 2>/dev/null; then
+            :
+        elif [[ -w "$env_dir" ]]; then
+            cp "$ENV_EXAMPLE" "$ENV_FILE"
+        else
+            as_root cp "$ENV_EXAMPLE" "$ENV_FILE"
+        fi
+        info "Created $ENV_FILE from $ENV_EXAMPLE."
+    fi
+}
+
+apply_env_overrides() {
+    ensure_env_file
+    if [[ -n "${WAYWISER_SKIPPED_PACKAGES+x}" ]]; then
+        if [[ -n "${WAYWISER_SKIPPED_PACKAGES}" ]]; then
+            env_set WAYWISER_SKIPPED_PACKAGES "\"${WAYWISER_SKIPPED_PACKAGES}\""
+        else
+            env_set WAYWISER_SKIPPED_PACKAGES ""
+        fi
+    fi
+}
+
+# Read a single key from an env file, stripping quotes.
+env_get() { grep -m1 "^${1}=" "${2:-$ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d '"'"'" || true; }
+# Write/update a key in ENV_FILE; appends if the key is absent.
+env_set() {
+    local key="$1" val="$2"
+    ensure_env_file
+    if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
+        if [[ -w "$ENV_FILE" ]]; then
+            sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"
+        else
+            as_root sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"
+        fi
+    else
+        if [[ -w "$ENV_FILE" ]]; then
+            printf '%s=%s\n' "$key" "$val" >> "$ENV_FILE"
+        else
+            printf '%s=%s\n' "$key" "$val" | as_root tee -a "$ENV_FILE" > /dev/null
+        fi
+    fi
+}
+# Source ROS setup files with nounset suspended because ROS setup may reference
+# variables (e.g. AMENT_TRACE_SETUP_FILES) that are not exported yet.
+source_ros() {
+    local f="$1"
+    [[ -f "$f" ]] || die "ROS setup not found: $f"
+    set +u
+    # shellcheck disable=SC1090
+    source "$f"
+    set -u
+    prune_missing_prefix_paths
+}
+
+source_underlay() {
+    local setup_file="${WAYWISER_UNDERLAY_SETUP:-}"
+    [[ -n "$setup_file" ]] || return 0
+    if [[ ! -f "$setup_file" ]]; then
+        if [[ "${CI:-}" == "true" ]]; then
+            warn "Underlay setup not found, continuing without it: $setup_file"
+            return 0
+        fi
+        die "Underlay setup not found: $setup_file"
+    fi
+
+    set +u
+    # shellcheck disable=SC1090
+    source "$setup_file"
+    set -u
+    prune_missing_prefix_paths
+    info "Sourced underlay: $setup_file"
+}
+
+ensure_ros2_environment() {
+    local ros_distro="${ROS_DISTRO:-humble}"
+    local ros_prefix="/opt/ros/$ros_distro"
+
+    if [[ -n "${ROS_DISTRO:-}" && ":${AMENT_PREFIX_PATH:-}:" == *":$ros_prefix:"* ]]; then
+        prune_missing_prefix_paths
+        info "Using sourced ROS2 environment: $ROS_DISTRO"
+        return 0
+    fi
+
+    local default_setup="$ros_prefix/setup.bash"
+    if [[ -f "$default_setup" ]]; then
+        source_ros "$default_setup"
+        info "Sourced ROS2 environment from $default_setup"
+        return 0
+    fi
+
+    die "ROS2 is not sourced and $default_setup does not exist.
+Please source your ROS2 environment before running make, for example:
+  source $default_setup"
+}
+
+colcon_supports_allow_overriding() {
+    colcon build --help 2>/dev/null | grep -q -- "--allow-overriding"
+}
+
+# Drop stale overlay prefixes left behind by a previously sourced install space.
+# This avoids noisy colcon warnings after build/, install/, or selected packages
+# have been cleaned since the user's shell was last sourced.
+prune_missing_prefix_paths() {
+    local var value IFS entry new_value
+    local -a prefix_vars=(
+        AMENT_PREFIX_PATH
+        CMAKE_PREFIX_PATH
+        COLCON_PREFIX_PATH
+    )
+
+    for var in "${prefix_vars[@]}"; do
+        value="${!var:-}"
+        [[ -n "$value" ]] || continue
+
+        new_value=""
+        IFS=':'
+        for entry in $value; do
+            [[ -z "$entry" || -e "$entry" ]] || continue
+            new_value+="${new_value:+:}$entry"
+        done
+        unset IFS
+
+        if [[ -n "$new_value" ]]; then
+            export "$var=$new_value"
+        else
+            unset "$var"
+        fi
+    done
+}
+
+# Activate venv + ROS (used by sim package functions).
+activate_env() {
+    local venv="$VENV_DIR"
+    [[ -f "$venv/bin/activate" ]] \
+        || die "Python venv not found at $venv — run 'make setup' first."
+    set +u
+    # shellcheck disable=SC1090
+    source "$venv/bin/activate"
+    set -u
+    ensure_ros2_environment
+}
+
+# Return 0 (true) if an NVIDIA GPU is accessible on this machine.
+has_nvidia_gpu() {
+    if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null 2>&1; then
+        return 0
+    fi
+    if ls /dev/nvidia0 &>/dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+
+# Return 0 (true) when the current machine looks like an NVIDIA Jetson.
+is_jetson() {
+    [[ -f /etc/nv_tegra_release ]] && return 0
+    dpkg -s nvidia-l4t-core &>/dev/null && return 0
+
+    if [[ -r /proc/device-tree/model ]] \
+        && tr -d '\0' < /proc/device-tree/model 2>/dev/null | grep -qi 'nvidia.*jetson'; then
+        return 0
+    fi
+
+    return 1
+}
+
+# Remove $1 from WAYWISER_SKIPPED_PACKAGES in .env (idempotent).
+remove_from_skip() {
+    local pkg="$1"
+    [[ -f "$ENV_FILE" ]] || return 0
+    local current
+    current=$(grep '^WAYWISER_SKIPPED_PACKAGES=' "$ENV_FILE" | head -1 \
+    | sed 's/^WAYWISER_SKIPPED_PACKAGES=//;s/"//g')
+    [[ -z "$current" ]] && return 0
+    local new_val
+    new_val=$(printf '%s\n' $current | grep -vxF "$pkg" | xargs || true)
+    if [[ -n "$new_val" ]]; then
+        sed -i "s|^WAYWISER_SKIPPED_PACKAGES=.*|WAYWISER_SKIPPED_PACKAGES=\"$new_val\"|" "$ENV_FILE"
+    else
+        sed -i "s|^WAYWISER_SKIPPED_PACKAGES=.*|WAYWISER_SKIPPED_PACKAGES=|" "$ENV_FILE"
+    fi
+    info "Updated .env: removed '$pkg' from WAYWISER_SKIPPED_PACKAGES"
+}
+
+ensure_workspace_venv_link() {
+    if [[ "${WAYWISER_NO_WORKSPACE_VENV_LINK:-}" == "true" ]]; then
+        return 0
+    fi
+
+    local workspace_venv="$WAYWISER_WS/.venv"
+    if [[ "$VENV_DIR" != "$workspace_venv" ]]; then
+        rm -rf "$workspace_venv"
+        ln -sfn "$VENV_DIR" "$workspace_venv"
+    fi
+}
+
+prepare_venv_path() {
+    if [[ -L "$VENV_DIR" ]]; then
+        if [[ "${WAYWISER_REUSE_VENV:-}" == "true" && -x "$VENV_DIR/bin/python" ]]; then
+            return 0
+        fi
+        info "Removing stale venv symlink at $VENV_DIR"
+        rm "$VENV_DIR"
+    fi
+}
+
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [options]
+
+Core workspace setup:
+  --prereqs-only   Only install system prerequisites, then exit
+  --skip-prereqs   Skip system prerequisites (assume already installed)
+  --skip-mavsdk    Skip MAVSDK check/install
+  --configure      (Re-)configure .env only, then exit
+  --build-only     Skip setup; only run colcon build
+  --post-build-only  Run post-build setup hooks, then exit
+  -y, --yes, --quiet  Non-interactive: accept all defaults
+  -h, --help       Show this help and exit
+
+Simulation packages are set up automatically from .env (WAYWISER_SKIPPED_PACKAGES).
+Run 'make configure' to change which packages are built.
+
+Workspace : $WAYWISER_WS
+Repository: $REPO_DIR
+EOF
+}
+
+# ── option parsing ────────────────────────────────────────────────────────────
+OPT_PREREQS_ONLY=false
+OPT_SETUP_ONLY=false
+MAVSDK_MANUAL_INSTALL=false
+OPT_SKIP_PREREQS=false
+OPT_SKIP_MAVSDK=false
+OPT_CONFIGURE_ONLY=false
+OPT_BUILD_ONLY=false
+OPT_POST_BUILD_ONLY=false
+OPT_YES=false
+
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+            --prereqs-only)  OPT_PREREQS_ONLY=true ;;
+            --setup-only)    OPT_SETUP_ONLY=true ;;
+            --skip-prereqs)  OPT_SKIP_PREREQS=true ;;
+            --skip-mavsdk)   OPT_SKIP_MAVSDK=true ;;
+            --configure)     OPT_CONFIGURE_ONLY=true ;;
+            --build-only)    OPT_BUILD_ONLY=true ;;
+            --post-build-only) OPT_POST_BUILD_ONLY=true ;;
+            -y|--yes|--quiet) OPT_YES=true ;;
+            -h|--help)       usage; exit 0 ;;
+            *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
+        esac
+        shift
+    done
+    
+    # prompt_value <variable_name> <prompt_text> <default>
+    # Sets the named variable to user input (or default on Enter / -y mode).
+    prompt_value() {
+        local -n _pv_ref="$1"
+        local prompt="$2"
+        local default="$3"
+        if [[ "$OPT_YES" == true ]]; then
+            _pv_ref="$default"
+            info "${prompt}: ${default} (auto)"
+        else
+            read -rp "  ${prompt} [${default}]: " _pv_ref
+            _pv_ref="${_pv_ref:-$default}"
+        fi
+    }
+    
+    # prompt_yn <question> <default: true|false>  → 0=yes, 1=no
+    prompt_yn() {
+        local question="$1"
+        local default="${2:-false}"
+        local answer
+        if [[ "$OPT_YES" == true ]]; then
+            [[ "$default" == true ]]; return
+        fi
+        if [[ "$default" == true ]]; then
+            read -rp "  ${question} [Y/n]: " answer
+            answer="${answer:-y}"
+        else
+            read -rp "  ${question} [y/N]: " answer
+            answer="${answer:-n}"
+        fi
+        [[ "${answer,,}" =~ ^y ]]
+    }
+
+# package_checklist <result_nameref> <current_skip_list>
+# Shows an interactive whiptail checklist of all workspace packages.
+# The user marks which ones to BUILD; unchecked = skipped.
+# waywiser and waywiser_core are always built and not shown in the checklist.
+package_checklist() {
+    local -n _pc_ref="$1"
+    local cur_skip="$2"
+
+    # Packages that are always built — excluded from the checklist entirely.
+    local -r LOCKED="waywiser waywiser_core waywiser_description waywiser_twist_safety"
+
+    # Enumerate packages from package.xml files in the repo (skip external/ and .git/)
+    local all_pkgs=()
+    while IFS= read -r name; do
+        [[ -n "$name" ]] && all_pkgs+=("$name")
+    done < <(find "$REPO_DIR" -name "package.xml" \
+        ! -path "*/external/*" ! -path "*/.git/*" \
+        -exec grep -m1 '<name>' {} \; \
+        | sed 's|.*<name>||;s|</name>.*||' | sort)
+
+    # Only show non-locked packages in the UI.
+    local pkgs=()
+    for p in "${all_pkgs[@]}"; do
+        [[ " $LOCKED " == *" $p "* ]] || pkgs+=("$p")
+    done
+
+    if [[ ${#pkgs[@]} -eq 0 ]]; then
+        warn "No selectable packages found in $REPO_DIR — skipping package selection."
+        _pc_ref="$cur_skip"
+        return
+    fi
+
+    if [[ "$OPT_YES" == true ]]; then
+        _pc_ref="$cur_skip"
+        return
+    fi
+
+    # Build reverse-dependency map: rev_deps[pkg]="space-separated list of workspace
+    # packages that declare a dependency on pkg".
+    local pkg_list_str=" ${all_pkgs[*]} "
+    declare -A rev_deps
+    while IFS= read -r xml; do
+        local depender
+        depender=$(grep -m1 '<name>' "$xml" | sed 's|.*<name>||;s|</name>.*||')
+        while IFS= read -r dep; do
+            [[ "$pkg_list_str" == *" $dep "* ]] || continue  # workspace packages only
+            rev_deps["$dep"]+="$depender "
+        done < <(grep -E '<(depend|build_depend|exec_depend|run_depend)>' "$xml" \
+                 | sed 's|^[[:space:]]*<[^>]*>||;s|</[^>]*>.*||' | sort -u)
+    done < <(find "$REPO_DIR" -name "package.xml" \
+        ! -path "*/external/*" ! -path "*/.git/*")
+
+    if command -v whiptail &>/dev/null && [[ -t 1 ]]; then
+        # Build the "always built" bullet list for the dialog message.
+        local locked_lines=""
+        for pkg in $LOCKED; do
+            [[ " ${all_pkgs[*]} " == *" $pkg "* ]] || continue
+            locked_lines+="  * $pkg"$'\n'
+        done
+
+        local items=()
+        for pkg in "${pkgs[@]}"; do
+            local state="ON"
+            [[ " $cur_skip " == *" $pkg "* ]] && state="OFF"
+            local desc=""
+            local rdeps="${rev_deps[$pkg]:-}"
+            [[ -n "$rdeps" ]] && desc="[needed by: ${rdeps% }]"
+            items+=("$pkg" "$desc" "$state")
+        done
+        local n=${#pkgs[@]}
+        local height=$(( n + 12 ))
+        (( height > 34 )) && height=34
+        local width=$(( $(tput cols 2>/dev/null || echo 80) - 4 ))
+        (( width < 60 )) && width=60
+        local result exit_status=0
+        result=$(whiptail \
+            --title "WayWiseR — Build Packages" \
+            --checklist \
+"Always built (cannot be skipped):
+${locked_lines}
+Check packages to BUILD (uncheck to skip).
+(Space = toggle  |  Arrow keys = navigate  |  Enter = confirm)" \
+            "$height" "$width" "$n" \
+            "${items[@]}" \
+            3>&1 1>&2 2>&3) || exit_status=$?
+        if [[ $exit_status -ne 0 ]]; then return 1; fi  # Cancel/Esc → abort
+        local selected
+        selected=$(echo "$result" | tr -d '"')
+        # Build new skip list from packages the user did not select.
+        local new_skip=()
+        for pkg in "${pkgs[@]}"; do
+            [[ " $selected " == *" $pkg "* ]] || new_skip+=("$pkg")
+        done
+        _pc_ref="${new_skip[*]:-}"
+    else
+        # Fallback: y/n per package
+        local _skip=()
+        echo "  Always built (cannot be skipped):"
+        for pkg in $LOCKED; do
+            [[ " ${all_pkgs[*]} " == *" $pkg "* ]] || continue
+            echo "    * $pkg"
+        done
+        echo
+        echo "  Select packages to build (answer n to skip):"
+        for pkg in "${pkgs[@]}"; do
+            local def=true
+            [[ " $cur_skip " == *" $pkg "* ]] && def=false
+            local rdeps="${rev_deps[$pkg]:-}"
+            local hint=""
+            [[ -n "$rdeps" ]] && hint=" [needed by: ${rdeps% }]"
+            prompt_yn "  Build $pkg?$hint" "$def" || _skip+=("$pkg")
+        done
+        _pc_ref="${_skip[*]:-}"
+    fi
+}
+
+    # ── step 1: system prerequisites ─────────────────────────────────────────────
+    
+    install_apt_deps() {
+        header "Installing system apt dependencies"
+        local -a _apt_packages=(
+            ccache
+            gnupg
+            git
+            build-essential
+            cmake
+            python3-colcon-common-extensions
+            python3-dev
+            curl
+            software-properties-common
+        )
+        local -a _missing=()
+        local _pkg
+        for _pkg in "${_apt_packages[@]}"; do
+            dpkg -s "$_pkg" &>/dev/null || _missing+=("$_pkg")
+        done
+        if [[ ${#_missing[@]} -eq 0 ]]; then
+            info "All apt packages already installed — skipping."
+            return 0
+        fi
+        info "Packages to install: ${_missing[*]}"
+        prompt_yn "Install missing apt packages (sudo apt-get install)?" true \
+            || { info "Skipping apt dependencies."; return 0; }
+        as_root apt-get update -qq
+        as_root apt-get install $(yes_args -y) "${_missing[@]}"
+        info "apt packages installed."
+    }
+
+    install_gazebo_harmonic_deps() {
+        header "Configuring PX4/Gazebo Harmonic apt repository"
+        local keyring="/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg"
+        local sources_list="/etc/apt/sources.list.d/gazebo-stable.list"
+
+        if [[ ! -f "$keyring" || ! -f "$sources_list" ]]; then
+            prompt_yn "Add OSRF Gazebo apt repository?" true \
+                || { info "Skipping PX4/Gazebo Harmonic dependencies."; return 0; }
+            as_root curl -fsSL https://packages.osrfoundation.org/gazebo.gpg \
+                -o "$keyring"
+            local ubuntu_codename
+            ubuntu_codename=$(. /etc/os-release && echo "$UBUNTU_CODENAME")
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=$keyring] http://packages.osrfoundation.org/gazebo/ubuntu-stable $ubuntu_codename main" \
+                | as_root tee "$sources_list" > /dev/null
+            as_root apt-get update -qq
+            info "OSRF Gazebo apt repository added. rosdep will install Gazebo packages."
+        else
+            info "OSRF Gazebo apt repository already configured."
+        fi
+    }
+
+    should_install_gazebo_harmonic_deps() {
+        local arch skipped
+
+        arch=$(dpkg --print-architecture 2>/dev/null || uname -m)
+        [[ "$arch" == "amd64" ]] || return 1
+
+        ensure_env_file
+        skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
+        [[ " $skipped " != *" waywiser_gazebo "* ]]
+    }
+    
+    install_uv() {
+        if command -v uv &>/dev/null; then
+            info "uv already installed: $(uv --version)"
+            return 0
+        fi
+        header "Installing uv (Python package manager)"
+        prompt_yn "Install uv via curl | sh?" true \
+            || die "uv is required. Install it manually: https://github.com/astral-sh/uv"
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        # Make uv available in this shell session
+        export PATH="$HOME/.local/bin:$PATH"
+        command -v uv &>/dev/null \
+        || die "uv installation failed — please install manually: https://github.com/astral-sh/uv"
+        info "uv installed: $(uv --version)"
+    }
+    
+    setup_ros2_environment() {
+        header "Checking ROS2 environment"
+        ensure_ros2_environment
+    }
+    
+    install_mavsdk() {
+        # Only install if libmavsdk-dev is missing; don't touch an existing install.
+        if dpkg -s libmavsdk-dev &>/dev/null; then
+            local ver; ver=$(dpkg -s libmavsdk-dev | awk '/^Version:/{print $2}')
+            info "MAVSDK already installed: ${ver}"
+            return 0
+        fi
+        header "Installing MAVSDK 2.x"
+        local arch; arch=$(dpkg --print-architecture)
+        local arch_var="MAVSDK_${arch^^}_DEB_URL"
+        arch_var="${arch_var//-/_}"
+        local mavsdk_release_version="${MAVSDK_VERSION_DEFAULT:-2.14.1}"
+        local mavsdk_deb_url="${MAVSDK_DEB_URL:-${!arch_var:-}}"
+        local mavsdk_deb_path="${MAVSDK_DEB_PATH:-}"
+
+        if [[ -z "$mavsdk_deb_url" ]]; then
+            case "$arch" in
+                amd64)
+                    mavsdk_deb_url="https://github.com/mavlink/MAVSDK/releases/download/v${mavsdk_release_version}/libmavsdk-dev_${mavsdk_release_version}_ubuntu22.04_amd64.deb"
+                    ;;
+                arm64)
+                    mavsdk_deb_url="https://github.com/mavlink/MAVSDK/releases/download/v${mavsdk_release_version}/libmavsdk-dev_${mavsdk_release_version}_debian11_arm64.deb"
+                    ;;
+            esac
+        fi
+
+        if [[ -n "$mavsdk_deb_path" ]]; then
+            [[ -f "$mavsdk_deb_path" ]] || die "MAVSDK_DEB_PATH does not exist: $mavsdk_deb_path"
+            info "Installing MAVSDK from local deb: $mavsdk_deb_path"
+            as_root dpkg -i "$mavsdk_deb_path"
+            info "MAVSDK installed."
+            return 0
+        fi
+
+        if [[ -n "$mavsdk_deb_url" ]]; then
+            local tmp_deb; tmp_deb=$(mktemp --suffix=.deb)
+            info "Downloading MAVSDK for $arch: $mavsdk_deb_url"
+            curl -LsSf "$mavsdk_deb_url" -o "$tmp_deb"
+            as_root dpkg -i "$tmp_deb"
+            rm -f "$tmp_deb"
+            info "MAVSDK installed."
+            return 0
+        fi
+
+        local mavsdk_build_script="$REPO_DIR/waywiser/scripts/build_mavsdk_deb.sh"
+        if [[ -x "$mavsdk_build_script" \
+            && "${WAYWISER_BUILD_MAVSDK_DEB:-false}" == "true" ]]; then
+            local built_deb
+            prompt_yn "Build and install MAVSDK deb for $arch from WayWise tools?" true \
+                || { info "Skipping MAVSDK build."; MAVSDK_MANUAL_INSTALL=true; return 0; }
+            built_deb="$(
+                MAVSDK_DEB_OUT="${WAYWISER_MAVSDK_DEB_OUT:-$WAYWISER_WS/deb_stage/$arch}" \
+                "$mavsdk_build_script" "$arch" | tail -n 1
+            )"
+            [[ -f "$built_deb" ]] || die "MAVSDK build did not produce a deb: $built_deb"
+            info "Installing MAVSDK from built deb: $built_deb"
+            as_root dpkg -i "$built_deb"
+            info "MAVSDK installed."
+            return 0
+        fi
+
+        # Default amd64 release package for Ubuntu 22.04; other arches require a
+        # local build or an explicit MAVSDK_DEB_URL/MAVSDK_DEB_PATH.
+        local MAVSDK_AMD64_URL="https://github.com/mavlink/MAVSDK/releases/download/v${mavsdk_release_version}/libmavsdk-dev_${mavsdk_release_version}_ubuntu22.04_amd64.deb"
+        if [[ "$arch" != "amd64" ]]; then
+            MAVSDK_MANUAL_INSTALL=true
+            warn "MAVSDK auto-install is only supported for amd64 unless MAVSDK_DEB_URL or MAVSDK_DEB_PATH is set."
+            return 0
+        fi
+        local tmp_deb; tmp_deb=$(mktemp --suffix=.deb)
+        prompt_yn "Install MAVSDK 2.x via dpkg -i (downloads ~10 MB)?" true \
+            || { info "Skipping MAVSDK install."; MAVSDK_MANUAL_INSTALL=true; return 0; }
+        info "Downloading: $MAVSDK_AMD64_URL"
+        curl -LsSf "$MAVSDK_AMD64_URL" -o "$tmp_deb"
+        as_root dpkg -i "$tmp_deb"
+        rm -f "$tmp_deb"
+        info "MAVSDK installed."
+    }
+
+init_rosdep() {
+    if [[ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]]; then
+        as_root rosdep init
+    fi
+    local waywiser_rosdep_source="/etc/ros/rosdep/sources.list.d/50-waywiser.list"
+    local waywiser_rosdep_yaml="$REPO_DIR/waywiser/rosdep/waywiser.yaml"
+    if [[ -f "$waywiser_rosdep_yaml" ]]; then
+        local source_line="yaml file://$waywiser_rosdep_yaml"
+        if [[ ! -f "$waywiser_rosdep_source" ]] \
+            || ! grep -qxF "$source_line" "$waywiser_rosdep_source"; then
+            echo "$source_line" | as_root tee "$waywiser_rosdep_source" > /dev/null
+            info "Registered WayWiseR rosdep rules: $waywiser_rosdep_yaml"
+        fi
+    fi
+    rosdep update --rosdistro "${ROS_DISTRO:-humble}"
+}
+
+check_prerequisites() {
+    install_apt_deps
+    if should_install_gazebo_harmonic_deps; then
+        install_gazebo_harmonic_deps
+    else
+        info "Skipping PX4/Gazebo Harmonic apt repository; waywiser_gazebo is not selected for this architecture."
+    fi
+    install_uv
+    setup_ros2_environment
+    if [[ "$OPT_SKIP_MAVSDK" != true ]]; then
+        install_mavsdk
+    fi
+    init_rosdep
+}
+
+# ── step 2: core git submodules ───────────────────────────────────────────────
+
+PX4_SUBMODULE_PATH="waywiser_core/external/PX4-Autopilot"
+PX4_DIR="$REPO_DIR/$PX4_SUBMODULE_PATH"
+PX4_SITL_REQUIRED_SUBMODULES=(
+    Tools/simulation/gz
+    src/drivers/gps/devices
+    src/lib/cdrstream/cyclonedds
+    src/lib/cdrstream/rosidl
+    src/lib/crypto/libtomcrypt
+    src/lib/crypto/libtommath
+    src/lib/crypto/monocypher
+    src/lib/events/libevents
+    src/lib/heatshrink/heatshrink
+    src/modules/mavlink/mavlink
+    src/modules/zenoh/zenoh-pico
+)
+
+init_px4_submodules() {
+    info "Initializing PX4-Autopilot submodule..."
+    git -C "$REPO_DIR" submodule update --init "$PX4_SUBMODULE_PATH"
+}
+
+init_px4_sitl_submodules() {
+    info "Initializing PX4 SITL/Zenoh submodules..."
+    init_px4_submodules
+    git -C "$PX4_DIR" submodule update --init --recursive \
+        "${PX4_SITL_REQUIRED_SUBMODULES[@]}"
+}
+
+init_submodules() {
+    header "Initializing core git submodules"
+    git -C "$REPO_DIR" submodule update --init waywiser_core/WayWise
+    init_px4_submodules
+    info "Core submodules initialized."
+}
+
+# ── step 3: .env configuration ────────────────────────────────────────────────
+
+# wt_form <nameref_array> <title> <body_text> <label1> <default1> [<label2> <default2> ...]
+# Shows all fields in a single dialog --form (one page).
+# Falls back to sequential whiptail --inputbox per field when dialog is not available.
+# On OK  : fills nameref_array (indexed) with the entered values.
+# On Cancel/Esc: returns 1.
+wt_form() {
+    local -n _wf_result="$1"; local title="$2" body="$3"; shift 3
+    local _labels=() _defaults=()
+    while [[ $# -ge 2 ]]; do _labels+=("$1"); _defaults+=("$2"); shift 2; done
+    local n=${#_labels[@]}
+    if [[ "$OPT_YES" == true ]]; then _wf_result=("${_defaults[@]}"); return 0; fi
+    local w; w=$(( $(tput cols 2>/dev/null || echo 80) - 4 ))
+    if (( w < 70 )); then w=70; fi
+    local body_lines; body_lines=$(printf '%s' "$body" | wc -l)
+    local h=$(( body_lines + n + 9 ))
+    if (( h > 40 )); then h=40; fi
+    local form_h=$(( n < 14 ? n : 14 ))
+    local max_lbl=0
+    for lbl in "${_labels[@]}"; do
+        if (( ${#lbl} > max_lbl )); then max_lbl=${#lbl}; fi
+    done
+    local field_x=$(( max_lbl + 3 ))
+    local field_len=$(( w - field_x - 4 ))
+    if (( field_len < 10 )); then field_len=10; fi
+    if command -v dialog &>/dev/null && [[ -t 1 ]]; then
+        local args=()
+        for (( i=0; i<n; i++ )); do
+            args+=("${_labels[$i]}" $(( i + 1 )) 1 "${_defaults[$i]}" $(( i + 1 )) "$field_x" "$field_len" 0)
+        done
+        local r; r=$(dialog --keep-tite --title "$title" --form "$body" "$h" "$w" "$form_h" \
+            "${args[@]}" 3>&1 1>&2 2>&3); local _dlg_rc=$?; tput cnorm 2>/dev/null || true
+        if (( _dlg_rc != 0 )); then return 1; fi
+        mapfile -t _wf_result <<< "$r"
+        # dialog omits trailing empty fields; pad array to expected length.
+        while (( ${#_wf_result[@]} < n )); do _wf_result+=(""); done
+    else
+        echo; echo "  === $title ==="; [[ -n "$body" ]] && echo "  $body"
+        _wf_result=()
+        for (( i=0; i<n; i++ )); do
+            local _v; read -rp "  ${_labels[$i]} [${_defaults[$i]}]: " _v
+            _wf_result+=("${_v:-${_defaults[$i]}}")
+        done
+    fi
+}
+
+# wt_checklist <nameref_array_selected> <title> <body_text> <item1> <on|off> [<item2> <on|off> ...]
+# Returns selected items in nameref_array. Returns 1 on cancel.
+wt_checklist() {
+    local -n _wcl_result="$1"; local title="$2" body="$3"; shift 3
+    local _items=() _states=()
+    while [[ $# -ge 2 ]]; do _items+=("$1"); _states+=("$2"); shift 2; done
+    local n=${#_items[@]}
+    if [[ "$OPT_YES" == true ]]; then
+        _wcl_result=()
+        for (( i=0; i<n; i++ )); do [[ "${_states[$i]}" == "on" ]] && _wcl_result+=("${_items[$i]}"); done
+        return 0
+    fi
+    local w=$(( $(tput cols 2>/dev/null || echo 80) - 4 )); (( w < 60 )) && w=60
+    local h=$(( n + 10 )); (( h > 34 )) && h=34
+    if command -v whiptail &>/dev/null && [[ -t 1 ]]; then
+        local args=()
+        for (( i=0; i<n; i++ )); do
+            local s="OFF"; [[ "${_states[$i]}" == "on" ]] && s="ON"
+            args+=("${_items[$i]}" "" "$s")
+        done
+        local r; r=$(whiptail --title "$title" --checklist "$body" "$h" "$w" "$n" \
+            "${args[@]}" 3>&1 1>&2 2>&3) || return 1
+        # Split quoted words from result into array
+        _wcl_result=()
+        local word
+        for word in $r; do _wcl_result+=("${word//\"/}"); done
+    else
+        echo; echo "  === $title ==="; [[ -n "$body" ]] && echo "  $body"
+        _wcl_result=()
+        for (( i=0; i<n; i++ )); do
+            local hint="[Y/n]"; [[ "${_states[$i]}" != "on" ]] && hint="[y/N]"
+            local answer; read -rp "  ${_items[$i]}? $hint: " answer
+            local keep=false
+            if [[ -z "$answer" ]]; then [[ "${_states[$i]}" == "on" ]] && keep=true
+            elif [[ "${answer,,}" =~ ^y ]]; then keep=true; fi
+            $keep && _wcl_result+=("${_items[$i]}")
+        done
+    fi
+}
+
+# wt_radiolist <nameref> <title> <body_text> <current> item1 item2 ...
+# Returns 1 on cancel.
+wt_radiolist() {
+    local -n _wrl_ref="$1"; local title="$2" body="$3" current="$4"; shift 4
+    local items=("$@"); local n=${#items[@]}
+    if [[ "$OPT_YES" == true ]]; then _wrl_ref="$current"; return 0; fi
+    local w=$(( $(tput cols 2>/dev/null || echo 80) - 4 )); (( w < 60 )) && w=60
+    local h=$(( n + 10 )); (( h > 20 )) && h=20
+    if command -v whiptail &>/dev/null && [[ -t 1 ]]; then
+        local rl=()
+        for item in "${items[@]}"; do
+            local s="OFF"; [[ "$item" == "$current" ]] && s="ON"
+            rl+=("$item" "" "$s")
+        done
+        local r; r=$(whiptail --title "$title" --radiolist "$body" "$h" "$w" "$n" \
+            "${rl[@]}" 3>&1 1>&2 2>&3) || return 1
+        _wrl_ref="${r//\"/}"
+    else
+        echo; echo "  === $title ==="; [[ -n "$body" ]] && echo "  $body"
+        local i=1
+        for item in "${items[@]}"; do
+            local m=" "; [[ "$item" == "$current" ]] && m="*"
+            echo "    $i) [$m] $item"; (( i++ ))
+        done
+        local choice; read -rp "  Choice (Enter = keep [$current]): " choice
+        if [[ -n "$choice" ]]; then
+            local idx=$(( choice - 1 ))
+            (( idx >= 0 && idx < n )) && _wrl_ref="${items[$idx]}" || _wrl_ref="$current"
+        else _wrl_ref="$current"; fi
+    fi
+}
+
+# wt_password <nameref> <title> <prompt>
+# Returns 1 on cancel.
+wt_password() {
+    local -n _wp_ref="$1"; local title="$2" prompt="$3"
+    if [[ "$OPT_YES" == true ]]; then _wp_ref=""; return 0; fi
+    local w=$(( $(tput cols 2>/dev/null || echo 80) - 4 )); (( w < 60 )) && w=60
+    if command -v whiptail &>/dev/null && [[ -t 1 ]]; then
+        local r; r=$(whiptail --title "$title" --passwordbox "$prompt" 9 "$w" \
+            3>&1 1>&2 2>&3) || return 1
+        _wp_ref="$r"
+    else
+        read -rsp "  $prompt: " _wp_ref; echo
+    fi
+}
+
+configure_env() {
+    local configure_script="$REPO_DIR/waywiser/scripts/configure_env.bash"
+    [[ -x "$configure_script" ]] || die "Configure script not found: $configure_script"
+
+    WAYWISER_ENV_FILE="$ENV_FILE" \
+    WAYWISER_ENV_FILE_EXAMPLE="$ENV_EXAMPLE" \
+    WAYWISER_REPO_DIR="$REPO_DIR" \
+    bash "$configure_script" $(yes_args --quiet)
+}
+
+# ── step 4: Python virtual environment ───────────────────────────────────────
+
+setup_venv() {
+    header "Setting up Python virtual environment"
+    [[ -f "$REPO_DIR/.python-version" ]] || die ".python-version not found in $REPO_DIR"
+    local py_ver; py_ver=$(cat "$REPO_DIR/.python-version")
+    local skipped=""
+    local setup_venv_script="$REPO_DIR/waywiser/scripts/setup_venv.bash"
+    local -a setup_args
+
+    [[ -x "$setup_venv_script" ]] || die "setup_venv script not found: $setup_venv_script"
+    ensure_env_file
+    [[ -f "$ENV_FILE" ]] && skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
+
+    cd "$WAYWISER_WS"
+    setup_args=(
+        --repo-dir "$REPO_DIR"
+        --venv "$VENV_DIR"
+        --skipped-packages "$skipped"
+        --python "$py_ver"
+        --editable
+        --quiet
+    )
+    prepare_venv_path
+    # In reuse mode an empty mounted venv directory is expected on first run,
+    # so only force a clear when reuse is disabled.
+    if [[ "${WAYWISER_REUSE_VENV:-}" != "true" ]]; then
+        setup_args+=(--clear)
+    fi
+    WAYWISER_REPO_DIR="$REPO_DIR" \
+    WAYWISER_PYPROJECT="$REPO_DIR/pyproject.toml" \
+    WAYWISER_SKIPPED_PACKAGES="$skipped" \
+    WAYWISER_PYTHON_EXTRAS="${WAYWISER_PYTHON_EXTRAS:-}" \
+        bash "$setup_venv_script" "${setup_args[@]}"
+    ensure_workspace_venv_link
+    # shellcheck disable=SC1091
+    source "$VENV_DIR/bin/activate"
+    export PYTHONPATH="$VENV_DIR/lib/python${py_ver}/site-packages:${PYTHONPATH:-}"
+    info "Python $py_ver venv ready at $VENV_DIR"
+}
+
+# ── step 5: ROS dependencies ─────────────────────────────────────────────────
+
+install_ros_deps() {
+    header "Installing dependencies"
+    cd "$WAYWISER_WS"
+
+    # shellcheck disable=SC1091
+    [[ -f "$VENV_DIR/bin/activate" ]] && source "$VENV_DIR/bin/activate"
+    ensure_ros2_environment
+    ensure_env_file
+    set -a; source "$ENV_FILE"; set +a
+
+    local skipped="${WAYWISER_SKIPPED_PACKAGES:-}"
+    local -a base_paths=("$WAYWISER_WS/src")
+    [[ " $skipped " != *" waywiser_carla "* ]] \
+        && base_paths+=("$REPO_DIR/waywiser_carla/external/carla-ros-bridge")
+
+    local paths
+    if [[ -n "$skipped" ]]; then
+        local skip_pattern
+        skip_pattern=$(echo "$skipped" | tr ' ' '|')
+        paths=$(colcon list --base-paths "${base_paths[@]}" --paths-only \
+            | grep -Evw "$skip_pattern" || true)
+    else
+        paths=$(colcon list --base-paths "${base_paths[@]}" --paths-only)
+    fi
+
+    [[ -n "$paths" ]] || die "No packages found to install dependencies for."
+
+    # These packages have no apt entry or are handled by the WayWiseR venv.
+    # px4_msgs: generated by waywiser_core from the PX4-Autopilot submodule
+    # carla_msgs: built from carla-ros-bridge submodule
+    # python-transforms3d-pip: installed through the waywiser_carla Python extra;
+    # rosdep's pip installer requires a system `pip` command on minimal installs.
+    local skip_keys="px4_msgs carla_msgs python-transforms3d-pip"
+
+    # Check first — skip apt-get update and sudo if everything is already installed.
+    local check_rc=0
+    local check_output
+    # shellcheck disable=SC2086
+    check_output=$(run_rosdep check --from-paths $paths \
+        --ignore-src --rosdistro "$ROS_DISTRO" \
+        --skip-keys "$skip_keys" 2>&1) || check_rc=$?
+    if [[ $check_rc -eq 0 ]]; then
+        info "All required rosdeps already installed — skipping."
+        return 0
+    fi
+
+    if command -v apt-get &>/dev/null \
+        && grep -Eq '(^|[[:space:]])apt[[:space:]]' <<< "$check_output"; then
+        if [[ "$(id -u)" -eq 0 ]]; then
+            apt-get update
+        else
+            sudo apt-get update
+        fi
+    fi
+
+    # shellcheck disable=SC2086
+    rosdep install --from-paths $paths \
+        --ignore-src --rosdistro "$ROS_DISTRO" \
+        --skip-keys "$skip_keys" -r $(yes_args -y)
+    info "Dependencies installed."
+}
+
+# ── step 6: build workspace ───────────────────────────────────────────────────
+
+build_workspace() {
+    header "Building workspace"
+    cd "$WAYWISER_WS"
+
+    # shellcheck disable=SC1091
+    [[ -f "$VENV_DIR/bin/activate" ]] && source "$VENV_DIR/bin/activate"
+    ensure_ros2_environment
+    source_underlay
+    ensure_env_file
+    set -a; source "$ENV_FILE"; set +a
+
+    local skipped="${WAYWISER_SKIPPED_PACKAGES:-}"
+    local selected="${WAYWISER_BUILD_PACKAGES:-}"
+    local up_to="${WAYWISER_PACKAGES_UP_TO:-}"
+    local -a base_paths=("$WAYWISER_WS/src")
+    local -a extra_args=()
+    local -a allow_overriding=()
+    local -a cmake_args=(
+        -U_lib
+        "-U*_LIBRARY"
+        "-U*_LIBRARIES"
+    )
+    local -a event_handlers=(console_stderr-)
+    local -a package_args=()
+    local notification_extension="colcon_core.event_handler.desktop_notification"
+    local colcon_extension_blocklist="${COLCON_EXTENSION_BLOCKLIST:-}"
+
+    if [[ ":$colcon_extension_blocklist:" != *":$notification_extension:"* ]]; then
+        colcon_extension_blocklist+="${colcon_extension_blocklist:+:}$notification_extension"
+    fi
+
+    if [[ " $skipped " != *" waywiser_carla "* ]]; then
+        base_paths+=("$REPO_DIR/waywiser_carla/external/carla-ros-bridge")
+        allow_overriding+=(waywiser waywiser_description)
+    fi
+
+    if [[ -n "${WAYWISER_CMAKE_ARGS:-}" ]]; then
+        # shellcheck disable=SC2206
+        local -a extra_cmake_args=($WAYWISER_CMAKE_ARGS)
+        cmake_args+=("${extra_cmake_args[@]}")
+    fi
+    extra_args+=(--cmake-args "${cmake_args[@]}")
+
+    # In quiet/CI mode suppress per-package live output from successful builds.
+    if [[ "$OPT_YES" == true || "${CI:-}" == "true" ]]; then
+        event_handlers+=(console_direct-)
+    fi
+
+    # Suppress per-package stderr recap blocks from successful legacy packages.
+    extra_args+=(--event-handlers "${event_handlers[@]}")
+
+    if [[ -n "$up_to" ]]; then
+        # shellcheck disable=SC2206
+        package_args=(--packages-up-to $up_to)
+        # shellcheck disable=SC2206
+        allow_overriding+=($up_to)
+        info "Building up to packages (incl. deps): $up_to"
+    elif [[ -n "$selected" ]]; then
+        # shellcheck disable=SC2206
+        package_args=(--packages-select $selected)
+        # shellcheck disable=SC2206
+        allow_overriding+=($selected)
+        info "Building selected packages: $selected"
+    fi
+
+    if [[ ${#package_args[@]} -gt 0 ]] && colcon_supports_allow_overriding; then
+        local colcon_list_output=""
+        if [[ -n "$skipped" ]]; then
+            # shellcheck disable=SC2086
+            colcon_list_output=$(
+                colcon list --base-paths "${base_paths[@]}" "${package_args[@]}" \
+                    --packages-skip $skipped --names-only 2>/dev/null || true
+            )
+        else
+            colcon_list_output=$(
+                colcon list --base-paths "${base_paths[@]}" "${package_args[@]}" \
+                    --names-only 2>/dev/null || true
+            )
+        fi
+        if [[ -n "$colcon_list_output" ]]; then
+            mapfile -t allow_overriding < <(
+                printf '%s\n' "${allow_overriding[@]}" $colcon_list_output \
+                    | awk 'NF && !seen[$0]++'
+            )
+        fi
+    fi
+
+    if [[ ${#allow_overriding[@]} -gt 0 ]] && colcon_supports_allow_overriding; then
+        extra_args+=(--allow-overriding "${allow_overriding[@]}")
+    fi
+
+    if [[ -n "$skipped" ]]; then
+        # shellcheck disable=SC2086
+        COLCON_EXTENSION_BLOCKLIST="$colcon_extension_blocklist" \
+            colcon build --symlink-install \
+            --base-paths "${base_paths[@]}" \
+            "${extra_args[@]}" \
+            "${package_args[@]}" \
+            --packages-skip $skipped
+    else
+        COLCON_EXTENSION_BLOCKLIST="$colcon_extension_blocklist" \
+            colcon build --symlink-install \
+            --base-paths "${base_paths[@]}" \
+            "${extra_args[@]}" \
+            "${package_args[@]}"
+    fi
+    info "Workspace build complete."
+}
+
+# ── step 7: optional activate hook ───────────────────────────────────────────
+
+setup_activate_hook() {
+    local venv_activate="$VENV_DIR/bin/activate"
+    [[ -f "$venv_activate" ]] || return 0
+    
+    if grep -q "WayWiseR Environment Setup" "$venv_activate" 2>/dev/null; then
+        info "Activate hook already present in .venv/bin/activate."
+        return 0
+    fi
+    
+    local py_ver; py_ver=$(cat "$REPO_DIR/.python-version")
+    cat >> "$venv_activate" <<EOT
+
+# WayWiseR Environment Setup
+# Load runtime config: prefer repo .env, fall back to deb conffile.
+if [ -f "\$WAYWISER_WS/src/WayWiseR/.env" ]; then
+    set -a; source "\$WAYWISER_WS/src/WayWiseR/.env"; set +a
+elif [ -f /etc/waywiser/waywiser.env ]; then
+    set -a; source /etc/waywiser/waywiser.env; set +a
+fi
+if [ -z "\${ROS_DISTRO:-}" ]; then
+    if [ -f /opt/ros/humble/setup.bash ]; then
+        set +u; source /opt/ros/humble/setup.bash; set -u
+    else
+        echo "WARNING: ROS2 is not sourced. Source your ROS2 environment before using this workspace." >&2
+    fi
+fi
+export PYTHONPATH=$VENV_DIR/lib/python${py_ver}/site-packages:\${PYTHONPATH:-}
+if [ -f "\$WAYWISER_WS/install/setup.bash" ]; then
+    set +u; source "\$WAYWISER_WS/install/setup.bash"; set -u
+fi
+EOT
+    info "Activate hook added."
+    info "From now on, 'source $VENV_DIR/bin/activate' sets up everything."
+}
+
+# ── simulation pre/post setup ─────────────────────────────────────────────────
+
+# Run before install_ros_deps and build: initialise external sources and install
+# Python requirements for selected packages and core PX4 interfaces/SITL.
+presim_setup() {
+    ensure_env_file
+    local skipped
+    skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
+
+    header "Pre-setup: waywiser_core PX4"
+    init_px4_submodules
+    info "Ensuring PX4 Python requirements from pyproject extra are installed..."
+    activate_env
+    cd "$WAYWISER_WS"
+    run_uv_install pip install -e "$REPO_DIR[px4]"
+
+    if [[ " $skipped " != *" waywiser_carla "* ]]; then
+        header "Pre-setup: waywiser_carla"
+        info "Initializing carla-ros-bridge submodule..."
+        git -C "$REPO_DIR" submodule update --init --recursive \
+            waywiser_carla/external/carla-ros-bridge
+        activate_env
+        cd "$WAYWISER_WS"
+        info "Ensuring CARLA Python requirements from pyproject extra are installed..."
+        run_uv_install pip install -e "$REPO_DIR[waywiser_carla]"
+    fi
+
+    if [[ " $skipped " != *" waywiser_gazebo "* ]]; then
+        header "Pre-setup: waywiser_gazebo"
+        info "Initializing ros_gz_harmonic submodule..."
+        git -C "$REPO_DIR" submodule update --init --recursive \
+            waywiser_gazebo/external/ros_gz_harmonic
+        init_px4_sitl_submodules
+    fi
+
+    if [[ " $skipped " != *" waywiser_perception "* ]]; then
+        header "Pre-setup: waywiser_perception"
+        local arch; arch=$(uname -m)
+        activate_env
+        cd "$WAYWISER_WS"
+        if is_jetson; then
+            # ── Jetson (aarch64) ──────────────────────────────────────────
+            # TensorRT, CUDA, and cuDNN come from JetPack; install the
+            # supporting system libraries that pycuda and libnvinfer need.
+            info "Detected NVIDIA Jetson. Installing Jetson-specific apt packages..."
+            prompt_yn "Install Jetson perception apt dependencies (sudo apt-get install)?" true \
+                || { info "Skipping Jetson apt packages."; return 0; }
+            sudo apt-get update -qq
+            sudo apt-get install $(yes_args -y) \
+                python3-pip \
+                libopenblas-base \
+                libopenmpi-dev \
+                libomp-dev \
+                python3-libnvinfer-dev \
+                libjpeg-dev \
+                zlib1g-dev \
+                libpython3-dev \
+                libavcodec-dev \
+                libavformat-dev \
+                libswscale-dev
+            info "Installing pycuda..."
+            run_uv_install pip install pycuda
+            warn "torch and torchvision for Jetson must be installed manually."
+            warn "Follow the NVIDIA instructions at:"
+            warn "  https://forums.developer.nvidia.com/t/pytorch-for-jetson/"
+            warn "After installing torch/torchvision, re-run 'make build'."
+        elif [[ "$arch" == "aarch64" ]]; then
+            info "Detected aarch64 without Jetson markers — skipping Jetson-specific perception apt packages."
+        else
+            # ── x86_64 ────────────────────────────────────────────────────
+            # torch and torchvision are already pulled in via the
+            # waywiser_perception_x86 extra in setup_venv.
+            # Install pycuda only when a CUDA toolkit is present, since it
+            # requires CUDA headers to compile its native extension.
+            local nvcc_bin=""
+            if command -v nvcc &>/dev/null; then
+                nvcc_bin=$(command -v nvcc)
+            elif [[ -x /usr/local/cuda/bin/nvcc ]]; then
+                nvcc_bin=/usr/local/cuda/bin/nvcc
+            fi
+            if [[ -n "$nvcc_bin" ]]; then
+                info "CUDA toolkit detected ($nvcc_bin). Installing pycuda..."
+                run_uv_install pip install pycuda
+            else
+                info "CUDA toolkit not found — skipping pycuda."
+                info "To enable GPU acceleration later, install the CUDA toolkit:"
+                info "  https://docs.nvidia.com/cuda/cuda-installation-guide-linux/"
+                info "Then run: uv pip install pycuda"
+            fi
+        fi
+    fi
+}
+
+agrarsense_post_build() {
+    ensure_env_file
+    local skipped
+    skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
+    [[ " $skipped " != *" waywiser_agrarsense "* ]] || return 0
+
+    header "Post-build: waywiser_agrarsense"
+    if [[ "${CI:-}" == "true" ]]; then
+        info "CI environment detected — skipping local Docker setup for waywiser_agrarsense."
+        return 0
+    fi
+
+    if ! command -v docker &>/dev/null; then
+        warn "Docker is not installed; skipping waywiser_agrarsense Docker setup."
+        warn "Install and configure Docker, then run: make post-build"
+        return 0
+    fi
+
+    if ! docker info &>/dev/null 2>&1; then
+        warn "Docker is installed but not usable by this user; skipping waywiser_agrarsense Docker setup."
+        warn "Start Docker or configure permissions/rootless Docker, then run: make post-build"
+        return 0
+    fi
+
+    local docker_script="$REPO_DIR/waywiser_agrarsense/ros_bridge/build_docker_container.sh"
+    if [[ ! -f "$docker_script" ]]; then
+        warn "Agrarsense Docker build script not found: $docker_script"
+        return 0
+    fi
+
+    bash "$docker_script"
+}
+
+run_post_build() {
+    header "Running post-build setup"
+    agrarsense_post_build
+}
+
+# ── main ─────────────────────────────────────────────────────────────────────────
+
+main() {
+    ensure_git_safe_directory
+
+    # ── core workspace setup ───────────────────────────────────────────────
+    if [[ "$OPT_CONFIGURE_ONLY" == true ]]; then
+        configure_env || { echo; info "Configuration cancelled."; exit 0; }
+        echo; info "Done. Run 'make setup' to install prerequisites and dependencies."
+        return 0
+    fi
+
+    if [[ "$OPT_POST_BUILD_ONLY" == true ]]; then
+        apply_env_overrides
+        run_post_build
+        return 0
+    elif [[ "$OPT_BUILD_ONLY" == true ]]; then
+        apply_env_overrides
+        build_workspace
+        setup_activate_hook
+    elif [[ "$OPT_SETUP_ONLY" == true ]]; then
+        apply_env_overrides
+        if [[ "$OPT_SKIP_PREREQS" != true ]]; then
+            check_prerequisites
+        fi
+        init_submodules
+        setup_venv
+        presim_setup
+        install_ros_deps
+        echo
+        if [[ "$MAVSDK_MANUAL_INSTALL" == true ]]; then
+            warn "MAVSDK must be installed manually for your architecture."
+            warn "Download from: https://github.com/mavlink/MAVSDK/releases"
+            warn "Then run: sudo dpkg -i libmavsdk-dev*.deb"
+            warn "After that, run 'make build' to build the workspace."
+        else
+            info "Setup complete. Run 'make build' to build the workspace."
+        fi
+        return 0
+    elif [[ "$OPT_PREREQS_ONLY" == true ]]; then
+        check_prerequisites
+        echo; info "Prerequisites installed. Run 'make setup' to continue."
+        return 0
+    else
+        apply_env_overrides
+        configure_env || { echo; info "Configuration cancelled."; exit 0; }
+        if [[ "$OPT_SKIP_PREREQS" != true ]]; then
+            check_prerequisites
+        fi
+        init_submodules
+        setup_venv
+        presim_setup
+        install_ros_deps
+        if [[ "$MAVSDK_MANUAL_INSTALL" == true ]]; then
+            echo
+            warn "MAVSDK must be installed manually for your architecture."
+            warn "Download from: https://github.com/mavlink/MAVSDK/releases"
+            warn "Then run: sudo dpkg -i libmavsdk-dev*.deb"
+            warn "After that, run 'make build' to build the workspace."
+            exit 0
+        fi
+        build_workspace
+        run_post_build
+        setup_activate_hook
+    fi
+    
+    echo
+    echo "==================================================="
+    echo "  Installation complete!"
+    echo "==================================================="
+    echo
+    echo "  Source the workspace:"
+    echo "    source $WAYWISER_WS/.venv/bin/activate"
+    echo
+}
+
+main

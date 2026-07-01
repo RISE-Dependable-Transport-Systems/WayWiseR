@@ -16,11 +16,16 @@ def generate_launch_description():
         default_value=os.path.join(waywiser_carla_dir, 'config/carla_osm_tile_server.yaml'),
         description='Full path to params file for carla',
     )
+    use_sim_time_la = DeclareLaunchArgument(
+        'use_sim_time',
+        default_value='True',
+        description='Use simulation (Gazebo) clock if true',
+    )
 
     # start nodes and use args to set parameters
     carla_osm_tile_server_node = Node(
         package='waywiser_carla',
-        executable='carla_osm_tile_server.py',
+        executable='carla_osm_tile_server_node.py',
         name='carla_osm_tile_server_node',
         parameters=[
             {'use_sim_time': LaunchConfiguration('use_sim_time')},
@@ -36,6 +41,7 @@ def generate_launch_description():
 
     # declare launch args
     ld.add_action(config_la)
+    ld.add_action(use_sim_time_la)
 
     # start nodes
     ld.add_action(carla_osm_tile_server_node)

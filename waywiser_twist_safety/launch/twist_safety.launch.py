@@ -118,7 +118,7 @@ def conditional_launch_setup(context):
 
         emergency_stop_monitor_node = Node(
             package='waywiser_twist_safety',
-            executable='emergency_stop_monitor',
+            executable='emergency_stop_monitor_node',
             name='emergency_stop_monitor',
             parameters=[
                 RosUtils.get_node_params(config_file, 'emergency_stop_monitor'),
@@ -132,7 +132,7 @@ def conditional_launch_setup(context):
     else:
         emergency_stop_monitor_node = Node(
             package='waywiser_twist_safety',
-            executable='emergency_stop_monitor',
+            executable='emergency_stop_monitor_node',
             name='emergency_stop_monitor',
             parameters=[
                 RosUtils.get_node_params(config_file, 'emergency_stop_monitor'),

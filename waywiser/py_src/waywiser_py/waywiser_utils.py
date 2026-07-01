@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import ctypes
 import os
 import signal
 import subprocess
@@ -7,9 +8,10 @@ import time
 from typing import Union
 
 from geometry_msgs.msg import PoseStamped
+from launch.actions import EmitEvent, LogInfo
+from launch.events import Shutdown
 import psutil
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
-import yagmail
 
 import yaml
 
@@ -26,6 +28,23 @@ RELIABLE_VOLATILE_QOS = QoSProfile(
     history=HistoryPolicy.KEEP_LAST,
     depth=1,
 )
+
+
+def shutdown_on_process_error(event, _context):
+    """Shutdown a launch when a process exits with a non-zero status."""
+    returncode = getattr(event, 'returncode', 0)
+    if returncode == 0:
+        return []
+
+    action = getattr(event, 'action', None)
+    action_class = getattr(action, '__class__', type(action))
+    action_name = getattr(action, 'name', None) or action_class.__name__
+    reason = f"Shutting down launch because '{action_name}' exited with code {returncode}."
+
+    return [
+        LogInfo(msg=reason),
+        EmitEvent(event=Shutdown(reason=reason)),
+    ]
 
 
 class FileUtils:
@@ -71,6 +90,8 @@ class NotificationUtils:
             return
 
         try:
+            import yagmail
+
             # Initialize SMTP connection
             yag = yagmail.SMTP(
                 user=email_user,
@@ -98,9 +119,19 @@ class ProcessUtils:
         stderr=subprocess.DEVNULL,
         text=False,
     ):
+        def _set_pdeathsig():
+            # Linux: send SIGTERM to this child process when its parent exits
+            # (PR_SET_PDEATHSIG = 1).  This runs in the forked child before exec,
+            # so it covers even the case where the parent is SIGKILL'd.
+            try:
+                ctypes.CDLL('libc.so.6').prctl(1, signal.SIGTERM)
+            except Exception:
+                pass
+
         subprocess_ = subprocess.Popen(
             command,
             start_new_session=True,
+            preexec_fn=_set_pdeathsig,
             stdout=stdout,
             stderr=stderr,
             text=text,

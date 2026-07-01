@@ -23,96 +23,58 @@ WayWiseR is divided into modular ROS2 packages:
 
 ---
 
-## Installation & Build (Ubuntu 22.04)
+## Installation (Ubuntu 22.04)
 
-1. **Prerequisites:**
-   - Install [uv](https://github.com/astral-sh/uv?tab=readme-ov-file#installation) for Python package management:
-
-     ```bash
-     curl -LsSf https://astral.sh/uv/install.sh | sh
-     ```
-
-   - Install ROS2 Humble following the [official guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html).
-
-   - Install the latest MAVSDK 2.x version (3.x is not yet supported) by downloading the latest deb package from [prebuilt releases](https://github.com/mavlink/MAVSDK/releases) and running:
-
-     ```bash
-     sudo dpkg -i libmavsdk-dev*.deb
-     ```
-
-     Alternatively, MAVSDK can be built from source by using the scripts [here](https://github.com/das-rise/WayWise/tree/main/tools/build_MAVSDK).
-
-   - Install system dependencies:
-
-     ```bash
-     sudo apt update && sudo apt install -y \
-         libunwind-dev \
-         libqt5serialport5-dev \
-         git \
-         build-essential \
-         cmake \
-         python3-colcon-common-extensions \
-         python3-pyqt5
-     ```
-
-2. **Initialize the workspace:**
+1. **Clone the repository:**
 
    ```bash
-   export WAYWISER_WS=~/waywiser_ws # Update with your desired path
+   export WAYWISER_WS=~/waywiser_ws   # update to your desired path
    mkdir -p $WAYWISER_WS/src
    git clone git@github.com:das-rise/WayWiseR.git $WAYWISER_WS/src/WayWiseR
-   cd $WAYWISER_WS/src/WayWiseR
-   git submodule update --init waywiser_core/WayWise
+   ln -s $WAYWISER_WS/src/WayWiseR/Makefile $WAYWISER_WS/Makefile
    ```
 
-3. **Setup Python virtual environment:**
+2. **Build the workspace:**
 
    ```bash
    cd $WAYWISER_WS
-   uv venv --python 3.10 --clear
-   source .venv/bin/activate
-   export PYTHONPATH=$WAYWISER_WS/.venv/lib/python3.10/site-packages:$PYTHONPATH
-   uv pip install -e src/WayWiseR
+   make all
    ```
 
-4. **Build the workspace:**
+   This will:
+   - Prompt you to configure your `.env` (packages to build, RMW, middleware settings, etc.)
+   - Install all system prerequisites
+   - Create and populate the Python virtual environment with only the Python extras needed by the selected packages
+   - Install ROS dependencies via rosdep
+   - Build the workspace with colcon
+
+   For a list of all available make targets:
 
    ```bash
-   cd $WAYWISER_WS
-   source /opt/ros/humble/setup.bash
-   # Skip simulator packages for now:
-   export WAYWISER_SKIPPED_PACKAGES="waywiser_agrarsense waywiser_carla waywiser_gazebo"
-   rosdep install --from-paths $(colcon list --paths-only | grep -Evw "$(echo "$WAYWISER_SKIPPED_PACKAGES" | tr ' ' '|')") --ignore-src --rosdistro $ROS_DISTRO -r -y
-   colcon build --symlink-install --packages-skip $WAYWISER_SKIPPED_PACKAGES
+   make help
    ```
 
-   > 💡 **Tip**: To persist environment variables, append the setup block to your `.venv/bin/activate` by running the following command in your terminal:
-   >
-   > ```bash
-   > cat <<EOT >> $WAYWISER_WS/.venv/bin/activate
-   > # WayWiseR Environment Setup
-   > source /opt/ros/humble/setup.bash
-   > export WAYWISER_WS=$WAYWISER_WS
-   > export WAYWISER_SKIPPED_PACKAGES="$WAYWISER_SKIPPED_PACKAGES"
-   > export PYTHONPATH=$WAYWISER_WS/.venv/lib/python3.10/site-packages:\$PYTHONPATH
-   >
-   > if [ -f "$WAYWISER_WS/install/setup.bash" ]; then
-   >   source "$WAYWISER_WS/install/setup.bash"
-   > fi
-   > EOT
-   > ```
+   > ⚠️ **Important**: MAVSDK is automatically installed from a prebuilt deb (Ubuntu 22.04, amd64). On other architectures the setup will pause and ask you to install it manually, then run `make build`. For Non-amd64 / manual install, prerequisites can be skipped with `make setup ARGS=--skip-prereqs` if you have already installed them.
 
-   To build simulator-related packages such as waywiser_agrarsense, waywiser_carla, and waywiser_gazebo, follow the instructions in the respective packages.
-
-5. **Environment Configuration (.env):**
-
-   WayWiseR uses a `.env` file to manage settings such as ROS2 Domain ID and FastDDS Discovery Server configurations.
+3. **Activate the workspace:**
 
    ```bash
-   cp src/WayWiseR/.env.example src/WayWiseR/.env
+   source $WAYWISER_WS/.venv/bin/activate
    ```
 
-   Update the configurations in the `.env` file as needed. The `.env` file is automatically sourced whenever the virtual environment is activated via `source $WAYWISER_WS/.venv/bin/activate`.
+   The venv activation script automatically sources ROS2, the workspace install, and your `.env`.
+
+## Quick Start
+
+Launch a rover with teleoperation:
+
+```bash
+cd $WAYWISER_WS
+source .venv/bin/activate
+ros2 launch waywiser_hwbringup hwbringup_rover.launch.py
+```
+
+The rover dynamics are simulated by WayWise using a simple bicycle model.
 
 ---
 

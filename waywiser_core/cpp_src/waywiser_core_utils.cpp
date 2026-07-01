@@ -3,6 +3,41 @@
 
 #include "waywiser_core_utils.hpp"
 
+std::string CoreUtils::waywiseObjectTypeToString(WAYWISE_OBJECT_TYPE object_type)
+{
+  switch (object_type) {
+    case WAYWISE_OBJECT_TYPE_CAR:
+      return "car";
+    case WAYWISE_OBJECT_TYPE_TRUCK:
+      return "truck";
+    case WAYWISE_OBJECT_TYPE_TRAILER:
+      return "trailer";
+    case WAYWISE_OBJECT_TYPE_QUADCOPTER:
+      return "quadcopter";
+    case WAYWISE_OBJECT_TYPE_GENERIC:
+    default:
+      return "generic";
+  }
+}
+
+std::string CoreUtils::declare_read_only_waywise_object_type_param(
+  rclcpp::Node * node, const QSharedPointer<ObjectState> & object_state,
+  const std::string & param_name)
+{
+  const auto object_type = object_state ? object_state->getWaywiseObjectType() :
+    WAYWISE_OBJECT_TYPE_GENERIC;
+  const auto object_type_string = waywiseObjectTypeToString(object_type);
+
+  rcl_interfaces::msg::ParameterDescriptor descriptor;
+  descriptor.description =
+    "WayWise vehicle/object type derived from the node's ObjectState. "
+    "This parameter is read-only and ignores startup overrides.";
+  descriptor.read_only = true;
+
+  return node->declare_parameter<std::string>(
+    param_name, object_type_string, descriptor, true);
+}
+
 waywiser_core::msg::CarControlCommand CarControlCommand::to_msg() const
 {
   waywiser_core::msg::CarControlCommand car_control_command_msg;
@@ -56,8 +91,12 @@ std::string CoreUtils::missionStateToString(MissionState state)
       return "Waiting For Emergency Stop Clear";
     case MissionState::WaitingForGnssAccuracy:
       return "Waiting For GNSS Accuracy";
+    case MissionState::WaitingForHeartbeat:
+      return "Waiting For Heartbeat";
     case MissionState::FollowRouteInit:
       return "Follow Route Init";
+    case MissionState::FollowRouteLiftOff:
+      return "Follow Route Lift Off";
     case MissionState::FollowRouteGotoBegin:
       return "Follow Route Goto Begin";
     case MissionState::FollowRouteFollowing:
@@ -66,6 +105,14 @@ std::string CoreUtils::missionStateToString(MissionState state)
       return "Follow Route Approaching End Goal";
     case MissionState::FollowRouteFinished:
       return "Follow Route Finished";
+    case MissionState::ReturnHomeInit:
+      return "Return Home Init";
+    case MissionState::ReturnHomeLiftOff:
+      return "Return Home Lift Off";
+    case MissionState::ReturnHomeCruising:
+      return "Return Home Cruising";
+    case MissionState::ReturnHomeLanding:
+      return "Return Home Landing";
     default:
       return "Unknown MissionState";
   }
@@ -98,6 +145,7 @@ WayPointFollowerSTMstates CoreUtils::convertToWayPointFollowerSTMstates(MissionS
     case MissionState::Idle:
       return WayPointFollowerSTMstates::NONE;
     case MissionState::FollowRouteInit:
+    case MissionState::FollowRouteLiftOff:
       return WayPointFollowerSTMstates::FOLLOW_ROUTE_INIT;
     case MissionState::FollowRouteGotoBegin:
       return WayPointFollowerSTMstates::FOLLOW_ROUTE_GOTO_BEGIN;

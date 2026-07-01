@@ -48,7 +48,7 @@ def emulated_range_sensor_array_launch(context):
     nodes.append(
         Node(
             package='waywiser_carla',
-            executable='emulated_range_sensor_array',
+            executable='emulated_range_sensor_array_node',
             name='emulated_range_sensor_array_node',
             parameters=[
                 node_params_dict,

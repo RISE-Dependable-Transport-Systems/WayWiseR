@@ -7,42 +7,91 @@ on:
   push:
     branches:
       - humble
-
   workflow_dispatch:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-22.04
-    container: ghcr.io/das-rise/waywiser/ci-image:humble
+    name: Build and test ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-22.04
+            image: ghcr.io/das-rise/waywiser/ci-image-amd64:humble
+            skipped_packages: ""
+    container:
+      image: ${{ matrix.image }}
+      options: --user root
+    env:
+      CI: "true"
+      CCACHE_DIR: /opt/ccache
+      WAYWISER_SKIPPED_PACKAGES: ${{ matrix.skipped_packages }}
+      WAYWISER_PYTHON_EXTRAS: "build,waywiser_test_runner"
+      WAYWISER_VENV_PATH: /opt/waywiser-ci-venv
+      WAYWISER_REUSE_VENV: "true"
+      WAYWISER_UNDERLAY_SETUP: /home/waywiser/workspaces/waywiser_ws/install/setup.bash
+      WAYWISER_CHECKOUT_PATH: src/WayWiseR
+      WAYWISER_WORKING_DIRECTORY: src/WayWiseR
+      WAYWISER_CMAKE_ARGS: >-
+        --no-warn-unused-cli
+        -DPython3_EXECUTABLE=/usr/bin/python3
+        -DPYTHON_EXECUTABLE=/usr/bin/python3
+        -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        -DCMAKE_C_COMPILER_LAUNCHER=ccache
+    defaults:
+      run:
+        working-directory: src/WayWiseR
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          path: ${{ env.WAYWISER_CHECKOUT_PATH }}
           submodules: recursive
+          fetch-depth: 0
 
-      - name: Generate repos file with carla-ros-bridge
+      - name: Prep for local act
+        if: ${{ env.ACT == 'true' }}
+        working-directory: ${{ env.WAYWISER_WORKING_DIRECTORY }}
         run: |
-          cat << 'EOF' > /tmp/deps.repos
-          repositories:
-            carla_ros_bridge:
-              type: git
-              url: https://github.com/das-rise/carla-ros-bridge.git
-              version: v0.9.15-humble-dev
-          EOF
+          # Use a local git repo to avoid "reference is not a tree" since act doesn't copy .git reliably
+          git init
+          git config user.email "act@local"
+          git config user.name "act"
+          git checkout -B ${{ github.ref_name }}
+          git add .
+          git commit -m "Local build for act" --allow-empty
+          mkdir -p /tmp/fake_github/${{ github.repository_owner }}
+          ln -sf $(pwd) /tmp/fake_github/${{ github.repository }}.git
+          rm -rf ../../build ../../install ../../log
 
       - name: Cache ccache
+        if: ${{ env.ACT != 'true' }}
         uses: actions/cache@v4
         with:
-          path: /root/.ccache
+          path: /opt/ccache
           key: ${{ runner.os }}-ccache-humble-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-ccache-humble-
 
+      - name: Setup Workspace
+        working-directory: ${{ env.WAYWISER_WORKING_DIRECTORY }}
+        run: WAYWISER_SKIPPED_PACKAGES="${{ matrix.skipped_packages }}" make setup ARGS="--quiet"
+
+      - name: Build Workspace
+        working-directory: ${{ env.WAYWISER_WORKING_DIRECTORY }}
+        run: |
+          export WAYWISER_SKIPPED_PACKAGES="${{ matrix.skipped_packages }}"
+          workspace="${WAYWISER_WS:-$(cd ../.. && pwd)}"
+          make build || {
+            status=$?
+            find "$workspace/log" \( -path '*/stderr.log' -o -path '*/stdout_stderr.log' \) -print \
+              -exec sh -c 'echo "===== $1"; grep -nEi "CMake Error|Traceback|(^|[^A-Za-z])(error|fatal):|undefined reference|No such file|not found|failed" "$1" | tail -n 100 || true; tail -n 300 "$1"' sh {} \;
+            exit "$status"
+          }
+
       - name: Run Tests
-        uses: ros-tooling/action-ros-ci@v0.3
-        with:
-          package-name: waywiser waywiser_agrarsense waywiser_carla waywiser_core waywiser_description waywiser_gazebo waywiser_hwbringup waywiser_nav2 waywiser_perception waywiser_rviz2 waywiser_slam waywiser_teleop waywiser_test_runner waywiser_twist_safety
-          target-ros2-distro: humble
-          vcs-repo-file-url: /tmp/deps.repos
-          extra-cmake-args: -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
+        working-directory: ${{ env.WAYWISER_WORKING_DIRECTORY }}
+        run: WAYWISER_SKIPPED_PACKAGES="${{ matrix.skipped_packages }}" make test

@@ -1,0 +1,446 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+    <class>UsageGuideDialog</class>
+    <widget class="QDialog" name="UsageGuideDialog">
+        <property name="geometry">
+            <rect>
+                <x>0</x>
+                <y>0</y>
+                <width>700</width>
+                <height>600</height>
+            </rect>
+        </property>
+        <property name="windowTitle">
+            <string>Waywiser Twist Keyboard - Usage Guide</string>
+        </property>
+        <property name="modal">
+            <bool>false</bool>
+        </property>
+        <property name="styleSheet">
+            <string notr="true">QDialog {
+                background-color: #1a1d29;
+                color: #e4e6eb;
+                }
+                QLabel {
+                color: #e4e6eb;
+                font-size: 10pt;
+                }
+                QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #3b4252, stop:1 #2e3440);
+                border: 1px solid #4c566a;
+                border-radius: 8px;
+                padding: 10px 16px;
+                color: #e4e6eb;
+                font-weight: 600;
+                font-size: 10pt;
+                }
+                QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #4c566a, stop:1 #3b4252);
+                border-color: #60a5fa;
+                }
+                QPushButton:pressed {
+                background: #2e3440;
+                }
+                QGroupBox {
+                border: 1px solid #2d3748;
+                border-radius: 12px;
+                margin-top: 16px;
+                padding-top: 16px;
+                font-weight: 600;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #232936, stop:1 #1a1d29);
+                font-size: 11pt;
+                }
+                QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 20px;
+                padding: 0 8px;
+                color: #60a5fa;
+                }</string>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout">
+            <item>
+                <widget class="QScrollArea" name="scrollArea">
+                    <property name="widgetResizable">
+                        <bool>true</bool>
+                    </property>
+                    <property name="frameShape">
+                        <enum>QFrame::NoFrame</enum>
+                    </property>
+                    <widget class="QWidget" name="scrollAreaWidgetContents">
+                        <property name="geometry">
+                            <rect>
+                                <x>0</x>
+                                <y>0</y>
+                                <width>682</width>
+                                <height>514</height>
+                            </rect>
+                        </property>
+                        <layout class="QVBoxLayout" name="verticalLayout_2">
+                            <item>
+                                <widget class="QGroupBox" name="movement_group">
+                                    <property name="title">
+                                        <string>MOVEMENT CONTROLS</string>
+                                    </property>
+                                    <layout class="QVBoxLayout" name="verticalLayout_3">
+                                        <item>
+                                            <widget class="QLabel" name="movement_text">
+                                                <property name="text">
+                                                    <string>&lt;div style='line-height: 1.8;
+                                                        font-size: 11pt;'&gt;
+                                                        &lt;table style='width: 100%;
+                                                        border-collapse: collapse;'&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px; width:
+                                                        120px;'&gt;&lt;span style='color: #a5b4fc;
+                                                        font-weight:
+                                                        700;'&gt;W&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Move
+                                                        Forward&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #a5b4fc; font-weight:
+                                                        700;'&gt;X&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Move
+                                                        Reverse&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #a5b4fc; font-weight:
+                                                        700;'&gt;A&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Turn Left
+                                                        (while moving)&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #a5b4fc; font-weight:
+                                                        700;'&gt;D&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Turn Right
+                                                        (while moving)&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #a5b4fc; font-weight:
+                                                        700;'&gt;S&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Stop (halts
+                                                        all movement)&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;/table&gt;
+                                                        &lt;p style='margin-top: 12px; color: #9ca3af;'&gt;
+                                                        Quadcopter only:
+                                                        &lt;/p&gt;
+                                                        &lt;table style='width: 100%;
+                                                        border-collapse: collapse;'&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px; width:
+                                                        120px;'&gt;&lt;span style='color: #34d399;
+                                                        font-weight:
+                                                        700;'&gt;Q&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Strafe Left
+                                                        (positive Y)&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #34d399; font-weight:
+                                                        700;'&gt;E&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Strafe Right
+                                                        (negative Y)&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #34d399; font-weight:
+                                                        700;'&gt;R&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Move Up
+                                                        (positive Z)&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #34d399; font-weight:
+                                                        700;'&gt;F&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Move Down
+                                                        (negative Z)&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #fb7185; font-weight:
+                                                        700;'&gt;Ctrl + L&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Auto lift-off
+                                                        to 2 m when Auto lift off is enabled&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #fb7185; font-weight:
+                                                        700;'&gt;Ctrl + Shift + L&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Auto
+                                                        Land &amp;amp; Disarm&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;/table&gt;
+                                                        &lt;/div&gt;</string>
+                                                </property>
+                                                <property name="wordWrap">
+                                                    <bool>true</bool>
+                                                </property>
+                                            </widget>
+                                        </item>
+                                    </layout>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QGroupBox" name="speed_group">
+                                    <property name="title">
+                                        <string>SPEED ADJUSTMENT</string>
+                                    </property>
+                                    <layout class="QVBoxLayout" name="verticalLayout_4">
+                                        <item>
+                                            <widget class="QLabel" name="speed_text">
+                                                <property name="text">
+                                                    <string>&lt;div style='line-height: 1.8;
+                                                        font-size: 11pt;'&gt;
+                                                        &lt;table style='width: 100%;
+                                                        border-collapse: collapse;'&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px; width:
+                                                        120px;'&gt;&lt;span style='color: #c4b5fd;
+                                                        font-weight:
+                                                        700;'&gt;I&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Increase
+                                                        Linear Speed&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #c4b5fd; font-weight:
+                                                        700;'&gt;K&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Decrease
+                                                        Linear Speed&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #c4b5fd; font-weight:
+                                                        700;'&gt;O&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Increase
+                                                        Angular Speed&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&lt;span
+                                                        style='color: #c4b5fd; font-weight:
+                                                        700;'&gt;L&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Decrease
+                                                        Angular Speed&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;/table&gt;
+                                                        &lt;/div&gt;</string>
+                                                </property>
+                                                <property name="wordWrap">
+                                                    <bool>true</bool>
+                                                </property>
+                                            </widget>
+                                        </item>
+                                    </layout>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QGroupBox" name="estop_group">
+                                    <property name="title">
+                                        <string>EMERGENCY STOP MANAGEMENT</string>
+                                    </property>
+                                    <layout class="QVBoxLayout" name="verticalLayout_5">
+                                        <item>
+                                            <widget class="QLabel" name="estop_text">
+                                                <property name="text">
+                                                    <string>&lt;div style='line-height: 1.8;
+                                                        font-size: 11pt;'&gt;
+                                                        &lt;table style='width: 100%;
+                                                        border-collapse: collapse;'&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px; width:
+                                                        180px;'&gt;&lt;span style='color: #f87171;
+                                                        font-weight: 700;'&gt;Ctrl +
+                                                        E&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Activate
+                                                        Emergency Stop&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #34d399; font-weight:
+                                                        700;'&gt;Ctrl + Shift +
+                                                        E&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Clear
+                                                        Emergency Stop&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;/table&gt;
+                                                        &lt;/div&gt;</string>
+                                                </property>
+                                                <property name="wordWrap">
+                                                    <bool>true</bool>
+                                                </property>
+                                            </widget>
+                                        </item>
+                                    </layout>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QGroupBox" name="quadcopter_arm_group">
+                                    <property name="title">
+                                        <string>QUADCOPTER ARM MANAGEMENT</string>
+                                    </property>
+                                    <layout class="QVBoxLayout" name="verticalLayout_arm_group">
+                                        <item>
+                                            <widget class="QLabel" name="quadcopter_arm_text">
+                                                <property name="text">
+                                                    <string>&lt;div style='line-height: 1.8;
+                                                        font-size: 11pt;'&gt;
+                                                        &lt;table style='width: 100%;
+                                                        border-collapse: collapse;'&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px; width:
+                                                        180px;'&gt;&lt;span style='color: #34d399;
+                                                        font-weight: 700;'&gt;Ctrl +
+                                                        M&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Request arm
+                                                        (only when ready for takeoff)&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #fbbf24; font-weight:
+                                                        700;'&gt;Ctrl + Shift +
+                                                        M&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Request
+                                                        disarm (only when not in air)&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;/table&gt;
+                                                        &lt;/div&gt;</string>
+                                                </property>
+                                                <property name="wordWrap">
+                                                    <bool>true</bool>
+                                                </property>
+                                            </widget>
+                                        </item>
+                                    </layout>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QGroupBox" name="route_planning_group">
+                                    <property name="title">
+                                        <string>ROUTE PLANNING</string>
+                                    </property>
+                                    <layout class="QVBoxLayout" name="verticalLayout_route_planning">
+                                        <item>
+                                            <widget class="QLabel" name="route_planning_text">
+                                                <property name="text">
+                                                    <string>&lt;div style='line-height: 1.8;
+                                                        font-size: 11pt;'&gt;
+                                                        &lt;table style='width: 100%;
+                                                        border-collapse: collapse;'&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px; width:
+                                                        180px;'&gt;&lt;span style='color: #a5b4fc;
+                                                        font-weight: 700;'&gt;Plan Route&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Toggle route
+                                                        editing controls on the map&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #34d399; font-weight:
+                                                        700;'&gt;Ctrl + Left Click&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Add a new
+                                                        waypoint at the clicked map position&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #34d399; font-weight:
+                                                        700;'&gt;Shift + Left Drag&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Move an
+                                                        existing waypoint&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #f87171; font-weight:
+                                                        700;'&gt;Right Click&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Delete the
+                                                        nearest waypoint&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #fbbf24; font-weight:
+                                                        700;'&gt;Left Drag&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Pan the map
+                                                        canvas while planning&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #fbbf24; font-weight:
+                                                        700;'&gt;Mouse Wheel&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Zoom the map
+                                                        around the cursor&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #c4b5fd; font-weight:
+                                                        700;'&gt;Load Route&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Select a
+                                                        preplanned WayWise XML route file&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #c4b5fd; font-weight:
+                                                        700;'&gt;Send Route&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Publish the
+                                                        route as PathWithTwists to the selected
+                                                        vehicle&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #c4b5fd; font-weight:
+                                                        700;'&gt;Save Route&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Export the
+                                                        current route as a WayWise XML file&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #c4b5fd; font-weight:
+                                                        700;'&gt;Clear Route&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Remove all
+                                                        planned waypoints from the map&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;/table&gt;
+                                                        &lt;p style='margin-top: 12px; color: #9ca3af;'&gt;
+                                                        For copters, Route z is applied as the
+                                                        constant altitude for the 2D route. For cars,
+                                                        z is ignored by the vehicle follower.
+                                                        &lt;/p&gt;
+                                                        &lt;/div&gt;</string>
+                                                </property>
+                                                <property name="wordWrap">
+                                                    <bool>true</bool>
+                                                </property>
+                                            </widget>
+                                        </item>
+                                    </layout>
+                                </widget>
+                            </item>
+                        </layout>
+                    </widget>
+                </widget>
+            </item>
+            <item>
+                <widget class="QPushButton" name="close_button">
+                    <property name="text">
+                        <string>Close Guide (Esc)</string>
+                    </property>
+                    <property name="font">
+                        <font>
+                            <family>Segoe UI</family>
+                            <pointsize>11</pointsize>
+                        </font>
+                    </property>
+                </widget>
+            </item>
+        </layout>
+    </widget>
+
+    <resources />
+    <connections />
+</ui>

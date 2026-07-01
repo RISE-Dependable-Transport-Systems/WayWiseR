@@ -43,3 +43,78 @@ navsatfix_extended_wrapper_node:
     gnss_heading_accuracy: 0.1
     gnss_last_rtcm_correction_age: 0
     gnss_num_satellites: 0
+
+waywiser_drone_node:
+  ros__parameters:
+    vehicle_interface_type: "ext_simulated"
+    odom_topic: "odometry"
+    input_odom_topic: "gazebo/odometry"
+    vehicle_pose_topic: "drone_pose"
+    quadcopter_state_topic: "quadcopter_state"
+    range_topic: "sensors/range/down"
+    battery_state_topic: ""
+    arm_command_topic: "arm_command"
+    fused_nav_sat_fix_extended_topic: "sensors/gnss/fused_nav_sat_fix_extended"
+    emergency_stop_status_topic: "emergency_stop/current_state"
+    emergency_stop_update_topic: "emergency_stop/target_state"
+    mission_status_topic: "mission_status"
+    autopilot_state_control_topic: "autopilot_state_control"
+    control_tower_heartbeat_rx_state_topic: "control_tower_heartbeat_rx_state"
+    joint_states_topic: "joint_states"
+    publish_odom_to_baselink_tf: true
+    publish_world_to_odom_tf: true
+    vehicle_state_poll_rate: 30
+    in_air_range_threshold: 0.20
+    autopilot_timer_rate: 10
+    mission_position_type: "odom"
+    require_gnss_for_mission: false
+    mission_waypoint_proximity: 0.5
+    mission_end_goal_alignment_threshold: 0.25
+    mission_cruise_speed: 3.0
+    mission_max_speed: 2.0
+    mission_min_approach_speed: 0.1
+    mission_approach_slowdown_radius: 1.5
+    mission_face_travel_direction: true
+    mission_yaw_gain: 1.5
+    mission_max_yaw_rate: 1.0
+    mission_vertical_height_tolerance: 0.5
+    mission_vertical_proportional_gain: 1.6
+    mission_vertical_integral_gain: 0.08
+    mission_vertical_derivative_gain: 0.5
+    mission_vertical_integral_limit: 2.0
+    # PX4 offboard setpoint bridge parameters
+    command_timeout: 0.5
+    mission_state_timeout: 1.0
+    return_home_on_control_tower_timeout: true
+    configure_px4_home_on_lift_off: true
+    publish_px4_aux_global_position: true
+    px4_aux_global_position_eph: 0.05
+    px4_aux_global_position_epv: 0.05
+    return_home_height: 10.0 # m above home for WayWiseR return-home cruise altitude
+    auto_landing_descent_velocity: 0.3 # m/s WayWiseR auto_landing descent speed
+    # Optional: set both to override the default return-home XY captured at lift-off.
+    # return_home_x: 0.0
+    # return_home_y: 0.0
+    control_tower_heartbeat_topic: control_tower_heartbeat
+    control_tower_heartbeat_timeout: 2.0
+    return_home_command_retry_period: 2.0
+    setpoint_rate: 20.0
+    request_retry_period: 1.0
+    auto_arm: true
+    require_local_position_before_arm: false
+    auto_lift_off_height: 2.0 # m target height for standalone waypoint-follower lift-off
+
+emergency_stop_monitor:
+  ros__parameters:
+    start_with_emergency_stop: false
+    cmd_vel_in_timeout: 0.5
+    emergency_stop_state_publish_rate: 10
+
+onboard_twist_mux:
+  ros__parameters:
+    use_stamped: false
+    topics:
+      teleop:
+        topic: teleop_mux_vel
+        timeout: 0.5
+        priority: 100

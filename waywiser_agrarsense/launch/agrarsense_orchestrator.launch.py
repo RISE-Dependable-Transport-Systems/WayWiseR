@@ -27,7 +27,7 @@ def generate_launch_description():
     # create nodes
     agrarsense_orchestrator = Node(
         package='waywiser_agrarsense',
-        executable='agrarsense_orchestrator.py',
+        executable='agrarsense_orchestrator_node.py',
         name='agrarsense_orchestrator_node',
         output='screen',
         parameters=[

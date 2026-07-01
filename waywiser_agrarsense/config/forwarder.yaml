@@ -69,6 +69,10 @@ waywiser_car_node:
     publish_world_to_odom_tf: true
     vehicle_state_poll_rate: 10 # currently same rate for both odom topic and odom->base_link tf
     min_battery_voltage: 13.6
+    control_tower_heartbeat_topic: "control_tower_heartbeat"
+    control_tower_heartbeat_rx_state_topic: "control_tower_heartbeat_rx_state"
+    control_tower_heartbeat_timeout: 2.0
+    emergency_stop_on_control_tower_timeout: true
     joint_states_publish_rate: 10
     invert_trailer_joint_state: true
     autopilot_timer_rate: 10

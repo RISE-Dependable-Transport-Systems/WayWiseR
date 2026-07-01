@@ -10,6 +10,10 @@ if(POLICY CMP0148)
   cmake_policy(SET CMP0148 OLD)
 endif()
 
+if(POLICY CMP0125)
+  cmake_policy(SET CMP0125 NEW)
+endif()
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_C_STANDARD 23)
@@ -18,6 +22,7 @@ set(CMAKE_C_STANDARD 23)
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
+unset(_lib CACHE)
 find_package(cv_bridge REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -35,7 +40,7 @@ find_package(octomap_msgs REQUIRED)
 include_directories(include)
 ament_export_include_directories(include)
 
-add_executable(octomap_node cpp_src/octomap.cpp)
+add_executable(octomap_node cpp_src/octomap_node.cpp)
 ament_target_dependencies(octomap_node
   rclcpp
   sensor_msgs
@@ -65,11 +70,11 @@ ament_target_dependencies(point_cloud_transformer_core
 )
 
 rclcpp_components_register_nodes(point_cloud_transformer_core
-  waywiser_perception::PointCloudTransformer
+  waywiser_perception::PointCloudTransformerNode
 )
 
-add_executable(point_cloud_transformer cpp_src/point_cloud_transformer.cpp)
-target_link_libraries(point_cloud_transformer point_cloud_transformer_core)
+add_executable(point_cloud_transformer_node cpp_src/point_cloud_transformer_node.cpp)
+target_link_libraries(point_cloud_transformer_node point_cloud_transformer_core)
 
 install(
   TARGETS point_cloud_transformer_core
@@ -79,7 +84,7 @@ install(
 )
 
 install(
-  TARGETS point_cloud_transformer
+  TARGETS point_cloud_transformer_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -100,10 +105,10 @@ ament_python_install_package(${PROJECT_NAME}_py
 install(
   PROGRAMS
   py_src/waywiser_perception_py/yolo_node.py
-  py_src/waywiser_perception_py/rgbd_to_pointcloud.py
-  py_src/waywiser_perception_py/collision_monitor.py
-  py_src/waywiser_perception_py/camera_info_publisher.py
-  py_src/waywiser_perception_py/rgb_to_grayscale.py
+  py_src/waywiser_perception_py/rgbd_to_pointcloud_node.py
+  py_src/waywiser_perception_py/collision_monitor_node.py
+  py_src/waywiser_perception_py/camera_info_publisher_node.py
+  py_src/waywiser_perception_py/rgb_to_grayscale_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -111,6 +116,7 @@ if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
+  set(ament_cmake_xmllint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 

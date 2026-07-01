@@ -20,8 +20,14 @@ ament_python_install_package(${PROJECT_NAME}_py
 )
 
 install(
-  DIRECTORY urdf sdf meshes scripts
+  DIRECTORY urdf sdf meshes
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  PROGRAMS
+  scripts/scale_urdf.sh
+  DESTINATION share/${PROJECT_NAME}/scripts
 )
 
 install(
@@ -34,6 +40,7 @@ if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
+  set(ament_cmake_xmllint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 

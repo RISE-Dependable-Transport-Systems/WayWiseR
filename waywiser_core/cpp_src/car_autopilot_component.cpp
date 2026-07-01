@@ -18,7 +18,7 @@ void CarAutopilotComponent::setupAutopilot(QSharedPointer<EmergencyStopState> em
   mCarState->setEndGoalAlignmentType(mEndGoalAlignmentType);
   mAutopilotMovementController.reset(new MovementController(mCarState));
 
-  // -- MAVLINK communication towards ControlTower --
+  // -- MAVLINK communication towards ControlTowerNode --
   if (mEnableMavlinkInterface) {
     mMavsdkVehicleServer.reset(
       new MavsdkVehicleServer(

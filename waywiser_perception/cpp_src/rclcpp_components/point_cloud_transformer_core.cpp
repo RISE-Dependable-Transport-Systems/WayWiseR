@@ -2,7 +2,7 @@
 
 namespace waywiser_perception
 {
-PointCloudTransformer::PointCloudTransformer(const rclcpp::NodeOptions & options)
+PointCloudTransformerNode::PointCloudTransformerNode(const rclcpp::NodeOptions & options)
 : Node("point_cloud_transformer", options)
 {
   output_frame_ = this->declare_parameter("output_frame", "base_link");
@@ -40,10 +40,11 @@ PointCloudTransformer::PointCloudTransformer(const rclcpp::NodeOptions & options
     this->create_publisher<sensor_msgs::msg::PointCloud2>(output_point_cloud_topic, 10);
   subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     input_point_cloud_topic, 10,
-    std::bind(&PointCloudTransformer::pointCloudCallback, this, std::placeholders::_1));
+    std::bind(&PointCloudTransformerNode::pointCloudCallback, this, std::placeholders::_1));
 }
 
-void PointCloudTransformer::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+void PointCloudTransformerNode::pointCloudCallback(
+  const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
   try {
     // Lookup transformation from input_frame to output_frame
@@ -80,6 +81,6 @@ void PointCloudTransformer::pointCloudCallback(const sensor_msgs::msg::PointClou
 }
 }  // namespace waywiser_perception
 
-// Register the PointCloudTransformer as a plugin
+// Register the PointCloudTransformerNode as a plugin
 #include "rclcpp_components/register_node_macro.hpp"
-RCLCPP_COMPONENTS_REGISTER_NODE(waywiser_perception::PointCloudTransformer)
+RCLCPP_COMPONENTS_REGISTER_NODE(waywiser_perception::PointCloudTransformerNode)

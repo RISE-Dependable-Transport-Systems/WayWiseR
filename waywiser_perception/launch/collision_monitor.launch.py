@@ -19,7 +19,7 @@ def generate_launch_description():
     collision_monitor_config_la = DeclareLaunchArgument(
         'collision_monitor_config',
         default_value=os.path.join(waywiser_perception_dir, 'config/collision_monitor.yaml'),
-        description='Full path to params file for CollisionMonitor node.',
+        description='Full path to params file for CollisionMonitorNode node.',
     )
     use_sim_time_la = DeclareLaunchArgument(
         'use_sim_time', default_value='False', description='Use simulation/Gazebo clock'
@@ -54,7 +54,7 @@ def waywiser_collision_monitor_launch(context):
 
     waywiser_collision_monitor = Node(
         package='waywiser_perception',
-        executable='collision_monitor.py',
+        executable='collision_monitor_node.py',
         name='waywiser_collision_monitor_node',
         parameters=[
             node_params_dict,

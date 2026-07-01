@@ -1,22 +1,15 @@
 {
     "topic_models": [
         {
-            "topic": "rover/robot_description",
-            "bridge_config": "./src/WayWiseR/waywiser_gazebo/config/rover_gazebo_bridges.yaml"
+            "topic": "/rover/robot_description",
+            "bridge_config": "package://waywiser_gazebo/config/rover_gazebo_bridges.yaml"
         }
     ],
     "sdf_models": [
         {
             "name": "standing_actor_1",
-            "path": "./src/WayWiseR/waywiser_description/sdf/actor_stand/model.sdf",
+            "path": "package://waywiser_description/sdf/actor_stand/model.sdf",
             "bridge_config": ""
-        }
-    ],
-    "static_transforms": [
-        {
-            "frame_id": "car_world",
-            "child_frame_id": "map",
-            "pose": "0 0 0 0 0 0"
         }
     ]
 }

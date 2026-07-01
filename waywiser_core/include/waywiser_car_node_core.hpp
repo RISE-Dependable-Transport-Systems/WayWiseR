@@ -14,6 +14,7 @@
 #include "rclcpp/logger.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
+#include "std_msgs/msg/header.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/u_int8.hpp"
 #include "std_msgs/msg/float32.hpp"
@@ -34,6 +35,7 @@
 
 #include "waywiser_core/msg/battery_state.hpp"
 #include "waywiser_core/msg/car_control_command.hpp"
+#include "waywiser_core/msg/heartbeat_rx_state.hpp"
 #include "waywiser_core/msg/mission_state.hpp"
 #include "waywiser_core/msg/nav_sat_fix_extended.hpp"
 #include "waywiser_core/msg/path_with_twists.hpp"
@@ -72,6 +74,7 @@ protected:
   void autopilot_state_control_callback(const std_msgs::msg::Bool::SharedPtr bool_msg);
   void emergency_stop_status_callback(
     const waywiser_twist_safety::msg::EmergencyStopState::SharedPtr msg);
+  void control_tower_heartbeat_callback(const std_msgs::msg::Header::SharedPtr msg);
   void odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom_msg); // for EXT_SIMULATED interface
   virtual void twist_callback(const geometry_msgs::msg::Twist::SharedPtr twist_msg);
   void path_with_twists_callback(const waywiser_core::msg::PathWithTwists::SharedPtr msg);
@@ -84,10 +87,14 @@ protected:
   virtual void publish_world_pose();
   void publish_route_markers();
   void publish_autopilot_markers();
+  void publish_control_tower_heartbeat_rx_state();
   virtual void publish_joint_states(double timePassed_ms);
   void publish_imu_data();
 
   // Utility methods
+  void update_control_tower_heartbeat_failsafe();
+  void publish_control_tower_timeout_emergency_stop(double heartbeat_age);
+  bool should_stop_for_control_tower_heartbeat() const;
   void process_twist_msg(const geometry_msgs::msg::Twist::SharedPtr twist_msg);
   virtual double update_joint_states_msg(
     sensor_msgs::msg::JointState & joint_state_msg, double timePassedSinceLastCall_ms);
@@ -122,6 +129,8 @@ protected:
   std::string joint_states_topic_;
 
   std::string mission_status_topic_;
+  std::string control_tower_heartbeat_topic_;
+  std::string control_tower_heartbeat_rx_state_topic_;
   std::string vehicle_alignment_reference_point_topic_;
   std::string autopilot_center_pose_topic_;
 
@@ -137,7 +146,7 @@ protected:
   // bool update_world_position_with_tf_;
   bool publish_odom_to_baselink_tf_;
   bool publish_world_to_odom_tf_;
-  bool waypoint_follower_bypass_mux_;
+  bool waypoint_follower_bypass_mux_ = false;
   bool invert_steering_feedback_from_odom_;
   int joint_states_publish_rate_;
   double wheel_diameter_;
@@ -161,6 +170,8 @@ protected:
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr autopilot_center_pose_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr route_marker_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr autopilot_marker_pub_;
+  rclcpp::Publisher<waywiser_core::msg::HeartbeatRxState>::SharedPtr
+    control_tower_heartbeat_rx_state_pub_;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_out_pub_;
@@ -174,6 +185,7 @@ protected:
     emergency_stop_status_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr autopilot_state_control_sub_;
   rclcpp::Subscription<waywiser_core::msg::PathWithTwists>::SharedPtr path_with_twists_sub_;
+  rclcpp::Subscription<std_msgs::msg::Header>::SharedPtr control_tower_heartbeat_sub_;
 
   // Timers
   rclcpp::TimerBase::SharedPtr node_management_timer_;
@@ -195,6 +207,12 @@ protected:
   bool received_first_odom_msg_ = false;
   double min_target_speed = 0.0;
   double max_target_speed = 0.0;
+  bool emergency_stop_on_control_tower_timeout_ = true;
+  double control_tower_heartbeat_timeout_ = 2.0;
+  bool received_control_tower_heartbeat_ = false;
+  bool control_tower_heartbeat_stale_stop_active_ = false;
+  bool control_tower_heartbeat_timeout_emergency_stop_active_ = false;
+  rclcpp::Time last_control_tower_heartbeat_stamp_;
 };
 
 #endif  // WAYWISER_CAR_NODE_CORE_HPP_

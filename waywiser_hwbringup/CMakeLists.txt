@@ -36,6 +36,7 @@ if(BUILD_TESTING)
   find_package(ament_cmake_pep257 REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
+  set(ament_cmake_xmllint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
   set(EXCLUDED_FILES py_src/waywiser_hwbringup_py/dfrobot_ch432t.py)
 

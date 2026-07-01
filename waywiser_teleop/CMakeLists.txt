@@ -13,15 +13,16 @@ find_package(teleop_twist_joy REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(builtin_interfaces REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(waywiser_twist_safety REQUIRED)
-find_package(waywiser_core REQUIRED)
 find_package(waywiser REQUIRED)
 
-add_executable(twist_angular_correction cpp_src/twist_angular_correction.cpp)
-ament_target_dependencies(twist_angular_correction
+add_executable(twist_angular_correction_node cpp_src/twist_angular_correction_node.cpp)
+ament_target_dependencies(twist_angular_correction_node
   geometry_msgs
   rclcpp
   sensor_msgs
@@ -29,7 +30,7 @@ ament_target_dependencies(twist_angular_correction
 )
 
 install(
-  TARGETS twist_angular_correction
+  TARGETS twist_angular_correction_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -43,19 +44,20 @@ ament_python_install_package(${PROJECT_NAME}_py
 )
 
 install(
-  PROGRAMS py_src/waywiser_teleop_py/twist_keyboard.py
+  PROGRAMS py_src/waywiser_teleop_py/control_tower_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
 install(
-  DIRECTORY user_interface/twist_keyboard/
-  DESTINATION share/${PROJECT_NAME}/user_interface/twist_keyboard
+  DIRECTORY user_interface/control_tower/
+  DESTINATION share/${PROJECT_NAME}/user_interface/control_tower
 )
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
+  set(ament_cmake_xmllint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 
