@@ -186,6 +186,7 @@ if(BUILD_TESTING)
     ament_cmake_lint_cmake
     ament_cmake_pep257
     ament_cmake_uncrustify
+    ament_cmake_cppcheck
   )
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)

@@ -156,3 +156,7 @@ fi
 rm -rf -- "$px4_artifact_dir"
 mkdir -p "$px4_artifact_dir"
 cp -a "$px4_build_dir"/. "$px4_artifact_dir"/
+
+# Remove OpticalFlow from build directories to prevent colcon test-result from
+# parsing its non-standard package.xml and throwing warnings.
+rm -rf "$px4_build_dir/OpticalFlow" "$px4_artifact_dir/OpticalFlow"
