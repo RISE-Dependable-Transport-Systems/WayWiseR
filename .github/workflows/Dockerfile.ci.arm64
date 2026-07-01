@@ -34,11 +34,9 @@ RUN [[ "$TARGETARCH" == "arm64" ]] \
     && [[ "$(dpkg --print-architecture)" == "arm64" ]]
 
 # Workaround for QEMU user-mode emulation bug causing ldconfig to segfault (exit 139) on arm64.
-# This wraps ldconfig so that if it crashes, it still returns success, allowing apt to continue.
+# This replaces ldconfig with /bin/true to skip it entirely during the build process, preventing hangs.
 RUN mv /sbin/ldconfig /sbin/ldconfig.real \
-    && echo '#!/bin/bash' > /sbin/ldconfig \
-    && echo '/sbin/ldconfig.real "$@" || true' >> /sbin/ldconfig \
-    && chmod +x /sbin/ldconfig
+    && ln -s /bin/true /sbin/ldconfig
 
 
 RUN apt-get update && apt-get install -y \
