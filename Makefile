@@ -16,10 +16,15 @@
 #   make clean                   — remove build*/, install*/, log*/, deb_*/ and .venv/
 #   make clean ARGS=--skip-venv  — remove build*/, install*/, log*/, deb_*/ (keep .venv)
 #
+# Testing:
+#   make test                    — colcon test (WayWiseR packages only) + show results
+#
+# Packages:
+#   make package                 — build amd64 .deb packages in Docker
+#
 # Options (via ARGS):
 #   make all ARGS="--skip-mavsdk"      — skip MAVSDK installation
 #   make all ARGS="--quiet"            — non-interactive
-#   make package ARGS="amd64 arm64"    — build selected .deb package arches
 #
 # Override workspace root:
 #   WAYWISER_WS=/custom/path make all
@@ -52,7 +57,7 @@ WAYWISER_PACKAGES := \
   waywiser_perception waywiser_rviz2 waywiser_slam waywiser_teleop \
   waywiser_test_runner waywiser_twist_safety
 
-.PHONY: help all configure setup build post-build rebuild test package package-amd64 package-arm64 clean list-packages
+.PHONY: help all configure setup build post-build rebuild test package clean list-packages
 .DEFAULT_GOAL := help
 
 help:
@@ -75,9 +80,6 @@ help:
 	@echo ""
 	@echo "Packages:"
 	@echo "  make package         — build amd64 .deb packages in Docker"
-	@echo "  make package ARGS='amd64 arm64' — build selected .deb package arches"
-	@echo "  make package-amd64   — alias for: make package ARGS=amd64"
-	@echo "  make package-arm64   — alias for: make package ARGS=arm64"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean           — remove build*/, install*/, log*/, deb_*/ and .venv/"
@@ -85,7 +87,6 @@ help:
 	@echo "Options (pass via ARGS):"
 	@echo "  make all ARGS='--skip-mavsdk'		— skip MAVSDK installation"
 	@echo "  make all ARGS='--quiet'   		— non-interactive"
-	@echo "  make package ARGS='amd64 arm64' 	— package selected architectures"
 	@echo "  make clean ARGS='--skip-venv'  	— skip removing .venv/"
 
 list-packages:
@@ -134,12 +135,6 @@ test:
 
 package:
 	@bash $(PACKAGE_SCRIPT) $(if $(strip $(ARGS)),$(ARGS),amd64)
-
-package-amd64:
-	@bash $(PACKAGE_SCRIPT) amd64
-
-package-arm64:
-	@bash $(PACKAGE_SCRIPT) arm64
 
 clean:
 	@echo "Removing build*/, install*/, log*/, deb_*/ ..."

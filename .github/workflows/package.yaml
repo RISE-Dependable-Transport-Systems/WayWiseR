@@ -27,7 +27,6 @@ jobs:
       matrix:
         arch:
           - amd64
-          - arm64
     env:
       WAYWISER_DEB_VERSION: ${{ inputs.version }}
       WAYWISER_DEB_UBUNTU_LABEL: ${{ inputs.ubuntu_label || 'ubuntu22-04' }}
@@ -50,11 +49,6 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           echo "WAYWISER_DEB_VERSION=${version}" >> "$GITHUB_ENV"
 
-      - name: Set up QEMU for arm64
-        if: ${{ matrix.arch == 'arm64' }}
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
 
       - name: Build ${{ matrix.arch }} Debian packages
         run: make package-${{ matrix.arch }}

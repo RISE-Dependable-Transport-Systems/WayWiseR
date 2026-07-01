@@ -165,14 +165,6 @@ docker buildx build --platform linux/amd64 --load \
   -t ghcr.io/das-rise/waywiser/ci-image-amd64:humble \
   -f $WAYWISER_WS/src/WayWiseR/.github/workflows/Dockerfile.ci.amd64 \
   $WAYWISER_WS/src/WayWiseR
-
-# Build the arm64 CI image used by make package-arm64
-docker run --privileged --rm tonistiigi/binfmt --install arm64
-docker buildx build --platform linux/arm64 --load \
-  --build-arg ACT_COMPAT=true \
-  -t ghcr.io/das-rise/waywiser/ci-image-arm64:humble \
-  -f $WAYWISER_WS/src/WayWiseR/.github/workflows/Dockerfile.ci.arm64 \
-  $WAYWISER_WS/src/WayWiseR
 ```
 
 Then, run the build and test job using `act`. The `--pull=false` flag ensures `act` uses your local image:
@@ -186,16 +178,6 @@ act --pull=false \
   --env WAYWISER_CHECKOUT_PATH=. \
   --env WAYWISER_WORKING_DIRECTORY=. \
   -j build-and-test
-
-# Run the CI pipeline locally for arm64
-act --pull=false \
-  --env-file /dev/null \
-  --container-architecture linux/arm64 \
-  -C $WAYWISER_WS/src/WayWiseR \
-  --matrix arch:arm64 \
-  --env WAYWISER_CHECKOUT_PATH=. \
-  --env WAYWISER_WORKING_DIRECTORY=. \
-  -j build-and-test
 ```
 
 ## (Experimental) Build amd64 packages
@@ -205,24 +187,10 @@ Build amd64 packages:
 ```bash
 make package
 ```
-
-Build arm64 packages (without simulation, rviz, and teleop packages) for Jetson or Raspberry Pi from an amd64 host:
-
-```bash
-make package ARGS=arm64
-```
-
-Build multiple architectures:
-
-```bash
-make package ARGS="amd64 arm64"
-```
-
 Packages are written to architecture-specific directories:
 
 ```text
 $WAYWISER_WS/deb_dist/amd64/
-$WAYWISER_WS/deb_dist/arm64/
 ```
 
 Install packages from a local release directory with the generated helper:

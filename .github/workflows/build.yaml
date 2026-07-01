@@ -21,10 +21,6 @@ jobs:
             runner: ubuntu-22.04
             image: ghcr.io/das-rise/waywiser/ci-image-amd64:humble
             skipped_packages: ""
-          - arch: arm64
-            runner: ubuntu-22.04-arm
-            image: ghcr.io/das-rise/waywiser/ci-image-arm64:humble
-            skipped_packages: "waywiser_agrarsense waywiser_carla waywiser_gazebo waywiser_rviz2 waywiser_teleop"
     container:
       image: ${{ matrix.image }}
       options: --user root
