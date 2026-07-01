@@ -560,6 +560,7 @@ Check packages to BUILD (uncheck to skip).
             ubuntu_codename=$(. /etc/os-release && echo "$UBUNTU_CODENAME")
             echo "deb [arch=$(dpkg --print-architecture) signed-by=$keyring] http://packages.osrfoundation.org/gazebo/ubuntu-stable $ubuntu_codename main" \
                 | as_root tee "$sources_list" > /dev/null
+            as_root apt-get update -qq
             info "OSRF Gazebo apt repository added. rosdep will install Gazebo packages."
         else
             info "OSRF Gazebo apt repository already configured."
