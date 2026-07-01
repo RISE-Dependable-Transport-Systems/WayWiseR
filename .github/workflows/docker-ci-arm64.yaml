@@ -1,13 +1,12 @@
-name: Build and Push CI Images
+name: Build and Push CI Image (arm64)
 
 on:
   push:
     branches:
       - humble
     paths:
-      - ".github/workflows/Dockerfile.ci.amd64"
       - ".github/workflows/Dockerfile.ci.arm64"
-      - ".github/workflows/docker-ci.yaml"
+      - ".github/workflows/docker-ci-arm64.yaml"
       - "Makefile"
       - "waywiser/scripts/bootstrap"
       - ".env.example"
@@ -21,20 +20,6 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            image: ghcr.io/das-rise/waywiser/ci-image-amd64
-            dockerfile: ./.github/workflows/Dockerfile.ci.amd64
-            platform: linux/amd64
-            cache_scope: ci-image-amd64
-          - arch: arm64
-            image: ghcr.io/das-rise/waywiser/ci-image-arm64
-            dockerfile: ./.github/workflows/Dockerfile.ci.arm64
-            platform: linux/arm64
-            cache_scope: ci-image-arm64
     permissions:
       contents: read
       packages: write
@@ -59,23 +44,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata for ${{ matrix.arch }}
+      - name: Extract metadata for arm64
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ matrix.image }}
+          images: ghcr.io/das-rise/waywiser/ci-image-arm64
           tags: |
             type=raw,value=humble
 
-      - name: Build and push ${{ matrix.arch }} Docker image
+      - name: Build and push arm64 Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
-          platforms: ${{ matrix.platform }}
+          file: ./.github/workflows/Dockerfile.ci.arm64
+          platforms: linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Cache optimization
-          cache-from: type=gha,scope=${{ matrix.cache_scope }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.cache_scope }}
+          cache-from: type=gha,scope=ci-image-arm64
+          cache-to: type=gha,mode=max,scope=ci-image-arm64
