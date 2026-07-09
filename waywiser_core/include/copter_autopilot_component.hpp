@@ -36,8 +36,11 @@ public:
   void setRequireGnssForMission(bool value) {mRequireGnssForMission = value;}
   void setVehicleInitialized(bool value) {mVehicleInitialized = value;}
   void setGnssFixStatus(GnssFixStatus gnssFixStatus) {mGnssFixStatus = gnssFixStatus;}
-  void setWaypointProximity(double value) {mWaypointProximity = value;}
-  void setEndGoalAlignmentThreshold(double value) {mEndGoalAlignmentThreshold = value;}
+  void setWaypointProximityXY(double value) {mWaypointProximityXY = value;}
+  void setWaypointProximityZ(double value) {mWaypointProximityZ = value;}
+  void setEndGoalAlignmentThresholdXY(double value) {mEndGoalAlignmentThresholdXY = value;}
+  void setEndGoalAlignmentThresholdZ(double value) {mEndGoalAlignmentThresholdZ = value;}
+  void setStopSpeedThreshold(double value) {mStopSpeedThreshold = value;}
   void setCruiseSpeed(double value) {mCruiseSpeed = value;}
   void setMaxMissionSpeed(double value) {mMaxMissionSpeed = value;}
   void setDescentSpeed(double value)
@@ -62,9 +65,9 @@ public:
     mPositionAccuracyThresholdForMission = value;
   }
   void setYawAccuracyThresholdForMission(float value) {mYawAccuracyThresholdForMission = value;}
-  void setAutoLiftOffEnabled(bool value);
-  void setAutoLiftOffActive(bool value);
-  void setAutoLiftOffHeight(double value) {mAutoLiftOffHeight = value;}
+  void setAutoClimbEnabled(bool value);
+  bool setAutoClimbActive(bool value);
+  void setAutoClimbHeight(double value) {mAutoClimbHeight = value;}
 
   // Getters
   int getAutopilotTimerRate() const {return mAutopilotTimerRate;}
@@ -81,8 +84,11 @@ public:
     return mAutopilotMovementController;
   }
   geometry_msgs::msg::Twist getAutopilotTwistCommand() const;
-  double getWaypointProximity() const {return mWaypointProximity;}
-  double getEndGoalAlignmentThreshold() const {return mEndGoalAlignmentThreshold;}
+  double getWaypointProximityXY() const {return mWaypointProximityXY;}
+  double getWaypointProximityZ() const {return mWaypointProximityZ;}
+  double getEndGoalAlignmentThresholdXY() const {return mEndGoalAlignmentThresholdXY;}
+  double getEndGoalAlignmentThresholdZ() const {return mEndGoalAlignmentThresholdZ;}
+  double getStopSpeedThreshold() const {return mStopSpeedThreshold;}
   double getCruiseSpeed() const {return mCruiseSpeed;}
   double getMaxMissionSpeed() const {return mMaxMissionSpeed;}
   double getDescentSpeed() const {return mDescentSpeed;}
@@ -96,10 +102,10 @@ public:
   double getVerticalIntegralGain() const {return mVerticalIntegralGain;}
   double getVerticalDerivativeGain() const {return mVerticalDerivativeGain;}
   double getVerticalIntegralLimit() const {return mVerticalIntegralLimit;}
-  bool getAutoLiftOffEnabled() const {return mAutoLiftOffEnabled;}
-  bool getAutoLiftOffActive() const {return mAutoLiftOffActive;}
-  double getAutoLiftOffHeight() const {return mAutoLiftOffHeight;}
-  bool getRouteLiftOffActive() const;
+  bool getAutoClimbEnabled() const {return mAutoClimbEnabled;}
+  bool getAutoClimbActive() const {return mAutoClimbActive;}
+  double getAutoClimbHeight() const {return mAutoClimbHeight;}
+  bool getRouteClimbActive() const;
 
   // Utility methods
   virtual void provideParametersToParameterServer();
@@ -110,8 +116,10 @@ public:
   bool isActive();
   virtual void stopWaypointFollower();
   void clearWaypointFollowerRoute();
-  void cancelAutoLiftOff();
-  bool startAutoLiftOffWithWaypointFollower();
+  void cancelAutoClimb();
+  bool startAutoClimbWithWaypointFollower();
+  void applyMissionWaypointFollowerTuning();
+  void applyAutoClimbWaypointFollowerTuning();
 
 signals:
   void updatedMissionState(MissionState state);
@@ -129,8 +137,11 @@ protected:
   int mWaywiseControlTowerPort = 14540;
   PosType mMissionPosTypeUsed = PosType::odom;
   bool mRequireGnssForMission = false;
-  double mWaypointProximity = 0.5;
-  double mEndGoalAlignmentThreshold = 0.25;
+  double mWaypointProximityXY = 0.5;
+  double mWaypointProximityZ = 1.0;
+  double mEndGoalAlignmentThresholdXY = 0.25;
+  double mEndGoalAlignmentThresholdZ = 0.25;
+  double mStopSpeedThreshold = 0.2;
   double mCruiseSpeed = 1.0;
   double mMaxMissionSpeed = 2.0;
   double mDescentSpeed = 0.3;
@@ -146,9 +157,9 @@ protected:
   double mVerticalIntegralLimit = 2.0;
   float mPositionAccuracyThresholdForMission = 0.5; // [m]
   float mYawAccuracyThresholdForMission = 5.0; // [deg]
-  bool mAutoLiftOffEnabled = false;
-  bool mAutoLiftOffActive = false;
-  double mAutoLiftOffHeight = 2.0;
+  bool mAutoClimbEnabled = false;
+  bool mAutoClimbActive = false;
+  double mAutoClimbHeight = 2.0;
 
   QSharedPointer<CopterState> mCopterState;
   QSharedPointer<EmergencyStopState> mEmergencyStopState;

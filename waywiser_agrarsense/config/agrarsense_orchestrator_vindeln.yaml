@@ -12,7 +12,7 @@
 
 agrarsense_orchestrator_node:
   ros__parameters:
-    sim_clock_timeout: 20.0
+    sim_clock_timeout: 120.0
     agrarsense_script_path: "~/workspaces/agrarsense_ws/Agrarsense.sh"
     sim_startup_time: 3.0
     render_off_screen: false

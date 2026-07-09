@@ -116,7 +116,7 @@
   gz_type_name: "gz.msgs.Pose_V"
   subscriber_queue: 5       # Default 10
   publisher_queue: 6        # Default 10
-  lazy: true                # Default "false"
+  lazy: false               # Default "false"
   direction: GZ_TO_ROS      # Default "BIDIRECTIONAL" - Bridge both directions
                             # "GZ_TO_ROS" - Bridge Ignition topic to ROS
                             # "ROS_TO_GZ" - Bridge ROS topic to Ignition

@@ -28,6 +28,7 @@ set(PYTHON_LIBRARIES ${Python3_LIBRARIES} CACHE FILEPATH "Legacy Python library 
 unset(_lib CACHE)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
@@ -340,6 +341,7 @@ set(CAR_DEPENDENCIES
   nav_msgs
   rclcpp
   std_msgs
+  std_srvs
   sensor_msgs
   tf2_geometry_msgs
   tf2_ros

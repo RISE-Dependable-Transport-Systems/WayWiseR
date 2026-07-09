@@ -78,6 +78,36 @@ def generate_launch_description():
         default_value='semitruck',
         description='Name of the vehicle',
     )
+    vehicle_control_enabled_la = DeclareLaunchArgument(
+        'vehicle_control_enabled',
+        default_value='True',
+        description='Enable Control Tower vehicle controls; set False for passive monitoring',
+    )
+    publish_control_tower_heartbeat_la = DeclareLaunchArgument(
+        'publish_control_tower_heartbeat',
+        default_value='True',
+        description='Publish the vehicle-scoped Control Tower heartbeat',
+    )
+    map_source_la = DeclareLaunchArgument(
+        'map_source',
+        default_value='OpenStreetMap',
+        description='Control Tower map source: OpenStreetMap, Local OSM server, or None',
+    )
+    osm_tile_server_url_la = DeclareLaunchArgument(
+        'osm_tile_server_url',
+        default_value='',
+        description='Control Tower OSM tile server URL',
+    )
+    osm_tile_cache_dir_la = DeclareLaunchArgument(
+        'osm_tile_cache_dir',
+        default_value='',
+        description='Control Tower OSM tile cache directory',
+    )
+    startup_route_file_la = DeclareLaunchArgument(
+        'startup_route_file',
+        default_value='',
+        description='Route file to load in Control Tower at startup',
+    )
 
     vehicle_name = LaunchConfiguration('vehicle_name')
     frame_prefix = [vehicle_name, '/']
@@ -288,6 +318,14 @@ def generate_launch_description():
                 '/',
                 LaunchConfiguration('control_vehicle_node_name'),
             ],
+            'vehicle_control_enabled': LaunchConfiguration('vehicle_control_enabled'),
+            'publish_control_tower_heartbeat': LaunchConfiguration(
+                'publish_control_tower_heartbeat'
+            ),
+            'map_source': LaunchConfiguration('map_source'),
+            'osm_tile_server_url': LaunchConfiguration('osm_tile_server_url'),
+            'osm_tile_cache_dir': LaunchConfiguration('osm_tile_cache_dir'),
+            'startup_route_file': LaunchConfiguration('startup_route_file'),
         }.items(),
     )
 
@@ -307,6 +345,12 @@ def generate_launch_description():
     ld.add_action(control_vehicle_node_name_la)
     ld.add_action(localization_node_name_la)
     ld.add_action(vehicle_name_la)
+    ld.add_action(vehicle_control_enabled_la)
+    ld.add_action(publish_control_tower_heartbeat_la)
+    ld.add_action(map_source_la)
+    ld.add_action(osm_tile_server_url_la)
+    ld.add_action(osm_tile_cache_dir_la)
+    ld.add_action(startup_route_file_la)
 
     # start nodes
     ld.add_action(carla_orchestrator)

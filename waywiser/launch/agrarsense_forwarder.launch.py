@@ -7,6 +7,7 @@ from launch.actions import (
     GroupAction,
     IncludeLaunchDescription,
     OpaqueFunction,
+    SetEnvironmentVariable,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
@@ -314,8 +315,8 @@ def generate_launch_description():
     ld.add_action(control_vehicle_node_name_la)
     ld.add_action(localization_node_name_la)
     ld.add_action(vehicle_name_la)
-
     # start nodes
+    ld.add_action(SetEnvironmentVariable('RMW_IMPLEMENTATION', 'rmw_fastrtps_cpp'))
     ld.add_action(agrarsense_orchestrator)
     ld.add_action(waywiser_agrarsense_relay)
     ld.add_action(waywiser_car_launch)

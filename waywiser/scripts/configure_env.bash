@@ -351,31 +351,39 @@ configure_env() {
         dds_default="zenoh"
     fi
 
+    local form_args=(
+        "WAYWISER_VENV_PATH (empty = use default)"            "$(cfg_get WAYWISER_VENV_PATH "")"
+        "DDS middleware (fastdds|zenoh)"                      "$dds_default"
+        "ROS_DOMAIN_ID (0-232)"                               "$(cfg_get ROS_DOMAIN_ID 0)"
+        "RCUTILS_LOGGING_USE_STDOUT (1/0)"                    "$(cfg_get RCUTILS_LOGGING_USE_STDOUT 1)"
+        "RCUTILS_LOGGING_BUFFERED_STREAM (1/0)"               "$(cfg_get RCUTILS_LOGGING_BUFFERED_STREAM 1)"
+        "PYTHONUNBUFFERED (1/0)"                              "$(cfg_get PYTHONUNBUFFERED 1)"
+        "RCUTILS_COLORIZED_OUTPUT (1/0)"                      "$(cfg_get RCUTILS_COLORIZED_OUTPUT 1)"
+        "FASTDDS_USE_DISCOVERY_SERVER (1/0)"                  "$(cfg_get FASTDDS_USE_DISCOVERY_SERVER 0)"
+        "FASTDDS_REMOTE_DISCOVERY_SERVER_IP"                  "$(cfg_get FASTDDS_REMOTE_DISCOVERY_SERVER_IP "")"
+        "FASTDDS_REMOTE_DISCOVERY_CLIENT_IP"                  "$(cfg_get FASTDDS_REMOTE_DISCOVERY_CLIENT_IP "")"
+        "FASTDDS_SUPER_CLIENT (1/0)"                          "$(cfg_get FASTDDS_SUPER_CLIENT 0)"
+        "ZENOH_USE_LOCAL_ROUTER (1/0)"                        "$(cfg_get ZENOH_USE_LOCAL_ROUTER 1)"
+        "ZENOH_REMOTE_ROUTER_IP"                              "$(cfg_get ZENOH_REMOTE_ROUTER_IP "")"
+        "ZENOH_REMOTE_ROUTER_PORT"                            "$(cfg_get ZENOH_REMOTE_ROUTER_PORT 7447)"
+        "ZENOH_ROUTER_CHECK_ATTEMPTS"                         "$(cfg_get ZENOH_ROUTER_CHECK_ATTEMPTS "-1")"
+        "ZENOH_SESSION_CONFIG_URI"                            "$(cfg_get ZENOH_SESSION_CONFIG_URI "")"
+        "ZENOH_CONFIG_OVERRIDE"                               "$(cfg_get ZENOH_CONFIG_OVERRIDE "")"
+        "EMAIL_USER"                                          "$(cfg_get EMAIL_USER "")"
+        "EMAIL_PASSWORD"                                      "$(env_get EMAIL_PASSWORD)"
+        "EMAIL_RECIPIENT"                                     "$(cfg_get EMAIL_RECIPIENT "")"
+        "SMTP_SERVER"                                         "$(cfg_get SMTP_SERVER smtp.gmail.com)"
+        "SMTP_PORT"                                           "$(cfg_get SMTP_PORT 465)"
+    )
+
+    if [[ " $new_skipped " != *" waywiser_carla "* ]]; then
+        form_args+=( "WAYWISER_CUSTOM_CARLA_ROOT" "$(cfg_get WAYWISER_CUSTOM_CARLA_ROOT "")" )
+    fi
+
     local cfg_vals=()
     wt_form cfg_vals "WayWiseR Runtime Configuration" \
         "Edit settings. Booleans use 1=yes, 0=no. DDS middleware options: fastdds or zenoh." \
-        "WAYWISER_VENV_PATH (empty = use default)"            "$(cfg_get WAYWISER_VENV_PATH "")" \
-        "DDS middleware (fastdds|zenoh)"         "$dds_default" \
-        "ROS_DOMAIN_ID (0-232)"                  "$(cfg_get ROS_DOMAIN_ID 0)" \
-        "RCUTILS_LOGGING_USE_STDOUT (1/0)"                    "$(cfg_get RCUTILS_LOGGING_USE_STDOUT 1)" \
-        "RCUTILS_LOGGING_BUFFERED_STREAM (1/0)"               "$(cfg_get RCUTILS_LOGGING_BUFFERED_STREAM 1)" \
-        "PYTHONUNBUFFERED (1/0)"                              "$(cfg_get PYTHONUNBUFFERED 1)" \
-        "RCUTILS_COLORIZED_OUTPUT (1/0)"                      "$(cfg_get RCUTILS_COLORIZED_OUTPUT 1)" \
-        "FASTDDS_USE_DISCOVERY_SERVER (1/0)"                  "$(cfg_get FASTDDS_USE_DISCOVERY_SERVER 0)" \
-        "FASTDDS_REMOTE_DISCOVERY_SERVER_IP"                  "$(cfg_get FASTDDS_REMOTE_DISCOVERY_SERVER_IP "")" \
-        "FASTDDS_REMOTE_DISCOVERY_CLIENT_IP"                  "$(cfg_get FASTDDS_REMOTE_DISCOVERY_CLIENT_IP "")" \
-        "FASTDDS_SUPER_CLIENT (1/0)"                          "$(cfg_get FASTDDS_SUPER_CLIENT 0)" \
-        "ZENOH_USE_LOCAL_ROUTER (1/0)"                        "$(cfg_get ZENOH_USE_LOCAL_ROUTER 1)" \
-        "ZENOH_REMOTE_ROUTER_IP"                              "$(cfg_get ZENOH_REMOTE_ROUTER_IP "")" \
-        "ZENOH_REMOTE_ROUTER_PORT"                            "$(cfg_get ZENOH_REMOTE_ROUTER_PORT 7447)" \
-        "ZENOH_ROUTER_CHECK_ATTEMPTS"                         "$(cfg_get ZENOH_ROUTER_CHECK_ATTEMPTS "-1")" \
-        "ZENOH_SESSION_CONFIG_URI"                            "$(cfg_get ZENOH_SESSION_CONFIG_URI "")" \
-        "ZENOH_CONFIG_OVERRIDE"                               "$(cfg_get ZENOH_CONFIG_OVERRIDE "")" \
-        "EMAIL_USER"                                          "$(cfg_get EMAIL_USER "")" \
-        "EMAIL_PASSWORD"                                      "$(env_get EMAIL_PASSWORD)" \
-        "EMAIL_RECIPIENT"                                     "$(cfg_get EMAIL_RECIPIENT "")" \
-        "SMTP_SERVER"                                         "$(cfg_get SMTP_SERVER smtp.gmail.com)" \
-        "SMTP_PORT"                                           "$(cfg_get SMTP_PORT 465)" \
+        "${form_args[@]}" \
         || return 1
 
     local new_rmw
@@ -416,6 +424,10 @@ configure_env() {
     env_set EMAIL_RECIPIENT                     "${cfg_vals[19]}"
     env_set SMTP_SERVER                         "${cfg_vals[20]}"
     env_set SMTP_PORT                           "${cfg_vals[21]}"
+
+    if [[ " $new_skipped " != *" waywiser_carla "* ]]; then
+        env_set WAYWISER_CUSTOM_CARLA_ROOT      "${cfg_vals[22]}"
+    fi
 
     echo
     info "Saved to $ENV_FILE"

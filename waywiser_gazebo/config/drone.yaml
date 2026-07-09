@@ -4,7 +4,7 @@
   #   this is useful when running multiple vehicles in the same simulation with same configuration
   # - namespace is used to prefix all topic names with a common prefix
   ros__parameters:
-    frame_prefix: "/"
+    frame_prefix: ""
     odom_frame: odom
     base_frame: base_link
     world_frame: map
@@ -53,7 +53,6 @@ waywiser_drone_node:
     quadcopter_state_topic: "quadcopter_state"
     range_topic: "sensors/range/down"
     battery_state_topic: ""
-    arm_command_topic: "arm_command"
     fused_nav_sat_fix_extended_topic: "sensors/gnss/fused_nav_sat_fix_extended"
     emergency_stop_status_topic: "emergency_stop/current_state"
     emergency_stop_update_topic: "emergency_stop/target_state"
@@ -68,8 +67,11 @@ waywiser_drone_node:
     autopilot_timer_rate: 10
     mission_position_type: "odom"
     require_gnss_for_mission: false
-    mission_waypoint_proximity: 0.5
-    mission_end_goal_alignment_threshold: 0.25
+    mission_waypoint_proximity_xy: 0.25
+    mission_waypoint_proximity_z: 0.5
+    mission_end_goal_alignment_threshold_xy: 0.25
+    mission_end_goal_alignment_threshold_z: 0.5
+    mission_stop_speed_threshold: 0.2
     mission_cruise_speed: 3.0
     mission_max_speed: 2.0
     mission_min_approach_speed: 0.1
@@ -86,13 +88,13 @@ waywiser_drone_node:
     command_timeout: 0.5
     mission_state_timeout: 1.0
     return_home_on_control_tower_timeout: true
-    configure_px4_home_on_lift_off: true
+    configure_px4_home_on_climb: true
     publish_px4_aux_global_position: true
     px4_aux_global_position_eph: 0.05
     px4_aux_global_position_epv: 0.05
     return_home_height: 10.0 # m above home for WayWiseR return-home cruise altitude
     auto_landing_descent_velocity: 0.3 # m/s WayWiseR auto_landing descent speed
-    # Optional: set both to override the default return-home XY captured at lift-off.
+    # Optional: set both to override the default return-home XY captured at climb.
     # return_home_x: 0.0
     # return_home_y: 0.0
     control_tower_heartbeat_topic: control_tower_heartbeat
@@ -100,9 +102,12 @@ waywiser_drone_node:
     return_home_command_retry_period: 2.0
     setpoint_rate: 20.0
     request_retry_period: 1.0
-    auto_arm: true
+    feature_auto_arm_enabled: true
+    feature_auto_land_enabled: true
+    feature_auto_climb_enabled: true
+    feature_hover_hold_enabled: true
     require_local_position_before_arm: false
-    auto_lift_off_height: 2.0 # m target height for standalone waypoint-follower lift-off
+    auto_climb_height: 2.0 # m target height for standalone waypoint-follower climb
 
 emergency_stop_monitor:
   ros__parameters:

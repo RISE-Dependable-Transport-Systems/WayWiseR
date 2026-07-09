@@ -37,7 +37,8 @@ class CollisionMonitorNode(Node):
         self.declare_parameter('class_ids_to_stop', [str()])  # Class IDs published as strings
         self.declare_parameter('tf_timeout_sec', 0.5)
         self.declare_parameter('reference_frame', 'base_link')
-        self.declare_parameter('use_sim_time', False)
+        if not self.has_parameter('use_sim_time'):
+            self.declare_parameter('use_sim_time', False)
 
         # Retrieve parameters
         self.distance_threshold = (

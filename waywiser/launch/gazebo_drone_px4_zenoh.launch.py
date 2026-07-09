@@ -229,6 +229,11 @@ def generate_launch_description():
         default_value=os.path.join(waywiser_gazebo_dir, 'config/gazebo_orchestrator.yaml'),
         description='Full path to Gazebo orchestrator config file',
     )
+    spectator_track_entity_la = DeclareLaunchArgument(
+        'spectator_track_entity',
+        default_value='drone',
+        description='Entity name for the Gazebo spectator view to track',
+    )
     drone_name = LaunchConfiguration('drone_name')
     frame_prefix = [drone_name, '/']
 
@@ -459,6 +464,7 @@ def generate_launch_description():
     ld.add_action(px4_start_delay_la)
     ld.add_action(launch_gazebo_orchestrator_la)
     ld.add_action(gazebo_orchestrator_config_la)
+    ld.add_action(spectator_track_entity_la)
     ld.add_action(RegisterEventHandler(OnProcessExit(on_exit=shutdown_on_process_error)))
 
     # start nodes
@@ -679,6 +685,7 @@ def px4_sitl_launch(context):
             'spawn_backend': 'gz_service',
             'start_gazebo_bridge': 'False',
             'gz_service_suppress_output': 'True',
+            'spectator_track_entity': LaunchConfiguration('spectator_track_entity'),
         }.items(),
     )
 
@@ -935,14 +942,14 @@ def drone_waypoint_follower_launch(context):
     parameter_overrides = {
         'enable_autopilot_component': True,
         'enable_px4_bridge': False,
-        'auto_arm': False,
-        'auto_lift_off': False,
+        'feature_auto_arm_enabled': False,
+        'feature_auto_climb_enabled': True,
         'input_odom_topic': 'odometry',
         'odom_topic': '',
         'vehicle_pose_topic': '',
         'quadcopter_state_topic': '',
+        'observed_quadcopter_state_topic': 'quadcopter_state',
         'battery_state_topic': '',
-        'arm_command_topic': '',
         'emergency_stop_update_topic': '',
         'control_tower_heartbeat_rx_state_topic': '',
         'joint_states_topic': '',

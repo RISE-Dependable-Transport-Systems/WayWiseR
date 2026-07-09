@@ -4,7 +4,7 @@
   #   this is useful when running multiple vehicles in the same simulation with same configuration
   # - namespace is used to prefix all topic names with a common prefix
   ros__parameters:
-    frame_prefix: "/"
+    frame_prefix: ""
     odom_frame: odom
     base_frame: base_link
     world_frame: map

@@ -42,13 +42,14 @@ with suppress_stderr():
     from rosgraph_msgs.msg import Clock
     from sensor_msgs.msg import JointState, Joy
     from std_msgs.msg import Bool, Header, String
+    from std_srvs.srv import SetBool
     import tf2_ros
     from tf_transformations import euler_from_quaternion
     from visualization_msgs.msg import MarkerArray
 
 try:
     with suppress_stderr():
-        from PyQt5.QtCore import QEvent, QPoint, Qt, QTimer, QUrl
+        from PyQt5.QtCore import QEvent, QPoint, QSettings, Qt, QTimer, QUrl
         from PyQt5.QtGui import QKeySequence
         from PyQt5.QtMultimedia import QAudio, QAudioDeviceInfo, QSoundEffect
         from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
@@ -264,7 +265,6 @@ class ControlTowerNode(Node):
         self.odom_topic = ''
         self.vehicle_pose_topic = ''
         self.battery_state_topic = ''
-        self.arm_command_topic = ''
         self.quadcopter_state_topic = ''
         self.mission_status_topic = ''
         self.control_tower_heartbeat_rx_state_topic = ''
@@ -294,7 +294,6 @@ class ControlTowerNode(Node):
         self.joint_states_subscriber = None
         self.marker_subscribers = []
         self.emergency_stop_request_publisher = None
-        self.arm_command_publisher = None
         self.mux_publisher = None
         self.route_publisher = None
         self.autopilot_state_control_publisher = None
@@ -419,10 +418,9 @@ class ControlTowerNode(Node):
         self.current_twist = Twist()
 
         # Auto arm state
-        self.auto_arm_enabled = True
-        self.hold_position_on_idle_enabled = True
-        self.auto_lift_off_enabled = True
-        self.auto_lift_off_active = False
+        self.feature_auto_arm_enabled = True
+        self.feature_auto_climb_enabled = True
+        self.auto_climb_active = False
         self.arm_request_debounce_period = 1.0
         self.last_arm_request = {'arm': None, 'time': 0.0}
 
@@ -430,6 +428,7 @@ class ControlTowerNode(Node):
         self.keys_pressed = set()
         self.is_actuation_requested = False
         self.auto_landing_active = False
+        self.return_home_active = False
 
         # RTCM correction age mapping
         self.rtcm_correction_age_mapping = {
@@ -500,7 +499,7 @@ class ControlTowerNode(Node):
         self.last_nav_sat_fix_extended = {'msg': None, 'stamp': now}
         self.current_twist = Twist()
         self.auto_landing_active = False
-        self.auto_lift_off_active = False
+        self.auto_climb_active = False
         self.vehicle_status_reset_pending = True
         self.vehicle_status_cleared = True
         self.vehicle_status_reset_generation += 1
@@ -566,6 +565,11 @@ class ControlTowerNode(Node):
             self.destroy_client(client)
             return
 
+        # Request the 13 core parameters that all vehicle node types declare.
+        # 'home_pose_topic' is intentionally NOT included here: car/truck nodes do not declare
+        # it, so including an undeclared parameter in a GetParameters batch causes ROS 2 to
+        # return 0 values for the entire request, breaking vehicle connection entirely.
+        # It is requested separately below with a graceful fallback.
         request = GetParameters.Request()
         request.names = [
             'odom_topic',
@@ -581,7 +585,6 @@ class ControlTowerNode(Node):
             'mission_status_topic',
             'control_tower_heartbeat_rx_state_topic',
             'control_tower_heartbeat_timeout',
-            'home_pose_topic',
         ]
 
         future = client.call_async(request)
@@ -632,36 +635,45 @@ class ControlTowerNode(Node):
                     )
                 if len(vals) >= 13 and vals[12].type == ParameterType.PARAMETER_DOUBLE:
                     self.control_tower_heartbeat_timeout = vals[12].double_value
-                self.home_pose_topic = self._prefix_with_vehicle_namespace(
-                    vals[13].string_value
-                    if len(vals) >= 14 and vals[13].string_value
-                    else 'home_pose'
-                )
+
+                # 'home_pose_topic' is optional — car/truck nodes don't declare it.
+                # Request it separately so a missing declaration doesn't break the batch above.
+                hp_request = GetParameters.Request()
+                hp_request.names = ['home_pose_topic']
+                hp_future = client.call_async(hp_request)
+                rclpy.spin_until_future_complete(self, hp_future, timeout_sec=2.0)
+                if (
+                    hp_future.result() is not None
+                    and hp_future.result().values
+                    and hp_future.result().values[0].string_value
+                ):
+                    self.home_pose_topic = self._prefix_with_vehicle_namespace(
+                        hp_future.result().values[0].string_value
+                    )
+                else:
+                    # Node does not expose home_pose_topic (e.g. car/truck node) — use default
+                    self.home_pose_topic = self._prefix_with_vehicle_namespace('home_pose')
                 if self.waywise_object_type == 'quadcopter':
                     qc_request = GetParameters.Request()
                     qc_request.names = [
-                        'arm_command_topic',
                         'quadcopter_state_topic',
-                        'auto_lift_off_enabled',
+                        'feature_auto_climb_enabled',
                     ]
                     qc_future = client.call_async(qc_request)
                     rclpy.spin_until_future_complete(self, qc_future, timeout_sec=5.0)
 
                     if qc_future.result() is not None:
                         qc_vals = qc_future.result().values
-                        if len(qc_vals) >= 3:
-                            self.arm_command_topic = self._prefix_with_vehicle_namespace(
-                                qc_vals[0].string_value or self.arm_command_topic
-                            )
+                        if len(qc_vals) >= 2:
                             self.quadcopter_state_topic = self._prefix_with_vehicle_namespace(
-                                qc_vals[1].string_value or self.quadcopter_state_topic
+                                qc_vals[0].string_value or self.quadcopter_state_topic
                             )
-                            if qc_vals[2].type == ParameterType.PARAMETER_BOOL:
-                                self.auto_lift_off_enabled = qc_vals[2].bool_value
+                            if qc_vals[1].type == ParameterType.PARAMETER_BOOL:
+                                self.feature_auto_climb_enabled = qc_vals[1].bool_value
                         else:
                             self.get_logger().warn(
                                 f'Received {len(qc_vals)} quadcopter params instead of '
-                                f"at least 3 from '{self.control_vehicle_node_fqn}'"
+                                f"at least 2 from '{self.control_vehicle_node_fqn}'"
                             )
 
                 # Create subscribers
@@ -677,7 +689,6 @@ class ControlTowerNode(Node):
                 )
 
                 # We don't reset the joy_watchdog_timer here; we wait for the first /joy message
-                self.set_hover_hold_enabled(self.hold_position_on_idle_enabled)
 
             else:
                 self.get_logger().warn(
@@ -727,62 +738,104 @@ class ControlTowerNode(Node):
         rclpy.spin_until_future_complete(self, future, timeout_sec=2.0)
         self.destroy_client(client)
 
-    def set_hover_hold_enabled(self, enabled):
-        """Update hover hold behavior on the vehicle node."""
-        self.hold_position_on_idle_enabled = bool(enabled)
+    def _call_vehicle_boolean_service(
+        self,
+        service_name_suffix,
+        value,
+        include_waypoint_follower=True,
+        include_vehicle_node=True,
+    ):
+        """Call a SetBool service on the remote vehicle node(s)."""
+        if not self.control_vehicle_node_fqn:
+            return False
 
+        target_fqns = [self.control_vehicle_node_fqn] if include_vehicle_node else []
+        # Also target the waypoint follower if it exists
+        if include_waypoint_follower and self.waywise_object_type == 'quadcopter':
+            wp_follower_fqn = self.control_vehicle_node_fqn.replace('_node', '_waypoint_follower')
+            if wp_follower_fqn != self.control_vehicle_node_fqn:
+                target_fqns.append(wp_follower_fqn)
+
+        any_success = False
+        for fqn in target_fqns:
+            service_name = f'/{fqn}/{service_name_suffix}'.replace('//', '/')
+            client = self.create_client(SetBool, service_name)
+            if not client.wait_for_service(timeout_sec=0.5):
+                self.get_logger().warn(f"Service '{service_name}' not available")
+                self.destroy_client(client)
+                continue
+
+            request = SetBool.Request()
+            request.data = bool(value)
+
+            future = client.call_async(request)
+            rclpy.spin_until_future_complete(self, future, timeout_sec=2.0)
+            if future.done():
+                try:
+                    response = future.result()
+                    if response.success:
+                        any_success = True
+                    elif response.message:
+                        self.get_logger().warn(
+                            f"Service '{service_name}' rejected request: {response.message}"
+                        )
+                except Exception as exc:
+                    self.get_logger().warn(
+                        f"Service '{service_name}' call failed: {exc}"
+                    )
+            else:
+                self.get_logger().warn(f"Service '{service_name}' call timed out")
+            self.destroy_client(client)
+
+        return any_success
+
+    def start_auto_climb(self):
+        """Request automatic climb from the vehicle node."""
         if self.waywise_object_type != 'quadcopter':
+            self.get_logger().warn('Auto climb is only available for quadcopters.')
             return
-
-        self.set_remote_node_parameter(
-            self.control_vehicle_node_fqn,
-            'hold_position_on_idle',
-            self.hold_position_on_idle_enabled,
-        )
-
-    def set_auto_lift_off_enabled(self, enabled):
-        """Update auto lift-off availability on the vehicle node."""
-        self.auto_lift_off_enabled = bool(enabled)
-        if not self.auto_lift_off_enabled and self.auto_lift_off_active:
-            self.auto_lift_off_active = False
-        self.set_remote_node_parameter(
-            self.control_vehicle_node_fqn,
-            'auto_lift_off_enabled',
-            self.auto_lift_off_enabled,
-        )
-        if not self.auto_lift_off_enabled:
-            self.set_remote_node_parameter(self.control_vehicle_node_fqn, 'auto_lift_off', False)
-
-    def start_auto_lift_off(self):
-        """Request automatic lift-off from the vehicle node."""
-        if self.waywise_object_type != 'quadcopter':
-            self.get_logger().warn('Auto lift-off is only available for quadcopters.')
-            return
-        if not self.auto_lift_off_enabled:
+        if not self.feature_auto_climb_enabled:
             self.get_logger().warn(
-                'Auto lift-off is disabled. Enable the Auto lift off option first.'
+                'Auto climb is disabled. Enable the Auto climb option first.'
             )
             return
 
+        # Disable landing on the main node FIRST so its quadcopter_state_callback
+        # no longer sees the LANDING state and won't clear the follower's climb route.
+        # We only need to disable on the main node here; the follower's handle_auto_climb_request
+        # already clears auto_landing_active_ internally when the climb is accepted.
         if self.auto_landing_active:
-            self.set_auto_landing_active(False)
+            self._call_vehicle_boolean_service(
+                'auto_landing', False,
+                include_waypoint_follower=False,
+                include_vehicle_node=True,
+            )
 
-        self.auto_lift_off_active = True
-        self.set_remote_node_parameter(self.control_vehicle_node_fqn, 'auto_lift_off', True)
-        self.get_logger().info('Auto lift-off requested.')
-
-    def set_auto_arm_enabled(self, enabled):
-        """Update auto arm behavior on the vehicle node."""
-        self.auto_arm_enabled = bool(enabled)
-        self.set_remote_node_parameter(
-            self.control_vehicle_node_fqn, 'auto_arm', self.auto_arm_enabled
+        climb_accepted = self._call_vehicle_boolean_service(
+            'auto_climb',
+            True,
+            include_waypoint_follower=True,
+            include_vehicle_node=False,
         )
+        if climb_accepted:
+            self.auto_landing_active = False
+            self.auto_climb_active = True
+        else:
+            self.get_logger().warn('Auto climb request was not accepted.')
+        self.get_logger().info('Auto climb requested.')
 
     def set_auto_landing_active(self, active):
         """Update auto landing behavior on the vehicle node."""
         self.auto_landing_active = bool(active)
-        self.set_remote_node_parameter(
-            self.control_vehicle_node_fqn, 'auto_landing', self.auto_landing_active
+        self._call_vehicle_boolean_service(
+            'auto_landing', self.auto_landing_active, include_waypoint_follower=True
+        )
+
+    def set_return_home_active(self, active: bool):
+        """Set manual return to home behavior on the vehicle node."""
+        self.return_home_active = active
+        self._call_vehicle_boolean_service(
+            'return_home', self.return_home_active, include_waypoint_follower=False
         )
 
     def _create_subscribers(self):
@@ -921,14 +974,6 @@ class ControlTowerNode(Node):
                 RELIABLE_TRANSIENT_LOCAL_QOS,
             )
 
-        if self.arm_command_topic:
-            if self.arm_command_publisher:
-                self.destroy_publisher(self.arm_command_publisher)
-            self.arm_command_publisher = self.create_publisher(Bool, self.arm_command_topic, 10)
-        elif self.arm_command_publisher:
-            self.destroy_publisher(self.arm_command_publisher)
-            self.arm_command_publisher = None
-
         if self.mux_output_topic:
             if self.mux_publisher:
                 self.destroy_publisher(self.mux_publisher)
@@ -995,6 +1040,10 @@ class ControlTowerNode(Node):
                 'Ignoring mission request: vehicle reports Control Tower heartbeat timeout.'
             )
             return False
+
+        if self.return_home_active:
+            self.get_logger().info('Mission requested during RTH. Cancelling RTH.')
+            self.set_return_home_active(False)
 
         if self.route_publisher is None or self.autopilot_state_control_publisher is None:
             self._create_publishers()
@@ -1142,7 +1191,7 @@ class ControlTowerNode(Node):
 
         # Sync auto landing state from vehicle node
         self.auto_landing_active = msg.state_code == QuadcopterState.LANDING
-        self.auto_lift_off_active = msg.state_code == QuadcopterState.AUTO_LIFTING_OFF
+        self.auto_climb_active = msg.state_code == QuadcopterState.CLIMBING
 
     def mission_status_callback(self, msg):
         """Handle mission state updates."""
@@ -1432,10 +1481,6 @@ class ControlTowerNode(Node):
                 self.get_logger().warn('Ignoring disarm request: vehicle is still in flight.')
                 return
 
-        if self.arm_command_publisher is None:
-            self.get_logger().warn('Arm/disarm command topic is not available for this vehicle.')
-            return
-
         now_monotonic = time.monotonic()
         if (
             self.last_arm_request['arm'] == bool(arm)
@@ -1443,9 +1488,9 @@ class ControlTowerNode(Node):
         ):
             return
 
-        msg = Bool()
-        msg.data = bool(arm)
-        self.arm_command_publisher.publish(msg)
+        self._call_vehicle_boolean_service(
+            'arm', bool(arm), include_waypoint_follower=False
+        )
         self.last_arm_request = {'arm': bool(arm), 'time': now_monotonic}
         if arm:
             self.get_logger().info('Requested arm through waywiser_copter_node.')
@@ -1745,6 +1790,12 @@ class ControlTowerUI(QMainWindow):
         # Auto-connect only when launch/config provided an explicit vehicle node name.
         if self.node.control_vehicle_node_fqn.strip():
             QTimer.singleShot(100, lambda: self.show_vehicle_node_dialog(auto_connect=True))
+
+        # Restore window geometry
+        self.settings = QSettings('WayWiseR', 'ControlTower')
+        geometry = self.settings.value('geometry')
+        if geometry:
+            self.restoreGeometry(geometry)
 
     def setup_mission_planner_shell(self):
         """Mount the mission planner next to the existing twist control panel."""
@@ -2587,9 +2638,6 @@ class ControlTowerUI(QMainWindow):
         self.fit_right_panel_button.toggled.connect(self.on_fit_right_panel_toggled)
         self.fit_right_panel_button.setChecked(True)
         self.mission_planner.send_mission_requested.connect(self.on_send_mission_requested)
-        self.auto_arm_checkbox.stateChanged.connect(self.on_auto_arm_changed)
-        self.hover_hold_checkbox.stateChanged.connect(self.on_hover_hold_changed)
-        self.auto_lift_off_checkbox.stateChanged.connect(self.on_auto_lift_off_changed)
 
     def on_mission_planner_toggled(self, checked):
         """Enable or disable waypoint editing on the map."""
@@ -2607,24 +2655,6 @@ class ControlTowerUI(QMainWindow):
         """Send the mission shown in the map to the selected vehicle."""
         if self.node.publish_mission(points, altitude, speed):
             self.mission_planner_button.setChecked(False)
-
-    def on_auto_arm_changed(self, state):
-        """Handle auto arm checkbox state change."""
-        self.node.set_auto_arm_enabled(state == Qt.Checked)
-
-    def on_hover_hold_changed(self, state):
-        """Handle hover hold checkbox state change."""
-        self.node.set_hover_hold_enabled(state == Qt.Checked)
-
-    def on_auto_lift_off_changed(self, state):
-        """Handle auto lift-off checkbox state change."""
-        self.node.set_auto_lift_off_enabled(state == Qt.Checked)
-
-    def sync_control_options_from_node(self):
-        """Update control option widgets from the node without writing parameters back."""
-        self.auto_lift_off_checkbox.blockSignals(True)
-        self.auto_lift_off_checkbox.setChecked(self.node.auto_lift_off_enabled)
-        self.auto_lift_off_checkbox.blockSignals(False)
 
     def setup_audio(self):
         """Set up audio for low battery warning beep."""
@@ -2726,7 +2756,6 @@ class ControlTowerUI(QMainWindow):
                 )
                 self.node._init_mux_sources()
                 self.node.request_params_from_vehicle_node()
-                self.sync_control_options_from_node()
                 self.update_ui_for_vehicle_type()
                 self.update_control_group_state()
                 self._schedule_panel_fit()
@@ -2778,14 +2807,6 @@ class ControlTowerUI(QMainWindow):
     def update_ui_for_vehicle_type(self):
         """Update UI elements based on the waywise_object_type."""
         self.mission_planner.set_vehicle_type(self.node.waywise_object_type)
-        if self.node.waywise_object_type == 'quadcopter':
-            self.auto_arm_status_box.show()
-            self.hover_hold_status_box.show()
-            self.auto_lift_off_status_box.show()
-        else:
-            self.auto_arm_status_box.hide()
-            self.hover_hold_status_box.hide()
-            self.auto_lift_off_status_box.hide()
 
     def keyPressEvent(self, event):
         """Handle key press events."""
@@ -2823,21 +2844,35 @@ class ControlTowerUI(QMainWindow):
             self.node.update_speed(linear_delta=-self.node.linear_speed_increment)
         elif key == Qt.Key.Key_O:
             self.node.update_speed(angular_delta=self.node.angular_speed_increment)
+        elif key == Qt.Key.Key_C and modifiers & Qt.KeyboardModifier.ControlModifier:
+            if self.node.waywise_object_type == 'quadcopter':
+                self.node.start_auto_climb()
+            else:
+                self.node.get_logger().warn('Auto climb is only available for quadcopters.')
         elif key == Qt.Key.Key_L:
             if modifiers & Qt.KeyboardModifier.ControlModifier:
                 if self.node.waywise_object_type == 'quadcopter':
-                    if modifiers & Qt.KeyboardModifier.ShiftModifier:
-                        self.node.set_auto_landing_active(not self.node.auto_landing_active)
-                        state_str = 'ENABLED' if self.node.auto_landing_active else 'DISABLED'
-                        self.node.get_logger().info(f'Auto landing {state_str}')
-                    else:
-                        self.node.start_auto_lift_off()
+                    requested_auto_landing = not self.node.auto_landing_active
+                    self.node.set_auto_landing_active(requested_auto_landing)
+                    state_str = 'ENABLED' if requested_auto_landing else 'DISABLED'
+                    self.node.get_logger().info(f'Auto landing {state_str}')
                 else:
-                    self.node.get_logger().warn(
-                        'Auto lift-off/landing is only available for quadcopters.'
-                    )
+                    self.node.get_logger().warn('Auto landing is only available for quadcopters.')
             else:
                 self.node.update_speed(angular_delta=-self.node.angular_speed_increment)
+        elif key == Qt.Key.Key_H:
+            if modifiers & Qt.KeyboardModifier.ControlModifier:
+                if self.node.waywise_object_type == 'quadcopter':
+                    if modifiers & Qt.KeyboardModifier.ShiftModifier:
+                        self.node.set_return_home_active(False)
+                        self.node.get_logger().info('Manual return to home CANCELLED')
+                    else:
+                        self.node.set_return_home_active(True)
+                        self.node.get_logger().info('Manual return to home REQUESTED')
+                else:
+                    self.node.get_logger().warn(
+                        'Return to home is only available for quadcopters.'
+                    )
 
         # Handle quadcopter arm/disarm
         if (
@@ -3130,23 +3165,18 @@ class ControlTowerUI(QMainWindow):
         if rx_msg is None:
             state_text = 'UNKNOWN'
             color = self.gray_color
-            tooltip = 'No vehicle heartbeat receive state has been received.'
         elif rx_msg.state == HeartbeatRxState.TIMEOUT:
             state_text = 'TIMEOUT'
             color = self.red_color
-            tooltip = 'Vehicle has timed out receiving Control Tower heartbeat.'
         elif rx_msg.state == HeartbeatRxState.NO_HEARTBEAT:
             state_text = 'NO HEARTBEAT'
             color = self.gray_color
-            tooltip = 'Vehicle has not received a Control Tower heartbeat yet.'
         elif rx_msg.state == HeartbeatRxState.ACTIVE:
             state_text = 'ACTIVE'
             color = self.green_color
-            tooltip = 'Vehicle is receiving Control Tower heartbeat normally.'
         else:
             state_text = 'UNKNOWN'
             color = self.yellow_color
-            tooltip = 'Vehicle reported an unknown heartbeat receive state.'
 
         if rx_msg is not None:
             report_stamp = self.node.last_control_tower_heartbeat_rx_state['stamp']
@@ -3165,14 +3195,8 @@ class ControlTowerUI(QMainWindow):
 
         self.heartbeat_rx_label.setText(state_text)
         self.heartbeat_rx_label.setStyleSheet(f'color: {color}; font-weight: 700;')
-        self.heartbeat_rx_label.setToolTip(
-            f'{tooltip} Age is measured from the heartbeat generation timestamp and '
-            'extrapolated between vehicle state updates. '
-            f'Vehicle timeout: {self.node.control_tower_heartbeat_timeout:.2f}s.'
-        )
         self.heartbeat_rx_time_label.setText(time_text)
         self.heartbeat_rx_time_label.setStyleSheet(f'color: {time_color}; font-size: 9pt;')
-        self.heartbeat_rx_time_label.setToolTip(tooltip)
 
     def _set_indicator_light(self, widget, is_on):
         """Set a status light to green, red, or gray."""
@@ -3224,9 +3248,8 @@ class ControlTowerUI(QMainWindow):
             elif state_code in [
                 QuadcopterState.ARMING,
                 QuadcopterState.LANDING,
-                QuadcopterState.LIFTING_OFF,
-                QuadcopterState.AUTO_LIFTING_OFF,
-                getattr(QuadcopterState, 'RETURNING_HOME', 13),
+                QuadcopterState.CLIMBING,
+                getattr(QuadcopterState, 'RETURNING_HOME', 11),
             ]:
                 color = '#EFA90B'
             else:
@@ -3236,13 +3259,13 @@ class ControlTowerUI(QMainWindow):
         if self.node.auto_landing_active:
             self.warning_label.setText('AUTO LANDING ACTIVE - MANUAL INPUT TO CANCEL')
             self.warning_label.show()
-        elif self.node.auto_lift_off_active:
-            self.warning_label.setText('AUTO LIFT-OFF ACTIVE - MANUAL INPUT TO CANCEL')
+        elif self.node.auto_climb_active:
+            self.warning_label.setText('AUTO CLIMB ACTIVE - MANUAL INPUT TO CANCEL')
             self.warning_label.show()
         elif self.warning_label.text() == 'AUTO LANDING ACTIVE - MANUAL INPUT TO CANCEL':
             self.warning_label.hide()
             self.warning_label.setText('')
-        elif self.warning_label.text() == 'AUTO LIFT-OFF ACTIVE - MANUAL INPUT TO CANCEL':
+        elif self.warning_label.text() == 'AUTO CLIMB ACTIVE - MANUAL INPUT TO CANCEL':
             self.warning_label.hide()
             self.warning_label.setText('')
 
@@ -3254,13 +3277,14 @@ class ControlTowerUI(QMainWindow):
         MissionState.WAITING_FOR_GNSS_ACCURACY: ('Waiting for GNSS', '#fbbf24'),
         MissionState.WAITING_FOR_HEARTBEAT: ('Waiting for heartbeat', '#fbbf24'),
         MissionState.FOLLOW_ROUTE_INIT: ('Route: Init', None),
-        MissionState.FOLLOW_ROUTE_LIFT_OFF: ('Route: Lift off', None),
+        MissionState.FOLLOW_ROUTE_CLIMB: ('Route: Climb', None),
         MissionState.FOLLOW_ROUTE_GOTO_BEGIN: ('Route: Go to start', None),
         MissionState.FOLLOW_ROUTE_FOLLOWING: ('Following route', None),
         MissionState.FOLLOW_ROUTE_APPROACHING_END_GOAL: ('Route: Approaching end', None),
+        MissionState.FOLLOW_ROUTE_APPROACHING_END_GOAL_Z: ('Route: Approaching end Z', None),
         MissionState.FOLLOW_ROUTE_FINISHED: ('Route: Finished', None),
         MissionState.RETURN_HOME_INIT: ('RTH: Init', '#EFA90B'),
-        MissionState.RETURN_HOME_LIFT_OFF: ('RTH: Lift off', '#EFA90B'),
+        MissionState.RETURN_HOME_CLIMB: ('RTH: Climb', '#EFA90B'),
         MissionState.RETURN_HOME_CRUISING: ('RTH: Cruising', '#EFA90B'),
         MissionState.RETURN_HOME_LANDING: ('RTH: Landing', '#EFA90B'),
     }
@@ -3671,6 +3695,9 @@ class ControlTowerUI(QMainWindow):
 
     def closeEvent(self, event):
         """Handle window close event."""
+        # Save window geometry
+        self.settings.setValue('geometry', self.saveGeometry())
+
         # Stop all timers
         self.ros_timer.stop()
         self.publish_timer.stop()
@@ -3754,7 +3781,7 @@ def main():
     timer.timeout.connect(lambda: None)
     timer.start(100)
 
-    gui.showMaximized()
+    gui.show()
 
     exit_code = app.exec()
 

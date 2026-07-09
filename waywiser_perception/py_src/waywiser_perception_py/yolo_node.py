@@ -140,9 +140,9 @@ class YoloNode(Node):
             tracker_config = IterableSimpleNamespace(**YAML.load(tracker_config_filepath))
 
             if tracker_config.tracker_type == 'bytetrack':
-                self.tracker = BYTETracker(args=tracker_config, frame_rate=1)
+                self.tracker = BYTETracker(args=tracker_config)
             elif tracker_config.tracker_type == 'botsort':
-                self.tracker = BOTSORT(args=tracker_config, frame_rate=1)
+                self.tracker = BOTSORT(args=tracker_config)
             else:
                 raise AssertionError(
                     f"Only 'bytetrack' and 'botsort' are supported for now, but got '{tracker_config.tracker_type}'"  # noqa

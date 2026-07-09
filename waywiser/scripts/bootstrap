@@ -1169,6 +1169,21 @@ presim_setup() {
         cd "$WAYWISER_WS"
         info "Ensuring CARLA Python requirements from pyproject extra are installed..."
         run_uv_install pip install -e "$REPO_DIR[waywiser_carla]"
+
+        local custom_carla_root
+        custom_carla_root=$(env_get WAYWISER_CUSTOM_CARLA_ROOT)
+        if [[ -n "$custom_carla_root" ]]; then
+            custom_carla_root=$(eval echo "$custom_carla_root")
+            local py_ver wheel_path
+            py_ver=$(python3 -c 'import sys; print(f"cp{sys.version_info.major}{sys.version_info.minor}")')
+            wheel_path=$(find "$custom_carla_root/PythonAPI/carla/dist" -name "*${py_ver}*.whl" 2>/dev/null | head -n 1)
+            if [[ -n "$wheel_path" && -f "$wheel_path" ]]; then
+                info "Installing custom CARLA wheel: $wheel_path"
+                run_uv_install pip install --force-reinstall "$wheel_path"
+            else
+                warn "No suitable carla wheel found in $custom_carla_root/PythonAPI/carla/dist/ for $py_ver"
+            fi
+        fi
     fi
 
     if [[ " $skipped " != *" waywiser_gazebo "* ]]; then

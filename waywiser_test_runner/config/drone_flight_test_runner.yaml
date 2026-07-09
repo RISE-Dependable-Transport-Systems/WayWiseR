@@ -8,7 +8,6 @@ flight_test_runner:
     quadcopter_state_topic: "quadcopter_state"
     heartbeat_rx_state_topic: "control_tower_heartbeat_rx_state"
     control_vehicle_node_fqn: "waywiser_drone_node"
-    arm_command_topic: "arm_command"
     autopilot_state_control_topic: "autopilot_state_control"
     route_publish_topic: "waywiser_path"
     preplanned_route_filepath: "$WAYWISER_WS/resources/forest.xml"
@@ -20,7 +19,7 @@ flight_test_runner:
     orchestrate_test_setup: true
     setup_request_topic: "/setup_request"
     setup_status_topic: "/setup_status"
-    setup_request_json: '{"reset_all": true}'
+    setup_request_json: '{"reset_all": true, "spectator_track_entity": "drone"}'
     staging_entity_name: "drone"
     # staging_area_pose: "0.217975816633690 14.141065620729639 0.3 0 0 0.0"
     # staging_area_pose: "0.0 0.0 0.3 0 0 0.0"

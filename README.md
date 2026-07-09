@@ -71,7 +71,7 @@ Launch a rover with teleoperation:
 ```bash
 cd $WAYWISER_WS
 source .venv/bin/activate
-ros2 launch waywiser_hwbringup hwbringup_rover.launch.py
+ros2 launch waywiser hwbringup_rover.launch.py
 ```
 
 The rover dynamics are simulated by WayWise using a simple bicycle model.
@@ -93,6 +93,10 @@ https://github.com/user-attachments/assets/10458e63-c195-4a39-ae8a-7fcdc91dceaf
 ### Safety-critical human detection and emergency braking in forestry simulations
 
 https://github.com/user-attachments/assets/b987e2b1-8aab-4627-a7d1-eda75a33960e
+
+### Autonomous UAV mission execution in Gazebo using PX4 SITL
+
+https://github.com/user-attachments/assets/139a8611-7e69-4d19-9e98-9aea803044eb
 
 ---
 

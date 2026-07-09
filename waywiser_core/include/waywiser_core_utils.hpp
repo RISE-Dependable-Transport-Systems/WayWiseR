@@ -66,14 +66,16 @@ enum class MissionState : int8_t
   WaitingForGnssAccuracy        = waywiser_core::msg::MissionState::WAITING_FOR_GNSS_ACCURACY,
   WaitingForHeartbeat           = waywiser_core::msg::MissionState::WAITING_FOR_HEARTBEAT,
   FollowRouteInit               = waywiser_core::msg::MissionState::FOLLOW_ROUTE_INIT,
-  FollowRouteLiftOff            = waywiser_core::msg::MissionState::FOLLOW_ROUTE_LIFT_OFF,
+  FollowRouteClimb            = waywiser_core::msg::MissionState::FOLLOW_ROUTE_CLIMB,
   FollowRouteGotoBegin          = waywiser_core::msg::MissionState::FOLLOW_ROUTE_GOTO_BEGIN,
   FollowRouteFollowing          = waywiser_core::msg::MissionState::FOLLOW_ROUTE_FOLLOWING,
   FollowRouteApproachingEndGoal =
     waywiser_core::msg::MissionState::FOLLOW_ROUTE_APPROACHING_END_GOAL,
+  FollowRouteApproachingEndGoalZ =
+    waywiser_core::msg::MissionState::FOLLOW_ROUTE_APPROACHING_END_GOAL_Z,
   FollowRouteFinished           = waywiser_core::msg::MissionState::FOLLOW_ROUTE_FINISHED,
   ReturnHomeInit                = waywiser_core::msg::MissionState::RETURN_HOME_INIT,
-  ReturnHomeLiftOff             = waywiser_core::msg::MissionState::RETURN_HOME_LIFT_OFF,
+  ReturnHomeClimb             = waywiser_core::msg::MissionState::RETURN_HOME_CLIMB,
   ReturnHomeCruising            = waywiser_core::msg::MissionState::RETURN_HOME_CRUISING,
   ReturnHomeLanding             = waywiser_core::msg::MissionState::RETURN_HOME_LANDING
 };
