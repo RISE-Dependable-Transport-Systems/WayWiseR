@@ -1,6 +1,8 @@
 #include "copter_autopilot_component.hpp"
 #include "moc_copter_autopilot_component.cpp"
 
+#include <algorithm>
+
 #include "WayWise/core/pospoint.h"
 
 void CopterAutopilotComponent::reset()
@@ -9,6 +11,7 @@ void CopterAutopilotComponent::reset()
     mWaypointFollower->clearRoute();
     mWaypointFollower->resetState();
   }
+  cancelAutoClimb();
   mWaypointList.clear();
   updateMissionState(MissionState::WaitingForVehicleInit);
 
@@ -18,40 +21,41 @@ void CopterAutopilotComponent::reset()
   }
 }
 
-void CopterAutopilotComponent::setAutoLiftOffEnabled(bool value)
+void CopterAutopilotComponent::setAutoClimbEnabled(bool value)
 {
-  mAutoLiftOffEnabled = value;
-  if (!mAutoLiftOffEnabled) {
-    if (mAutoLiftOffActive) {
+  mAutoClimbEnabled = value;
+  if (!mAutoClimbEnabled) {
+    if (mAutoClimbActive) {
       stopWaypointFollower();
     }
-    cancelAutoLiftOff();
+    cancelAutoClimb();
   }
 }
 
-void CopterAutopilotComponent::setAutoLiftOffActive(bool value)
+bool CopterAutopilotComponent::setAutoClimbActive(bool value)
 {
   if (!value) {
-    if (mAutoLiftOffActive) {
+    if (mAutoClimbActive) {
       stopWaypointFollower();
     }
-    cancelAutoLiftOff();
-    return;
+    cancelAutoClimb();
+    return true;
   }
 
-  if (!mAutoLiftOffEnabled) {
-    return;
+  if (!mAutoClimbEnabled) {
+    return false;
   }
 
-  startAutoLiftOffWithWaypointFollower();
+  return startAutoClimbWithWaypointFollower();
 }
 
-void CopterAutopilotComponent::cancelAutoLiftOff()
+void CopterAutopilotComponent::cancelAutoClimb()
 {
-  mAutoLiftOffActive = false;
+  mAutoClimbActive = false;
+  applyMissionWaypointFollowerTuning();
 }
 
-bool CopterAutopilotComponent::startAutoLiftOffWithWaypointFollower()
+bool CopterAutopilotComponent::startAutoClimbWithWaypointFollower()
 {
   if (!mWaypointFollower) {
     return false;
@@ -60,24 +64,55 @@ bool CopterAutopilotComponent::startAutoLiftOffWithWaypointFollower()
     return false;
   }
   if (currentMissionState == MissionState::WaitingForVehicleInit) {
-    return false;
+    updateMissionState(MissionState::Idle);
   }
 
-  cancelAutoLiftOff();
+  cancelAutoClimb();
 
   if (!mWaypointList.isEmpty()) {
-    return false;
+    mWaypointList.clear();
   }
 
-  PosPoint liftOffGoal = mCopterState->getPosition(mMissionPosTypeUsed);
-  liftOffGoal.setHeight(mAutoLiftOffHeight);
-  QList<PosPoint> liftOffRoute;
-  liftOffRoute.append(liftOffGoal);
-  startWaypointFollower(liftOffRoute);
-  mAutoLiftOffActive = true;
+  PosPoint autoClimbGoal = mCopterState->getPosition(mMissionPosTypeUsed);
+  autoClimbGoal.setHeight(mAutoClimbHeight);
+  QList<PosPoint> autoClimbRoute;
+  autoClimbRoute.append(autoClimbGoal);
+  mWaypointFollower->clearRoute();
+  mWaypointFollower->resetState();
+  mWaypointFollower->setFinishRouteAfterInitialClimb(true);
+  mWaypointFollower->addRoute(autoClimbRoute);
+  mWaypointFollower->startFollowingRoute(false);
+  mAutoClimbActive = true;
 
   updateMissionState(deriveWaypointFollowerMissionState());
+  applyAutoClimbWaypointFollowerTuning();
   return true;
+}
+
+void CopterAutopilotComponent::applyMissionWaypointFollowerTuning()
+{
+  if (!mWaypointFollower) {
+    return;
+  }
+  mWaypointFollower->setWaypointProximityXY(mWaypointProximityXY);
+  mWaypointFollower->setWaypointProximityZ(mWaypointProximityZ);
+  mWaypointFollower->setEndGoalAlignmentThresholdXY(mEndGoalAlignmentThresholdXY);
+  mWaypointFollower->setEndGoalAlignmentThresholdZ(mEndGoalAlignmentThresholdZ);
+  mWaypointFollower->setStopSpeedThreshold(mStopSpeedThreshold);
+  mWaypointFollower->setVerticalHeightTolerance(mVerticalHeightTolerance);
+}
+
+void CopterAutopilotComponent::applyAutoClimbWaypointFollowerTuning()
+{
+  if (!mWaypointFollower) {
+    return;
+  }
+  mWaypointFollower->setWaypointProximityXY(mWaypointProximityXY);
+  mWaypointFollower->setWaypointProximityZ(mWaypointProximityZ);
+  mWaypointFollower->setEndGoalAlignmentThresholdXY(mEndGoalAlignmentThresholdXY);
+  mWaypointFollower->setEndGoalAlignmentThresholdZ(mEndGoalAlignmentThresholdZ);
+  mWaypointFollower->setStopSpeedThreshold(mStopSpeedThreshold);
+  mWaypointFollower->setVerticalHeightTolerance(mWaypointProximityZ);
 }
 
 void CopterAutopilotComponent::setupAutopilot(QSharedPointer<EmergencyStopState> emergencyStopState)
@@ -88,8 +123,7 @@ void CopterAutopilotComponent::setupAutopilot(QSharedPointer<EmergencyStopState>
 
   mWaypointFollower.reset(new CopterWaypointFollower(mAutopilotMovementController, mMissionPosTypeUsed));
   mWaypointFollower->setRepeatRoute(false);
-  mWaypointFollower->setWaypointProximity(mWaypointProximity);
-  mWaypointFollower->setEndGoalAlignmentThreshold(mEndGoalAlignmentThreshold);
+  applyMissionWaypointFollowerTuning();
   mWaypointFollower->setCruiseSpeed(mCruiseSpeed);
   mWaypointFollower->setMaxSpeed(mMaxMissionSpeed);
   mWaypointFollower->setDescentSpeed(mDescentSpeed);
@@ -98,7 +132,6 @@ void CopterAutopilotComponent::setupAutopilot(QSharedPointer<EmergencyStopState>
   mWaypointFollower->setFaceTravelDirection(mFaceTravelDirection);
   mWaypointFollower->setYawGain(mYawGain);
   mWaypointFollower->setMaxYawRate(mMaxYawRate);
-  mWaypointFollower->setVerticalHeightTolerance(mVerticalHeightTolerance);
   mWaypointFollower->setVerticalProportionalGain(mVerticalProportionalGain);
   mWaypointFollower->setVerticalIntegralGain(mVerticalIntegralGain);
   mWaypointFollower->setVerticalDerivativeGain(mVerticalDerivativeGain);
@@ -161,7 +194,7 @@ void CopterAutopilotComponent::processMissionStateMachine()
 
     case MissionState::Idle:
       if (mWaypointFollower->isActive()) {
-        if (mAutoLiftOffActive) {
+        if (mAutoClimbActive) {
           updateMissionState(deriveWaypointFollowerMissionState());
         } else if (mWaypointFollower->getCurrentRoute().size() > 0) {
           mWaypointList = mWaypointFollower->getCurrentRoute();
@@ -184,7 +217,7 @@ void CopterAutopilotComponent::processMissionStateMachine()
           updateMissionState(deriveWaypointFollowerMissionState());
         }
       } else if (mWaypointFollower->getCurrentRoute().size() > 0) {
-        if (!mAutoLiftOffActive) {
+        if (!mAutoClimbActive) {
           mWaypointList = mWaypointFollower->getCurrentRoute();
           updateMissionState(deriveWaypointFollowerMissionState());
         }
@@ -214,10 +247,11 @@ void CopterAutopilotComponent::processMissionStateMachine()
       break;
 
     case MissionState::FollowRouteInit:
-    case MissionState::FollowRouteLiftOff:
+    case MissionState::FollowRouteClimb:
     case MissionState::FollowRouteGotoBegin:
     case MissionState::FollowRouteFollowing:
     case MissionState::FollowRouteApproachingEndGoal:
+    case MissionState::FollowRouteApproachingEndGoalZ:
       if (mEmergencyStopState->is_active()) {
         stopWaypointFollower();
         updateMissionState(MissionState::WaitingForEmergencyStopClear);
@@ -225,13 +259,6 @@ void CopterAutopilotComponent::processMissionStateMachine()
         stopWaypointFollower();
         updateMissionState(MissionState::WaitingForGnssAccuracy);
         emit gnssFixAccuracyAssertionFailed(mGnssFixStatus);
-      } else if (!mWaypointFollower->isActive()) {
-        if (mWaypointList.isEmpty()) {
-          updateMissionState(MissionState::WaitingForRoute);
-        } else {
-          startWaypointFollower(mWaypointList);
-          updateMissionState(MissionState::FollowRouteInit);
-        }
       } else {
         WayPointFollowerSTMstates wayPointFollowerSTMstate =
           mWaypointFollower->getCurrentState().stmState;
@@ -241,21 +268,35 @@ void CopterAutopilotComponent::processMissionStateMachine()
         }
 
         if (wayPointFollowerSTMstate == WayPointFollowerSTMstates::FOLLOW_ROUTE_FINISHED ||
-          (currentMissionState == MissionState::FollowRouteApproachingEndGoal &&
+          ((currentMissionState == MissionState::FollowRouteApproachingEndGoal ||
+            currentMissionState == MissionState::FollowRouteApproachingEndGoalZ) &&
           !mWaypointFollower->isActive()))
         {
           updateMissionState(MissionState::FollowRouteFinished);
+        } else if (!mWaypointFollower->isActive()) {
+          if (mWaypointList.isEmpty()) {
+            updateMissionState(MissionState::WaitingForRoute);
+          } else {
+            startWaypointFollower(mWaypointList);
+            updateMissionState(MissionState::FollowRouteInit);
+          }
         }
       }
       break;
 
     case MissionState::FollowRouteFinished:
-      if (mAutoLiftOffActive) {
-        cancelAutoLiftOff();
+      if (mAutoClimbActive) {
+        cancelAutoClimb();
         stopWaypointFollower();
         updateMissionState(mWaypointList.isEmpty() ? MissionState::Idle : MissionState::WaitingForRoute);
       } else {
-        stopWaypointFollower();
+        if (mWaypointFollower && mWaypointFollower->isActive()) {
+          mWaypointFollower->stop();
+        }
+        if (mAutopilotMovementController) {
+          mAutopilotMovementController->setDesiredSpeed(0.0);
+          mAutopilotMovementController->setDesiredSteering(0.0);
+        }
       }
       break;
 
@@ -291,7 +332,7 @@ void CopterAutopilotComponent::startWaypointFollower(QList<PosPoint> & waypointL
 void CopterAutopilotComponent::startWaypointFollowerRouteFromBeginning(
   QList<PosPoint> & waypointList)
 {
-  cancelAutoLiftOff();
+  cancelAutoClimb();
   stopWaypointFollower();
   mWaypointFollower->clearRoute();
   mWaypointFollower->resetState();
@@ -318,6 +359,7 @@ void CopterAutopilotComponent::stopWaypointFollower()
 
 void CopterAutopilotComponent::clearWaypointFollowerRoute()
 {
+  cancelAutoClimb();
   stopWaypointFollower();
   if (mWaypointFollower) {
     mWaypointFollower->clearRoute();
@@ -332,7 +374,7 @@ bool CopterAutopilotComponent::isActive()
   return mWaypointFollower && mWaypointFollower->isActive();
 }
 
-bool CopterAutopilotComponent::getRouteLiftOffActive() const
+bool CopterAutopilotComponent::getRouteClimbActive() const
 {
   return mWaypointFollower && mWaypointFollower->isActive() &&
     mWaypointFollower->isClimbingToStartWaypointHeight();
@@ -348,8 +390,8 @@ PosPoint CopterAutopilotComponent::getCurrentGoal() const
 
 void CopterAutopilotComponent::updateWaypointFollowerRoute(QList<PosPoint> & waypointList)
 {
-  if (mAutoLiftOffActive && mWaypointFollower && mWaypointFollower->isActive()) {
-    cancelAutoLiftOff();
+  if (mAutoClimbActive && mWaypointFollower && mWaypointFollower->isActive()) {
+    cancelAutoClimb();
     stopWaypointFollower();
     startWaypointFollower(waypointList);
     mWaypointList = mWaypointFollower->getCurrentRoute();
@@ -358,17 +400,18 @@ void CopterAutopilotComponent::updateWaypointFollowerRoute(QList<PosPoint> & way
 
   switch (currentMissionState) {
     case MissionState::FollowRouteInit:
-    case MissionState::FollowRouteLiftOff:
+    case MissionState::FollowRouteClimb:
     case MissionState::FollowRouteGotoBegin:
     case MissionState::FollowRouteFollowing:
     case MissionState::FollowRouteApproachingEndGoal:
-      cancelAutoLiftOff();
+    case MissionState::FollowRouteApproachingEndGoalZ:
+      cancelAutoClimb();
       stopWaypointFollower();
       startWaypointFollower(waypointList);
       mWaypointList = mWaypointFollower->getCurrentRoute();
       break;
     default:
-      cancelAutoLiftOff();
+      cancelAutoClimb();
       mWaypointList = waypointList;
       break;
   }
@@ -381,7 +424,7 @@ MissionState CopterAutopilotComponent::deriveWaypointFollowerMissionState() cons
   }
 
   if (mWaypointFollower->isClimbingToStartWaypointHeight()) {
-    return MissionState::FollowRouteLiftOff;
+    return MissionState::FollowRouteClimb;
   }
 
   return CoreUtils::convertToMissionState(mWaypointFollower->getCurrentState().stmState);
@@ -404,6 +447,9 @@ geometry_msgs::msg::Twist CopterAutopilotComponent::getAutopilotTwistCommand() c
 
 void CopterAutopilotComponent::updateMissionState(MissionState state)
 {
+  if (currentMissionState == state) {
+    return;
+  }
   currentMissionState = state;
   qDebug() << "MissionState: " << CoreUtils::missionStateToString(currentMissionState).c_str();
   emit updatedMissionState(currentMissionState);

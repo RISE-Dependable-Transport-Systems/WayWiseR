@@ -56,6 +56,7 @@ class GazeboOrchestratorNode(Node):
         self.declare_parameter('spawn_backend', 'gz_service')
         self.declare_parameter('start_gazebo_bridge', True)
         self.declare_parameter('gz_service_suppress_output', False)
+        self.declare_parameter('spectator_track_entity', '')
 
         self.world_name = self.get_parameter('world_name').get_parameter_value().string_value
         self.setup_request_topic = (
@@ -133,6 +134,9 @@ class GazeboOrchestratorNode(Node):
         self.gz_service_suppress_output = (
             self.get_parameter('gz_service_suppress_output').get_parameter_value().bool_value
         )
+        self.spectator_track_entity = (
+            self.get_parameter('spectator_track_entity').get_parameter_value().string_value
+        )
 
         self.setup_status = SetupState()
         self.setup_status.state = SetupState.IDLE
@@ -146,7 +150,7 @@ class GazeboOrchestratorNode(Node):
         self.managed_spawn_processes = []
         self.entities_spawned_at_requested_pose = set()
 
-        self.create_subscription(
+        self.setup_request_sub = self.create_subscription(
             String,
             self.setup_request_topic,
             self.setup_request_callback,
@@ -155,7 +159,7 @@ class GazeboOrchestratorNode(Node):
         self.setup_status_publisher = self.create_publisher(
             SetupState, self.setup_status_topic, RELIABLE_TRANSIENT_LOCAL_QOS
         )
-        self.create_timer(0.5, self.timer_callback)
+        self.orchestrator_timer = self.create_timer(0.5, self.timer_callback)
 
         if self.manage_px4_process and self.start_px4_on_startup:
             self.px4_start_timer = self.create_timer(
@@ -224,19 +228,26 @@ class GazeboOrchestratorNode(Node):
                     continue
                 self.remove_entity(entity_name)
             if self.should_spawn_on_setup():
-                self.stop_managed_spawn_processes()
+                if self.request_reset_all() or self.should_reset_gazebo():
+                    self.stop_managed_spawn_processes()
                 self.spawn_models()
             self.apply_requested_entity_poses()
+
             if restart_px4:
                 self.start_px4()
             self.setup_started_at = time.monotonic()
             return
 
         if self.setup_status.state == SetupState.SETUP_ONGOING:
+            self.get_logger().info(f"DEBUG: elapsed={time.monotonic() - self.setup_started_at:.2f}, settle={self.settle_time_sec}")
             if (time.monotonic() - self.setup_started_at) >= self.settle_time_sec:
                 self.unpause_setup_world()
                 self.setup_status.state = SetupState.SETUP_COMPLETED
                 self.get_logger().info('Gazebo setup completed.')
+
+                track_entity = self.get_spectator_track_entity()
+                if track_entity:
+                    self.schedule_spectator_track(track_entity)
             return
 
         if self.setup_status.state == SetupState.SETUP_COMPLETED:
@@ -316,32 +327,7 @@ class GazeboOrchestratorNode(Node):
             control_request,
         ]
         self.get_logger().info(f'{action} Gazebo world {world_name}.')
-        try:
-            result = subprocess.run(
-                command,
-                check=False,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=max(1.0, timeout_ms / 1000.0 + 1.0),
-            )
-        except subprocess.TimeoutExpired:
-            self.get_logger().error(f'Gazebo pause control timed out for world {world_name}.')
-            return
-        except OSError as exc:
-            self.get_logger().error(f'Could not run Gazebo pause control command: {exc}')
-            return
-
-        if result.returncode != 0:
-            self.get_logger().error(
-                f'Gazebo pause control failed with code {result.returncode}: '
-                f'{result.stderr.strip()}'
-            )
-            return
-
-        output = result.stdout.strip()
-        if output:
-            self.get_logger().info(f'Gazebo pause control response: {output}')
+        self.run_process(command, wait=False, suppress_output=self.gz_service_suppress_output)
 
     def unpause_setup_world(self):
         if not self.paused_setup_world_name:
@@ -363,6 +349,47 @@ class GazeboOrchestratorNode(Node):
     def request_reset_all(self) -> bool:
         request = self.pending_request if isinstance(self.pending_request, dict) else {}
         return self.get_request_bool(request, 'reset_all', self.reset_all)
+
+    def get_spectator_track_entity(self) -> str:
+        request = self.pending_request if isinstance(self.pending_request, dict) else {}
+        entity = request.get('spectator_track_entity', self.spectator_track_entity)
+        return str(entity).strip()
+
+    def publish_spectator_track(self, entity_name: str):
+        self.get_logger().info(f'Requesting GUI spectator tracking for {entity_name}.')
+        self.run_process(
+            [
+                'gz',
+                'topic',
+                '-t',
+                '/gui/track',
+                '-m',
+                'gz.msgs.CameraTrack',
+                '-p',
+                f'follow_target: {{name: "{entity_name}", type: 2}}, track_mode: 2, follow_offset: {{x: -5, y: 0, z: 3}}',
+            ],
+            wait=True,
+            suppress_output=self.gz_service_suppress_output,
+        )
+
+
+    def schedule_spectator_track(self, entity_name: str):
+        self.track_attempts = 5
+        self.track_entity_name = entity_name
+
+        if hasattr(self, 'track_timer') and self.track_timer is not None:
+            self.track_timer.cancel()
+
+        def _on_timer():
+            if self.track_attempts <= 0:
+                self.track_timer.cancel()
+                self.track_timer = None
+                return
+            self.track_attempts -= 1
+            self.publish_spectator_track(self.track_entity_name)
+
+        self.track_timer = self.create_timer(1.0, _on_timer)
+
 
     def should_spawn_on_setup(self) -> bool:
         request = self.pending_request if isinstance(self.pending_request, dict) else {}
@@ -569,6 +596,10 @@ class GazeboOrchestratorNode(Node):
             self.spawn_start_timer = None
         self.spawn_models(apply_start_delay=False)
 
+        track_entity = self.get_spectator_track_entity()
+        if track_entity:
+            self.schedule_spectator_track(track_entity)
+
     def spawn_models(self, apply_start_delay=True):
         request = self.pending_request if isinstance(self.pending_request, dict) else {}
         config_file = str(request.get('spawn_config_file', self.spawn_config_file)).strip()
@@ -630,14 +661,17 @@ class GazeboOrchestratorNode(Node):
         path = model.get('path')
         if not path:
             return
+        name = self.effective_spawn_model_name(model)
         sdf_path = self.resolve_resource_path(path, config_dir)
+
+        add_highlight = bool(name and name == self.get_spectator_track_entity())
+
         try:
-            sdf_path = self.create_sdf_with_static_override(sdf_path, model.get('static'))
+            sdf_path = self.prepare_sdf_for_spawn(sdf_path, model.get('static'), add_highlight, name)
         except (OSError, ET.ParseError, RuntimeError, ValueError) as exc:
             self.get_logger().error(f'Could not prepare SDF spawn file {sdf_path}: {exc}')
             return
 
-        name = self.effective_spawn_model_name(model)
         spawn_pose = self.requested_entity_pose_for_name(name)
         if spawn_pose and name:
             self.entities_spawned_at_requested_pose.add(name)
@@ -885,22 +919,94 @@ class GazeboOrchestratorNode(Node):
             return str(candidate)
         return str(base_dir / candidate)
 
-    def create_sdf_with_static_override(self, sdf_path, static):
+    def prepare_sdf_for_spawn(self, sdf_path, static, add_highlight=False, model_name=None):
         static = self.normalize_optional_bool(static)
-        if static is None:
+        if static is None and not add_highlight and not model_name:
             return sdf_path
 
         tree = ET.parse(sdf_path)
         root = tree.getroot()
         model_tag = root.find('model')
         if model_tag is None:
-            raise RuntimeError(f'Cannot set static on SDF without a <model> tag: {sdf_path}')
+            model_tag = root.find('actor')
+            if model_tag is None:
+                raise RuntimeError(f'Cannot parse SDF without a <model> or <actor> tag: {sdf_path}')
 
-        static_tag = model_tag.find('static')
-        if static_tag is None:
-            static_tag = ET.Element('static')
-            model_tag.insert(0, static_tag)
-        static_tag.text = static
+        if static is not None:
+            static_tag = model_tag.find('static')
+            if static_tag is None:
+                static_tag = ET.Element('static')
+                model_tag.insert(0, static_tag)
+            static_tag.text = static
+
+        if add_highlight:
+            # Dynamically compute bounding radius from all collisions
+            max_radius = 0.5
+            for link in model_tag.findall('link'):
+                lx, ly, lz = 0.0, 0.0, 0.0
+                link_pose = link.find('pose')
+                if link_pose is not None and link_pose.text:
+                    parts = link_pose.text.strip().split()
+                    if len(parts) >= 3:
+                        lx, ly, lz = float(parts[0]), float(parts[1]), float(parts[2])
+
+                for col in link.findall('collision'):
+                    cx, cy, cz = 0.0, 0.0, 0.0
+                    col_pose = col.find('pose')
+                    if col_pose is not None and col_pose.text:
+                        parts = col_pose.text.strip().split()
+                        if len(parts) >= 3:
+                            cx, cy, cz = float(parts[0]), float(parts[1]), float(parts[2])
+
+                    dist = ((lx+cx)**2 + (ly+cy)**2 + (lz+cz)**2)**0.5
+
+                    geom_radius = 0.0
+                    geom = col.find('geometry')
+                    if geom is not None:
+                        box = geom.find('box/size')
+                        if box is not None and box.text:
+                            parts = box.text.strip().split()
+                            if len(parts) == 3:
+                                geom_radius = ((float(parts[0])/2)**2 + (float(parts[1])/2)**2 + (float(parts[2])/2)**2)**0.5
+                        cyl = geom.find('cylinder/radius')
+                        if cyl is not None and cyl.text:
+                            geom_radius = float(cyl.text)
+                        sph = geom.find('sphere/radius')
+                        if sph is not None and sph.text:
+                            geom_radius = float(sph.text)
+
+                    if dist + geom_radius > max_radius:
+                        max_radius = dist + geom_radius
+
+            # Add 5% padding
+            final_radius = max_radius * 1.05
+
+            first_link = model_tag.find('link')
+            if first_link is not None:
+                visual = ET.SubElement(first_link, 'visual', name='highlight_marker')
+                pose = ET.SubElement(visual, 'pose')
+                pose.text = '0 0 0 0 0 0'
+                geometry = ET.SubElement(visual, 'geometry')
+                sphere = ET.SubElement(geometry, 'sphere')
+                radius = ET.SubElement(sphere, 'radius')
+                radius.text = f'{final_radius:.3f}'
+                material = ET.SubElement(visual, 'material')
+                ambient = ET.SubElement(material, 'ambient')
+                ambient.text = '1.0 0.0 0.0 0.05'
+                diffuse = ET.SubElement(material, 'diffuse')
+                diffuse.text = '1.0 0.0 0.0 0.05'
+                emissive = ET.SubElement(material, 'emissive')
+                emissive.text = '0.1 0.0 0.0 1.0'
+                cast_shadows = ET.SubElement(visual, 'cast_shadows')
+                cast_shadows.text = 'false'
+
+        if model_name:
+            prefix = f"{model_name}/"
+            for element in model_tag.iter():
+                if element.tag in ('gz_frame_id', 'robot_base_frame', 'odom_frame') and element.text:
+                    text = element.text.strip()
+                    if not text.startswith(prefix) and not text.startswith('/'):
+                        element.text = f"{prefix}{text}"
 
         temp_sdf = tempfile.NamedTemporaryFile(
             mode='wb',

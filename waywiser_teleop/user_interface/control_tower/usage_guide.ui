@@ -166,16 +166,30 @@
                                                         &lt;tr&gt;
                                                         &lt;td style='padding: 8px;'&gt;&lt;span
                                                         style='color: #fb7185; font-weight:
-                                                        700;'&gt;Ctrl + L&lt;/span&gt;&lt;/td&gt;
-                                                        &lt;td style='padding: 8px;'&gt;Auto lift-off
-                                                        to 2 m when Auto lift off is enabled&lt;/td&gt;
+                                                        700;'&gt;Ctrl + C&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Auto climb
+                                                        to 2 m when Auto climb is enabled&lt;/td&gt;
                                                         &lt;/tr&gt;
                                                         &lt;tr&gt;
                                                         &lt;td style='padding: 8px;'&gt;&lt;span
                                                         style='color: #fb7185; font-weight:
-                                                        700;'&gt;Ctrl + Shift + L&lt;/span&gt;&lt;/td&gt;
+                                                        700;'&gt;Ctrl + L&lt;/span&gt;&lt;/td&gt;
                                                         &lt;td style='padding: 8px;'&gt;Auto
                                                         Land &amp;amp; Disarm&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #fb7185; font-weight:
+                                                        700;'&gt;Ctrl + H&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Request Return to Home
+                                                        (RTH)&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #fb7185; font-weight:
+                                                        700;'&gt;Ctrl + Shift + H&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Cancel Return to Home
+                                                        (RTH)&lt;/td&gt;
                                                         &lt;/tr&gt;
                                                         &lt;/table&gt;
                                                         &lt;/div&gt;</string>
@@ -322,13 +336,13 @@
                                 </widget>
                             </item>
                             <item>
-                                <widget class="QGroupBox" name="route_planning_group">
+                                <widget class="QGroupBox" name="mission_planning_group">
                                     <property name="title">
-                                        <string>ROUTE PLANNING</string>
+                                        <string>MISSION PLANNING</string>
                                     </property>
-                                    <layout class="QVBoxLayout" name="verticalLayout_route_planning">
+                                    <layout class="QVBoxLayout" name="verticalLayout_mission_planning">
                                         <item>
-                                            <widget class="QLabel" name="route_planning_text">
+                                            <widget class="QLabel" name="mission_planning_text">
                                                 <property name="text">
                                                     <string>&lt;div style='line-height: 1.8;
                                                         font-size: 11pt;'&gt;
@@ -337,8 +351,8 @@
                                                         &lt;tr&gt;
                                                         &lt;td style='padding: 8px; width:
                                                         180px;'&gt;&lt;span style='color: #a5b4fc;
-                                                        font-weight: 700;'&gt;Plan Route&lt;/span&gt;&lt;/td&gt;
-                                                        &lt;td style='padding: 8px;'&gt;Toggle route
+                                                        font-weight: 700;'&gt;MISSION PLANNER&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Toggle mission
                                                         editing controls on the map&lt;/td&gt;
                                                         &lt;/tr&gt;
                                                         &lt;tr&gt;
@@ -346,21 +360,21 @@
                                                         style='color: #34d399; font-weight:
                                                         700;'&gt;Ctrl + Left Click&lt;/span&gt;&lt;/td&gt;
                                                         &lt;td style='padding: 8px;'&gt;Add a new
-                                                        waypoint at the clicked map position&lt;/td&gt;
+                                                        mission point at the clicked map position&lt;/td&gt;
                                                         &lt;/tr&gt;
                                                         &lt;tr&gt;
                                                         &lt;td style='padding: 8px;'&gt;&lt;span
                                                         style='color: #34d399; font-weight:
                                                         700;'&gt;Shift + Left Drag&lt;/span&gt;&lt;/td&gt;
                                                         &lt;td style='padding: 8px;'&gt;Move an
-                                                        existing waypoint&lt;/td&gt;
+                                                        existing mission point&lt;/td&gt;
                                                         &lt;/tr&gt;
                                                         &lt;tr&gt;
                                                         &lt;td style='padding: 8px;'&gt;&lt;span
                                                         style='color: #f87171; font-weight:
                                                         700;'&gt;Right Click&lt;/span&gt;&lt;/td&gt;
                                                         &lt;td style='padding: 8px;'&gt;Delete the
-                                                        nearest waypoint&lt;/td&gt;
+                                                        nearest mission point&lt;/td&gt;
                                                         &lt;/tr&gt;
                                                         &lt;tr&gt;
                                                         &lt;td style='padding: 8px;'&gt;&lt;span
@@ -379,36 +393,51 @@
                                                         &lt;tr&gt;
                                                         &lt;td style='padding: 8px;'&gt;&lt;span
                                                         style='color: #c4b5fd; font-weight:
-                                                        700;'&gt;Load Route&lt;/span&gt;&lt;/td&gt;
+                                                        700;'&gt;Load&lt;/span&gt;&lt;/td&gt;
                                                         &lt;td style='padding: 8px;'&gt;Select a
-                                                        preplanned WayWise XML route file&lt;/td&gt;
+                                                        preplanned WayWise XML mission file&lt;/td&gt;
                                                         &lt;/tr&gt;
                                                         &lt;tr&gt;
                                                         &lt;td style='padding: 8px;'&gt;&lt;span
                                                         style='color: #c4b5fd; font-weight:
-                                                        700;'&gt;Send Route&lt;/span&gt;&lt;/td&gt;
+                                                        700;'&gt;Send&lt;/span&gt;&lt;/td&gt;
                                                         &lt;td style='padding: 8px;'&gt;Publish the
-                                                        route as PathWithTwists to the selected
+                                                        mission as PathWithTwists to the selected
                                                         vehicle&lt;/td&gt;
                                                         &lt;/tr&gt;
                                                         &lt;tr&gt;
                                                         &lt;td style='padding: 8px;'&gt;&lt;span
                                                         style='color: #c4b5fd; font-weight:
-                                                        700;'&gt;Save Route&lt;/span&gt;&lt;/td&gt;
+                                                        700;'&gt;Save&lt;/span&gt;&lt;/td&gt;
                                                         &lt;td style='padding: 8px;'&gt;Export the
-                                                        current route as a WayWise XML file&lt;/td&gt;
+                                                        current mission as a WayWise XML file&lt;/td&gt;
                                                         &lt;/tr&gt;
                                                         &lt;tr&gt;
                                                         &lt;td style='padding: 8px;'&gt;&lt;span
                                                         style='color: #c4b5fd; font-weight:
-                                                        700;'&gt;Clear Route&lt;/span&gt;&lt;/td&gt;
+                                                        700;'&gt;Clear&lt;/span&gt;&lt;/td&gt;
                                                         &lt;td style='padding: 8px;'&gt;Remove all
-                                                        planned waypoints from the map&lt;/td&gt;
+                                                        planned mission points from the map&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #c4b5fd; font-weight:
+                                                        700;'&gt;Mission speed [m/s]&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Set the speed
+                                                        assigned when sending the mission; Apply speed
+                                                        updates existing mission points&lt;/td&gt;
+                                                        &lt;/tr&gt;
+                                                        &lt;tr&gt;
+                                                        &lt;td style='padding: 8px;'&gt;&lt;span
+                                                        style='color: #c4b5fd; font-weight:
+                                                        700;'&gt;Mission z [m]&lt;/span&gt;&lt;/td&gt;
+                                                        &lt;td style='padding: 8px;'&gt;Set the mission
+                                                        height; Apply z updates existing mission points&lt;/td&gt;
                                                         &lt;/tr&gt;
                                                         &lt;/table&gt;
                                                         &lt;p style='margin-top: 12px; color: #9ca3af;'&gt;
-                                                        For copters, Route z is applied as the
-                                                        constant altitude for the 2D route. For cars,
+                                                        For copters, Mission z is applied as the
+                                                        constant altitude for the 2D mission. For cars,
                                                         z is ignored by the vehicle follower.
                                                         &lt;/p&gt;
                                                         &lt;/div&gt;</string>

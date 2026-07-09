@@ -50,6 +50,11 @@ def generate_launch_description():
         default_value='True',
         description='Use NVIDIA PRIME offload environment variables for Gazebo rendering',
     )
+    sync_visual_rendering_to_display_la = DeclareLaunchArgument(
+        'sync_visual_rendering_to_display',
+        default_value='True',
+        description='Sync Gazebo visual rendering to the display refresh rate, typically 60 Hz.',
+    )
     gazebo_sim_version_la = DeclareLaunchArgument(
         'gazebo_sim_version',
         default_value='6',
@@ -145,6 +150,11 @@ def generate_launch_description():
         default_value='False',
         description='Suppress output from Gazebo service spawn calls',
     )
+    spectator_track_entity_la = DeclareLaunchArgument(
+        'spectator_track_entity',
+        default_value='',
+        description='Entity name for the Gazebo spectator view to track',
+    )
 
     # nvidia GPU offload env vars setup
     use_nvidia_gpu = IfCondition(LaunchConfiguration('use_nvidia_gpu'))
@@ -159,6 +169,14 @@ def generate_launch_description():
             ),
         ],
         condition=use_nvidia_gpu,
+    )
+    visual_rendering_env = GroupAction(
+        actions=[
+            SetEnvironmentVariable('__GL_SYNC_TO_VBLANK', '1'),
+            SetEnvironmentVariable('__GL_MaxFramesAllowed', '1'),
+            SetEnvironmentVariable('vblank_mode', '1'),
+        ],
+        condition=IfCondition(LaunchConfiguration('sync_visual_rendering_to_display')),
     )
 
     # gazebo bridge
@@ -188,6 +206,7 @@ def generate_launch_description():
     ld.add_action(gazebo_la)
     ld.add_action(gazebo_bridge_la)
     ld.add_action(use_nvidia_gpu_la)
+    ld.add_action(sync_visual_rendering_to_display_la)
     ld.add_action(gazebo_sim_version_la)
     ld.add_action(launch_bridge_la)
     ld.add_action(launch_map_frame_transform_la)
@@ -207,9 +226,11 @@ def generate_launch_description():
     ld.add_action(spawn_backend_la)
     ld.add_action(start_gazebo_bridge_la)
     ld.add_action(gz_service_suppress_output_la)
+    ld.add_action(spectator_track_entity_la)
 
     # run Nvidia GPU setup action
     ld.add_action(nvidia_gpu_env)
+    ld.add_action(visual_rendering_env)
 
     # run gazebo launch file
     ld.add_action(gazebo)
@@ -468,6 +489,9 @@ def create_gazebo_orchestrator_node(context):
     )
     node_params['gz_service_suppress_output'] = ParameterValue(
         LaunchConfiguration('gz_service_suppress_output'), value_type=bool
+    )
+    node_params['spectator_track_entity'] = ParameterValue(
+        LaunchConfiguration('spectator_track_entity'), value_type=str
     )
 
     return [

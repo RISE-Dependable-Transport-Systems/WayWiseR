@@ -28,6 +28,7 @@
 #include "sensor_msgs/msg/range.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/header.hpp"
+#include "std_srvs/srv/set_bool.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_broadcaster.h"
 #include "tf2_ros/transform_listener.h"
@@ -68,13 +69,11 @@ public:
     IN_FLIGHT = waywiser_core::msg::QuadcopterState::IN_FLIGHT,
     LANDING = waywiser_core::msg::QuadcopterState::LANDING,
     EMERGENCY = waywiser_core::msg::QuadcopterState::EMERGENCY,
-    LIFTING_OFF = waywiser_core::msg::QuadcopterState::LIFTING_OFF,
+    CLIMBING = waywiser_core::msg::QuadcopterState::CLIMBING,
     HOVERING = waywiser_core::msg::QuadcopterState::HOVERING,
-    IDLE_DESCENT = waywiser_core::msg::QuadcopterState::IDLE_DESCENT,
-    AUTO_LIFTING_OFF = waywiser_core::msg::QuadcopterState::AUTO_LIFTING_OFF,
     ON_MISSION = waywiser_core::msg::QuadcopterState::ON_MISSION,
     LANDED = waywiser_core::msg::QuadcopterState::LANDED,
-    RETURNING_HOME = 13
+    RETURNING_HOME = waywiser_core::msg::QuadcopterState::RETURNING_HOME
   };
 
   void initialize_node();
@@ -100,7 +99,8 @@ protected:
     const px4_msgs::msg::VehicleLocalPosition::SharedPtr msg);
   void px4_vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
   void px4_home_position_callback(const px4_msgs::msg::HomePosition::SharedPtr msg);
-  void arm_command_callback(const std_msgs::msg::Bool::SharedPtr msg);
+  void observed_quadcopter_state_callback(
+    const waywiser_core::msg::QuadcopterState::SharedPtr msg);
   void autopilot_state_control_callback(const std_msgs::msg::Bool::SharedPtr bool_msg);
   void mission_status_callback(const waywiser_core::msg::MissionState::SharedPtr msg);
   void control_tower_heartbeat_callback(const std_msgs::msg::Header::SharedPtr msg);
@@ -110,7 +110,7 @@ protected:
     const waywiser_core::msg::NavSatFixExtended::SharedPtr msg);
   void range_callback(const sensor_msgs::msg::Range::SharedPtr msg);
 
-  void request_arm_state(bool arm);
+  bool request_arm_state(bool arm);
   void send_arm_command(bool arm, bool force = false);
   void send_offboard_mode_command();
   bool send_return_home_command();
@@ -118,6 +118,7 @@ protected:
   bool send_waywiser_return_home_command();
   bool return_home_landed_at_home() const;
   bool return_home_position_reached() const;
+  bool return_home_cruise_height_reached() const;
   bool return_home_ready_to_land() const;
   void clear_return_home_failsafe();
   void cancel_return_home_failsafe_on_heartbeat_restore();
@@ -126,8 +127,11 @@ protected:
   void update_home_position_parameters(double x, double y);
   void process_twist_msg(const geometry_msgs::msg::Twist::SharedPtr twist_msg);
   void publish_command();
+  void process_autopilots();
+  bool waypoint_follower_route_activation_allowed() const;
   void update_control_tower_heartbeat_failsafe();
   MissionState derive_return_home_mission_state() const;
+  bool is_return_home_active() const { return control_tower_timeout_return_home_active_ || manual_return_home_active_; }
   void publish_control_tower_timeout_emergency_stop(double heartbeat_age);
   void refresh_in_flight_status();
   HighLevelState derive_quadcopter_state();
@@ -170,12 +174,12 @@ protected:
 
   std::string odom_topic_;
   std::string input_odom_topic_;
-  std::string arm_command_topic_;
   std::string fused_nav_sat_fix_extended_topic_;
   std::string vehicle_pose_topic_;
   std::string home_pose_topic_;
   std::string range_topic_;
   std::string quadcopter_state_topic_;
+  std::string observed_quadcopter_state_topic_;
   std::string battery_state_topic_;
   std::string emergency_stop_status_topic_;
   std::string emergency_stop_update_topic_;
@@ -193,6 +197,7 @@ protected:
   float in_flight_range_threshold_ = 0.15F;
   float min_steering_height_ = 0.5F;
   geometry_msgs::msg::Twist current_cmd_vel_out_;
+  geometry_msgs::msg::Twist current_cmd_vel_in_;
 
   llh_t enuref_;
 
@@ -215,7 +220,6 @@ protected:
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr home_pose_pub_;
 
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_command_sub_;
   rclcpp::Subscription<px4_msgs::msg::ActuatorArmed>::SharedPtr px4_actuator_armed_sub_;
   rclcpp::Subscription<px4_msgs::msg::HealthReport>::SharedPtr px4_health_report_sub_;
   rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr
@@ -234,10 +238,29 @@ protected:
     fused_nav_sat_fix_extended_sub_;
   rclcpp::Subscription<waywiser_twist_safety::msg::EmergencyStopState>::SharedPtr
     emergency_stop_status_sub_;
+  rclcpp::Subscription<waywiser_core::msg::QuadcopterState>::SharedPtr
+    observed_quadcopter_state_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr autopilot_state_control_sub_;
   rclcpp::Subscription<waywiser_core::msg::MissionState>::SharedPtr mission_status_sub_;
   rclcpp::Subscription<std_msgs::msg::Header>::SharedPtr control_tower_heartbeat_sub_;
   rclcpp::Subscription<waywiser_core::msg::PathWithTwists>::SharedPtr path_with_twists_sub_;
+
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr return_home_srv_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr auto_land_srv_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr arm_srv_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr auto_climb_srv_;
+  void handle_return_home_request(
+    const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+    std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+  void handle_auto_land_request(
+    const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+    std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+  void handle_arm_request(
+    const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+    std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+  void handle_auto_climb_request(
+    const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+    std::shared_ptr<std_srvs::srv::SetBool::Response> response);
 
   rclcpp::TimerBase::SharedPtr node_management_timer_;
   rclcpp::TimerBase::SharedPtr autopilot_state_machine_timer_;
@@ -253,6 +276,7 @@ protected:
   QSharedPointer<EmergencyStopState> mEmergencyStopState;
   QSharedPointer<CopterInterfaceComponent> mCopterInterfaceComponent;
   QSharedPointer<CopterAutopilotComponent> mCopterAutopilotComponent;
+  QSharedPointer<CopterAutopilotComponent> mRthAutopilotComponent;
   QSharedPointer<urdf::Model> mUrdfModel;
   bool has_px4_altitude_ = false;
   float latest_px4_altitude_ = 0.0F;
@@ -264,7 +288,6 @@ protected:
   bool ready_for_offboard_ = false;
   bool ready_to_arm_ = false;
   bool armed_ = false;
-  bool force_arm_ = false;
   bool px4_dist_bottom_valid_ = false;
   float px4_dist_bottom_ = 0.0F;
   bool received_range_data_ = false;
@@ -277,19 +300,30 @@ protected:
   bool preflight_all_pass_logged_ = false;
   int64_t last_preflight_failure_log_time_ns_ = 0;
 
-  bool auto_arm_enabled_ = true;
+  bool feature_auto_arm_enabled_ = true;
+  bool feature_auto_land_enabled_ = true;
   bool auto_landing_active_ = false;
+  bool auto_landing_disarm_requested_ = false;
+  bool inhibit_auto_arm_after_auto_land_ = false;
   double auto_landing_descent_velocity_ = 0.3;
-  bool hover_hold_on_idle_ = true;
+  bool feature_hover_hold_enabled_ = false;
   HighLevelState current_state_ = HighLevelState::STARTING_UP;
   OnSetParametersCallbackHandle::SharedPtr parameter_callback_handle_;
 
+  bool observed_quadcopter_state_received_ = false;
+  bool observed_drone_starting_up_ = false;
+  bool observed_drone_route_activation_allowed_ = false;
+  bool observed_drone_on_mission_ = true;
+  bool observed_drone_returning_home_ = false;
+  bool observed_drone_has_been_on_mission_ = false;
+  bool mission_idle_published_after_observed_drone_left_mission_ = false;
   bool received_active_mission_status_ = false;
   rclcpp::Time last_active_mission_status_time_;
   double mission_state_timeout_ = 1.0;
+  bool ignore_non_rth_mission_status_until_idle_ = false;
 
   bool return_home_on_control_tower_timeout_ = true;
-  bool configure_px4_home_on_lift_off_ = true;
+  bool configure_px4_home_on_climb_ = true;
   bool publish_px4_aux_global_position_ = true;
   double px4_aux_global_position_eph_ = 0.05;
   double px4_aux_global_position_epv_ = 0.05;
@@ -304,14 +338,15 @@ protected:
   bool updating_home_position_parameters_ = false;
   bool return_home_x_configured_ = false;
   bool return_home_y_configured_ = false;
-  double lift_off_position_x_ = 0.0;
-  double lift_off_position_y_ = 0.0;
-  bool has_lift_off_position_ = false;
-  bool has_landed_after_lift_off_ = false;
+  double climb_position_x_ = 0.0;
+  double climb_position_y_ = 0.0;
+  bool has_climb_position_ = false;
+  bool has_landed_after_climb_ = false;
   double control_tower_heartbeat_timeout_ = 2.0;
   double return_home_command_retry_period_ = 2.0;
   bool received_control_tower_heartbeat_ = false;
   bool control_tower_timeout_return_home_active_ = false;
+  bool manual_return_home_active_ = false;
   bool waiting_for_heartbeat_mission_active_ = false;
   bool return_home_completed_ = false;
   bool control_tower_heartbeat_timeout_emergency_stop_active_ = false;
@@ -359,12 +394,13 @@ protected:
   int setpoint_count_ = 0;
   int required_setpoint_count_ = 40;
   bool was_command_active_ = false;
-  bool liftoff_active_ = false;          // true once armed+z>thresh, cleared on in_flight or disarm
-  float liftoff_saved_v_up_ = 0.0F;      // last non-zero upward velocity seen during liftoff
+  bool climb_active_ = false;          // true once armed+z>thresh, cleared on in_flight or disarm
+  float climb_saved_v_up_ = 0.0F;      // last non-zero upward velocity seen during climb
   bool has_hold_position_ = false;
   std::array<float, 3> hold_position_ned_{};
   bool has_last_mode_request_time_ = false;
   rclcpp::Time last_mode_request_time_;
+  bool retry_offboard_for_mission_after_rth_land_ = false;
 
   // Offboard bridge parameters
   double command_timeout_ = 0.5;
@@ -374,7 +410,6 @@ protected:
   double local_position_ready_duration_ = 1.0;
   double hold_velocity_epsilon_ = 1e-4;
   double idle_descent_rate_ = 0.5;
-  bool auto_offboard_ = false;
   bool require_motion_before_engage_ = true;
   double request_retry_period_ = 1.0;
   bool publish_waypoint_markers_ = false;  // disabled by default; control tower draws its own route

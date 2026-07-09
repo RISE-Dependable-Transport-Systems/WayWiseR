@@ -75,6 +75,40 @@ PosType parse_pos_type(const std::string & value)
   }
   return PosType::odom;
 }
+
+bool mission_state_is_route_active(MissionState state)
+{
+  switch (state) {
+    case MissionState::FollowRouteInit:
+    case MissionState::FollowRouteClimb:
+    case MissionState::FollowRouteGotoBegin:
+    case MissionState::FollowRouteFollowing:
+    case MissionState::FollowRouteApproachingEndGoal:
+    case MissionState::FollowRouteApproachingEndGoalZ:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool mission_state_is_return_home_active(MissionState state)
+{
+  switch (state) {
+    case MissionState::ReturnHomeInit:
+    case MissionState::ReturnHomeClimb:
+    case MissionState::ReturnHomeCruising:
+    case MissionState::ReturnHomeLanding:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool mission_state_is_active(MissionState state)
+{
+  return mission_state_is_route_active(state) ||
+         mission_state_is_return_home_active(state);
+}
 }  // namespace
 
 void WaywiserCopter::initialize_node()
@@ -87,6 +121,7 @@ void WaywiserCopter::initialize_node()
 
   enable_autopilot_component_ = declare_parameter("enable_autopilot_component", true);
   mCopterAutopilotComponent.reset(new CopterAutopilotComponent(this, mCopterState));
+  mRthAutopilotComponent.reset(new CopterAutopilotComponent(this, mCopterState));
 
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -101,6 +136,7 @@ void WaywiserCopter::initialize_node()
       mCopterAutopilotComponent->provideParametersToParameterServer();
     }
   }
+  mRthAutopilotComponent->setupAutopilot(mEmergencyStopState);
 
   setup_publishers();
   setup_subscribers();
@@ -110,6 +146,9 @@ void WaywiserCopter::initialize_node()
 
   if (mCopterAutopilotComponent) {
     mCopterAutopilotComponent->reset();
+  }
+  if (mRthAutopilotComponent) {
+    mRthAutopilotComponent->reset();
   }
   mCopterInterfaceComponent->reset();
 
@@ -130,13 +169,14 @@ void WaywiserCopter::setup_parameters()
 
   odom_topic_ = declare_parameter("odom_topic", "/odometry");
   input_odom_topic_ = declare_parameter("input_odom_topic", odom_topic_);
-  arm_command_topic_ = declare_parameter("arm_command_topic", "arm_command");
   fused_nav_sat_fix_extended_topic_ = declare_parameter(
     "fused_nav_sat_fix_extended_topic", "/nav_sat_fix_extended");
   vehicle_pose_topic_ = declare_parameter("vehicle_pose_topic", "/copter_pose");
   home_pose_topic_ = declare_parameter("home_pose_topic", "home_pose");
   range_topic_ = declare_parameter("range_topic", "sensors/range/down");
   quadcopter_state_topic_ = declare_parameter("quadcopter_state_topic", "quadcopter_state");
+  observed_quadcopter_state_topic_ =
+    declare_parameter("observed_quadcopter_state_topic", std::string(""));
   battery_state_topic_ = declare_parameter("battery_state_topic", "/battery_state");
   emergency_stop_status_topic_ = declare_parameter(
     "emergency_stop_status_topic", "/emergency_stop/current_state");
@@ -155,13 +195,12 @@ void WaywiserCopter::setup_parameters()
   publish_world_to_odom_tf_ = declare_parameter("publish_world_to_odom_tf", false);
   in_flight_range_threshold_ = declare_parameter("in_air_range_threshold", 0.2);
   min_steering_height_ = declare_parameter("min_steering_height", 0.5);
-  force_arm_ = declare_parameter("force_arm", false);
-
-  auto_arm_enabled_ = declare_parameter("auto_arm", true);
-  auto_landing_active_ = declare_parameter("auto_landing", false);
+  feature_auto_arm_enabled_ = declare_parameter("feature_auto_arm_enabled", true);
+  feature_auto_land_enabled_ = declare_parameter("feature_auto_land_enabled", true);
+  auto_landing_active_ = false;
   auto_landing_descent_velocity_ = std::max(
     0.0, declare_parameter("auto_landing_descent_velocity", 0.3));
-  hover_hold_on_idle_ = declare_parameter("hold_position_on_idle", true);
+  feature_hover_hold_enabled_ = declare_parameter("feature_hover_hold_enabled", false);
 
   setpoint_rate_ = std::max(2.0, declare_parameter("setpoint_rate", 20.0));
   offboard_prestream_duration_ = declare_parameter("offboard_prestream_duration", 1.5);
@@ -173,13 +212,12 @@ void WaywiserCopter::setup_parameters()
   local_position_ready_duration_ = declare_parameter("local_position_ready_duration", 1.0);
   hold_velocity_epsilon_ = declare_parameter("hold_velocity_epsilon", 1e-4);
   idle_descent_rate_ = std::max(0.0, declare_parameter("idle_descent_rate", 0.5));
-  auto_offboard_ = declare_parameter("auto_offboard", false);
   require_motion_before_engage_ = declare_parameter("require_motion_before_engage", true);
   request_retry_period_ = declare_parameter("request_retry_period", 1.0);
   mission_state_timeout_ = declare_parameter("mission_state_timeout", 1.0);
   return_home_on_control_tower_timeout_ =
     declare_parameter("return_home_on_control_tower_timeout", true);
-  configure_px4_home_on_lift_off_ = declare_parameter("configure_px4_home_on_lift_off", true);
+  configure_px4_home_on_climb_ = declare_parameter("configure_px4_home_on_climb", true);
   publish_px4_aux_global_position_ = declare_parameter("publish_px4_aux_global_position", true);
   px4_aux_global_position_eph_ = std::max(
     0.01, declare_parameter("px4_aux_global_position_eph", 0.05));
@@ -224,10 +262,10 @@ void WaywiserCopter::setup_parameters()
   // Disabled by default: the control tower already visualises the route it sent.
   // Set to true in the YAML to publish markers for RViz2 or other consumers.
   publish_waypoint_markers_ = declare_parameter("publish_waypoint_markers", false);
-  mCopterAutopilotComponent->setAutoLiftOffEnabled(
-    declare_parameter("auto_lift_off_enabled", true));
-  mCopterAutopilotComponent->setAutoLiftOffActive(declare_parameter("auto_lift_off", false));
-  mCopterAutopilotComponent->setAutoLiftOffHeight(declare_parameter("auto_lift_off_height", 2.0));
+  mCopterAutopilotComponent->setAutoClimbEnabled(
+    declare_parameter("feature_auto_climb_enabled", true));
+  mCopterAutopilotComponent->setAutoClimbActive(false);
+  mCopterAutopilotComponent->setAutoClimbHeight(declare_parameter("auto_climb_height", 2.0));
 
   parameter_callback_handle_ = add_on_set_parameters_callback(
     std::bind(&WaywiserCopter::on_parameter_set, this, std::placeholders::_1));
@@ -244,50 +282,67 @@ void WaywiserCopter::setup_parameters()
   declare_parameter("control_tower_selectable", true);
   enable_px4_bridge_ = declare_parameter("enable_px4_bridge", true);
 
-  if (enable_autopilot_component_) {
-    mCopterAutopilotComponent->setAutopilotTimerRate(
-      declare_parameter("autopilot_timer_rate", 10));
-    mCopterAutopilotComponent->setEnableMavlinkInterface(
-      declare_parameter("enable_mavlink_interface", true));
-    mCopterAutopilotComponent->setWaywiseControlTowerAddress(
-      declare_parameter("waywise_control_tower_address", std::string("127.0.0.1")));
-    mCopterAutopilotComponent->setWaywiseControlTowerPort(
-      declare_parameter("waywise_control_tower_port", 14540));
-    mCopterAutopilotComponent->setMissionPosTypeUsed(
-      parse_pos_type(declare_parameter("mission_position_type", std::string("odom"))));
-    mCopterAutopilotComponent->setRequireGnssForMission(
-      declare_parameter("require_gnss_for_mission", false));
-    mCopterAutopilotComponent->setWaypointProximity(
-      declare_parameter("mission_waypoint_proximity", 0.5));
-    mCopterAutopilotComponent->setEndGoalAlignmentThreshold(
-      declare_parameter("mission_end_goal_alignment_threshold", 0.25));
-    mCopterAutopilotComponent->setCruiseSpeed(declare_parameter("mission_cruise_speed", 1.0));
-    mCopterAutopilotComponent->setMaxMissionSpeed(
-      declare_parameter("mission_max_speed", 2.0));
-    mCopterAutopilotComponent->setDescentSpeed(auto_landing_descent_velocity_);
-    mCopterAutopilotComponent->setMinApproachSpeed(
-      declare_parameter("mission_min_approach_speed", 0.1));
-    mCopterAutopilotComponent->setApproachSlowdownRadius(
-      declare_parameter("mission_approach_slowdown_radius", 1.5));
-    mCopterAutopilotComponent->setFaceTravelDirection(
-      declare_parameter("mission_face_travel_direction", true));
-    mCopterAutopilotComponent->setYawGain(declare_parameter("mission_yaw_gain", 1.5));
-    mCopterAutopilotComponent->setMaxYawRate(declare_parameter("mission_max_yaw_rate", 1.0));
-    mCopterAutopilotComponent->setVerticalHeightTolerance(
-      declare_parameter("mission_vertical_height_tolerance", 0.10));
-    mCopterAutopilotComponent->setVerticalProportionalGain(
-      declare_parameter("mission_vertical_proportional_gain", 0.8));
-    mCopterAutopilotComponent->setVerticalIntegralGain(
-      declare_parameter("mission_vertical_integral_gain", 0.04));
-    mCopterAutopilotComponent->setVerticalDerivativeGain(
-      declare_parameter("mission_vertical_derivative_gain", 0.5));
-    mCopterAutopilotComponent->setVerticalIntegralLimit(
-      declare_parameter("mission_vertical_integral_limit", 2.0));
-    mCopterAutopilotComponent->setPositionAccuracyThresholdForMission(
-      declare_parameter("position_accuracy_threshold_for_mission", 0.5));
-    mCopterAutopilotComponent->setYawAccuracyThresholdForMission(
-      declare_parameter("yaw_accuracy_threshold_for_mission", 5.0));
+  const int autopilot_timer_rate = declare_parameter("autopilot_timer_rate", 10);
+  const bool enable_mavlink_interface = declare_parameter("enable_mavlink_interface", true);
+  const std::string waywise_control_tower_address = declare_parameter("waywise_control_tower_address", std::string("127.0.0.1"));
+  const int waywise_control_tower_port = declare_parameter("waywise_control_tower_port", 14540);
+  const PosType mission_pos_type = parse_pos_type(declare_parameter("mission_position_type", std::string("odom")));
+  const bool require_gnss_for_mission = declare_parameter("require_gnss_for_mission", false);
+  const double mission_waypoint_proximity_xy = declare_parameter("mission_waypoint_proximity_xy", 0.5);
+  const double mission_waypoint_proximity_z = declare_parameter("mission_waypoint_proximity_z", 1.0);
+  const double mission_end_goal_alignment_threshold_xy = declare_parameter("mission_end_goal_alignment_threshold_xy", 0.25);
+  const double mission_end_goal_alignment_threshold_z = declare_parameter("mission_end_goal_alignment_threshold_z", 0.25);
+  const double mission_stop_speed_threshold = declare_parameter("mission_stop_speed_threshold", 0.2);
+  const double mission_cruise_speed = declare_parameter("mission_cruise_speed", 1.0);
+  const double mission_max_speed = declare_parameter("mission_max_speed", 2.0);
+  const double mission_min_approach_speed = declare_parameter("mission_min_approach_speed", 0.1);
+  const double mission_approach_slowdown_radius = declare_parameter("mission_approach_slowdown_radius", 1.5);
+  const bool mission_face_travel_direction = declare_parameter("mission_face_travel_direction", true);
+  const double mission_yaw_gain = declare_parameter("mission_yaw_gain", 1.5);
+  const double mission_max_yaw_rate = declare_parameter("mission_max_yaw_rate", 1.0);
+  const double mission_vertical_height_tolerance = declare_parameter("mission_vertical_height_tolerance", 0.10);
+  const double mission_vertical_proportional_gain = declare_parameter("mission_vertical_proportional_gain", 0.8);
+  const double mission_vertical_integral_gain = declare_parameter("mission_vertical_integral_gain", 0.04);
+  const double mission_vertical_derivative_gain = declare_parameter("mission_vertical_derivative_gain", 0.5);
+  const double mission_vertical_integral_limit = declare_parameter("mission_vertical_integral_limit", 2.0);
+  const double position_accuracy_threshold_for_mission = declare_parameter("position_accuracy_threshold_for_mission", 0.5);
+  const double yaw_accuracy_threshold_for_mission = declare_parameter("yaw_accuracy_threshold_for_mission", 5.0);
+
+  auto configure_autopilot = [&](QSharedPointer<CopterAutopilotComponent> comp) {
+    if (!comp) return;
+    comp->setAutopilotTimerRate(autopilot_timer_rate);
+    comp->setEnableMavlinkInterface(enable_mavlink_interface);
+    comp->setWaywiseControlTowerAddress(waywise_control_tower_address);
+    comp->setWaywiseControlTowerPort(waywise_control_tower_port);
+    comp->setMissionPosTypeUsed(mission_pos_type);
+    comp->setRequireGnssForMission(require_gnss_for_mission);
+    comp->setWaypointProximityXY(mission_waypoint_proximity_xy);
+    comp->setWaypointProximityZ(mission_waypoint_proximity_z);
+    comp->setEndGoalAlignmentThresholdXY(mission_end_goal_alignment_threshold_xy);
+    comp->setEndGoalAlignmentThresholdZ(mission_end_goal_alignment_threshold_z);
+    comp->setStopSpeedThreshold(mission_stop_speed_threshold);
+    comp->setCruiseSpeed(mission_cruise_speed);
+    comp->setMaxMissionSpeed(mission_max_speed);
+    comp->setDescentSpeed(auto_landing_descent_velocity_);
+    comp->setMinApproachSpeed(mission_min_approach_speed);
+    comp->setApproachSlowdownRadius(mission_approach_slowdown_radius);
+    comp->setFaceTravelDirection(mission_face_travel_direction);
+    comp->setYawGain(mission_yaw_gain);
+    comp->setMaxYawRate(mission_max_yaw_rate);
+    comp->setVerticalHeightTolerance(mission_vertical_height_tolerance);
+    comp->setVerticalProportionalGain(mission_vertical_proportional_gain);
+    comp->setVerticalIntegralGain(mission_vertical_integral_gain);
+    comp->setVerticalDerivativeGain(mission_vertical_derivative_gain);
+    comp->setVerticalIntegralLimit(mission_vertical_integral_limit);
+    comp->setPositionAccuracyThresholdForMission(position_accuracy_threshold_for_mission);
+    comp->setYawAccuracyThresholdForMission(yaw_accuracy_threshold_for_mission);
+  };
+
+  if (enable_autopilot_component_)
+  {
+    configure_autopilot(mCopterAutopilotComponent);
   }
+  configure_autopilot(mRthAutopilotComponent);
 
   auto vector3_param = RosUtils::get_vector3_param(this, "enuref");
   if (vector3_param) {
@@ -344,6 +399,11 @@ void WaywiserCopter::setup_publishers()
     mission_status_pub_ =
       create_publisher<waywiser_core::msg::MissionState>(
       mission_status_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS);
+    if (enable_autopilot_component_) {
+      waywiser_core::msg::MissionState missionStateMsg;
+      missionStateMsg.state = static_cast<uint8_t>(MissionState::WaitingForVehicleInit);
+      mission_status_pub_->publish(missionStateMsg);
+    }
   }
   if (!control_tower_heartbeat_rx_state_topic_.empty()) {
     control_tower_heartbeat_rx_state_pub_ =
@@ -388,6 +448,19 @@ void WaywiserCopter::setup_publishers()
             break;
           case MissionState::Idle:
           case MissionState::FollowRouteFinished:
+            if (mCopterAutopilotComponent->getAutoClimbActive()) {
+              current_cmd_vel_in_ = geometry_msgs::msg::Twist();
+              current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+              last_input_command_time_ = 0.0;
+              climb_active_ = false;
+              climb_saved_v_up_ = 0.0F;
+              if (has_vehicle_local_position_) {
+                hold_position_ned_ = {local_position_x_, local_position_y_, local_position_z_};
+                has_hold_position_ = true;
+              }
+              RCLCPP_INFO(get_logger(), "Auto climb finished. Switching to hover hold.");
+              publish_quadcopter_state();
+            }
             publish_autopilot_markers();
             break;
           default:
@@ -409,11 +482,6 @@ void WaywiserCopter::setup_subscribers()
   if (mCopterInterfaceComponent->getVehicleInterfaceType() == VehicleInterfaceType::EXT_SIMULATED &&
     enable_px4_bridge_)
   {
-    if (!arm_command_topic_.empty()) {
-      arm_command_sub_ = create_subscription<std_msgs::msg::Bool>(
-        arm_command_topic_, 10, std::bind(&WaywiserCopter::arm_command_callback, this, _1));
-    }
-
     auto px4_qos = rclcpp::QoS(rclcpp::KeepLast(7))
       .reliable()
       .durability_volatile();
@@ -476,6 +544,13 @@ void WaywiserCopter::setup_subscribers()
   }
 
   if (enable_autopilot_component_) {
+    if (!enable_px4_bridge_ && !observed_quadcopter_state_topic_.empty()) {
+      observed_quadcopter_state_sub_ =
+        create_subscription<waywiser_core::msg::QuadcopterState>(
+        observed_quadcopter_state_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS,
+        std::bind(&WaywiserCopter::observed_quadcopter_state_callback, this, _1));
+    }
+
     if (!autopilot_state_control_topic_.empty()) {
       autopilot_state_control_sub_ = create_subscription<std_msgs::msg::Bool>(
         autopilot_state_control_topic_,
@@ -491,6 +566,22 @@ void WaywiserCopter::setup_subscribers()
       mission_status_topic_, QOS_PROFILES::RELIABLE_TRANSIENT_LOCAL_QOS,
       std::bind(&WaywiserCopter::mission_status_callback, this, _1));
   }
+
+  return_home_srv_ = create_service<std_srvs::srv::SetBool>(
+    "~/return_home",
+    std::bind(&WaywiserCopter::handle_return_home_request, this, std::placeholders::_1, std::placeholders::_2));
+
+  auto_land_srv_ = create_service<std_srvs::srv::SetBool>(
+    "~/auto_landing",
+    std::bind(&WaywiserCopter::handle_auto_land_request, this, std::placeholders::_1, std::placeholders::_2));
+
+  arm_srv_ = create_service<std_srvs::srv::SetBool>(
+    "~/arm",
+    std::bind(&WaywiserCopter::handle_arm_request, this, std::placeholders::_1, std::placeholders::_2));
+
+  auto_climb_srv_ = create_service<std_srvs::srv::SetBool>(
+    "~/auto_climb",
+    std::bind(&WaywiserCopter::handle_auto_climb_request, this, std::placeholders::_1, std::placeholders::_2));
 }
 
 void WaywiserCopter::setup_timers()
@@ -512,15 +603,42 @@ void WaywiserCopter::setup_timers()
       std::bind(&WaywiserCopter::setpoint_timer_callback, this));
   }
 
-  if (enable_autopilot_component_) {
-    autopilot_state_machine_timer_ = rclcpp::create_timer(
-      this->get_node_base_interface(),
-      this->get_node_timers_interface(),
-      this->get_clock(),
-      std::chrono::milliseconds(1000 / mCopterAutopilotComponent->getAutopilotTimerRate()),
-      std::bind(&CopterAutopilotComponent::processMissionStateMachine, mCopterAutopilotComponent)
-    );
+  const int autopilot_timer_rate = get_parameter("autopilot_timer_rate").as_int();
+  autopilot_state_machine_timer_ = rclcpp::create_timer(
+    this->get_node_base_interface(),
+    this->get_node_timers_interface(),
+    this->get_clock(),
+    std::chrono::milliseconds(1000 / autopilot_timer_rate),
+    std::bind(&WaywiserCopter::process_autopilots, this)
+  );
+}
+
+void WaywiserCopter::process_autopilots()
+{
+  if (enable_autopilot_component_ && mCopterAutopilotComponent) {
+    if (waypoint_follower_route_activation_allowed()) {
+      const auto current_mission_state = mCopterAutopilotComponent->getCurrentMissionState();
+      if (!mCopterAutopilotComponent->getWaypointList().isEmpty() &&
+        !mCopterAutopilotComponent->isActive() &&
+        !mission_state_is_route_active(current_mission_state))
+      {
+        mCopterAutopilotComponent->switchAutopilot(true);
+      }
+      mCopterAutopilotComponent->processMissionStateMachine();
+    }
   }
+  if (mRthAutopilotComponent) {
+    mRthAutopilotComponent->processMissionStateMachine();
+  }
+}
+
+bool WaywiserCopter::waypoint_follower_route_activation_allowed() const
+{
+  if (enable_px4_bridge_ || observed_quadcopter_state_topic_.empty()) {
+    return true;
+  }
+
+  return observed_quadcopter_state_received_ && observed_drone_route_activation_allowed_;
 }
 
 void WaywiserCopter::node_management_timer_callback()
@@ -536,8 +654,8 @@ void WaywiserCopter::node_management_timer_callback()
         (return_home_x_configured_ || home_position_x_configured_) &&
         (return_home_y_configured_ || home_position_y_configured_);
     }
-    has_lift_off_position_ = false;
-    has_landed_after_lift_off_ = false;
+    has_climb_position_ = false;
+    has_landed_after_climb_ = false;
     px4_home_position_set_ = false;
     if (home_pose_pub_) {
       home_pose_pub_.reset();
@@ -557,9 +675,10 @@ void WaywiserCopter::node_management_timer_callback()
     has_hold_position_ = false;
     last_input_command_time_ = -1.0;
     was_command_active_ = false;
-    liftoff_active_ = false;
-    liftoff_saved_v_up_ = 0.0F;
+    climb_active_ = false;
+    climb_saved_v_up_ = 0.0F;
     current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+    current_cmd_vel_in_ = geometry_msgs::msg::Twist();
     last_node_management_time_ = now_time;
     return;
   }
@@ -580,6 +699,11 @@ void WaywiserCopter::node_management_timer_callback()
     enable_px4_bridge_ &&
     !received_first_odom_msg_)
   {
+    if (enable_autopilot_component_ && mission_status_pub_) {
+      waywiser_core::msg::MissionState missionStateMsg;
+      missionStateMsg.state = static_cast<uint8_t>(MissionState::WaitingForVehicleInit);
+      mission_status_pub_->publish(missionStateMsg);
+    }
     return;
   }
 
@@ -588,24 +712,82 @@ void WaywiserCopter::node_management_timer_callback()
   }
 
   if (enable_autopilot_component_ && mission_status_pub_) {
-    waywiser_core::msg::MissionState missionStateMsg;
     const auto current_mission_state = mCopterAutopilotComponent->getCurrentMissionState();
-    if (control_tower_timeout_return_home_active_) {
-      missionStateMsg.state =
-        static_cast<uint8_t>(derive_return_home_mission_state());
+    const bool auto_climb_active = mCopterAutopilotComponent->getAutoClimbActive();
+    const bool route_mission_active =
+      mission_state_is_route_active(current_mission_state) &&
+      !auto_climb_active;
+    const bool route_pending = !mCopterAutopilotComponent->getWaypointList().isEmpty();
+    const bool vehicle_starting_up = enable_px4_bridge_ &&
+      derive_quadcopter_state() == HighLevelState::STARTING_UP;
+    if (!enable_px4_bridge_ && is_return_home_active()) {
+      // Do not publish mission status from the waypoint follower node during RTH.
+      // Let the primary drone node publish the RTH mission state.
+    } else if (!enable_px4_bridge_ &&
+      route_pending &&
+      !waypoint_follower_route_activation_allowed())
+    {
+      waywiser_core::msg::MissionState missionStateMsg;
+      missionStateMsg.state = static_cast<uint8_t>(MissionState::WaitingForVehicleInit);
+      mission_status_pub_->publish(missionStateMsg);
+    } else if (!enable_px4_bridge_ &&
+      !observed_quadcopter_state_topic_.empty() &&
+      (!observed_quadcopter_state_received_ || observed_drone_starting_up_))
+    {
+      waywiser_core::msg::MissionState missionStateMsg;
+      missionStateMsg.state = static_cast<uint8_t>(MissionState::WaitingForVehicleInit);
+      mission_status_pub_->publish(missionStateMsg);
+    } else if (vehicle_starting_up) {
+      waywiser_core::msg::MissionState missionStateMsg;
+      missionStateMsg.state = static_cast<uint8_t>(MissionState::WaitingForVehicleInit);
+      mission_status_pub_->publish(missionStateMsg);
+    } else if (!enable_px4_bridge_ && auto_climb_active) {
+      waywiser_core::msg::MissionState missionStateMsg;
+      missionStateMsg.state = static_cast<uint8_t>(MissionState::Idle);
+      mission_status_pub_->publish(missionStateMsg);
+    } else if (!enable_px4_bridge_ &&
+      observed_quadcopter_state_received_ &&
+      observed_drone_has_been_on_mission_ &&
+      !observed_drone_on_mission_ &&
+      !observed_drone_returning_home_ &&
+      !route_mission_active)
+    {
+      waywiser_core::msg::MissionState missionStateMsg;
+      missionStateMsg.state = static_cast<uint8_t>(MissionState::Idle);
+      mission_status_pub_->publish(missionStateMsg);
     } else {
-      missionStateMsg.state =
-        static_cast<uint8_t>(current_mission_state);
+      if (!enable_px4_bridge_ && (observed_drone_on_mission_ || observed_drone_returning_home_) && !route_mission_active) {
+        return; // Let the primary drone node publish its mission state (e.g. RTH)
+      }
+      waywiser_core::msg::MissionState missionStateMsg;
+      if (is_return_home_active()) {
+        missionStateMsg.state =
+          static_cast<uint8_t>(derive_return_home_mission_state());
+      } else if (auto_landing_active_) {
+        missionStateMsg.state = static_cast<uint8_t>(MissionState::Idle);
+      } else if (return_home_completed_) {
+        // RTH is done; publish Idle so the UI clears the RTH Landing state.
+        missionStateMsg.state = static_cast<uint8_t>(MissionState::Idle);
+      } else {
+        missionStateMsg.state =
+          static_cast<uint8_t>(current_mission_state);
+      }
+      mission_status_pub_->publish(missionStateMsg);
     }
-    mission_status_pub_->publish(missionStateMsg);
   } else if (
     !enable_autopilot_component_ &&
-    control_tower_timeout_return_home_active_ &&
-    waiting_for_heartbeat_mission_active_ &&
     mission_status_pub_)
   {
     waywiser_core::msg::MissionState missionStateMsg;
-    missionStateMsg.state = static_cast<uint8_t>(derive_return_home_mission_state());
+    if (is_return_home_active()) {
+      missionStateMsg.state = static_cast<uint8_t>(derive_return_home_mission_state());
+    } else if (auto_landing_active_) {
+      missionStateMsg.state = static_cast<uint8_t>(MissionState::Idle);
+    } else if (return_home_completed_) {
+      missionStateMsg.state = static_cast<uint8_t>(MissionState::Idle);
+    } else {
+      return; // nothing RTH-related to publish
+    }
     mission_status_pub_->publish(missionStateMsg);
   }
 
@@ -634,7 +816,7 @@ void WaywiserCopter::odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom
 
   CoreUtils::update_pospoint_from_pose(
     mCopterState, {0.0, 0.0, 0.0}, odom_msg->pose.pose, PosType::odom);
-  if (!home_position_initialized_ && (!armed_ || first_odom_msg) && !has_lift_off_position_ &&
+  if (!home_position_initialized_ && (!armed_ || first_odom_msg) && !has_climb_position_ &&
     (!return_home_x_configured_ || !return_home_y_configured_))
   {
     const PosPoint odom_position = mCopterState->getPosition(PosType::odom);
@@ -648,6 +830,11 @@ void WaywiserCopter::odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom
     mCopterAutopilotComponent->getMissionPosTypeUsed() == PosType::odom)
   {
     mCopterAutopilotComponent->setVehicleInitialized(true);
+  }
+  if (mRthAutopilotComponent &&
+    mRthAutopilotComponent->getMissionPosTypeUsed() == PosType::odom)
+  {
+    mRthAutopilotComponent->setVehicleInitialized(true);
   }
 
   mCopterState->setVelocity(
@@ -772,14 +959,23 @@ void WaywiserCopter::px4_vehicle_land_detected_callback(
   px4_landed_ = msg->landed;
   refresh_in_flight_status();
   if (return_home_landed_at_home()) {
+    const bool was_heartbeat_failsafe =
+      control_tower_timeout_return_home_active_ && !manual_return_home_active_;
     clear_return_home_failsafe();
+    manual_return_home_active_ = false;
     return_home_completed_ = true;
-    publish_control_tower_timeout_emergency_stop(control_tower_heartbeat_monitor_age());
+    if (was_heartbeat_failsafe) {
+      publish_control_tower_timeout_emergency_stop(control_tower_heartbeat_monitor_age());
+    }
     if (mCopterAutopilotComponent) {
       mCopterAutopilotComponent->clearWaypointFollowerRoute();
     }
+    if (mRthAutopilotComponent) {
+      mRthAutopilotComponent->clearWaypointFollowerRoute();
+    }
     current_cmd_vel_out_ = geometry_msgs::msg::Twist();
-    RCLCPP_INFO(get_logger(), "Return-home failsafe completed: vehicle landed at home.");
+    current_cmd_vel_in_ = geometry_msgs::msg::Twist();
+    RCLCPP_INFO(get_logger(), "Return-home completed: vehicle landed at home.");
   }
   if (return_home_completed_ && armed_) {
     const auto now_time = get_clock()->now();
@@ -791,6 +987,7 @@ void WaywiserCopter::px4_vehicle_land_detected_callback(
       last_return_home_disarm_request_time_ = now_time;
       RCLCPP_INFO(get_logger(), "Return-home landing complete. Requesting forced disarm.");
       send_arm_command(false, true);
+      last_arm_request_value_ = false;
     }
   }
   publish_quadcopter_state();
@@ -873,7 +1070,14 @@ void WaywiserCopter::px4_vehicle_status_callback(
 {
   armed_ = (msg->arming_state == px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED);
   if (!armed_) {
-    has_lift_off_position_ = false;
+    has_climb_position_ = false;
+    if (auto_landing_active_) {
+      auto_landing_active_ = false;
+      auto_landing_disarm_requested_ = false;
+      inhibit_auto_arm_after_auto_land_ = true;
+      current_cmd_vel_in_ = geometry_msgs::msg::Twist();
+      current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+    }
   }
   px4_nav_state_ = msg->nav_state;
   ready_to_arm_ = msg->pre_flight_checks_pass;
@@ -890,33 +1094,127 @@ void WaywiserCopter::px4_home_position_callback(const px4_msgs::msg::HomePositio
   }
 }
 
-void WaywiserCopter::arm_command_callback(const std_msgs::msg::Bool::SharedPtr msg)
+void WaywiserCopter::observed_quadcopter_state_callback(
+  const waywiser_core::msg::QuadcopterState::SharedPtr msg)
 {
-  request_arm_state(msg->data);
+  const bool was_on_mission =
+    !observed_quadcopter_state_received_ || observed_drone_on_mission_;
+  observed_quadcopter_state_received_ = true;
+  observed_drone_starting_up_ =
+    msg->state_code == waywiser_core::msg::QuadcopterState::STARTING_UP;
+  switch (msg->state_code) {
+    case waywiser_core::msg::QuadcopterState::READY_TO_ARM:
+    case waywiser_core::msg::QuadcopterState::ARMED:
+    case waywiser_core::msg::QuadcopterState::IN_FLIGHT:
+    case waywiser_core::msg::QuadcopterState::LANDING:
+    case waywiser_core::msg::QuadcopterState::CLIMBING:
+    case waywiser_core::msg::QuadcopterState::HOVERING:
+    case waywiser_core::msg::QuadcopterState::ON_MISSION:
+    case waywiser_core::msg::QuadcopterState::RETURNING_HOME:
+      observed_drone_route_activation_allowed_ = true;
+      break;
+    default:
+      observed_drone_route_activation_allowed_ = false;
+      break;
+  }
+  observed_drone_on_mission_ =
+    msg->state_code == waywiser_core::msg::QuadcopterState::ON_MISSION;
+  observed_drone_returning_home_ =
+    msg->state_code == waywiser_core::msg::QuadcopterState::RETURNING_HOME;
+  const bool observed_drone_landing =
+    msg->state_code == waywiser_core::msg::QuadcopterState::LANDING;
+  const bool observed_drone_climbing =
+    msg->state_code == waywiser_core::msg::QuadcopterState::CLIMBING;
+  const auto current_mission_state = mCopterAutopilotComponent ?
+    mCopterAutopilotComponent->getCurrentMissionState() :
+    MissionState::Idle;
+  const bool route_mission_active =
+    mCopterAutopilotComponent &&
+    mission_state_is_route_active(current_mission_state) &&
+    !mCopterAutopilotComponent->getAutoClimbActive();
+
+  // Only block cmd_vel and bail out if THIS node still has auto_landing active.
+  // If auto_landing was already cancelled (e.g. by a climb request sent to the main node
+  // just before this callback fires), do NOT zero cmd_vel — the drone needs to hold/climb.
+  if (observed_drone_landing && auto_landing_active_ &&
+      !(mCopterAutopilotComponent && mCopterAutopilotComponent->getAutoClimbActive())) {
+    if (mCopterAutopilotComponent) {
+      mCopterAutopilotComponent->clearWaypointFollowerRoute();
+    }
+    current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+    current_cmd_vel_in_ = geometry_msgs::msg::Twist();
+    if (mission_status_pub_) {
+      waywiser_core::msg::MissionState missionStateMsg;
+      missionStateMsg.state = static_cast<uint8_t>(MissionState::Idle);
+      mission_status_pub_->publish(missionStateMsg);
+    }
+    mission_idle_published_after_observed_drone_left_mission_ = true;
+    return;
+  }
+
+  if (waypoint_follower_route_activation_allowed() &&
+    mCopterAutopilotComponent &&
+    !mCopterAutopilotComponent->getWaypointList().isEmpty() &&
+    !mCopterAutopilotComponent->isActive() &&
+    !route_mission_active)
+  {
+    mCopterAutopilotComponent->switchAutopilot(true);
+    mCopterAutopilotComponent->processMissionStateMachine();
+  }
+
+  if (observed_drone_on_mission_) {
+    observed_drone_has_been_on_mission_ = true;
+    mission_idle_published_after_observed_drone_left_mission_ = false;
+    return;
+  }
+
+  if (route_mission_active && observed_drone_climbing) {
+    return;
+  }
+
+  if (observed_drone_has_been_on_mission_ && was_on_mission) {
+    if (mCopterAutopilotComponent) {
+      mCopterAutopilotComponent->clearWaypointFollowerRoute();
+    }
+    current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+    current_cmd_vel_in_ = geometry_msgs::msg::Twist();
+    if (mission_status_pub_) {
+      waywiser_core::msg::MissionState missionStateMsg;
+      missionStateMsg.state = static_cast<uint8_t>(MissionState::Idle);
+      mission_status_pub_->publish(missionStateMsg);
+    }
+    mission_idle_published_after_observed_drone_left_mission_ = true;
+  }
 }
 
-void WaywiserCopter::request_arm_state(bool arm)
+bool WaywiserCopter::request_arm_state(bool arm)
 {
   if (arm) {
+    if (auto_landing_active_ || auto_landing_disarm_requested_) {
+      RCLCPP_WARN_THROTTLE(
+        this->get_logger(), *get_clock(), 2000,
+        "Ignoring arm request: auto landing is active.");
+      return false;
+    }
     if (armed_) {
-      return;
+      return true;
     }
     if (!px4_ready_for_arm_command(ready_for_takeoff_, ready_for_offboard_, ready_to_arm_)) {
-      return;
+      return false;
     }
     if (control_tower_heartbeat_timed_out()) {
       RCLCPP_WARN(
         this->get_logger(),
         "Ignoring arm request: Control Tower heartbeat is timed out.");
-      return;
+      return false;
     }
   } else {
     if (!armed_) {
-      return;
+      return true;
     }
     if (in_flight_) {
       RCLCPP_WARN(this->get_logger(), "Ignoring disarm request: vehicle is still in flight.");
-      return;
+      return false;
     }
   }
 
@@ -925,13 +1223,13 @@ void WaywiserCopter::request_arm_state(bool arm)
     arm && last_arm_request_value_ &&
     (now_monotonic - last_arm_request_time_) < arm_transition_grace_period_)
   {
-    return;
+    return true;
   }
   if (
     last_arm_request_value_ == arm &&
     (now_monotonic - last_arm_request_time_) < arm_request_debounce_period_)
   {
-    return;
+    return true;
   }
 
   last_arm_request_value_ = arm;
@@ -939,11 +1237,13 @@ void WaywiserCopter::request_arm_state(bool arm)
 
   if (arm) {
     clear_return_home_failsafe();
+    manual_return_home_active_ = false;
     return_home_completed_ = false;
     return_home_disarm_requested_ = false;
     has_last_return_home_disarm_request_time_ = false;
-    has_landed_after_lift_off_ = false;
+    has_landed_after_climb_ = false;
     current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+    current_cmd_vel_in_ = geometry_msgs::msg::Twist();
     send_offboard_mode_command();
     send_arm_command(true);
     RCLCPP_INFO(this->get_logger(), "Sent PX4 offboard mode and arm commands.");
@@ -951,6 +1251,7 @@ void WaywiserCopter::request_arm_state(bool arm)
     send_arm_command(false);
     RCLCPP_INFO(this->get_logger(), "Sent PX4 disarm command.");
   }
+  return true;
 }
 
 void WaywiserCopter::send_arm_command(bool arm, bool force)
@@ -964,7 +1265,7 @@ void WaywiserCopter::send_arm_command(bool arm, bool force)
   command.timestamp = static_cast<uint64_t>(this->get_clock()->now().nanoseconds() / 1000);
   command.command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM;
   command.param1 = arm ? 1.0F : 0.0F;
-  command.param2 = (force || force_arm_) ? 21196.0F : 0.0F;
+  command.param2 = force ? 21196.0F : 0.0F;
   command.target_system = 1;
   command.target_component = 1;
   command.source_system = 1;
@@ -997,7 +1298,19 @@ void WaywiserCopter::send_offboard_mode_command()
 
 bool WaywiserCopter::send_waywiser_return_home_command()
 {
-  if (!enable_autopilot_component_ || !mCopterAutopilotComponent) {
+  if (!enable_px4_bridge_) {
+    return true; // Waypoint follower node should not generate RTH routes.
+  }
+
+  if (return_home_position_reached()) {
+    if (send_px4_land_at_current_position_command()) {
+      return_home_landing_phase_active_ = true;
+      return true;
+    }
+    return false;
+  }
+
+  if (!mRthAutopilotComponent) {
     return false;
   }
 
@@ -1005,7 +1318,7 @@ bool WaywiserCopter::send_waywiser_return_home_command()
   PosPoint returnHomeApproach = mCopterState->getPosition(PosType::odom);
   const double target_home_x = home_position_x_;
   const double target_home_y = home_position_y_;
-  const double cruise_speed = mCopterAutopilotComponent->getCruiseSpeed();
+  const double cruise_speed = mRthAutopilotComponent->getCruiseSpeed();
   PosPoint returnHomeCruiseStart = returnHomeApproach;
   returnHomeCruiseStart.setHeight(return_home_height_);
   returnHomeCruiseStart.setSpeed(cruise_speed);
@@ -1019,7 +1332,7 @@ bool WaywiserCopter::send_waywiser_return_home_command()
   returnHomeLanding.setHeight(0.0);
   returnHomeLanding.setSpeed(auto_landing_descent_velocity_);
   returnHomeRoute.append(returnHomeLanding);
-  mCopterAutopilotComponent->startWaypointFollowerRouteFromBeginning(returnHomeRoute);
+  mRthAutopilotComponent->startWaypointFollowerRouteFromBeginning(returnHomeRoute);
   return_home_landing_phase_active_ = false;
   RCLCPP_WARN(
     this->get_logger(),
@@ -1033,7 +1346,7 @@ bool WaywiserCopter::send_waywiser_return_home_command()
 
 bool WaywiserCopter::return_home_landed_at_home() const
 {
-  if (!control_tower_timeout_return_home_active_) {
+  if (!is_return_home_active()) {
     return false;
   }
 
@@ -1051,8 +1364,8 @@ bool WaywiserCopter::return_home_landed_at_home() const
 
   const double home_distance = std::hypot(
     odom_position.getX() - home_position_x_, odom_position.getY() - home_position_y_);
-  const double home_tolerance = mCopterAutopilotComponent
-    ? std::max(1.0, mCopterAutopilotComponent->getWaypointProximity())
+  const double home_tolerance = mRthAutopilotComponent
+    ? std::max(1.0, mRthAutopilotComponent->getWaypointProximityXY())
     : 1.0;
   return home_distance <= home_tolerance;
 }
@@ -1063,10 +1376,18 @@ bool WaywiserCopter::return_home_position_reached() const
   const double home_distance = std::hypot(
     odom_position.getX() - home_position_x_, odom_position.getY() - home_position_y_);
   double home_tolerance = kDefaultHomePositionTolerance;
-  if (mCopterAutopilotComponent) {
-    home_tolerance = std::max(home_tolerance, mCopterAutopilotComponent->getWaypointProximity());
+  if (mRthAutopilotComponent) {
+    home_tolerance = std::max(home_tolerance, mRthAutopilotComponent->getWaypointProximityXY());
   }
   return home_distance <= home_tolerance;
+}
+
+bool WaywiserCopter::return_home_cruise_height_reached() const
+{
+  const PosPoint odom_position = mCopterState->getPosition(PosType::odom);
+  const double height_tolerance = mRthAutopilotComponent ?
+    mRthAutopilotComponent->getVerticalHeightTolerance() : 0.5;
+  return odom_position.getHeight() + height_tolerance >= return_home_height_;
 }
 
 bool WaywiserCopter::return_home_ready_to_land() const
@@ -1074,24 +1395,23 @@ bool WaywiserCopter::return_home_ready_to_land() const
   if (!return_home_position_reached()) {
     return false;
   }
+  if (!return_home_cruise_height_reached()) {
+    return false;
+  }
 
   const auto velocity = mCopterState->getVelocity();
   const double horizontal_speed = std::hypot(velocity.x, velocity.y);
-  const double speed_tolerance = mCopterAutopilotComponent ?
+  const double speed_tolerance = mRthAutopilotComponent ?
     std::max(
       kReturnHomeLandingHorizontalSpeedThreshold,
-      mCopterAutopilotComponent->getMinApproachSpeed()) :
+      mRthAutopilotComponent->getMinApproachSpeed()) :
     kReturnHomeLandingHorizontalSpeedThreshold;
   return horizontal_speed <= speed_tolerance;
 }
 
 MissionState WaywiserCopter::derive_return_home_mission_state() const
 {
-  const PosPoint odom_position = mCopterState->getPosition(PosType::odom);
-  const double height_tolerance = mCopterAutopilotComponent ?
-    mCopterAutopilotComponent->getVerticalHeightTolerance() : 0.5;
-
-  if (return_home_landing_phase_active_ || return_home_land_request_sent_ || return_home_ready_to_land()) {
+  if (return_home_landing_phase_active_ || return_home_land_request_sent_) {
     return MissionState::ReturnHomeLanding;
   }
 
@@ -1102,8 +1422,12 @@ MissionState WaywiserCopter::derive_return_home_mission_state() const
   const bool px4_climbing =
     has_px4_vertical_velocity_ && std::isfinite(latest_px4_vertical_velocity_) &&
     latest_px4_vertical_velocity_ > kVerticalMotionInAirThreshold;
-  if (px4_climbing || odom_position.getHeight() + height_tolerance < return_home_height_) {
-    return MissionState::ReturnHomeLiftOff;
+  if (px4_climbing || !return_home_cruise_height_reached()) {
+    return MissionState::ReturnHomeClimb;
+  }
+
+  if (return_home_ready_to_land()) {
+    return MissionState::ReturnHomeLanding;
   }
 
   return MissionState::ReturnHomeCruising;
@@ -1113,6 +1437,7 @@ void WaywiserCopter::clear_return_home_failsafe()
 {
   control_tower_timeout_return_home_active_ = false;
   waiting_for_heartbeat_mission_active_ = false;
+  ignore_non_rth_mission_status_until_idle_ = false;
   has_last_return_home_request_time_ = false;
   return_home_request_sent_ = false;
   return_home_land_request_sent_ = false;
@@ -1121,8 +1446,10 @@ void WaywiserCopter::clear_return_home_failsafe()
 
 void WaywiserCopter::cancel_return_home_failsafe_on_heartbeat_restore()
 {
+  // Only clears heartbeat-timeout-specific flags. RTH completion state
+  // (return_home_completed_, manual_return_home_active_) is owned by the RTH
+  // state machine and must NOT be touched here.
   clear_return_home_failsafe();
-  return_home_completed_ = false;
   control_tower_heartbeat_timeout_emergency_stop_active_ = false;
   return_home_disarm_requested_ = false;
   has_last_return_home_disarm_request_time_ = false;
@@ -1133,7 +1460,7 @@ void WaywiserCopter::cancel_return_home_failsafe_on_heartbeat_restore()
     if (has_vehicle_local_position_) {
       hold_position_ned_ = {local_position_x_, local_position_y_, local_position_z_};
       has_hold_position_ = true;
-      publish_offboard_control_mode(hover_hold_on_idle_);
+      publish_offboard_control_mode(feature_hover_hold_enabled_);
       publish_trajectory_setpoint();
     }
     send_offboard_mode_command();
@@ -1166,6 +1493,9 @@ bool WaywiserCopter::send_px4_land_at_current_position_command()
   return_home_land_request_sent_ = true;
   if (mCopterAutopilotComponent) {
     mCopterAutopilotComponent->clearWaypointFollowerRoute();
+  }
+  if (mRthAutopilotComponent) {
+    mRthAutopilotComponent->clearWaypointFollowerRoute();
   }
   RCLCPP_INFO(
     this->get_logger(),
@@ -1210,7 +1540,7 @@ bool WaywiserCopter::configure_px4_global_origin()
 
 void WaywiserCopter::configure_px4_home_position()
 {
-  if (!configure_px4_home_on_lift_off_) {
+  if (!configure_px4_home_on_climb_) {
     return;
   }
 
@@ -1286,7 +1616,7 @@ void WaywiserCopter::refresh_in_flight_status()
 {
   if (!armed_) {
     in_flight_ = false;
-    has_lift_off_position_ = false;
+    has_climb_position_ = false;
     return;
   }
 
@@ -1311,8 +1641,10 @@ void WaywiserCopter::refresh_in_flight_status()
     has_px4_vertical_velocity_ && std::isfinite(latest_px4_vertical_velocity_) &&
     (std::fabs(latest_px4_vertical_velocity_) > kVerticalMotionInAirThreshold);
   const bool climb_command_active =
+    current_cmd_vel_in_.linear.z > 0.01 ||
     current_cmd_vel_out_.linear.z > 0.01 ||
-    (mCopterAutopilotComponent && mCopterAutopilotComponent->getAutoLiftOffActive());
+    climb_active_ ||
+    (mCopterAutopilotComponent && mCopterAutopilotComponent->getAutoClimbActive());
   const bool takeoff_evidence =
     vertical_motion_active ||
     (climb_command_active && (range_above_takeoff_threshold || altitude_above_takeoff_threshold));
@@ -1320,27 +1652,28 @@ void WaywiserCopter::refresh_in_flight_status()
   const PosPoint odom_position = mCopterState->getPosition(PosType::odom);
   const bool odom_near_ground = odom_position.getHeight() <= landed_height_threshold;
   const bool touchdown_evidence =
-    px4_landed_ ||
-    (touchdown_cue && !vertical_motion_active && (range_near_ground || altitude_near_ground)) ||
-    (odom_near_ground && !vertical_motion_active);
+    !climb_command_active &&
+    (px4_landed_ ||
+     (touchdown_cue && !vertical_motion_active && (range_near_ground || altitude_near_ground)) ||
+     (odom_near_ground && !vertical_motion_active));
 
   if (in_flight_) {
     in_flight_ = !touchdown_evidence;
-    if (!in_flight_ && has_lift_off_position_) {
-      has_landed_after_lift_off_ = true;
+    if (!in_flight_ && has_climb_position_) {
+      has_landed_after_climb_ = true;
     }
     return;
   }
 
   in_flight_ = takeoff_evidence && !touchdown_evidence;
   if (in_flight_ && !was_in_flight) {
-    has_landed_after_lift_off_ = false;
-    lift_off_position_x_ = odom_position.getX();
-    lift_off_position_y_ = odom_position.getY();
-    has_lift_off_position_ = true;
+    has_landed_after_climb_ = false;
+    climb_position_x_ = odom_position.getX();
+    climb_position_y_ = odom_position.getY();
+    has_climb_position_ = true;
     update_home_position_parameters(
-      return_home_x_configured_ ? return_home_x_ : lift_off_position_x_,
-      return_home_y_configured_ ? return_home_y_ : lift_off_position_y_);
+      return_home_x_configured_ ? return_home_x_ : climb_position_x_,
+      return_home_y_configured_ ? return_home_y_ : climb_position_y_);
     configure_px4_home_position();
   }
 }
@@ -1408,17 +1741,11 @@ void WaywiserCopter::publish_quadcopter_state()
     case HighLevelState::HOVERING:
       msg.state_str = "Hovering";
       break;
-    case HighLevelState::IDLE_DESCENT:
-      msg.state_str = "Idle descent";
-      break;
     case HighLevelState::LANDING:
       msg.state_str = "Landing";
       break;
-    case HighLevelState::LIFTING_OFF:
-      msg.state_str = "Lifting off";
-      break;
-    case HighLevelState::AUTO_LIFTING_OFF:
-      msg.state_str = "Lifting off (Auto)";
+    case HighLevelState::CLIMBING:
+      msg.state_str = "Climbing";
       break;
     case HighLevelState::EMERGENCY:
       msg.state_str = "EMERGENCY STOP";
@@ -1448,49 +1775,62 @@ WaywiserCopter::HighLevelState WaywiserCopter::derive_quadcopter_state()
   const bool landed_evidence = px4_landed_ || (px4_ground_contact_ && px4_maybe_landed_) ||
     (odom_near_ground && vertical_motion_inactive);
   const bool landed_after_flight = landed_evidence &&
-    (has_lift_off_position_ || has_landed_after_lift_off_);
+    (has_climb_position_ || has_landed_after_climb_);
   const bool ready_for_arm = px4_ready_for_arm_command(
     ready_for_takeoff_, ready_for_offboard_, ready_to_arm_);
   const bool keep_landed_state = landed_after_flight && (armed_ || !ready_for_arm);
-  const bool mission_active = enable_autopilot_component_
-    ? (mCopterAutopilotComponent &&
-       mCopterAutopilotComponent->getCurrentMissionState() != MissionState::Idle &&
-       mCopterAutopilotComponent->getCurrentMissionState() != MissionState::FollowRouteFinished)
-    : received_active_mission_status_;
+  const bool internal_mission_active =
+    enable_autopilot_component_ &&
+    mCopterAutopilotComponent &&
+    mission_state_is_route_active(mCopterAutopilotComponent->getCurrentMissionState());
+  const bool external_mission_active_recent =
+    !enable_autopilot_component_ &&
+    received_active_mission_status_ &&
+    (get_clock()->now() - last_active_mission_status_time_).seconds() <= mission_state_timeout_;
+  const bool mission_active = armed_ && (internal_mission_active || external_mission_active_recent);
+  const double now_monotonic = steady_time_seconds();
+  const bool input_command_active =
+    last_input_command_time_ > 0.0 &&
+    (now_monotonic - last_input_command_time_) <= kInputCommandTimeout;
+  const bool climb_command_active =
+    armed_ &&
+    ((input_command_active &&
+     (current_cmd_vel_in_.linear.z > 0.01 ||
+     current_cmd_vel_out_.linear.z > 0.01)) ||
+     climb_active_ ||
+     (mCopterAutopilotComponent &&
+     (mCopterAutopilotComponent->getAutoClimbActive() ||
+     mCopterAutopilotComponent->getRouteClimbActive())));
 
   if (mEmergencyStopState && mEmergencyStopState->is_active()) {
     return HighLevelState::EMERGENCY;
-  } else if (keep_landed_state) {
-    return HighLevelState::LANDED;
-  } else if (control_tower_timeout_return_home_active_) {
+  } else if (is_return_home_active()) {
     return HighLevelState::RETURNING_HOME;
   } else if (auto_landing_active_) {
     return HighLevelState::LANDING;
-  } else if (!enable_autopilot_component_ && received_active_mission_status_ && in_flight_) {
-    const double mission_status_age =
-      (get_clock()->now() - last_active_mission_status_time_).seconds();
-    return mission_status_age <= mission_state_timeout_
-      ? HighLevelState::ON_MISSION
-      : HighLevelState::HOVERING;
+  } else if (mission_active) {
+    return HighLevelState::ON_MISSION;
+  } else if (climb_command_active) {
+    return HighLevelState::CLIMBING;
+  } else if (keep_landed_state) {
+    return HighLevelState::LANDED;
   } else if (armed_) {
-    if (mission_active) {
-      return HighLevelState::ON_MISSION;
-    } else if (mCopterAutopilotComponent &&
-      (mCopterAutopilotComponent->getAutoLiftOffActive() ||
-      mCopterAutopilotComponent->getRouteLiftOffActive()))
+    if (mCopterAutopilotComponent &&
+      (mCopterAutopilotComponent->getAutoClimbActive() ||
+      mCopterAutopilotComponent->getRouteClimbActive()))
     {
-      return HighLevelState::AUTO_LIFTING_OFF;
+      return HighLevelState::CLIMBING;
     } else if (in_flight_) {
-      const double now_monotonic = steady_time_seconds();
-      const bool input_command_active =
-        (now_monotonic - last_input_command_time_) <= kInputCommandTimeout;
+      if (input_command_active && current_cmd_vel_out_.linear.z > 0.01) {
+        return HighLevelState::CLIMBING;
+      }
       if (!input_command_active) {
-        return hover_hold_on_idle_ ? HighLevelState::HOVERING : HighLevelState::IDLE_DESCENT;
+        return feature_hover_hold_enabled_ ? HighLevelState::HOVERING : HighLevelState::IN_FLIGHT;
       } else {
         return HighLevelState::IN_FLIGHT;
       }
-    } else if (current_cmd_vel_out_.linear.z > 0.01 || liftoff_active_) {
-      return HighLevelState::LIFTING_OFF;
+    } else if ((input_command_active && current_cmd_vel_out_.linear.z > 0.01) || climb_active_) {
+      return HighLevelState::CLIMBING;
     } else {
       return HighLevelState::ARMED;
     }
@@ -1531,7 +1871,7 @@ waywiser_core::msg::HeartbeatRxState WaywiserCopter::derive_control_tower_heartb
     msg.state = waywiser_core::msg::HeartbeatRxState::TIMEOUT;
   } else if (!received_control_tower_heartbeat_) {
     msg.state = waywiser_core::msg::HeartbeatRxState::NO_HEARTBEAT;
-  } else if (control_tower_timeout_return_home_active_ || return_home_completed_) {
+  } else if (control_tower_timeout_return_home_active_ || control_tower_heartbeat_timeout_emergency_stop_active_) {
     msg.state = waywiser_core::msg::HeartbeatRxState::TIMEOUT;
   } else if (msg.age_s > control_tower_heartbeat_timeout_) {
     msg.state = waywiser_core::msg::HeartbeatRxState::TIMEOUT;
@@ -1604,11 +1944,73 @@ void WaywiserCopter::autopilot_state_control_callback(
 void WaywiserCopter::mission_status_callback(
   const waywiser_core::msg::MissionState::SharedPtr msg)
 {
-  received_active_mission_status_ =
-    msg->state != static_cast<uint8_t>(MissionState::Idle) &&
-    msg->state != static_cast<uint8_t>(MissionState::FollowRouteFinished);
+  const auto mission_state = static_cast<MissionState>(msg->state);
+  const bool external_mission_active = mission_state_is_active(mission_state);
+  const bool is_rth_state = mission_state_is_return_home_active(mission_state);
+
+  if (external_mission_active && is_rth_state &&
+    (is_return_home_active() || return_home_completed_ ||
+    current_state_ == HighLevelState::RETURNING_HOME ||
+    current_state_ == HighLevelState::LANDED))
+  {
+    return;
+  }
+  if (external_mission_active && !is_rth_state &&
+    ignore_non_rth_mission_status_until_idle_ &&
+    is_return_home_active())
+  {
+    return;
+  }
+  if (external_mission_active && !is_rth_state) {
+    if (inhibit_auto_arm_after_auto_land_) {
+      RCLCPP_INFO(
+        get_logger(),
+        "Active mission status received. Re-enabling auto arm after auto landing.");
+    }
+    inhibit_auto_arm_after_auto_land_ = false;
+  }
+
+  if (external_mission_active && auto_landing_active_) {
+    auto_landing_active_ = false;
+    auto_landing_disarm_requested_ = false;
+    current_cmd_vel_in_ = geometry_msgs::msg::Twist();
+    current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+    RCLCPP_INFO(get_logger(), "Active mission status received. Cancelling auto landing.");
+  }
+
+  received_active_mission_status_ = external_mission_active;
+  if (!received_active_mission_status_) {
+    ignore_non_rth_mission_status_until_idle_ = false;
+  }
   if (received_active_mission_status_) {
     last_active_mission_status_time_ = get_clock()->now();
+
+    // If the primary node receives an active mission state from the waypoint follower
+    // that is NOT an RTH state (meaning a new actual route mission was started),
+    // we clear all RTH flags so the vehicle can auto-arm and follow the route.
+    if (!is_rth_state && (is_return_home_active() || return_home_completed_)) {
+      clear_return_home_failsafe();
+      ignore_non_rth_mission_status_until_idle_ = false;
+      manual_return_home_active_ = false;
+      return_home_completed_ = false;
+      return_home_disarm_requested_ = false;
+      has_last_return_home_disarm_request_time_ = false;
+      if (mRthAutopilotComponent) {
+        mRthAutopilotComponent->clearWaypointFollowerRoute();
+      }
+      current_cmd_vel_in_ = geometry_msgs::msg::Twist();
+      current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+      if (enable_px4_bridge_ && armed_) {
+        retry_offboard_for_mission_after_rth_land_ = true;
+        send_offboard_mode_command();
+        last_mode_request_time_ = get_clock()->now();
+        has_last_mode_request_time_ = true;
+        RCLCPP_INFO(
+          get_logger(),
+          "New mission interrupted return-home landing. Requested PX4 Offboard mode.");
+      }
+      RCLCPP_INFO(get_logger(), "Active mission status received. Resetting RTH state.");
+    }
   }
   publish_quadcopter_state();
 }
@@ -1629,13 +2031,15 @@ void WaywiserCopter::control_tower_heartbeat_callback(
 
   const double heartbeat_age =
     std::max(0.0, (now_time - last_control_tower_heartbeat_stamp_).seconds());
-  if ((control_tower_timeout_return_home_active_ || return_home_completed_) &&
+  // Only cancel the heartbeat-timeout RTH when the heartbeat-owned flags are active.
+  // RTH completion state is independent and not touched here.
+  if ((control_tower_timeout_return_home_active_ || control_tower_heartbeat_timeout_emergency_stop_active_) &&
     heartbeat_age <= control_tower_heartbeat_timeout_)
   {
     cancel_return_home_failsafe_on_heartbeat_restore();
     RCLCPP_INFO(
       get_logger(),
-      "Control tower heartbeat restored. Cancelling return-to-home failsafe.");
+      "Control tower heartbeat restored. Cancelling heartbeat return-to-home failsafe.");
     publish_quadcopter_state();
   }
   publish_control_tower_heartbeat_rx_state();
@@ -1647,10 +2051,45 @@ void WaywiserCopter::path_with_twists_callback(
   if (control_tower_heartbeat_timed_out()) {
     RCLCPP_WARN_THROTTLE(
       get_logger(), *get_clock(), 2000,
-      "Ignoring mission route: Control Tower heartbeat is timed out.");
+      "Ignoring mission route: Heartbeat timed out.");
     return;
   }
 
+  if (!enable_px4_bridge_) {
+    observed_drone_has_been_on_mission_ = false;
+    mission_idle_published_after_observed_drone_left_mission_ = false;
+  }
+  inhibit_auto_arm_after_auto_land_ = false;
+
+  // If RTH was active or completed, a new incoming mission means the user wants
+  // to start a fresh flight or interrupt the current RTH.
+  // We clear all RTH flags so the route and auto-arm logic proceed normally.
+  if (is_return_home_active() || return_home_completed_) {
+    clear_return_home_failsafe();
+    manual_return_home_active_ = false;
+    return_home_completed_ = false;
+    if (mRthAutopilotComponent) {
+      mRthAutopilotComponent->clearWaypointFollowerRoute();
+    }
+    if (enable_px4_bridge_ && armed_) {
+      retry_offboard_for_mission_after_rth_land_ = true;
+      send_offboard_mode_command();
+      last_mode_request_time_ = get_clock()->now();
+      has_last_mode_request_time_ = true;
+      RCLCPP_INFO(
+        get_logger(),
+        "New mission interrupted return-home landing. Requested PX4 Offboard mode.");
+    }
+    RCLCPP_INFO(get_logger(), "New mission received. Resetting RTH state and overriding with new mission.");
+  }
+
+  if (auto_landing_active_) {
+    auto_landing_active_ = false;
+    auto_landing_disarm_requested_ = false;
+    current_cmd_vel_in_ = geometry_msgs::msg::Twist();
+    current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+    RCLCPP_INFO(get_logger(), "New mission received. Cancelling auto landing and overriding with new mission.");
+  }
   QList<PosPoint> waypointList;
   for (size_t i = 0; i < msg->path.poses.size(); ++i) {
     PosPoint currentPoint;
@@ -1671,7 +2110,43 @@ void WaywiserCopter::path_with_twists_callback(
     waypointList.append(currentPoint);
   }
 
-  mCopterAutopilotComponent->updateWaypointFollowerRoute(waypointList);
+  bool is_new_route = true;
+  const auto existing_list = mCopterAutopilotComponent->getWaypointList();
+  if (existing_list.size() == waypointList.size()) {
+    is_new_route = false;
+    for (int i = 0; i < existing_list.size(); ++i) {
+      if (std::abs(existing_list[i].getX() - waypointList[i].getX()) > 0.01 ||
+          std::abs(existing_list[i].getY() - waypointList[i].getY()) > 0.01 ||
+          std::abs(existing_list[i].getHeight() - waypointList[i].getHeight()) > 0.01) {
+        is_new_route = true;
+        break;
+      }
+    }
+  }
+
+  if (is_new_route) {
+    mCopterAutopilotComponent->updateWaypointFollowerRoute(waypointList);
+
+    if (waypoint_follower_route_activation_allowed()) {
+      // Guarantee the autopilot activates when a new route is explicitly pushed.
+      // This bypasses potential ROS 2 message deduplication if the UI sends True repeatedly.
+      mCopterAutopilotComponent->switchAutopilot(true);
+      mCopterAutopilotComponent->processMissionStateMachine();
+    } else {
+      RCLCPP_INFO(
+        get_logger(),
+        "Mission route received and stored. Waiting for armed vehicle state before activating waypoint follower.");
+    }
+  }
+  if (mission_status_pub_) {
+    waywiser_core::msg::MissionState missionStateMsg;
+    missionStateMsg.state = static_cast<uint8_t>(
+      waypoint_follower_route_activation_allowed() ?
+      mCopterAutopilotComponent->getCurrentMissionState() :
+      MissionState::WaitingForVehicleInit);
+    mission_status_pub_->publish(missionStateMsg);
+  }
+  publish_quadcopter_state();
 }
 
 void WaywiserCopter::fused_nav_sat_fix_extended_callback(
@@ -1692,18 +2167,25 @@ void WaywiserCopter::fused_nav_sat_fix_extended_callback(
   pos_point.setPitch(-msg->pitch);
   pos_point.setTime(QTime::currentTime().addSecs(-QDateTime::currentDateTime().offsetFromUtc()));
   mCopterState->setPosition(pos_point);
+  GnssFixStatus gnssFixStatus;
+  gnssFixStatus.isFusedOnChip = msg->is_fused_on_chip;
+  gnssFixStatus.fixType = static_cast<GNSS_FIX_TYPE>(msg->fix_type);
+  gnssFixStatus.horizontalAccuracy = msg->horizontal_accuracy;
+  gnssFixStatus.verticalAccuracy = msg->vertical_accuracy;
+  gnssFixStatus.headingAccuracy = msg->heading_accuracy;
+  gnssFixStatus.lastRtcmCorrectionAge = msg->last_rtcm_correction_age;
+  gnssFixStatus.numSatellites = msg->num_satellites;
+
   if (mCopterAutopilotComponent) {
-    GnssFixStatus gnssFixStatus;
-    gnssFixStatus.isFusedOnChip = msg->is_fused_on_chip;
-    gnssFixStatus.fixType = static_cast<GNSS_FIX_TYPE>(msg->fix_type);
-    gnssFixStatus.horizontalAccuracy = msg->horizontal_accuracy;
-    gnssFixStatus.verticalAccuracy = msg->vertical_accuracy;
-    gnssFixStatus.headingAccuracy = msg->heading_accuracy;
-    gnssFixStatus.lastRtcmCorrectionAge = msg->last_rtcm_correction_age;
-    gnssFixStatus.numSatellites = msg->num_satellites;
     mCopterAutopilotComponent->setGnssFixStatus(gnssFixStatus);
     if (mCopterAutopilotComponent->getMissionPosTypeUsed() == PosType::fused) {
       mCopterAutopilotComponent->setVehicleInitialized(true);
+    }
+  }
+  if (mRthAutopilotComponent) {
+    mRthAutopilotComponent->setGnssFixStatus(gnssFixStatus);
+    if (mRthAutopilotComponent->getMissionPosTypeUsed() == PosType::fused) {
+      mRthAutopilotComponent->setVehicleInitialized(true);
     }
   }
 }
@@ -1723,12 +2205,11 @@ void WaywiserCopter::process_twist_msg(const geometry_msgs::msg::Twist::SharedPt
 {
   auto output = *twist_msg;
   if ((mEmergencyStopState && mEmergencyStopState->is_active()) ||
-    control_tower_timeout_return_home_active_ || control_tower_heartbeat_timed_out())
+    is_return_home_active() || control_tower_heartbeat_timed_out())
   {
     output = geometry_msgs::msg::Twist();
   }
 
-  // Handle manual input cancellation of auto landing
   bool manual_input = std::abs(output.linear.x) > kInputCommandThreshold ||
     std::abs(output.linear.y) > kInputCommandThreshold ||
     std::abs(output.linear.z) > kInputCommandThreshold ||
@@ -1736,50 +2217,55 @@ void WaywiserCopter::process_twist_msg(const geometry_msgs::msg::Twist::SharedPt
 
   if (manual_input) {
     last_input_command_time_ = steady_time_seconds();
-    if (mCopterAutopilotComponent && mCopterAutopilotComponent->getAutoLiftOffActive()) {
-      RCLCPP_INFO(get_logger(), "Auto lift-off CANCELLED by manual input.");
-      set_parameter(rclcpp::Parameter("auto_lift_off", false));
+    if (mCopterAutopilotComponent && mCopterAutopilotComponent->getAutoClimbActive()) {
+      RCLCPP_INFO(get_logger(), "Auto climb CANCELLED by manual input.");
+      (void)mCopterAutopilotComponent->setAutoClimbActive(false);
     }
   }
 
-  if (manual_input && auto_landing_active_) {
-    RCLCPP_INFO(get_logger(), "Auto landing CANCELLED by manual input.");
-    set_parameter(rclcpp::Parameter("auto_landing", false));
-  }
-
-  // Handle Auto Arm/Disarm logic
-  if (auto_arm_enabled_ && !auto_landing_active_ && !return_home_completed_) {
-    if (!armed_ && output.linear.z > 0.001) {
-      request_arm_state(true);
-    } else if (armed_ && !in_flight_ && output.linear.z < -0.001) {
-      // Only auto-disarm if liftoff has not been initiated (prevent disarm on cmd gaps)
-      if (!liftoff_active_) {
-        request_arm_state(false);
-      }
+  if (!auto_landing_active_ &&
+    !auto_landing_disarm_requested_ &&
+    output.linear.z > kInputCommandThreshold)
+  {
+    if (inhibit_auto_arm_after_auto_land_) {
+      inhibit_auto_arm_after_auto_land_ = false;
+      RCLCPP_INFO(
+        get_logger(),
+        "Climb command received. Re-enabling auto arm after auto landing.");
+    }
+    // If a prior RTH completed (return_home_completed_ == true) but no RTH is currently active,
+    // a climb request should reset the RTH-completed state so auto-arm is not blocked.
+    // This handles the case where the auto_climb service targets the waypoint follower node only,
+    // leaving this (drone) node's return_home_completed_ flag set after a manual RTH.
+    if (return_home_completed_ && !is_return_home_active()) {
+      clear_return_home_failsafe();
+      manual_return_home_active_ = false;
+      return_home_completed_ = false;
+      return_home_disarm_requested_ = false;
+      has_last_return_home_disarm_request_time_ = false;
+      RCLCPP_INFO(
+        get_logger(),
+        "Climb command received after RTH. Clearing RTH-completed state to allow re-arm.");
     }
   }
 
-  // Track liftoff: once we see an upward command while armed-but-not-yet-in-flight,
-  // save the velocity so publish_trajectory_setpoint can continue commanding it
-  // even if the external cmd_vel pipeline goes momentarily silent (mux timeouts, etc.)
-  if (armed_ && !in_flight_) {
-    if (output.linear.z > 0.01F) {
-      liftoff_active_ = true;
-      liftoff_saved_v_up_ = static_cast<float>(output.linear.z);
-    }
+  // When auto_landing is active, zero the incoming velocity so the landing override wins.
+  // When auto_landing was just disabled, the follower may still be publishing its last
+  // descent velocity for a brief window. Suppress purely-downward cmd_vel in this case
+  // so hover hold can engage cleanly instead of the stale descent passing through.
+  const bool auto_climb_requested =
+    mCopterAutopilotComponent && mCopterAutopilotComponent->getAutoClimbActive();
+  const bool incoming_is_pure_descent =
+    !auto_climb_requested &&
+    output.linear.z < -kInputCommandThreshold &&
+    std::abs(output.linear.x) <= kInputCommandThreshold &&
+    std::abs(output.linear.y) <= kInputCommandThreshold &&
+    std::abs(output.angular.z) <= kInputCommandThreshold;
+  if (auto_landing_active_ || (!auto_landing_active_ && incoming_is_pure_descent)) {
+    current_cmd_vel_in_ = geometry_msgs::msg::Twist();
   } else {
-    // Once airborne, clear the liftoff override
-    liftoff_active_ = false;
-    liftoff_saved_v_up_ = 0.0F;
+    current_cmd_vel_in_ = output;
   }
-
-  auto movement_controller = mCopterInterfaceComponent->getMovementController();
-  if (movement_controller) {
-    movement_controller->setDesiredSpeed(output.linear.x);
-    movement_controller->setDesiredSteering(output.angular.z);
-  }
-
-  current_cmd_vel_out_ = output;
 }
 
 void WaywiserCopter::publish_command()
@@ -1788,26 +2274,48 @@ void WaywiserCopter::publish_command()
     return;
   }
 
-  auto output = current_cmd_vel_out_;
-
-  if (auto_landing_active_) {
-    output.linear.x = 0.0;
-    output.linear.y = 0.0;
-    output.linear.z = -auto_landing_descent_velocity_;
-    output.angular.z = 0.0;
-
-    if (armed_ && !in_flight_) {
-      RCLCPP_INFO(get_logger(), "Vehicle landed. Requesting disarm...");
-      request_arm_state(false);
-      set_parameter(rclcpp::Parameter("auto_landing", false));
+  if (!enable_px4_bridge_ &&
+    observed_quadcopter_state_received_ &&
+    observed_drone_has_been_on_mission_ &&
+    !observed_drone_on_mission_ &&
+    !(mCopterAutopilotComponent && mCopterAutopilotComponent->getAutoClimbActive()))
+  {
+    const auto current_mission_state = mCopterAutopilotComponent ?
+      mCopterAutopilotComponent->getCurrentMissionState() :
+      MissionState::Idle;
+    const bool route_mission_active =
+      mCopterAutopilotComponent &&
+      mission_state_is_route_active(current_mission_state);
+    if (!route_mission_active) {
+      current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+      current_cmd_vel_in_ = geometry_msgs::msg::Twist();
+      return;
     }
-  } else if (mCopterAutopilotComponent) {
-    if (!mCopterAutopilotComponent->getAutoLiftOffActive() &&
-      get_parameter("auto_lift_off").as_bool())
-    {
-      set_parameter(rclcpp::Parameter("auto_lift_off", false));
-    }
-    if (mCopterAutopilotComponent->isActive()) {
+  }
+
+  const bool autopilot_active = mCopterAutopilotComponent && mCopterAutopilotComponent->isActive();
+  const bool external_command_stale =
+    last_input_command_time_ > 0.0 &&
+    (steady_time_seconds() - last_input_command_time_) > command_timeout_;
+  if (external_command_stale &&
+    !autopilot_active &&
+    !is_return_home_active() &&
+    !auto_landing_active_)
+  {
+    current_cmd_vel_in_ = geometry_msgs::msg::Twist();
+    current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+    last_input_command_time_ = 0.0;
+    climb_active_ = false;
+    climb_saved_v_up_ = 0.0F;
+  }
+
+  auto output = current_cmd_vel_in_;
+
+  if (mCopterAutopilotComponent) {
+    static bool was_autopilot_active = false;
+    bool is_autopilot_active = mCopterAutopilotComponent->isActive();
+
+    if (is_autopilot_active) {
       output = mCopterAutopilotComponent->getAutopilotTwistCommand();
       {
         // Suppress horizontal motion and yaw until drone is above min_steering_height_ AGL.
@@ -1830,17 +2338,61 @@ void WaywiserCopter::publish_command()
         }
       }
       last_input_command_time_ = steady_time_seconds();
-      if (auto_arm_enabled_ && !return_home_completed_ && !control_tower_heartbeat_timed_out() &&
+      if (feature_auto_arm_enabled_ && !return_home_completed_ && !control_tower_heartbeat_timed_out() &&
         !armed_ && output.linear.z > 0.001)
       {
         request_arm_state(true);
       }
+    } else if (was_autopilot_active) {
+      output = geometry_msgs::msg::Twist();
+      last_input_command_time_ = 0.0;
+
+      if (mCopterAutopilotComponent->getCurrentMissionState() == MissionState::Idle) {
+        const auto & waypointList = mCopterAutopilotComponent->getWaypointList();
+        if (!waypointList.isEmpty()) {
+          const PosPoint goal = waypointList.last();
+          xyz_t enu = {goal.getX(), goal.getY(), goal.getHeight()};
+          xyz_t ned = coordinateTransforms::enuToNED(enu);
+          hold_position_ned_ = {static_cast<float>(ned.x), static_cast<float>(ned.y), static_cast<float>(ned.z)};
+          has_hold_position_ = true;
+          was_command_active_ = false;
+          RCLCPP_INFO(get_logger(), "Mission finished. Snapping hover hold to final goal coordinates.");
+        }
+      }
     }
+    was_autopilot_active = is_autopilot_active;
   }
 
   const bool suppress_for_heartbeat_timeout =
     control_tower_heartbeat_timed_out() && !control_tower_timeout_return_home_active_;
-  if (control_tower_timeout_return_home_active_ &&
+
+  bool rth_twist_applied = false;
+  if (is_return_home_active() && mRthAutopilotComponent && mRthAutopilotComponent->isActive()) {
+    output = mRthAutopilotComponent->getAutopilotTwistCommand();
+    {
+      const PosPoint odom_position = mCopterState->getPosition(PosType::odom);
+      const double odom_height = odom_position.getHeight();
+      float height_agl = 0.0F;
+      if (px4_dist_bottom_valid_ && std::isfinite(px4_dist_bottom_)) {
+        height_agl = std::max(height_agl, px4_dist_bottom_);
+      }
+      if (has_px4_altitude_ && std::isfinite(latest_px4_altitude_)) {
+        height_agl = std::max(height_agl, latest_px4_altitude_);
+      }
+      if (std::isfinite(odom_height)) {
+        height_agl = std::max(height_agl, static_cast<float>(odom_height));
+      }
+      if (height_agl < static_cast<float>(min_steering_height_)) {
+        output.linear.x = 0.0;
+        output.linear.y = 0.0;
+        output.angular.z = 0.0;
+      }
+    }
+    rth_twist_applied = true;
+    last_input_command_time_ = steady_time_seconds();
+  }
+
+  if (is_return_home_active() && !rth_twist_applied &&
     (return_home_landing_phase_active_ || return_home_ready_to_land()))
   {
     const float descent_velocity = constrained_descent_velocity(
@@ -1855,7 +2407,68 @@ void WaywiserCopter::publish_command()
     output = geometry_msgs::msg::Twist();
   }
 
+  if (auto_landing_active_) {
+    output.linear.x = 0.0;
+    output.linear.y = 0.0;
+    output.linear.z = -auto_landing_descent_velocity_;
+    output.angular.z = 0.0;
+
+    const PosPoint odom_position = mCopterState->getPosition(PosType::odom);
+    const double landed_height_threshold = std::max(
+      0.0, static_cast<double>(in_flight_range_threshold_ + kLandingHeightMargin));
+    const bool odom_near_ground = odom_position.getHeight() <= landed_height_threshold;
+    const bool vertical_motion_inactive = !has_px4_vertical_velocity_ ||
+      std::fabs(latest_px4_vertical_velocity_) <= kVerticalMotionInAirThreshold;
+    const bool px4_landed_evidence = px4_landed_ || (px4_ground_contact_ && px4_maybe_landed_);
+    const bool landed_evidence = px4_landed_evidence || (odom_near_ground && vertical_motion_inactive);
+
+    if (armed_ && landed_evidence && !auto_landing_disarm_requested_) {
+      RCLCPP_INFO(get_logger(), "Vehicle landed. Requesting disarm...");
+      send_arm_command(false, true);
+      last_arm_request_value_ = false;
+      auto_landing_disarm_requested_ = true;
+    }
+  }
+
   current_cmd_vel_out_ = output;
+
+  // Handle Auto Arm/Disarm logic
+  if (feature_auto_arm_enabled_ &&
+    !auto_landing_active_ &&
+    !auto_landing_disarm_requested_ &&
+    !inhibit_auto_arm_after_auto_land_ &&
+    !return_home_completed_)
+  {
+    if (!armed_ && output.linear.z > 0.001) {
+      request_arm_state(true);
+    } else if (armed_ && !in_flight_ && output.linear.z < -0.001) {
+      // Only auto-disarm if climb has not been initiated (prevent disarm on cmd gaps)
+      if (!climb_active_) {
+        request_arm_state(false);
+      }
+    }
+  }
+
+  // Track climb: once we see an upward command while armed-but-not-yet-in-flight,
+  // save the velocity so publish_trajectory_setpoint can continue commanding it
+  // even if the external cmd_vel pipeline goes momentarily silent (mux timeouts, etc.)
+  if (armed_ && !in_flight_) {
+    if (output.linear.z > 0.01F) {
+      climb_active_ = true;
+      climb_saved_v_up_ = static_cast<float>(output.linear.z);
+    }
+  } else {
+    // Once airborne, clear the climb override
+    climb_active_ = false;
+    climb_saved_v_up_ = 0.0F;
+  }
+
+  auto movement_controller = mCopterInterfaceComponent->getMovementController();
+  if (movement_controller) {
+    movement_controller->setDesiredSpeed(output.linear.x);
+    movement_controller->setDesiredSteering(output.angular.z);
+  }
+
   cmd_vel_out_pub_->publish(output);
 }
 
@@ -1869,61 +2482,84 @@ void WaywiserCopter::update_control_tower_heartbeat_failsafe()
   const bool failsafe_eligible = ready_to_arm_ || armed_ || in_flight_ ||
     control_tower_timeout_return_home_active_ || return_home_completed_;
 
-  if (!received_control_tower_heartbeat_ && !heartbeat_timed_out) {
-    clear_return_home_failsafe();
-    return_home_completed_ = false;
-    return_home_disarm_requested_ = false;
-    has_last_return_home_disarm_request_time_ = false;
-    return;
-  }
-
   const auto now_time = get_clock()->now();
   const double heartbeat_age = control_tower_heartbeat_monitor_age();
-  if (!heartbeat_timed_out || manual_arm_heartbeat_grace_active()) {
-    if (control_tower_timeout_return_home_active_ || return_home_completed_) {
-      cancel_return_home_failsafe_on_heartbeat_restore();
-      RCLCPP_INFO(
+
+  if (!manual_return_home_active_) {
+    if (!received_control_tower_heartbeat_ && !heartbeat_timed_out) {
+      clear_return_home_failsafe();
+      return_home_completed_ = false;
+      return_home_disarm_requested_ = false;
+      has_last_return_home_disarm_request_time_ = false;
+      return;
+    }
+
+    // Heartbeat is not yet timed out (or grace active): only cancel the
+    // heartbeat-timeout RTH flag. RTH completion state is independent and
+    // must not be touched here (RTH can be requested manually).
+    if (!heartbeat_timed_out || manual_arm_heartbeat_grace_active()) {
+      if (control_tower_timeout_return_home_active_) {
+        cancel_return_home_failsafe_on_heartbeat_restore();
+        RCLCPP_INFO(
+          get_logger(),
+          "Control tower heartbeat restored. Cancelling heartbeat return-to-home failsafe.");
+      }
+      return;
+    }
+
+    if (!failsafe_eligible) {
+      clear_return_home_failsafe();
+      return_home_disarm_requested_ = false;
+      has_last_return_home_disarm_request_time_ = false;
+      return;
+    }
+
+    if (!control_tower_timeout_return_home_active_ && !return_home_completed_) {
+      const bool mission_active_before_rth =
+        enable_autopilot_component_
+        ? (mCopterAutopilotComponent &&
+        mission_state_is_route_active(mCopterAutopilotComponent->getCurrentMissionState()))
+        : received_active_mission_status_;
+      control_tower_timeout_return_home_active_ = true;
+      ignore_non_rth_mission_status_until_idle_ = true;
+      received_active_mission_status_ = false;
+      if (auto_landing_active_) {
+        auto_landing_active_ = false;
+        auto_landing_disarm_requested_ = false;
+        RCLCPP_WARN(get_logger(), "Auto landing cancelled because heartbeat return-to-home is active.");
+      }
+      current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+      current_cmd_vel_in_ = geometry_msgs::msg::Twist();
+      waiting_for_heartbeat_mission_active_ = mission_active_before_rth;
+      RCLCPP_WARN(
         get_logger(),
-        "Control tower heartbeat restored. Cancelling return-to-home failsafe.");
+        "Control tower heartbeat timed out after %.2f s. Starting return-home failsafe.",
+        heartbeat_age);
+      publish_quadcopter_state();
     }
-    return;
   }
 
-  if (!failsafe_eligible) {
-    clear_return_home_failsafe();
-    return_home_disarm_requested_ = false;
-    has_last_return_home_disarm_request_time_ = false;
+  if (!is_return_home_active() && !return_home_completed_) {
     return;
-  }
-
-  if (!control_tower_timeout_return_home_active_ && !return_home_completed_) {
-    control_tower_timeout_return_home_active_ = true;
-    if (auto_landing_active_) {
-      auto_landing_active_ = false;
-      set_parameter(rclcpp::Parameter("auto_landing", false));
-      RCLCPP_WARN(get_logger(), "Auto landing cancelled because heartbeat return-to-home is active.");
-    }
-    current_cmd_vel_out_ = geometry_msgs::msg::Twist();
-    waiting_for_heartbeat_mission_active_ =
-      enable_autopilot_component_
-      ? (mCopterAutopilotComponent &&
-      mCopterAutopilotComponent->getCurrentMissionState() != MissionState::Idle &&
-      mCopterAutopilotComponent->getCurrentMissionState() != MissionState::FollowRouteFinished)
-      : received_active_mission_status_;
-    RCLCPP_WARN(
-      get_logger(),
-      "Control tower heartbeat timed out after %.2f s. Starting return-home failsafe.",
-      heartbeat_age);
   }
 
   if (return_home_landed_at_home()) {
+    const bool was_heartbeat_failsafe =
+      control_tower_timeout_return_home_active_ && !manual_return_home_active_;
     clear_return_home_failsafe();
     return_home_completed_ = true;
-    publish_control_tower_timeout_emergency_stop(control_tower_heartbeat_monitor_age());
+    manual_return_home_active_ = false;
+    if (was_heartbeat_failsafe) {
+      publish_control_tower_timeout_emergency_stop(control_tower_heartbeat_monitor_age());
+    }
     if (mCopterAutopilotComponent) {
       mCopterAutopilotComponent->clearWaypointFollowerRoute();
     }
+    if (mRthAutopilotComponent) {
+      mRthAutopilotComponent->clearWaypointFollowerRoute();
+    }
     current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+    current_cmd_vel_in_ = geometry_msgs::msg::Twist();
     const auto now_time = get_clock()->now();
     const bool disarm_request_due = !has_last_return_home_disarm_request_time_ ||
       (now_time - last_return_home_disarm_request_time_).seconds() >= return_home_command_retry_period_;
@@ -1933,15 +2569,16 @@ void WaywiserCopter::update_control_tower_heartbeat_failsafe()
       last_return_home_disarm_request_time_ = now_time;
       RCLCPP_INFO(get_logger(), "Return-home landing complete. Requesting forced disarm.");
       send_arm_command(false, true);
+      last_arm_request_value_ = false;
     }
-    RCLCPP_INFO(get_logger(), "Return-home failsafe completed: vehicle landed at home.");
+    RCLCPP_INFO(get_logger(), "Return-home completed: vehicle landed at home.");
     return;
   }
 
-  if (control_tower_timeout_return_home_active_ &&
+  if (is_return_home_active() &&
     return_home_request_sent_ &&
     !return_home_land_request_sent_ &&
-    return_home_position_reached())
+    return_home_ready_to_land())
   {
     send_px4_land_at_current_position_command();
     return;
@@ -1951,14 +2588,26 @@ void WaywiserCopter::update_control_tower_heartbeat_failsafe()
     return;
   }
 
-  if (control_tower_timeout_return_home_active_ &&
+  if (is_return_home_active() &&
+    !return_home_request_sent_ &&
+    !return_home_land_request_sent_ &&
+    return_home_position_reached())
+  {
+    send_px4_land_at_current_position_command();
+    return_home_landing_phase_active_ = true;
+    return;
+  }
+
+  if (is_return_home_active() &&
     return_home_request_sent_ && return_home_ready_to_land())
   {
     return_home_landing_phase_active_ = true;
   }
 
   if (!in_flight_) {
-    publish_control_tower_timeout_emergency_stop(heartbeat_age);
+    if (control_tower_timeout_return_home_active_ && !manual_return_home_active_) {
+      publish_control_tower_timeout_emergency_stop(heartbeat_age);
+    }
     if (armed_) {
       const bool disarm_request_due = !has_last_return_home_disarm_request_time_ ||
         (now_time - last_return_home_disarm_request_time_).seconds() >= return_home_command_retry_period_;
@@ -1968,9 +2617,14 @@ void WaywiserCopter::update_control_tower_heartbeat_failsafe()
         last_return_home_disarm_request_time_ = now_time;
         RCLCPP_INFO(get_logger(), "Heartbeat timeout while landed. Requesting forced disarm.");
         send_arm_command(false, true);
+        last_arm_request_value_ = false;
       }
     }
     return_home_completed_ = true;
+    manual_return_home_active_ = false;
+    if (mRthAutopilotComponent) {
+      mRthAutopilotComponent->clearWaypointFollowerRoute();
+    }
     return;
   }
 
@@ -2027,24 +2681,21 @@ rcl_interfaces::msg::SetParametersResult WaywiserCopter::on_parameter_set(
   result.successful = true;
 
   for (const auto & parameter : parameters) {
-    if (parameter.get_name() == "auto_arm") {
-      auto_arm_enabled_ = parameter.as_bool();
-    } else if (parameter.get_name() == "auto_landing") {
-      auto_landing_active_ = parameter.as_bool();
-      if (auto_landing_active_) {
-        RCLCPP_INFO(get_logger(), "Auto landing ENABLED");
-      } else {
-        RCLCPP_INFO(get_logger(), "Auto landing DISABLED");
+    if (parameter.get_name() == "feature_auto_arm_enabled") {
+      feature_auto_arm_enabled_ = parameter.as_bool();
+    } else if (parameter.get_name() == "feature_auto_land_enabled") {
+      feature_auto_land_enabled_ = parameter.as_bool();
+      if (!feature_auto_land_enabled_) {
+        auto_landing_active_ = false;
+        auto_landing_disarm_requested_ = false;
       }
     } else if (parameter.get_name() == "auto_landing_descent_velocity") {
       auto_landing_descent_velocity_ = std::max(0.0, parameter.as_double());
       if (mCopterAutopilotComponent) {
         mCopterAutopilotComponent->setDescentSpeed(auto_landing_descent_velocity_);
       }
-    } else if (parameter.get_name() == "hold_position_on_idle") {
-      hover_hold_on_idle_ = parameter.as_bool();
-    } else if (parameter.get_name() == "auto_offboard") {
-      auto_offboard_ = parameter.as_bool();
+    } else if (parameter.get_name() == "feature_hover_hold_enabled") {
+      feature_hover_hold_enabled_ = parameter.as_bool();
     } else if (parameter.get_name() == "require_motion_before_engage") {
       require_motion_before_engage_ = parameter.as_bool();
     } else if (parameter.get_name() == "idle_descent_rate") {
@@ -2055,12 +2706,10 @@ rcl_interfaces::msg::SetParametersResult WaywiserCopter::on_parameter_set(
       command_timeout_ = parameter.as_double();
     } else if (parameter.get_name() == "request_retry_period") {
       request_retry_period_ = parameter.as_double();
-    } else if (parameter.get_name() == "force_arm") {
-      force_arm_ = parameter.as_bool();
     } else if (parameter.get_name() == "return_home_on_control_tower_timeout") {
-      return_home_on_control_tower_timeout_ = true;
-    } else if (parameter.get_name() == "configure_px4_home_on_lift_off") {
-      configure_px4_home_on_lift_off_ = parameter.as_bool();
+      return_home_on_control_tower_timeout_ = parameter.as_bool();
+    } else if (parameter.get_name() == "configure_px4_home_on_climb") {
+      configure_px4_home_on_climb_ = parameter.as_bool();
     } else if (parameter.get_name() == "return_home_x") {
       return_home_x_configured_ =
         parameter.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET;
@@ -2111,17 +2760,10 @@ rcl_interfaces::msg::SetParametersResult WaywiserCopter::on_parameter_set(
       control_tower_heartbeat_timeout_ = std::max(0.1, parameter.as_double());
     } else if (parameter.get_name() == "return_home_command_retry_period") {
       return_home_command_retry_period_ = std::max(0.1, parameter.as_double());
-    } else if (parameter.get_name() == "auto_lift_off_enabled") {
-      mCopterAutopilotComponent->setAutoLiftOffEnabled(parameter.as_bool());
-    } else if (parameter.get_name() == "auto_lift_off") {
-      mCopterAutopilotComponent->setAutoLiftOffActive(parameter.as_bool());
-      if (mCopterAutopilotComponent->getAutoLiftOffActive()) {
-        RCLCPP_INFO(get_logger(), "Auto lift-off ENABLED");
-      } else {
-        RCLCPP_INFO(get_logger(), "Auto lift-off DISABLED");
-      }
-    } else if (parameter.get_name() == "auto_lift_off_height") {
-      mCopterAutopilotComponent->setAutoLiftOffHeight(parameter.as_double());
+    } else if (parameter.get_name() == "feature_auto_climb_enabled") {
+      mCopterAutopilotComponent->setAutoClimbEnabled(parameter.as_bool());
+    } else if (parameter.get_name() == "auto_climb_height") {
+      mCopterAutopilotComponent->setAutoClimbHeight(parameter.as_double());
     }
   }
 
@@ -2257,10 +2899,10 @@ void WaywiserCopter::px4_vehicle_command_ack_callback(
 void WaywiserCopter::setpoint_timer_callback()
 {
   const bool motion_requested = command_requests_motion();
-  const bool force_rth_landing_velocity = control_tower_timeout_return_home_active_ &&
+  const bool force_rth_landing_velocity = is_return_home_active() &&
     (return_home_landing_phase_active_ || return_home_ready_to_land());
 
-  if (hover_hold_on_idle_ && was_command_active_ && !motion_requested &&
+  if (feature_hover_hold_enabled_ && was_command_active_ && !motion_requested &&
     has_vehicle_local_position_)
   {
     hold_position_ned_ = {local_position_x_, local_position_y_, local_position_z_};
@@ -2269,7 +2911,7 @@ void WaywiserCopter::setpoint_timer_callback()
   was_command_active_ = motion_requested;
 
   const bool use_position_hold =
-    hover_hold_on_idle_ && !motion_requested && has_vehicle_local_position_ &&
+    feature_hover_hold_enabled_ && !motion_requested && has_vehicle_local_position_ &&
     !force_rth_landing_velocity;
   publish_offboard_control_mode(use_position_hold);
   publish_trajectory_setpoint();
@@ -2281,8 +2923,7 @@ void WaywiserCopter::setpoint_timer_callback()
     !has_last_mode_request_time_ ||
     (get_clock()->now() - last_mode_request_time_).seconds() >= request_retry_period_;
 
-  if (auto_offboard_ &&
-    setpoint_count_ >= required_setpoint_count_ &&
+  if (setpoint_count_ >= required_setpoint_count_ &&
     engagement_requested() &&
     local_position_stable() &&
     !is_offboard_px4() &&
@@ -2294,12 +2935,36 @@ void WaywiserCopter::setpoint_timer_callback()
     RCLCPP_INFO(get_logger(), "Requested PX4 Offboard mode.");
   }
 
+  if (retry_offboard_for_mission_after_rth_land_) {
+    if (!armed_ || !received_active_mission_status_ || is_offboard_px4()) {
+      retry_offboard_for_mission_after_rth_land_ = false;
+    } else {
+      const bool retry_mode_request_due =
+        !has_last_mode_request_time_ ||
+        (get_clock()->now() - last_mode_request_time_).seconds() >= request_retry_period_;
+      if (setpoint_count_ >= required_setpoint_count_ &&
+        local_position_stable() &&
+        retry_mode_request_due)
+      {
+        send_offboard_mode_command();
+        last_mode_request_time_ = get_clock()->now();
+        has_last_mode_request_time_ = true;
+        RCLCPP_INFO(
+          get_logger(),
+          "Retrying PX4 Offboard mode request for mission after interrupted return-home landing.");
+      }
+    }
+  }
+
   // Auto arm from setpoint pre-stream
-  if (auto_arm_enabled_ &&
+  if (feature_auto_arm_enabled_ &&
+    !auto_landing_active_ &&
+    !auto_landing_disarm_requested_ &&
+    !inhibit_auto_arm_after_auto_land_ &&
     !return_home_completed_ &&
     setpoint_count_ >= required_setpoint_count_ &&
     engagement_requested() &&
-    (!auto_offboard_ || is_offboard_px4()) &&
+    is_offboard_px4() &&
     local_position_stable() &&
     !armed_)
   {
@@ -2334,7 +2999,7 @@ void WaywiserCopter::publish_trajectory_setpoint()
 
   const float yaw = has_vehicle_local_position_ ? vehicle_heading_ : 0.0F;
   const bool motion_requested = command_requests_motion();
-  const bool force_rth_landing_velocity = control_tower_timeout_return_home_active_ &&
+  const bool force_rth_landing_velocity = is_return_home_active() &&
     (return_home_landing_phase_active_ || return_home_ready_to_land());
 
   if (force_rth_landing_velocity) {
@@ -2350,7 +3015,7 @@ void WaywiserCopter::publish_trajectory_setpoint()
     return;
   }
 
-  if (hover_hold_on_idle_ && !motion_requested && has_vehicle_local_position_) {
+  if (feature_hover_hold_enabled_ && !motion_requested && has_vehicle_local_position_) {
     if (!has_hold_position_) {
       hold_position_ned_ = {local_position_x_, local_position_y_, local_position_z_};
       has_hold_position_ = true;
@@ -2371,12 +3036,12 @@ void WaywiserCopter::publish_trajectory_setpoint()
     float v_left = command_active ?
       static_cast<float>(current_cmd_vel_out_.linear.y) : 0.0F;
     float v_up;
-    if (liftoff_active_ && !in_flight_) {
-      // During liftoff, always command the last seen upward velocity regardless of
+    if (climb_active_ && !in_flight_) {
+      // During climb, always command the last seen upward velocity regardless of
       // command_active, so brief gaps in the external cmd_vel pipeline (mux timeouts)
-      // cannot stall the ascent or cause LIFTING_OFF<->ARMED state flapping.
-      v_up = liftoff_saved_v_up_;
-    } else if (hover_hold_on_idle_ || motion_requested) {
+      // cannot stall the ascent or cause CLIMBING<->ARMED state flapping.
+      v_up = climb_saved_v_up_;
+    } else if (feature_hover_hold_enabled_ || motion_requested) {
       v_up = command_active ? static_cast<float>(current_cmd_vel_out_.linear.z) : 0.0F;
     } else {
       v_up = -static_cast<float>(idle_descent_rate_);
@@ -2451,7 +3116,7 @@ void WaywiserCopter::publish_route_markers()
   route_marker_pub_->publish(marker_array);
 
   marker_array.markers.clear();
-  const double proximity = mCopterAutopilotComponent->getWaypointProximity();
+  const double proximity = mCopterAutopilotComponent->getWaypointProximityXY();
   const auto & waypointList = mCopterAutopilotComponent->getWaypointList();
   int marker_id = 0;
   for (int i = 0; i < waypointList.size(); ++i) {
@@ -2529,12 +3194,14 @@ void WaywiserCopter::publish_autopilot_markers()
   marker_array.markers.push_back(del_marker);
   autopilot_marker_pub_->publish(marker_array);
 
-  if (mCopterAutopilotComponent->getCurrentMissionState() == MissionState::Idle) {
+  if (!mission_state_is_route_active(mCopterAutopilotComponent->getCurrentMissionState()) ||
+    mCopterAutopilotComponent->getAutoClimbActive())
+  {
     return;
   }
 
   marker_array.markers.clear();
-  const double proximity = mCopterAutopilotComponent->getWaypointProximity();
+  const double proximity = mCopterAutopilotComponent->getWaypointProximityXY();
   const double approach_radius = mCopterAutopilotComponent->getApproachSlowdownRadius();
   const PosPoint currentPos = mCopterState->getPosition(PosType::fused);
   int marker_id = 0;
@@ -2608,4 +3275,234 @@ void WaywiserCopter::publish_home_pose()
   home_pose.pose.position.y = home_position_y_;
   home_pose.pose.position.z = 0.0;
   home_pose_pub_->publish(home_pose);
+}
+
+void WaywiserCopter::handle_return_home_request(
+  const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+  std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+{
+  if (request->data && !manual_return_home_active_) {
+    clear_return_home_failsafe();
+    control_tower_heartbeat_timeout_emergency_stop_active_ = false;
+    if (mRthAutopilotComponent) {
+      mRthAutopilotComponent->clearWaypointFollowerRoute();
+    }
+    const bool mission_active_before_rth =
+      enable_autopilot_component_
+      ? (mCopterAutopilotComponent &&
+      mission_state_is_route_active(mCopterAutopilotComponent->getCurrentMissionState()))
+      : received_active_mission_status_;
+    manual_return_home_active_ = true;
+    ignore_non_rth_mission_status_until_idle_ = true;
+    received_active_mission_status_ = false;
+    return_home_completed_ = false;
+    return_home_disarm_requested_ = false;
+    has_last_return_home_disarm_request_time_ = false;
+    current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+    current_cmd_vel_in_ = geometry_msgs::msg::Twist();
+    if (auto_landing_active_) {
+      auto_landing_active_ = false;
+      auto_landing_disarm_requested_ = false;
+      RCLCPP_WARN(get_logger(), "Auto landing cancelled because manual return-to-home is active.");
+    }
+    if (mCopterAutopilotComponent) {
+      mCopterAutopilotComponent->clearWaypointFollowerRoute();
+    }
+    waiting_for_heartbeat_mission_active_ = mission_active_before_rth;
+    RCLCPP_WARN(get_logger(), "Manual return to home REQUESTED via service");
+    publish_quadcopter_state();
+  } else if (!request->data && manual_return_home_active_) {
+    manual_return_home_active_ = false;
+    ignore_non_rth_mission_status_until_idle_ = false;
+    return_home_request_sent_ = false;
+    return_home_land_request_sent_ = false;
+    return_home_landing_phase_active_ = false;
+    RCLCPP_WARN(get_logger(), "Manual return to home CANCELLED via service");
+  }
+  response->success = true;
+}
+
+void WaywiserCopter::handle_auto_land_request(
+  const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+  std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+{
+  if (request->data && !feature_auto_land_enabled_) {
+    auto_landing_active_ = false;
+    auto_landing_disarm_requested_ = false;
+    response->success = false;
+    response->message = "Auto landing is disabled by feature_auto_land_enabled.";
+    RCLCPP_WARN(get_logger(), "Ignoring auto landing request: feature_auto_land_enabled is false.");
+    return;
+  }
+
+  auto_landing_active_ = request->data;
+  auto_landing_disarm_requested_ = false;
+  inhibit_auto_arm_after_auto_land_ = request->data;
+  if (auto_landing_active_) {
+    received_active_mission_status_ = false;
+    ignore_non_rth_mission_status_until_idle_ = false;
+    if (mCopterAutopilotComponent) {
+      mCopterAutopilotComponent->clearWaypointFollowerRoute();
+    }
+    if (mRthAutopilotComponent) {
+      mRthAutopilotComponent->clearWaypointFollowerRoute();
+    }
+    clear_return_home_failsafe();
+    manual_return_home_active_ = false;
+    return_home_completed_ = false;
+    return_home_disarm_requested_ = false;
+    has_last_return_home_disarm_request_time_ = false;
+    retry_offboard_for_mission_after_rth_land_ = false;
+    current_cmd_vel_in_ = geometry_msgs::msg::Twist();
+    current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+    if (mission_status_pub_) {
+      waywiser_core::msg::MissionState missionStateMsg;
+      missionStateMsg.state = static_cast<uint8_t>(MissionState::Idle);
+      mission_status_pub_->publish(missionStateMsg);
+    }
+    RCLCPP_INFO(get_logger(), "Auto landing ENABLED via service");
+  } else {
+    // Snap hover hold to current position so the drone holds immediately
+    // instead of continuing to fall after landing is cancelled.
+    if (has_vehicle_local_position_) {
+      hold_position_ned_ = {local_position_x_, local_position_y_, local_position_z_};
+      has_hold_position_ = true;
+    }
+    current_cmd_vel_in_ = geometry_msgs::msg::Twist();
+    current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+    last_input_command_time_ = 0.0;
+    RCLCPP_INFO(get_logger(), "Auto landing DISABLED via service");
+  }
+  publish_quadcopter_state();
+  response->success = true;
+}
+
+void WaywiserCopter::handle_arm_request(
+  const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+  std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+{
+  const bool accepted = request_arm_state(request->data);
+  if (request->data) {
+    RCLCPP_INFO(get_logger(), "Arm REQUESTED via service");
+  } else {
+    RCLCPP_INFO(get_logger(), "Disarm REQUESTED via service");
+  }
+  response->success = accepted;
+  if (!accepted) {
+    response->message = request->data ?
+      "Arm request rejected by current vehicle state." :
+      "Disarm request rejected by current vehicle state.";
+  }
+}
+
+void WaywiserCopter::handle_auto_climb_request(
+  const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+  std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+{
+  if (!mCopterAutopilotComponent) {
+    response->success = false;
+    response->message = "Auto climb is unavailable because the autopilot component is not initialized.";
+    return;
+  }
+
+  if (request->data && !mCopterAutopilotComponent->getAutoClimbEnabled()) {
+    response->success = false;
+    response->message = "Auto climb is disabled by feature_auto_climb_enabled.";
+    RCLCPP_WARN(get_logger(), "Ignoring auto climb request: feature_auto_climb_enabled is false.");
+    return;
+  }
+
+  if (request->data) {
+    inhibit_auto_arm_after_auto_land_ = false;
+    const bool auto_climb_active = mCopterAutopilotComponent->getAutoClimbActive();
+    const bool route_climb_active = mCopterAutopilotComponent->getRouteClimbActive();
+    if (auto_climb_active || route_climb_active) {
+      const char * active_climb_message = auto_climb_active ?
+        "Vehicle is already auto climbing." :
+        "Vehicle is already climbing on an active route.";
+      RCLCPP_INFO(get_logger(), "Ignoring auto climb request: %s", active_climb_message);
+      publish_quadcopter_state();
+      response->success = auto_climb_active;
+      response->message = active_climb_message;
+      return;
+    }
+
+    const PosPoint odom_position = mCopterState->getPosition(PosType::odom);
+    const double current_height = odom_position.getHeight();
+    const double auto_climb_height = mCopterAutopilotComponent->getAutoClimbHeight();
+    // If the drone is at or above the climb target, do not start a climb route
+    // (even from landing) — the follower would navigate downward to reach the target.
+    // Instead the landing is cancelled and hover hold activates at the current position.
+    const bool already_at_or_above_climb_height = current_height >= auto_climb_height;
+
+    mCopterAutopilotComponent->clearWaypointFollowerRoute();
+    if (mRthAutopilotComponent) {
+      mRthAutopilotComponent->clearWaypointFollowerRoute();
+    }
+    clear_return_home_failsafe();
+    manual_return_home_active_ = false;
+    return_home_completed_ = false;
+    return_home_disarm_requested_ = false;
+    has_last_return_home_disarm_request_time_ = false;
+    retry_offboard_for_mission_after_rth_land_ = false;
+    // Clear any active landing so it no longer overrides the climb command output
+    if (auto_landing_active_) {
+      RCLCPP_INFO(get_logger(), "Auto landing cancelled by climb request.");
+    }
+    auto_landing_active_ = false;
+    auto_landing_disarm_requested_ = false;
+    last_arm_request_value_ = false;
+    // Snap the hover hold to the current position so that if the climb route
+    // hasn't produced output yet, the drone holds rather than falling
+    if (has_vehicle_local_position_) {
+      hold_position_ned_ = {local_position_x_, local_position_y_, local_position_z_};
+      has_hold_position_ = true;
+    }
+    current_cmd_vel_in_ = geometry_msgs::msg::Twist();
+    current_cmd_vel_out_ = geometry_msgs::msg::Twist();
+
+    if (mission_status_pub_) {
+      waywiser_core::msg::MissionState missionStateMsg;
+      missionStateMsg.state = static_cast<uint8_t>(MissionState::Idle);
+      mission_status_pub_->publish(missionStateMsg);
+    }
+
+    if (already_at_or_above_climb_height) {
+      mCopterAutopilotComponent->setAutoClimbActive(false);
+      last_input_command_time_ = -1.0;
+      RCLCPP_INFO(
+        get_logger(),
+        "Ignoring auto climb request: current height %.2f m is already at or above configured climb height %.2f m. No climb started.",
+        current_height, auto_climb_height);
+      publish_quadcopter_state();
+      response->success = true;
+      response->message = "Vehicle is already at or above auto climb height. Climb not started, but request accepted.";
+      return;
+    }
+
+  }
+
+  const bool auto_climb_request_applied =
+    mCopterAutopilotComponent->setAutoClimbActive(request->data);
+  if (request->data && auto_climb_request_applied) {
+    auto_landing_active_ = false;
+    auto_landing_disarm_requested_ = false;
+  }
+  if (mCopterAutopilotComponent->getAutoClimbActive()) {
+    RCLCPP_INFO(get_logger(), "Auto climb ENABLED via service");
+  } else {
+    const char * log_message = request->data && !auto_climb_request_applied ?
+      "Auto climb request was not accepted by the current vehicle state." :
+      "Auto climb DISABLED via service";
+    if (request->data && !auto_climb_request_applied) {
+      RCLCPP_WARN(get_logger(), "%s", log_message);
+    } else {
+      RCLCPP_INFO(get_logger(), "%s", log_message);
+    }
+  }
+  publish_quadcopter_state();
+  response->success = auto_climb_request_applied;
+  if (!auto_climb_request_applied) {
+    response->message = "Auto climb request was not accepted by the current vehicle state.";
+  }
 }

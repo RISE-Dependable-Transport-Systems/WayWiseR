@@ -151,6 +151,27 @@ def generate_launch_description():
         default_value='waywiser_drone_localization_node',
         description='Name of the node to be launched',
     )
+    vehicle_control_enabled_la = DeclareLaunchArgument(
+        'vehicle_control_enabled',
+        default_value='True',
+        description='Enable Control Tower vehicle controls; set False for passive monitoring',
+    )
+    publish_control_tower_heartbeat_la = DeclareLaunchArgument(
+        'publish_control_tower_heartbeat',
+        default_value='True',
+        description='Publish the vehicle-scoped Control Tower heartbeat',
+    )
+    map_source_la = DeclareLaunchArgument(
+        'map_source',
+        default_value='Local OSM server',
+        description='Control Tower map source: OpenStreetMap, Local OSM server, or None',
+    )
+
+    startup_route_file_la = DeclareLaunchArgument(
+        'startup_route_file',
+        default_value='',
+        description='Route file to load in Control Tower at startup',
+    )
 
     drone_name = LaunchConfiguration('drone_name')
     drone_frame_prefix = [drone_name, '/']
@@ -171,7 +192,7 @@ def generate_launch_description():
             'world': LaunchConfiguration('world'),
             'launch_gazebo_orchestrator': LaunchConfiguration('launch_gazebo_orchestrator'),
             'gazebo_orchestrator_config': LaunchConfiguration('gazebo_orchestrator_config'),
-            'rover_enable_collision_monitor': LaunchConfiguration(
+            'rover_enable_nav2_collision_monitor': LaunchConfiguration(
                 'rover_enable_collision_monitor'
             ),
             'rover_config': LaunchConfiguration('rover_config'),
@@ -187,6 +208,12 @@ def generate_launch_description():
             'rover_yolo_config': LaunchConfiguration('rover_yolo_config'),
             'rover_octomap_config': LaunchConfiguration('rover_octomap_config'),
             'rover_name': LaunchConfiguration('rover_name'),
+            'vehicle_control_enabled': LaunchConfiguration('vehicle_control_enabled'),
+            'publish_control_tower_heartbeat': LaunchConfiguration(
+                'publish_control_tower_heartbeat'
+            ),
+            'map_source': LaunchConfiguration('map_source'),
+            'startup_route_file': LaunchConfiguration('startup_route_file'),
         }.items(),
     )
 
@@ -317,6 +344,10 @@ def generate_launch_description():
     ld.add_action(drone_octomap_config_la)
     ld.add_action(drone_name_la)
     ld.add_action(drone_localization_node_name_la)
+    ld.add_action(vehicle_control_enabled_la)
+    ld.add_action(publish_control_tower_heartbeat_la)
+    ld.add_action(map_source_la)
+    ld.add_action(startup_route_file_la)
 
     # start nodes
     ld.add_action(gazebo_rover)

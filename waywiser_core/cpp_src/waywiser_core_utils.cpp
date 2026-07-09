@@ -95,20 +95,22 @@ std::string CoreUtils::missionStateToString(MissionState state)
       return "Waiting For Heartbeat";
     case MissionState::FollowRouteInit:
       return "Follow Route Init";
-    case MissionState::FollowRouteLiftOff:
-      return "Follow Route Lift Off";
+    case MissionState::FollowRouteClimb:
+      return "Follow Route Climb";
     case MissionState::FollowRouteGotoBegin:
       return "Follow Route Goto Begin";
     case MissionState::FollowRouteFollowing:
       return "Follow Route Following";
     case MissionState::FollowRouteApproachingEndGoal:
       return "Follow Route Approaching End Goal";
+    case MissionState::FollowRouteApproachingEndGoalZ:
+      return "Follow Route Approaching End Goal Z";
     case MissionState::FollowRouteFinished:
       return "Follow Route Finished";
     case MissionState::ReturnHomeInit:
       return "Return Home Init";
-    case MissionState::ReturnHomeLiftOff:
-      return "Return Home Lift Off";
+    case MissionState::ReturnHomeClimb:
+      return "Return Home Climb";
     case MissionState::ReturnHomeCruising:
       return "Return Home Cruising";
     case MissionState::ReturnHomeLanding:
@@ -131,6 +133,8 @@ MissionState CoreUtils::convertToMissionState(WayPointFollowerSTMstates state)
       return MissionState::FollowRouteFollowing;
     case WayPointFollowerSTMstates::FOLLOW_ROUTE_APPROACHING_END_GOAL:
       return MissionState::FollowRouteApproachingEndGoal;
+    case WayPointFollowerSTMstates::FOLLOW_ROUTE_APPROACHING_END_GOAL_Z:
+      return MissionState::FollowRouteApproachingEndGoalZ;
     case WayPointFollowerSTMstates::FOLLOW_ROUTE_FINISHED:
       return MissionState::FollowRouteFinished;
     default:
@@ -145,7 +149,7 @@ WayPointFollowerSTMstates CoreUtils::convertToWayPointFollowerSTMstates(MissionS
     case MissionState::Idle:
       return WayPointFollowerSTMstates::NONE;
     case MissionState::FollowRouteInit:
-    case MissionState::FollowRouteLiftOff:
+    case MissionState::FollowRouteClimb:
       return WayPointFollowerSTMstates::FOLLOW_ROUTE_INIT;
     case MissionState::FollowRouteGotoBegin:
       return WayPointFollowerSTMstates::FOLLOW_ROUTE_GOTO_BEGIN;
@@ -153,6 +157,8 @@ WayPointFollowerSTMstates CoreUtils::convertToWayPointFollowerSTMstates(MissionS
       return WayPointFollowerSTMstates::FOLLOW_ROUTE_FOLLOWING;
     case MissionState::FollowRouteApproachingEndGoal:
       return WayPointFollowerSTMstates::FOLLOW_ROUTE_APPROACHING_END_GOAL;
+    case MissionState::FollowRouteApproachingEndGoalZ:
+      return WayPointFollowerSTMstates::FOLLOW_ROUTE_APPROACHING_END_GOAL_Z;
     case MissionState::FollowRouteFinished:
       return WayPointFollowerSTMstates::FOLLOW_ROUTE_FINISHED;
     default:

@@ -687,10 +687,11 @@ class TrackTestRunnerNode(TestRunnerBase):
                 self.get_logger().info('Test execution completed.')
         elif msg.state in (
             MissionState.FOLLOW_ROUTE_INIT,
-            MissionState.FOLLOW_ROUTE_LIFT_OFF,
+            MissionState.FOLLOW_ROUTE_CLIMB,
             MissionState.FOLLOW_ROUTE_GOTO_BEGIN,
             MissionState.FOLLOW_ROUTE_FOLLOWING,
             MissionState.FOLLOW_ROUTE_APPROACHING_END_GOAL,
+            MissionState.FOLLOW_ROUTE_APPROACHING_END_GOAL_Z,
         ):
             if self.test_state == TestState.SETUP_INIT:
                 if self.orchestrate_test_setup:

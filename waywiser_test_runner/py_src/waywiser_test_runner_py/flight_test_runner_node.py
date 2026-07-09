@@ -15,6 +15,7 @@ import rclpy
 from rclpy.signals import SignalHandlerOptions
 from rosidl_runtime_py.utilities import get_message
 from std_msgs.msg import Bool
+from std_srvs.srv import SetBool
 
 from waywiser_core.msg import HeartbeatRxState, PathWithTwists, QuadcopterState
 from waywiser_py.waywiser_utils import FileUtils, RELIABLE_TRANSIENT_LOCAL_QOS
@@ -37,7 +38,6 @@ class FlightTestRunnerNode(TestRunnerBase):
         self.declare_parameter('quadcopter_state_topic', 'quadcopter_state')
         self.declare_parameter('heartbeat_rx_state_topic', 'control_tower_heartbeat_rx_state')
         self.declare_parameter('control_vehicle_node_fqn', 'waywiser_drone_node')
-        self.declare_parameter('arm_command_topic', 'arm_command')
         self.declare_parameter('autopilot_state_control_topic', 'autopilot_state_control')
         self.declare_parameter('route_publish_topic', 'waywiser_path')
         self.declare_parameter('preplanned_route_filepath', '')
@@ -75,9 +75,6 @@ class FlightTestRunnerNode(TestRunnerBase):
         )
         self.control_vehicle_node_fqn = (
             self.get_parameter('control_vehicle_node_fqn').get_parameter_value().string_value
-        )
-        self.arm_command_topic = (
-            self.get_parameter('arm_command_topic').get_parameter_value().string_value
         )
         self.autopilot_state_control_topic = (
             self.get_parameter('autopilot_state_control_topic').get_parameter_value().string_value
@@ -149,9 +146,9 @@ class FlightTestRunnerNode(TestRunnerBase):
         self.phase_started_at: float | None = None
         self.profile_started_at: float | None = None
         self.last_arm_request_time = 0.0
-        self.last_auto_lift_off_request_time = 0.0
+        self.last_auto_climb_request_time = 0.0
         self.arm_requested = False
-        self.auto_lift_off_requested = False
+        self.auto_climb_requested = False
         self.route_sent = False
         self.rosbag_started = False
         self.completed = False
@@ -160,7 +157,6 @@ class FlightTestRunnerNode(TestRunnerBase):
         self.pending_perturbation_channels: dict[str, float] = {}
         self.completed_perturbation_channels: set[str] = set()
 
-        self.arm_command_publisher = self.create_publisher(Bool, self.arm_command_topic, 10)
         self.autopilot_state_control_publisher = self.create_publisher(
             Bool,
             self.autopilot_state_control_topic,
@@ -729,11 +725,11 @@ class FlightTestRunnerNode(TestRunnerBase):
         self.phase_started_at = self.experiment_now()
         self.phase = 'setup' if self.orchestrate_test_setup else 'waiting_for_mission_trigger'
         self.arm_requested = False
-        self.auto_lift_off_requested = False
+        self.auto_climb_requested = False
         self.route_sent = False
         self.rosbag_started = False
         self.last_arm_request_time = 0.0
-        self.last_auto_lift_off_request_time = 0.0
+        self.last_auto_climb_request_time = 0.0
         self.active_perturbation_channels = {}
         self.pending_perturbation_channels = {}
         self.completed_perturbation_channels = set()
@@ -903,44 +899,36 @@ class FlightTestRunnerNode(TestRunnerBase):
             ):
                 return
             if (now - self.last_arm_request_time) >= self.arm_request_retry_period:
-                self.publish_arm_request(True)
+                self.request_remote_node_bool_service(
+                    self.control_vehicle_node_fqn, 'arm', True
+                )
                 self.arm_requested = True
                 self.last_arm_request_time = now
             return
 
         if self.current_quadcopter_state_code == QuadcopterState.ARMED:
-            if not self.auto_lift_off_requested and (
+            if not self.auto_climb_requested and (
                 self.pending_parameter_request is None
-                and (now - self.last_auto_lift_off_request_time) >= self.arm_request_retry_period
+                and (now - self.last_auto_climb_request_time) >= self.arm_request_retry_period
             ):
-                self.request_remote_node_parameter(
-                    self.control_vehicle_node_fqn, 'auto_lift_off', True
+                self.request_remote_node_bool_service(
+                    self.control_vehicle_node_fqn, 'auto_climb', True
                 )
-                self.last_auto_lift_off_request_time = now
+                self.last_auto_climb_request_time = now
             return
 
         if self.current_quadcopter_state_code in (
-            QuadcopterState.LIFTING_OFF,
-            QuadcopterState.AUTO_LIFTING_OFF,
+            QuadcopterState.CLIMBING,
             QuadcopterState.IN_FLIGHT,
             QuadcopterState.HOVERING,
         ):
             if self.parameter_request_effect_observed():
                 self.get_logger().info(
-                    'Observed lift-off after requesting auto_lift_off; '
+                    'Observed climb after requesting auto_climb; '
                     'treating the parameter request as applied.'
                 )
                 self.clear_pending_parameter_request()
-            self.auto_lift_off_requested = True
-
-    def publish_arm_request(self, arm: bool):
-        arm_message = Bool()
-        arm_message.data = arm
-        self.arm_command_publisher.publish(arm_message)
-        if arm:
-            self.get_logger().info('Published arm command request.')
-        else:
-            self.get_logger().info('Published disarm command request.')
+            self.auto_climb_requested = True
 
     @staticmethod
     def stamp_to_sec(stamp) -> float | None:
@@ -1043,6 +1031,30 @@ class FlightTestRunnerNode(TestRunnerBase):
         self.get_logger().info(f'Requested {name} on {resolved_node_fqn}.')
         return True
 
+    def request_remote_node_bool_service(self, node_fqn: str, name: str, value: bool) -> bool:
+        resolved_node_fqn = node_fqn if node_fqn.startswith('/') else f'/{node_fqn}'
+        service_name = f'{resolved_node_fqn}/{name}'
+        client = self.create_client(SetBool, service_name)
+
+        if not client.service_is_ready():
+            self.get_logger().warn(f'Service {service_name} is not ready.')
+            self.destroy_client(client)
+            return False
+
+        request = SetBool.Request()
+        request.data = value
+        self.pending_parameter_request = {
+            'client': client,
+            'future': client.call_async(request),
+            'node_fqn': resolved_node_fqn,
+            'name': name,
+            'value': value,
+            'started_at': self.runner_now(),
+            'kind': 'bool_service',
+        }
+        self.get_logger().info(f'Requested {name} on {resolved_node_fqn}.')
+        return True
+
     def poll_pending_parameter_request(self, now: float):
         if self.pending_parameter_request is None:
             return
@@ -1066,6 +1078,19 @@ class FlightTestRunnerNode(TestRunnerBase):
                 )
                 return
 
+            if request.get('kind') == 'bool_service':
+                if not result.success:
+                    self.get_logger().warn(
+                        f'Requesting {request["name"]} on {request["node_fqn"]} was rejected: '
+                        f'{result.message}'
+                    )
+                    return
+
+                self.get_logger().info(f'Requested {request["name"]} on {request["node_fqn"]}.')
+                if request['name'] == 'auto_climb' and request['value'] is True:
+                    self.auto_climb_requested = True
+                return
+
             if not all(item.successful for item in result.results):
                 self.get_logger().warn(
                     f'Setting {request["name"]} on {request["node_fqn"]} was rejected.'
@@ -1073,16 +1098,16 @@ class FlightTestRunnerNode(TestRunnerBase):
                 return
 
             self.get_logger().info(f'Set {request["name"]} on {request["node_fqn"]}.')
-            if request['name'] == 'auto_lift_off' and request['value'] is True:
-                self.auto_lift_off_requested = True
+            if request['name'] == 'auto_climb' and request['value'] is True:
+                self.auto_climb_requested = True
             return
 
         if self.parameter_request_effect_observed():
             self.get_logger().info(
-                'Observed lift-off before the auto_lift_off parameter service responded.'
+                'Observed climb before the auto_climb parameter service responded.'
             )
             self.clear_pending_parameter_request()
-            self.auto_lift_off_requested = True
+            self.auto_climb_requested = True
             return
 
         if (now - request['started_at']) >= self.vehicle_parameter_service_timeout_sec:
@@ -1097,12 +1122,11 @@ class FlightTestRunnerNode(TestRunnerBase):
             return False
 
         request = self.pending_parameter_request
-        if request['name'] != 'auto_lift_off' or request['value'] is not True:
+        if request['name'] != 'auto_climb' or request['value'] is not True:
             return False
 
         return self.current_quadcopter_state_code in (
-            QuadcopterState.LIFTING_OFF,
-            QuadcopterState.AUTO_LIFTING_OFF,
+            QuadcopterState.CLIMBING,
             QuadcopterState.IN_FLIGHT,
             QuadcopterState.HOVERING,
         )

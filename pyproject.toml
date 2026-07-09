@@ -71,7 +71,7 @@ waywiser_perception = [
     # Architecture-specific extras are selected automatically by the bootstrap script.
     "lap==0.5.13",
     "opencv-python==4.11.0.86",
-    "ultralytics==8.3.235",
+    "ultralytics==8.4.84",
 ]
 waywiser_perception_jetson = [
     # aarch64 / NVIDIA Jetson — TensorRT comes from JetPack apt packages;
@@ -96,7 +96,7 @@ waywiser_perception_x86_cuda = [
 ]
 waywiser_perception_tensorrt = [
     # Installed only when an NVIDIA GPU is detected (selected by the bootstrap script).
-    "tensorrt==10.0.1",
+    "tensorrt==11.1.0.106",
 ]
 waywiser_teleop = [
     "numpy<2",
