@@ -14,9 +14,10 @@ The package uses a component-based architecture with two main components:
 
 ## Available Nodes
 
-- `waywise_car` – ROS 2 node for car-like vehicles using the vehicle interface and autopilot components
-- `waywise_truck` – ROS 2 node for truck-like vehicles (extends `waywise_car` functionality)
+- `waywiser_car_node` – ROS 2 node for car-like vehicles using the vehicle interface and autopilot components
+- `waywiser_truck_node` – ROS 2 node for truck-like vehicles (extends `waywiser_car_node` functionality)
+- `waywiser_copter_node` – ROS 2 node for copter-like vehicles (drones) using PX4 (if built with PX4 support)
 
 ## Node Hierarchy
 
-Following the WayWise vehicle state hierarchy, `waywise_truck` is designed with `waywise_car` as the base node class. This means that all functionalities of `waywise_car` are inherently available to `waywise_truck`.
+Following the WayWise vehicle state hierarchy, `waywiser_truck_node` is designed with `waywiser_car_node` as the base node class. This means that all functionalities of `waywiser_car_node` are inherently available to `waywiser_truck_node`.

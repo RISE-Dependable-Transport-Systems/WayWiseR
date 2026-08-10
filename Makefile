@@ -24,6 +24,7 @@
 #
 # Options (via ARGS):
 #   make all ARGS="--skip-mavsdk"      — skip MAVSDK installation
+#   make build ARGS="--skip-px4-drone" — skip PX4/drone targets
 #   make all ARGS="--quiet"            — non-interactive
 #
 # Override workspace root:
@@ -49,13 +50,9 @@ ifeq ($(_FIRST_GOAL),$(filter $(_FIRST_GOAL),$(_BUILD_LIKE)))
   endif
 endif
 
-# First-party packages — mirrors build.yaml package-name; used by 'make test'
-# to avoid descending into submodules (PX4-Autopilot, ros_gz_harmonic, etc.).
-WAYWISER_PACKAGES := \
-  waywiser waywiser_agrarsense waywiser_carla waywiser_core \
-  waywiser_description waywiser_gazebo waywiser_hwbringup waywiser_nav2 \
-  waywiser_perception waywiser_rviz2 waywiser_slam waywiser_teleop \
-  waywiser_test_runner waywiser_twist_safety
+# First-party packages — automatically discovered across $(WAYWISER_WS)/src;
+# used by 'make test' to avoid descending into submodules (PX4-Autopilot, etc.).
+WAYWISER_PACKAGES ?= $(shell find $(WAYWISER_WS)/src -maxdepth 3 -name "package.xml" -exec dirname {} \; | xargs -n1 basename | grep -E '^waywiser(_|$$)' | sort -u)
 
 .PHONY: help all configure setup build post-build rebuild test package clean list-packages
 .DEFAULT_GOAL := help
@@ -86,6 +83,7 @@ help:
 	@echo ""
 	@echo "Options (pass via ARGS):"
 	@echo "  make all ARGS='--skip-mavsdk'		— skip MAVSDK installation"
+	@echo "  make build ARGS='--skip-px4-drone'	— skip PX4/drone targets"
 	@echo "  make all ARGS='--quiet'   		— non-interactive"
 	@echo "  make clean ARGS='--skip-venv'  	— skip removing .venv/"
 
@@ -122,6 +120,19 @@ test:
 	$(eval TEST_SELECTION := $(or $(WAYWISER_TEST_PACKAGES),$(WAYWISER_BUILD_PACKAGES),$(WAYWISER_PACKAGES)))
 	$(eval PKG_LIST := $(filter-out $(SKIPPED),$(TEST_SELECTION)))
 	@cd $(WAYWISER_WS) && bash -c '\
+	  test_pkgs=""; \
+	  for pkg in $(PKG_LIST); do \
+	    if [ -d "build/$$pkg" ]; then \
+	      test_pkgs="$$test_pkgs $$pkg"; \
+	    else \
+	      echo "Skipping test for unbuilt package: $$pkg"; \
+	    fi; \
+	  done; \
+	  test_pkgs=$$(echo "$$test_pkgs" | xargs); \
+	  if [ -z "$$test_pkgs" ]; then \
+	    echo "ERROR: No built packages found for testing. Run make build first."; \
+	    exit 1; \
+	  fi; \
 	  venv_site=$$(find .venv/lib -maxdepth 2 -type d -name site-packages 2>/dev/null | head -n 1); \
 	  if [ -n "$$venv_site" ] && [ -n "$$PYTHONPATH" ]; then \
 	    export PYTHONPATH=$$(printf "%s" "$$PYTHONPATH" | tr ":" "\n" | grep -vx "$$(pwd)/$$venv_site" | grep -vx "$$venv_site" | paste -sd: -); \
@@ -130,8 +141,10 @@ test:
 	  if [ -n "$$WAYWISER_UNDERLAY_SETUP" ] && [ -f "$$WAYWISER_UNDERLAY_SETUP" ]; then . "$$WAYWISER_UNDERLAY_SETUP"; fi; \
 	  . install/setup.bash 2>/dev/null || true; \
 	  colcon test-result --delete-yes >/dev/null 2>&1 || true; \
-	  colcon test --packages-select $(PKG_LIST); \
-	  colcon test-result --verbose'
+	  colcon test --packages-select $$test_pkgs; \
+	  test_rc=$$?; \
+	  colcon test-result --verbose; \
+	  exit $$test_rc'
 
 package:
 	@bash $(PACKAGE_SCRIPT) $(if $(strip $(ARGS)),$(ARGS),amd64)

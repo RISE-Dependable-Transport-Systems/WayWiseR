@@ -194,7 +194,7 @@ is_waywiser_release_package() {
         ros_compatibility|\
         rqt_carla_control|\
         waywiser|\
-        waywiser_agrarsense|\
+        waywiser_*|\
         waywiser_carla|\
         waywiser_core|\
         waywiser_description|\
@@ -519,12 +519,11 @@ run_container() {
     stage_dir="$stage_root/$deb_arch/package_stage"
     if [[ "$deb_arch" != "amd64" ]]; then
         skipped_packages="$(append_unique_packages "$skipped_packages" \
-            waywiser_agrarsense \
             waywiser_carla \
             waywiser_gazebo \
             waywiser_rviz2 \
             waywiser_teleop )"
-        info "Skipping simulation, rviz2, and teleop packages for $deb_arch: waywiser_agrarsense waywiser_carla waywiser_gazebo waywiser_rviz2 waywiser_teleop"
+        info "Skipping simulation, rviz2, and teleop packages for $deb_arch: waywiser_carla waywiser_gazebo waywiser_rviz2 waywiser_teleop"
     fi
 
     package_env_file="$(mktemp)"

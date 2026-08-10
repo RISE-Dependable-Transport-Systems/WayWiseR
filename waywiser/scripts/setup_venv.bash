@@ -281,7 +281,14 @@ normalize_extras() {
 }
 
 source_extras() {
-    local extras="build px4"
+    local extras="build"
+
+    case "${WAYWISER_BUILD_PX4_DRONE:-1}" in
+        0|false|FALSE|False|no|NO|No|off|OFF|Off)
+            info "Skipping PX4 Python extra for ground-vehicle build." >&2 ;;
+        *)
+            extras="$(append_unique "$extras" px4)" ;;
+    esac
 
     [[ " $skipped_packages " == *" waywiser_carla "* ]] \
         || extras="$(append_unique "$extras" waywiser_carla)"

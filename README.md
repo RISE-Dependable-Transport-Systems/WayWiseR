@@ -19,7 +19,8 @@ WayWiseR is divided into modular ROS2 packages:
 | `waywiser_teleop`                            | Multi-source teleoperation and arbitration.                       |
 | `waywiser_test_runner`                       | Test orchestration for both simulators and hardware.              |
 | `waywiser_twist_safety`                      | Onboard safety features such as command arbitration, E-Stop, etc. |
-| `waywiser_gazebo` / `_carla` / `_agrarsense` | Simulation-specific integration and environments.                 |
+
+The simulation-specific integrations are maintained in seperate repositories: [WayWiseR_Agrarsense](https://github.com/das-rise/WayWiseR_Agrarsense), [WayWiseR_Carla](https://github.com/das-rise/WayWiseR_Carla), and [WayWiseR_Gazebo](https://github.com/das-rise/WayWiseR_Gazebo).
 
 ---
 
@@ -54,7 +55,9 @@ WayWiseR is divided into modular ROS2 packages:
    make help
    ```
 
-   > ⚠️ **Important**: MAVSDK is automatically installed from a prebuilt deb (Ubuntu 22.04, amd64). On other architectures the setup will pause and ask you to install it manually, then run `make build`. For Non-amd64 / manual install, prerequisites can be skipped with `make setup ARGS=--skip-prereqs` if you have already installed them.
+   > 💡 **Notes**:
+   > - **MAVSDK**: Automatically installed on Ubuntu 22.04 (amd64). On other architectures, install it manually and skip prereqs with `make all ARGS="--skip-prereqs"`.
+   > - **Ground-only builds**: Disable PX4/drone support via `WAYWISER_BUILD_PX4_DRONE=0` in `.env` (`make configure`) or pass `ARGS="--skip-px4-drone"` (e.g., `make all ARGS="--skip-px4-drone"`).
 
 3. **Activate the workspace:**
 

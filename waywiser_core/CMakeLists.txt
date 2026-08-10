@@ -16,6 +16,8 @@ set(CMAKE_C_STANDARD 23)
 
 include(ExternalProject)
 
+option(WAYWISER_BUILD_PX4_DRONE "Build PX4 message interfaces and the WayWiseR copter node" ON)
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
@@ -78,37 +80,46 @@ set(PX4_AUTOPILOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/PX4-Autopilot")
 set(PX4_MSGS_SOURCE_DIR "${PX4_AUTOPILOT_DIR}/msg")
 set(PX4_MSGS_VENDOR_TEMPLATE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/px4_msgs_vendor")
 
-if(EXISTS "${PX4_MSGS_SOURCE_DIR}/CMakeLists.txt")
-  ExternalProject_Add(px4_msgs_vendor
-    SOURCE_DIR "${PX4_MSGS_VENDOR_TEMPLATE_DIR}"
-    BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/px4_msgs_vendor_build"
-    INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
-    UPDATE_COMMAND ""
-    TEST_COMMAND ""
-    CMAKE_ARGS
-      -DBUILD_TESTING=OFF
-      -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
-      -DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}
-      -DCMAKE_LIBRARY_PATH=${CMAKE_LIBRARY_PATH}
-      -DPython3_EXECUTABLE=${Python3_EXECUTABLE}
-      -DPython3_INCLUDE_DIRS=${Python3_INCLUDE_DIRS}
-      -DPython3_LIBRARIES=${Python3_LIBRARIES}
-      -DPYTHON_EXECUTABLE=${Python3_EXECUTABLE}
-      -DPYTHON_INCLUDE_DIRS=${Python3_INCLUDE_DIRS}
-      -DPYTHON_LIBRARIES=${Python3_LIBRARIES}
-      -DPX4_AUTOPILOT_DIR=${PX4_AUTOPILOT_DIR}
-  )
+if(WAYWISER_BUILD_PX4_DRONE)
+  if(EXISTS "${PX4_MSGS_SOURCE_DIR}/CMakeLists.txt")
+    ExternalProject_Add(px4_msgs_vendor
+      SOURCE_DIR "${PX4_MSGS_VENDOR_TEMPLATE_DIR}"
+      BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/px4_msgs_vendor_build"
+      INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
+      UPDATE_COMMAND ""
+      TEST_COMMAND ""
+      CMAKE_ARGS
+        -DBUILD_TESTING=OFF
+        -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
+        -DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}
+        -DCMAKE_LIBRARY_PATH=${CMAKE_LIBRARY_PATH}
+        -DPython3_EXECUTABLE=${Python3_EXECUTABLE}
+        -DPython3_INCLUDE_DIRS=${Python3_INCLUDE_DIRS}
+        -DPython3_LIBRARIES=${Python3_LIBRARIES}
+        -DPYTHON_EXECUTABLE=${Python3_EXECUTABLE}
+        -DPYTHON_INCLUDE_DIRS=${Python3_INCLUDE_DIRS}
+        -DPYTHON_LIBRARIES=${Python3_LIBRARIES}
+        -DPX4_AUTOPILOT_DIR=${PX4_AUTOPILOT_DIR}
+    )
+  else()
+    message(FATAL_ERROR
+      "PX4-Autopilot submodule is missing at ${PX4_AUTOPILOT_DIR}. Run "
+      "'make setup' to initialize the required PX4 checkout, or configure "
+      "WAYWISER_BUILD_PX4_DRONE=0 for a ground-vehicle build."
+    )
+  endif()
 else()
-  message(FATAL_ERROR
-    "PX4-Autopilot submodule is missing at ${PX4_AUTOPILOT_DIR}. Run "
-    "'make setup' to initialize the required PX4 checkout."
+  message(STATUS
+    "WAYWISER_BUILD_PX4_DRONE is OFF: skipping PX4 messages and waywiser_copter_node."
   )
 endif()
 
 # Instead of using find_package(px4_msgs), we manually specify the include directories
 # since the external project builds it during the make phase, not configure phase.
-include_directories(${CMAKE_INSTALL_PREFIX}/include/px4_msgs/px4_msgs/msg)
-include_directories(${CMAKE_INSTALL_PREFIX}/include/px4_msgs)
+if(WAYWISER_BUILD_PX4_DRONE)
+  include_directories(${CMAKE_INSTALL_PREFIX}/include/px4_msgs/px4_msgs/msg)
+  include_directories(${CMAKE_INSTALL_PREFIX}/include/px4_msgs)
+endif()
 
 include_directories(include WayWise/)
 
@@ -245,19 +256,21 @@ add_executable(
   ${COMMON_WAYWISE_AP_SOURCES}
 )
 
-add_executable(
-  waywiser_copter_node
-  cpp_src/waywiser_copter_node.cpp
-  cpp_src/waywiser_copter_node_core.cpp
-  cpp_src/waywiser_core_utils.cpp
-  cpp_src/copter_autopilot_component.cpp
-  cpp_src/copter_interface_component.cpp
-  cpp_src/qobject_node.cpp
-  ${COMMON_WAYWISE_SOURCES}
-  ${WAYWISE_LOCALIZATION_SOURCES}
-  ${WAYWISE_COPTER_SOURCES}
-  ${COMMON_WAYWISE_AP_SOURCES}
-)
+if(WAYWISER_BUILD_PX4_DRONE)
+  add_executable(
+    waywiser_copter_node
+    cpp_src/waywiser_copter_node.cpp
+    cpp_src/waywiser_copter_node_core.cpp
+    cpp_src/waywiser_core_utils.cpp
+    cpp_src/copter_autopilot_component.cpp
+    cpp_src/copter_interface_component.cpp
+    cpp_src/qobject_node.cpp
+    ${COMMON_WAYWISE_SOURCES}
+    ${WAYWISE_LOCALIZATION_SOURCES}
+    ${WAYWISE_COPTER_SOURCES}
+    ${COMMON_WAYWISE_AP_SOURCES}
+  )
+endif()
 
 add_executable(navsatfix_extended_wrapper_node
   cpp_src/navsatfix_extended_wrapper_node.cpp
@@ -288,14 +301,16 @@ set(TRUCK_LIBRARIES
   ${CAR_LIBRARIES}
 )
 
-set(COPTER_LIBRARIES
-  ${CAR_LIBRARIES}
-  ${CMAKE_INSTALL_PREFIX}/lib/libpx4_msgs__rosidl_typesupport_cpp.so
-  ${CMAKE_INSTALL_PREFIX}/lib/libpx4_msgs__rosidl_typesupport_c.so
-  ${CMAKE_INSTALL_PREFIX}/lib/libpx4_msgs__rosidl_typesupport_introspection_cpp.so
-  ${CMAKE_INSTALL_PREFIX}/lib/libpx4_msgs__rosidl_typesupport_introspection_c.so
-  ${CMAKE_INSTALL_PREFIX}/lib/libpx4_msgs__rosidl_generator_c.so
-)
+if(WAYWISER_BUILD_PX4_DRONE)
+  set(COPTER_LIBRARIES
+    ${CAR_LIBRARIES}
+    ${CMAKE_INSTALL_PREFIX}/lib/libpx4_msgs__rosidl_typesupport_cpp.so
+    ${CMAKE_INSTALL_PREFIX}/lib/libpx4_msgs__rosidl_typesupport_c.so
+    ${CMAKE_INSTALL_PREFIX}/lib/libpx4_msgs__rosidl_typesupport_introspection_cpp.so
+    ${CMAKE_INSTALL_PREFIX}/lib/libpx4_msgs__rosidl_typesupport_introspection_c.so
+    ${CMAKE_INSTALL_PREFIX}/lib/libpx4_msgs__rosidl_generator_c.so
+  )
+endif()
 
 set(NAVSATFIX_EXTENDED_WRAPPER_LIBRARIES
   Qt5::Core
@@ -305,7 +320,9 @@ set(NAVSATFIX_EXTENDED_WRAPPER_LIBRARIES
 target_link_libraries(waywiser_localization_node ${LOCALIZATION_LIBRARIES})
 target_link_libraries(waywiser_car_node ${CAR_LIBRARIES})
 target_link_libraries(waywiser_truck_node ${TRUCK_LIBRARIES})
-target_link_libraries(waywiser_copter_node ${COPTER_LIBRARIES})
+if(WAYWISER_BUILD_PX4_DRONE)
+  target_link_libraries(waywiser_copter_node ${COPTER_LIBRARIES})
+endif()
 target_link_libraries(navsatfix_extended_wrapper_node ${NAVSATFIX_EXTENDED_WRAPPER_LIBRARIES})
 
 function(add_qt_includes target)
@@ -320,7 +337,9 @@ endfunction()
 add_qt_includes(waywiser_localization_node)
 add_qt_includes(waywiser_car_node)
 add_qt_includes(waywiser_truck_node)
-add_qt_includes(waywiser_copter_node)
+if(WAYWISER_BUILD_PX4_DRONE)
+  add_qt_includes(waywiser_copter_node)
+endif()
 add_qt_includes(navsatfix_extended_wrapper_node)
 
 set(LOCALIZATION_DEPENDENCIES
@@ -356,9 +375,11 @@ set(TRUCK_DEPENDENCIES
   ${CAR_DEPENDENCIES}
 )
 
-set(COPTER_DEPENDENCIES
-  ${CAR_DEPENDENCIES}
-)
+if(WAYWISER_BUILD_PX4_DRONE)
+  set(COPTER_DEPENDENCIES
+    ${CAR_DEPENDENCIES}
+  )
+endif()
 
 set(NAVSATFIX_EXTENDED_WRAPPER_DEPENDENCIES
   rclcpp
@@ -374,8 +395,10 @@ set(NAVSATFIX_EXTENDED_WRAPPER_DEPENDENCIES
 ament_target_dependencies(waywiser_localization_node ${LOCALIZATION_DEPENDENCIES})
 ament_target_dependencies(waywiser_car_node ${CAR_DEPENDENCIES})
 ament_target_dependencies(waywiser_truck_node ${TRUCK_DEPENDENCIES})
-ament_target_dependencies(waywiser_copter_node ${COPTER_DEPENDENCIES})
-add_dependencies(waywiser_copter_node px4_msgs_vendor)
+if(WAYWISER_BUILD_PX4_DRONE)
+  ament_target_dependencies(waywiser_copter_node ${COPTER_DEPENDENCIES})
+  add_dependencies(waywiser_copter_node px4_msgs_vendor)
+endif()
 ament_target_dependencies(
   navsatfix_extended_wrapper_node
   ${NAVSATFIX_EXTENDED_WRAPPER_DEPENDENCIES}
@@ -389,7 +412,9 @@ install(
 install(TARGETS waywiser_localization_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS waywiser_car_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS waywiser_truck_node DESTINATION lib/${PROJECT_NAME})
-install(TARGETS waywiser_copter_node DESTINATION lib/${PROJECT_NAME})
+if(WAYWISER_BUILD_PX4_DRONE)
+  install(TARGETS waywiser_copter_node DESTINATION lib/${PROJECT_NAME})
+endif()
 install(TARGETS navsatfix_extended_wrapper_node DESTINATION lib/${PROJECT_NAME}
 )
 
