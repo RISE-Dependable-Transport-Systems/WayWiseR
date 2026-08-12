@@ -1201,17 +1201,24 @@ if [ -f "\$WAYWISER_WS/src/WayWiseR/.env" ]; then
 elif [ -f /etc/waywiser/waywiser.env ]; then
     set -a; source /etc/waywiser/waywiser.env; set +a
 fi
+_waywiser_had_nounset=0
+case \$- in
+    *u*) _waywiser_had_nounset=1 ;;
+esac
 if [ -z "\${ROS_DISTRO:-}" ]; then
     if [ -f /opt/ros/humble/setup.bash ]; then
-        set +u; source /opt/ros/humble/setup.bash; set -u
+        set +u; source /opt/ros/humble/setup.bash
+        if [ "\$_waywiser_had_nounset" -eq 1 ]; then set -u; fi
     else
         echo "WARNING: ROS2 is not sourced. Source your ROS2 environment before using this workspace." >&2
     fi
 fi
 export PYTHONPATH=$VENV_DIR/lib/python${py_ver}/site-packages:\${PYTHONPATH:-}
 if [ -f "\$WAYWISER_WS/install/setup.bash" ]; then
-    set +u; source "\$WAYWISER_WS/install/setup.bash"; set -u
+    set +u; source "\$WAYWISER_WS/install/setup.bash"
+    if [ "\$_waywiser_had_nounset" -eq 1 ]; then set -u; fi
 fi
+unset _waywiser_had_nounset
 EOT
     info "Activate hook added."
     info "From now on, 'source $VENV_DIR/bin/activate' sets up everything."

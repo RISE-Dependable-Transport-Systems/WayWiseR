@@ -225,9 +225,14 @@ if [ -n "\${WAYWISER_WS:-}" ] && [ -f "\$WAYWISER_WS/src/WayWiseR/.env" ]; then
 elif [ -f /etc/waywiser/waywiser.env ]; then
     set -a; source /etc/waywiser/waywiser.env; set +a
 fi
+_waywiser_had_nounset=0
+case \$- in
+    *u*) _waywiser_had_nounset=1 ;;
+esac
 if [ -z "\${ROS_DISTRO:-}" ]; then
     if [ -f /opt/ros/$ros_distro/setup.bash ]; then
-        set +u; source /opt/ros/$ros_distro/setup.bash; set -u
+        set +u; source /opt/ros/$ros_distro/setup.bash
+        if [ "\$_waywiser_had_nounset" -eq 1 ]; then set -u; fi
     else
         echo "WARNING: ROS2 is not sourced. Source your ROS2 environment before using WayWiseR." >&2
     fi
@@ -240,11 +245,13 @@ if [ -n "\${VIRTUAL_ENV:-}" ]; then
     unset _waywiser_venv_site
 fi
 if ${source_workspace_install} && [ -n "\${WAYWISER_WS:-}" ] && [ -f "\$WAYWISER_WS/install/setup.bash" ]; then
-    set +u; source "\$WAYWISER_WS/install/setup.bash"; set -u
+    set +u; source "\$WAYWISER_WS/install/setup.bash"
+    if [ "\$_waywiser_had_nounset" -eq 1 ]; then set -u; fi
 fi
 if [ -n "\${VIRTUAL_ENV:-}" ]; then
     export PATH="\$VIRTUAL_ENV/bin:\$PATH"
 fi
+unset _waywiser_had_nounset
 $marker_end
 EOF
 }
