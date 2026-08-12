@@ -57,19 +57,14 @@ RUN mkdir -p /opt/ccache && chmod 777 /opt/ccache
 # Build a reusable WayWiseR underlay so CI and local act runs can build the
 # checked-out workspace as a thin overlay.
 RUN --mount=type=bind,source=.,target=/tmp/WayWiseR-local,readonly \
-    mkdir -p "$WAYWISER_UNDERLAY_WS/src" \
-    && if [[ "$USE_LOCAL_SRC" != "true" ]] && git clone --branch "$WAYWISER_REF" https://github.com/das-rise/WayWiseR.git /tmp/WayWiseR-remote 2>/dev/null; then \
-        if [[ -f /tmp/WayWiseR-remote/Makefile ]]; then \
-            mkdir -p "$WAYWISER_UNDERLAY_WS/src/WayWiseR"; \
-            shopt -s dotglob; \
-            mv /tmp/WayWiseR-remote/* "$WAYWISER_UNDERLAY_WS/src/WayWiseR"/; \
-            shopt -u dotglob; \
-        fi; \
-        rm -rf /tmp/WayWiseR-remote; \
-    fi \
-    && if [[ ! -f "$WAYWISER_UNDERLAY_WS/src/WayWiseR/Makefile" ]]; then \
-        mkdir -p "$WAYWISER_UNDERLAY_WS/src/WayWiseR"; \
+    mkdir -p "$WAYWISER_UNDERLAY_WS/src/WayWiseR" \
+    && if [[ -f /tmp/WayWiseR-local/Makefile ]]; then \
         cp -a /tmp/WayWiseR-local/. "$WAYWISER_UNDERLAY_WS/src/WayWiseR/"; \
+    elif git clone --branch "$WAYWISER_REF" https://github.com/das-rise/WayWiseR.git /tmp/WayWiseR-remote 2>/dev/null; then \
+        shopt -s dotglob; \
+        mv /tmp/WayWiseR-remote/* "$WAYWISER_UNDERLAY_WS/src/WayWiseR"/; \
+        shopt -u dotglob; \
+        rm -rf /tmp/WayWiseR-remote; \
     fi \
     && if [[ ! -e "$WAYWISER_UNDERLAY_WS/Makefile" ]]; then \
         ln -s "$WAYWISER_UNDERLAY_WS/src/WayWiseR/Makefile" "$WAYWISER_UNDERLAY_WS/Makefile"; \

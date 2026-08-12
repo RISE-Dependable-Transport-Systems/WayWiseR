@@ -290,8 +290,6 @@ source_extras() {
             extras="$(append_unique "$extras" px4)" ;;
     esac
 
-    [[ " $skipped_packages " == *" waywiser_carla "* ]] \
-        || extras="$(append_unique "$extras" waywiser_carla)"
     [[ " $skipped_packages " == *" waywiser_hwbringup "* ]] \
         || extras="$(append_unique "$extras" waywiser_hwbringup)"
     if [[ " $skipped_packages " != *" waywiser_perception "* ]]; then
@@ -448,6 +446,21 @@ for extra in $extras; do
     [[ "$editable" == true ]] || install_args+=(--extra "$extra")
 done
 run_uv_install pip install "${install_args[@]}"
+
+# Install Python dependencies for any unskipped simulation plugins in the workspace
+ws_src="${WAYWISER_WS:-$(cd "$repo_dir/../.." 2>/dev/null && pwd)}/src"
+if [[ -d "$ws_src" ]]; then
+    while IFS= read -r plugin_proj; do
+        [[ -f "$plugin_proj" ]] || continue
+        plugin_dir="$(dirname "$plugin_proj")"
+        plugin_name="$(basename "$plugin_dir")"
+        if [[ "$plugin_dir" != "$repo_dir"* ]] && [[ " $skipped_packages " != *" ${plugin_name,,} "* && " $skipped_packages " != *" ${plugin_name} "* ]]; then
+            info "Installing Python dependencies for workspace plugin: $plugin_name"
+            run_uv_install pip install --python "$venv_dir/bin/python" -e "$plugin_dir" || true
+        fi
+    done < <(find "$ws_src" -maxdepth 3 -name pyproject.toml 2>/dev/null || true)
+fi
+
 install_activate_hook
 install_ros2_wrapper
 

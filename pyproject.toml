@@ -47,20 +47,6 @@ px4 = [
     "toml>=0.9",
     "wheel>=0.31.1",
 ]
-waywiser_carla = [
-    "autopep8",
-    "carla==0.9.15",
-    "cmake_format==0.6.11",
-    "networkx",
-    "numpy<2",
-    "pep8",
-    "pexpect",
-    "pygame",
-    "pylint",
-    "rosinstall-generator==0.1.22",
-    "simple-pid",
-    "transforms3d>=0.4.2",
-]
 waywiser_hwbringup = [
     "modbus-tk>=1.1.5",
     "pyserial>=3.5",
@@ -115,7 +101,6 @@ all = [
     "waywiser[build]",
     "waywiser[email]",
     "waywiser[px4]",
-    "waywiser[waywiser_carla]",
     "waywiser[waywiser_hwbringup]",
     "waywiser[waywiser_perception]",
     "waywiser[waywiser_teleop]",
