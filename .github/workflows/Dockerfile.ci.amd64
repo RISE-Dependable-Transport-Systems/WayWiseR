@@ -13,6 +13,7 @@ ARG ROS_DISTRO
 ARG WAYWISER_REF
 ARG WAYWISER_SKIPPED_PACKAGES
 ARG ACT_COMPAT
+ARG USE_LOCAL_SRC=false
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV ROS_DISTRO=${ROS_DISTRO}
@@ -56,18 +57,14 @@ RUN mkdir -p /opt/ccache && chmod 777 /opt/ccache
 # Build a reusable WayWiseR underlay so CI and local act runs can build the
 # checked-out workspace as a thin overlay.
 RUN --mount=type=bind,source=.,target=/tmp/WayWiseR-local,readonly \
-    mkdir -p "$WAYWISER_UNDERLAY_WS/src" \
-    && git clone --branch "$WAYWISER_REF" https://github.com/das-rise/WayWiseR.git /tmp/WayWiseR-remote \
-    && if [[ -f /tmp/WayWiseR-remote/Makefile ]]; then \
-        mkdir -p "$WAYWISER_UNDERLAY_WS/src/WayWiseR"; \
+    mkdir -p "$WAYWISER_UNDERLAY_WS/src/WayWiseR" \
+    && if [[ -f /tmp/WayWiseR-local/Makefile ]]; then \
+        cp -a /tmp/WayWiseR-local/. "$WAYWISER_UNDERLAY_WS/src/WayWiseR/"; \
+    elif git clone --branch "$WAYWISER_REF" https://github.com/das-rise/WayWiseR.git /tmp/WayWiseR-remote 2>/dev/null; then \
         shopt -s dotglob; \
         mv /tmp/WayWiseR-remote/* "$WAYWISER_UNDERLAY_WS/src/WayWiseR"/; \
         shopt -u dotglob; \
         rm -rf /tmp/WayWiseR-remote; \
-    else \
-        rm -rf /tmp/WayWiseR-remote; \
-        mkdir -p "$WAYWISER_UNDERLAY_WS/src/WayWiseR"; \
-        cp -a /tmp/WayWiseR-local/. "$WAYWISER_UNDERLAY_WS/src/WayWiseR/"; \
     fi \
     && if [[ ! -e "$WAYWISER_UNDERLAY_WS/Makefile" ]]; then \
         ln -s "$WAYWISER_UNDERLAY_WS/src/WayWiseR/Makefile" "$WAYWISER_UNDERLAY_WS/Makefile"; \

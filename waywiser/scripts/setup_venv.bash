@@ -225,9 +225,14 @@ if [ -n "\${WAYWISER_WS:-}" ] && [ -f "\$WAYWISER_WS/src/WayWiseR/.env" ]; then
 elif [ -f /etc/waywiser/waywiser.env ]; then
     set -a; source /etc/waywiser/waywiser.env; set +a
 fi
+_waywiser_had_nounset=0
+case \$- in
+    *u*) _waywiser_had_nounset=1 ;;
+esac
 if [ -z "\${ROS_DISTRO:-}" ]; then
     if [ -f /opt/ros/$ros_distro/setup.bash ]; then
-        set +u; source /opt/ros/$ros_distro/setup.bash; set -u
+        set +u; source /opt/ros/$ros_distro/setup.bash
+        if [ "\$_waywiser_had_nounset" -eq 1 ]; then set -u; fi
     else
         echo "WARNING: ROS2 is not sourced. Source your ROS2 environment before using WayWiseR." >&2
     fi
@@ -240,11 +245,13 @@ if [ -n "\${VIRTUAL_ENV:-}" ]; then
     unset _waywiser_venv_site
 fi
 if ${source_workspace_install} && [ -n "\${WAYWISER_WS:-}" ] && [ -f "\$WAYWISER_WS/install/setup.bash" ]; then
-    set +u; source "\$WAYWISER_WS/install/setup.bash"; set -u
+    set +u; source "\$WAYWISER_WS/install/setup.bash"
+    if [ "\$_waywiser_had_nounset" -eq 1 ]; then set -u; fi
 fi
 if [ -n "\${VIRTUAL_ENV:-}" ]; then
     export PATH="\$VIRTUAL_ENV/bin:\$PATH"
 fi
+unset _waywiser_had_nounset
 $marker_end
 EOF
 }
@@ -281,10 +288,15 @@ normalize_extras() {
 }
 
 source_extras() {
-    local extras="build px4"
+    local extras="build"
 
-    [[ " $skipped_packages " == *" waywiser_carla "* ]] \
-        || extras="$(append_unique "$extras" waywiser_carla)"
+    case "${WAYWISER_BUILD_PX4_DRONE:-1}" in
+        0|false|FALSE|False|no|NO|No|off|OFF|Off)
+            info "Skipping PX4 Python extra for ground-vehicle build." >&2 ;;
+        *)
+            extras="$(append_unique "$extras" px4)" ;;
+    esac
+
     [[ " $skipped_packages " == *" waywiser_hwbringup "* ]] \
         || extras="$(append_unique "$extras" waywiser_hwbringup)"
     if [[ " $skipped_packages " != *" waywiser_perception "* ]]; then
@@ -441,6 +453,21 @@ for extra in $extras; do
     [[ "$editable" == true ]] || install_args+=(--extra "$extra")
 done
 run_uv_install pip install "${install_args[@]}"
+
+# Install Python dependencies for any unskipped simulation plugins in the workspace
+ws_src="${WAYWISER_WS:-$(cd "$repo_dir/../.." 2>/dev/null && pwd)}/src"
+if [[ -d "$ws_src" ]]; then
+    while IFS= read -r plugin_proj; do
+        [[ -f "$plugin_proj" ]] || continue
+        plugin_dir="$(dirname "$plugin_proj")"
+        plugin_name="$(basename "$plugin_dir")"
+        if [[ "$plugin_dir" != "$repo_dir"* ]] && [[ " $skipped_packages " != *" ${plugin_name,,} "* && " $skipped_packages " != *" ${plugin_name} "* ]]; then
+            info "Installing Python dependencies for workspace plugin: $plugin_name"
+            run_uv_install pip install --python "$venv_dir/bin/python" -e "$plugin_dir" || true
+        fi
+    done < <(find "$ws_src" -maxdepth 3 -name pyproject.toml 2>/dev/null || true)
+fi
+
 install_activate_hook
 install_ros2_wrapper
 

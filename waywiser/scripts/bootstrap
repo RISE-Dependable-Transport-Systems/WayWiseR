@@ -8,6 +8,7 @@
 #   --setup-only     Install prereqs + venv + rosdep, then exit (no build)
 #   --skip-prereqs   Skip system prerequisites (assume already installed)
 #   --skip-mavsdk    Skip MAVSDK check/install
+#   --skip-px4-drone Skip PX4 setup and the waywiser_core copter node
 #   --configure      (Re-)configure .env only, then exit
 #   --build-only     Skip setup; only run colcon build
 #   --post-build-only  Run post-build setup hooks, then exit
@@ -129,6 +130,9 @@ apply_env_overrides() {
             env_set WAYWISER_SKIPPED_PACKAGES ""
         fi
     fi
+    if [[ -n "${WAYWISER_BUILD_PX4_DRONE+x}" ]]; then
+        env_set WAYWISER_BUILD_PX4_DRONE "${WAYWISER_BUILD_PX4_DRONE}"
+    fi
 }
 
 # Read a single key from an env file, stripping quotes.
@@ -239,6 +243,29 @@ prune_missing_prefix_paths() {
     done
 }
 
+sanitize_build_toolchain_env() {
+    if [[ "$PATH" == */linuxbrew* ]]; then
+        PATH=$(echo "$PATH" | tr ':' '\n' | grep -v -E '^/home/linuxbrew|^/usr/local/linuxbrew' | paste -sd:)
+        export PATH
+    fi
+
+    unset COMPILER_PATH LIBRARY_PATH LD LDFLAGS
+}
+
+px4_drone_enabled() {
+    local value="${WAYWISER_BUILD_PX4_DRONE:-}"
+    if [[ -z "$value" && -f "$ENV_FILE" ]]; then
+        value="$(env_get WAYWISER_BUILD_PX4_DRONE)"
+    fi
+    value="${value:-1}"
+    case "$value" in
+        0|false|FALSE|False|no|NO|No|off|OFF|Off)
+            return 1 ;;
+        *)
+            return 0 ;;
+    esac
+}
+
 # Activate venv + ROS (used by sim package functions).
 activate_env() {
     local venv="$VENV_DIR"
@@ -323,6 +350,7 @@ Core workspace setup:
   --prereqs-only   Only install system prerequisites, then exit
   --skip-prereqs   Skip system prerequisites (assume already installed)
   --skip-mavsdk    Skip MAVSDK check/install
+  --skip-px4-drone Skip PX4 setup and the waywiser_core copter node
   --configure      (Re-)configure .env only, then exit
   --build-only     Skip setup; only run colcon build
   --post-build-only  Run post-build setup hooks, then exit
@@ -355,6 +383,7 @@ while [[ $# -gt 0 ]]; do
             --setup-only)    OPT_SETUP_ONLY=true ;;
             --skip-prereqs)  OPT_SKIP_PREREQS=true ;;
             --skip-mavsdk)   OPT_SKIP_MAVSDK=true ;;
+            --skip-px4-drone) export WAYWISER_BUILD_PX4_DRONE=0 ;;
             --configure)     OPT_CONFIGURE_ONLY=true ;;
             --build-only)    OPT_BUILD_ONLY=true ;;
             --post-build-only) OPT_POST_BUILD_ONLY=true ;;
@@ -398,25 +427,46 @@ while [[ $# -gt 0 ]]; do
         [[ "${answer,,}" =~ ^y ]]
     }
 
+ensure_dialog() {
+    if command -v dialog &>/dev/null || [[ "$OPT_YES" == true ]] || [[ ! -t 1 ]]; then
+        return 0
+    fi
+
+    info "'dialog' package is not installed (required for interactive configuration UI)."
+    if prompt_yn "Install missing 'dialog' package (sudo apt-get install -y dialog)?" true; then
+        info "Installing 'dialog'..."
+        if as_root apt-get update -qq && as_root apt-get install $(yes_args -y) dialog; then
+            info "'dialog' installed successfully."
+        else
+            warn "Failed to install 'dialog'. Falling back to line-by-line prompts."
+        fi
+    fi
+}
+
 # package_checklist <result_nameref> <current_skip_list>
-# Shows an interactive whiptail checklist of all workspace packages.
+# Shows an interactive dialog/whiptail checklist of all workspace packages.
 # The user marks which ones to BUILD; unchecked = skipped.
 # waywiser and waywiser_core are always built and not shown in the checklist.
 package_checklist() {
     local -n _pc_ref="$1"
     local cur_skip="$2"
 
+    ensure_dialog
+
     # Packages that are always built — excluded from the checklist entirely.
     local -r LOCKED="waywiser waywiser_core waywiser_description waywiser_twist_safety"
 
-    # Enumerate packages from package.xml files in the repo (skip external/ and .git/)
+    local search_dir="${WAYWISER_WS:-$(cd "$REPO_DIR/../.." && pwd)}/src"
+    [[ -d "$search_dir" ]] || search_dir="$REPO_DIR"
+
+    # Enumerate packages from package.xml files in the workspace (skip external/ and .git/)
     local all_pkgs=()
     while IFS= read -r name; do
         [[ -n "$name" ]] && all_pkgs+=("$name")
-    done < <(find "$REPO_DIR" -name "package.xml" \
+    done < <(find "$search_dir" -name "package.xml" \
         ! -path "*/external/*" ! -path "*/.git/*" \
         -exec grep -m1 '<name>' {} \; \
-        | sed 's|.*<name>||;s|</name>.*||' | sort)
+        | sed 's|.*<name>||;s|</name>.*||' | sort -u)
 
     # Only show non-locked packages in the UI.
     local pkgs=()
@@ -425,7 +475,7 @@ package_checklist() {
     done
 
     if [[ ${#pkgs[@]} -eq 0 ]]; then
-        warn "No selectable packages found in $REPO_DIR — skipping package selection."
+        warn "No selectable packages found in $search_dir — skipping package selection."
         _pc_ref="$cur_skip"
         return
     fi
@@ -447,10 +497,17 @@ package_checklist() {
             rev_deps["$dep"]+="$depender "
         done < <(grep -E '<(depend|build_depend|exec_depend|run_depend)>' "$xml" \
                  | sed 's|^[[:space:]]*<[^>]*>||;s|</[^>]*>.*||' | sort -u)
-    done < <(find "$REPO_DIR" -name "package.xml" \
+    done < <(find "$search_dir" -name "package.xml" \
         ! -path "*/external/*" ! -path "*/.git/*")
 
-    if command -v whiptail &>/dev/null && [[ -t 1 ]]; then
+    local dialog_cmd=""
+    if command -v dialog &>/dev/null; then
+        dialog_cmd="dialog --keep-tite"
+    elif command -v whiptail &>/dev/null; then
+        dialog_cmd="whiptail"
+    fi
+
+    if [[ -n "$dialog_cmd" && -t 1 ]]; then
         # Build the "always built" bullet list for the dialog message.
         local locked_lines=""
         for pkg in $LOCKED; do
@@ -473,7 +530,7 @@ package_checklist() {
         local width=$(( $(tput cols 2>/dev/null || echo 80) - 4 ))
         (( width < 60 )) && width=60
         local result exit_status=0
-        result=$(whiptail \
+        result=$($dialog_cmd \
             --title "WayWiseR — Build Packages" \
             --checklist \
 "Always built (cannot be skipped):
@@ -483,6 +540,7 @@ Check packages to BUILD (uncheck to skip).
             "$height" "$width" "$n" \
             "${items[@]}" \
             3>&1 1>&2 2>&3) || exit_status=$?
+        tput cnorm 2>/dev/null || true
         if [[ $exit_status -ne 0 ]]; then return 1; fi  # Cancel/Esc → abort
         local selected
         selected=$(echo "$result" | tr -d '"')
@@ -546,39 +604,37 @@ Check packages to BUILD (uncheck to skip).
         info "apt packages installed."
     }
 
-    install_gazebo_harmonic_deps() {
-        header "Configuring PX4/Gazebo Harmonic apt repository"
-        local keyring="/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg"
-        local sources_list="/etc/apt/sources.list.d/gazebo-stable.list"
-
-        if [[ ! -f "$keyring" || ! -f "$sources_list" ]]; then
-            prompt_yn "Add OSRF Gazebo apt repository?" true \
-                || { info "Skipping PX4/Gazebo Harmonic dependencies."; return 0; }
-            as_root curl -fsSL https://packages.osrfoundation.org/gazebo.gpg \
-                -o "$keyring"
-            local ubuntu_codename
-            ubuntu_codename=$(. /etc/os-release && echo "$UBUNTU_CODENAME")
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=$keyring] http://packages.osrfoundation.org/gazebo/ubuntu-stable $ubuntu_codename main" \
-                | as_root tee "$sources_list" > /dev/null
-            as_root apt-get update -qq
-            info "OSRF Gazebo apt repository added. rosdep will install Gazebo packages."
-        else
-            info "OSRF Gazebo apt repository already configured."
-        fi
+    source_plugin_scripts() {
+        local plugin_script
+        while IFS= read -r plugin_script; do
+            # shellcheck disable=SC1090
+            source "$plugin_script"
+        done < <(find "$WAYWISER_WS/src" -maxdepth 4 -type f -name "bootstrap_plugin.bash" -not -path '*/.git/*' 2>/dev/null)
     }
 
-    should_install_gazebo_harmonic_deps() {
-        local arch skipped
-
-        arch=$(dpkg --print-architecture 2>/dev/null || uname -m)
-        [[ "$arch" == "amd64" ]] || return 1
-
-        ensure_env_file
+    run_package_hooks() {
+        local hook_suffix="$1"
+        local skipped
         skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
-        [[ " $skipped " != *" waywiser_gazebo "* ]]
+
+        local pkg pkg_xml
+        while IFS= read -r pkg_xml; do
+            pkg=$(grep -m1 '<name>' "$pkg_xml" | sed 's|.*<name>||;s|</name>.*||')
+            if [[ " $skipped " != *" $pkg "* ]]; then
+                if type "${pkg}_${hook_suffix}" >/dev/null 2>&1; then
+                    header "Running hook: ${pkg}_${hook_suffix}"
+                    "${pkg}_${hook_suffix}"
+                fi
+            fi
+        done < <(find "$WAYWISER_WS/src" -maxdepth 4 -name "package.xml" -not -path '*/.git/*' 2>/dev/null)
     }
     
     install_uv() {
+        for _p in "$HOME/.local/bin" "/root/.local/bin" "/home/waywiser/.local/bin"; do
+            if [ -x "$_p/uv" ] && [[ ":$PATH:" != *":$_p:"* ]]; then
+                export PATH="$_p:$PATH"
+            fi
+        done
         if command -v uv &>/dev/null; then
             info "uv already installed: $(uv --version)"
             return 0
@@ -697,11 +753,8 @@ init_rosdep() {
 
 check_prerequisites() {
     install_apt_deps
-    if should_install_gazebo_harmonic_deps; then
-        install_gazebo_harmonic_deps
-    else
-        info "Skipping PX4/Gazebo Harmonic apt repository; waywiser_gazebo is not selected for this architecture."
-    fi
+    source_plugin_scripts
+    run_package_hooks "pre_setup"
     install_uv
     setup_ros2_environment
     if [[ "$OPT_SKIP_MAVSDK" != true ]]; then
@@ -743,7 +796,11 @@ init_px4_sitl_submodules() {
 init_submodules() {
     header "Initializing core git submodules"
     git -C "$REPO_DIR" submodule update --init waywiser_core/WayWise
-    init_px4_submodules
+    if px4_drone_enabled; then
+        init_px4_submodules
+    else
+        info "Skipping PX4-Autopilot submodule for ground-vehicle build."
+    fi
     info "Core submodules initialized."
 }
 
@@ -898,12 +955,15 @@ setup_venv() {
     [[ -f "$REPO_DIR/.python-version" ]] || die ".python-version not found in $REPO_DIR"
     local py_ver; py_ver=$(cat "$REPO_DIR/.python-version")
     local skipped=""
+    local build_px4_drone=""
     local setup_venv_script="$REPO_DIR/waywiser/scripts/setup_venv.bash"
     local -a setup_args
 
     [[ -x "$setup_venv_script" ]] || die "setup_venv script not found: $setup_venv_script"
     ensure_env_file
     [[ -f "$ENV_FILE" ]] && skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
+    [[ -f "$ENV_FILE" ]] && build_px4_drone=$(env_get WAYWISER_BUILD_PX4_DRONE)
+    build_px4_drone="${WAYWISER_BUILD_PX4_DRONE:-${build_px4_drone:-1}}"
 
     cd "$WAYWISER_WS"
     setup_args=(
@@ -923,6 +983,7 @@ setup_venv() {
     WAYWISER_REPO_DIR="$REPO_DIR" \
     WAYWISER_PYPROJECT="$REPO_DIR/pyproject.toml" \
     WAYWISER_SKIPPED_PACKAGES="$skipped" \
+    WAYWISER_BUILD_PX4_DRONE="$build_px4_drone" \
     WAYWISER_PYTHON_EXTRAS="${WAYWISER_PYTHON_EXTRAS:-}" \
         bash "$setup_venv_script" "${setup_args[@]}"
     ensure_workspace_venv_link
@@ -946,8 +1007,11 @@ install_ros_deps() {
 
     local skipped="${WAYWISER_SKIPPED_PACKAGES:-}"
     local -a base_paths=("$WAYWISER_WS/src")
-    [[ " $skipped " != *" waywiser_carla "* ]] \
-        && base_paths+=("$REPO_DIR/waywiser_carla/external/carla-ros-bridge")
+    if [[ " $skipped " != *" waywiser_carla "* ]]; then
+        local carla_bridge_dir
+        carla_bridge_dir=$(find "$WAYWISER_WS/src" -maxdepth 4 -type d -name "carla-ros-bridge" -not -path '*/.git/*' 2>/dev/null | head -n 1)
+        [[ -n "$carla_bridge_dir" ]] && base_paths+=("$carla_bridge_dir")
+    fi
 
     local paths
     if [[ -n "$skipped" ]]; then
@@ -980,12 +1044,16 @@ install_ros_deps() {
         return 0
     fi
 
+    # Ensure apt-get does not wait for interactive input (e.g. when act runs
+    # with --env-file /dev/null which strips DEBIAN_FRONTEND from the image env).
+    export DEBIAN_FRONTEND=noninteractive
+
     if command -v apt-get &>/dev/null \
         && grep -Eq '(^|[[:space:]])apt[[:space:]]' <<< "$check_output"; then
         if [[ "$(id -u)" -eq 0 ]]; then
-            apt-get update
+            apt-get update -qq
         else
-            sudo apt-get update
+            sudo apt-get update -qq
         fi
     fi
 
@@ -1008,6 +1076,7 @@ build_workspace() {
     source_underlay
     ensure_env_file
     set -a; source "$ENV_FILE"; set +a
+    sanitize_build_toolchain_env
 
     local skipped="${WAYWISER_SKIPPED_PACKAGES:-}"
     local selected="${WAYWISER_BUILD_PACKAGES:-}"
@@ -1029,15 +1098,18 @@ build_workspace() {
         colcon_extension_blocklist+="${colcon_extension_blocklist:+:}$notification_extension"
     fi
 
-    if [[ " $skipped " != *" waywiser_carla "* ]]; then
-        base_paths+=("$REPO_DIR/waywiser_carla/external/carla-ros-bridge")
-        allow_overriding+=(waywiser waywiser_description)
-    fi
+    source_plugin_scripts
+    run_package_hooks "pre_build"
 
     if [[ -n "${WAYWISER_CMAKE_ARGS:-}" ]]; then
         # shellcheck disable=SC2206
         local -a extra_cmake_args=($WAYWISER_CMAKE_ARGS)
         cmake_args+=("${extra_cmake_args[@]}")
+    fi
+    if px4_drone_enabled; then
+        cmake_args+=("-DWAYWISER_BUILD_PX4_DRONE=ON")
+    else
+        cmake_args+=("-DWAYWISER_BUILD_PX4_DRONE=OFF")
     fi
     extra_args+=(--cmake-args "${cmake_args[@]}")
 
@@ -1088,10 +1160,10 @@ build_workspace() {
     if [[ ${#allow_overriding[@]} -gt 0 ]] && colcon_supports_allow_overriding; then
         extra_args+=(--allow-overriding "${allow_overriding[@]}")
     fi
-
     if [[ -n "$skipped" ]]; then
         # shellcheck disable=SC2086
         COLCON_EXTENSION_BLOCKLIST="$colcon_extension_blocklist" \
+        PATH="$PATH" COMPILER_PATH= LIBRARY_PATH= LD= LDFLAGS= \
             colcon build --symlink-install \
             --base-paths "${base_paths[@]}" \
             "${extra_args[@]}" \
@@ -1099,6 +1171,7 @@ build_workspace() {
             --packages-skip $skipped
     else
         COLCON_EXTENSION_BLOCKLIST="$colcon_extension_blocklist" \
+        PATH="$PATH" COMPILER_PATH= LIBRARY_PATH= LD= LDFLAGS= \
             colcon build --symlink-install \
             --base-paths "${base_paths[@]}" \
             "${extra_args[@]}" \
@@ -1128,17 +1201,24 @@ if [ -f "\$WAYWISER_WS/src/WayWiseR/.env" ]; then
 elif [ -f /etc/waywiser/waywiser.env ]; then
     set -a; source /etc/waywiser/waywiser.env; set +a
 fi
+_waywiser_had_nounset=0
+case \$- in
+    *u*) _waywiser_had_nounset=1 ;;
+esac
 if [ -z "\${ROS_DISTRO:-}" ]; then
     if [ -f /opt/ros/humble/setup.bash ]; then
-        set +u; source /opt/ros/humble/setup.bash; set -u
+        set +u; source /opt/ros/humble/setup.bash
+        if [ "\$_waywiser_had_nounset" -eq 1 ]; then set -u; fi
     else
         echo "WARNING: ROS2 is not sourced. Source your ROS2 environment before using this workspace." >&2
     fi
 fi
 export PYTHONPATH=$VENV_DIR/lib/python${py_ver}/site-packages:\${PYTHONPATH:-}
 if [ -f "\$WAYWISER_WS/install/setup.bash" ]; then
-    set +u; source "\$WAYWISER_WS/install/setup.bash"; set -u
+    set +u; source "\$WAYWISER_WS/install/setup.bash"
+    if [ "\$_waywiser_had_nounset" -eq 1 ]; then set -u; fi
 fi
+unset _waywiser_had_nounset
 EOT
     info "Activate hook added."
     info "From now on, 'source $VENV_DIR/bin/activate' sets up everything."
@@ -1154,45 +1234,34 @@ presim_setup() {
     skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
 
     header "Pre-setup: waywiser_core PX4"
-    init_px4_submodules
-    info "Ensuring PX4 Python requirements from pyproject extra are installed..."
-    activate_env
-    cd "$WAYWISER_WS"
-    run_uv_install pip install -e "$REPO_DIR[px4]"
-
-    if [[ " $skipped " != *" waywiser_carla "* ]]; then
-        header "Pre-setup: waywiser_carla"
-        info "Initializing carla-ros-bridge submodule..."
-        git -C "$REPO_DIR" submodule update --init --recursive \
-            waywiser_carla/external/carla-ros-bridge
+    if px4_drone_enabled; then
+        init_px4_submodules
+        info "Ensuring PX4 Python requirements from pyproject extra are installed..."
         activate_env
         cd "$WAYWISER_WS"
-        info "Ensuring CARLA Python requirements from pyproject extra are installed..."
-        run_uv_install pip install -e "$REPO_DIR[waywiser_carla]"
+        run_uv_install pip install -e "$REPO_DIR[px4]"
+    else
+        info "Skipping PX4 setup and Python requirements for ground-vehicle build."
+    fi
 
-        local custom_carla_root
-        custom_carla_root=$(env_get WAYWISER_CUSTOM_CARLA_ROOT)
-        if [[ -n "$custom_carla_root" ]]; then
-            custom_carla_root=$(eval echo "$custom_carla_root")
-            local py_ver wheel_path
-            py_ver=$(python3 -c 'import sys; print(f"cp{sys.version_info.major}{sys.version_info.minor}")')
-            wheel_path=$(find "$custom_carla_root/PythonAPI/carla/dist" -name "*${py_ver}*.whl" 2>/dev/null | head -n 1)
-            if [[ -n "$wheel_path" && -f "$wheel_path" ]]; then
-                info "Installing custom CARLA wheel: $wheel_path"
-                run_uv_install pip install --force-reinstall "$wheel_path"
-            else
-                warn "No suitable carla wheel found in $custom_carla_root/PythonAPI/carla/dist/ for $py_ver"
+    # Execute modular package pre-simulation setups dynamically
+    local plugin_script
+    while IFS= read -r plugin_script; do
+        # shellcheck disable=SC1090
+        source "$plugin_script"
+    done < <(find "$WAYWISER_WS/src" -maxdepth 4 -type f -name "bootstrap_plugin.bash" -not -path '*/.git/*' 2>/dev/null)
+
+    # Discover packages and call their _presim_setup function if defined and not skipped
+    local pkg pkg_xml
+    while IFS= read -r pkg_xml; do
+        pkg=$(grep -m1 '<name>' "$pkg_xml" | sed 's|.*<name>||;s|</name>.*||')
+        if [[ " $skipped " != *" $pkg "* ]]; then
+            if type "${pkg}_presim_setup" >/dev/null 2>&1; then
+                header "Pre-setup: $pkg"
+                "${pkg}_presim_setup"
             fi
         fi
-    fi
-
-    if [[ " $skipped " != *" waywiser_gazebo "* ]]; then
-        header "Pre-setup: waywiser_gazebo"
-        info "Initializing ros_gz_harmonic submodule..."
-        git -C "$REPO_DIR" submodule update --init --recursive \
-            waywiser_gazebo/external/ros_gz_harmonic
-        init_px4_sitl_submodules
-    fi
+    done < <(find "$WAYWISER_WS/src" -maxdepth 4 -name "package.xml" -not -path '*/.git/*' 2>/dev/null)
 
     if [[ " $skipped " != *" waywiser_perception "* ]]; then
         header "Pre-setup: waywiser_perception"
@@ -1252,42 +1321,24 @@ presim_setup() {
     fi
 }
 
-agrarsense_post_build() {
+run_package_post_build_hooks() {
     ensure_env_file
     local skipped
     skipped=$(env_get WAYWISER_SKIPPED_PACKAGES)
-    [[ " $skipped " != *" waywiser_agrarsense "* ]] || return 0
 
-    header "Post-build: waywiser_agrarsense"
     if [[ "${CI:-}" == "true" ]]; then
-        info "CI environment detected — skipping local Docker setup for waywiser_agrarsense."
+        info "CI environment detected — skipping local Docker post-build setups."
         return 0
     fi
 
-    if ! command -v docker &>/dev/null; then
-        warn "Docker is not installed; skipping waywiser_agrarsense Docker setup."
-        warn "Install and configure Docker, then run: make post-build"
-        return 0
-    fi
-
-    if ! docker info &>/dev/null 2>&1; then
-        warn "Docker is installed but not usable by this user; skipping waywiser_agrarsense Docker setup."
-        warn "Start Docker or configure permissions/rootless Docker, then run: make post-build"
-        return 0
-    fi
-
-    local docker_script="$REPO_DIR/waywiser_agrarsense/ros_bridge/build_docker_container.sh"
-    if [[ ! -f "$docker_script" ]]; then
-        warn "Agrarsense Docker build script not found: $docker_script"
-        return 0
-    fi
-
-    bash "$docker_script"
+    # Execute modular package post-build setups dynamically
+    source_plugin_scripts
+    run_package_hooks "post_build_setup"
 }
 
 run_post_build() {
     header "Running post-build setup"
-    agrarsense_post_build
+    run_package_post_build_hooks
 }
 
 # ── main ─────────────────────────────────────────────────────────────────────────
@@ -1366,4 +1417,7 @@ main() {
     echo
 }
 
-main
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]] && [[ "${_WAYWISER_BOOTSTRAP_ACTIVE:-}" != "1" ]]; then
+    _WAYWISER_BOOTSTRAP_ACTIVE=1
+    main
+fi

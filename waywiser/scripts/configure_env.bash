@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
         -y|--yes|--quiet)
             OPT_YES=true; shift ;;
         --prereqs-only|--setup-only|--configure|--build-only|--post-build-only|\
-        --skip-prereqs|--skip-mavsdk)
+        --skip-prereqs|--skip-mavsdk|--skip-px4-drone)
             # Accepted as no-ops so Makefile/bootstrap ARGS can be shared.
             shift ;;
         -h|--help)
@@ -232,7 +232,12 @@ package_checklist() {
     local cur_skip="$2"
     local -r locked="waywiser waywiser_core waywiser_description waywiser_twist_safety"
 
-    if [[ -z "$REPO_DIR" || ! -d "$REPO_DIR" ]]; then
+    local search_dir="${WAYWISER_WS:-$(cd "${REPO_DIR:-$PWD}"/../.. 2>/dev/null && pwd)}/src"
+    if [[ ! -d "$search_dir" ]]; then
+        search_dir="${REPO_DIR:-$PWD}"
+    fi
+
+    if [[ -z "$search_dir" || ! -d "$search_dir" ]]; then
         _pc_ref="$cur_skip"
         return 0
     fi
@@ -240,10 +245,10 @@ package_checklist() {
     local all_pkgs=()
     while IFS= read -r name; do
         [[ -n "$name" ]] && all_pkgs+=("$name")
-    done < <(find "$REPO_DIR" -name package.xml \
+    done < <(find "$search_dir" -name package.xml \
         ! -path "*/external/*" ! -path "*/.git/*" \
         -exec grep -m1 '<name>' {} \; \
-        | sed 's|.*<name>||;s|</name>.*||' | sort)
+        | sed 's|.*<name>||;s|</name>.*||' | sort -u)
 
     local pkgs=()
     for pkg in "${all_pkgs[@]}"; do
@@ -265,7 +270,7 @@ package_checklist() {
             rev_deps["$dep"]+="$depender "
         done < <(grep -E '<(depend|build_depend|exec_depend|run_depend)>' "$xml" \
             | sed 's|^[[:space:]]*<[^>]*>||;s|</[^>]*>.*||' | sort -u)
-    done < <(find "$REPO_DIR" -name package.xml \
+    done < <(find "$search_dir" -name package.xml \
         ! -path "*/external/*" ! -path "*/.git/*")
 
     if command -v dialog &>/dev/null && [[ -t 1 ]]; then
@@ -322,9 +327,27 @@ Check packages to BUILD (uncheck to skip).
     fi
 }
 
+ensure_dialog() {
+    if command -v dialog &>/dev/null || [[ "$OPT_YES" == true ]] || [[ ! -t 1 ]]; then
+        return 0
+    fi
+
+    info "'dialog' package is not installed (required for interactive configuration UI)."
+    if prompt_yn "Install missing 'dialog' package (sudo apt-get install -y dialog)?" true; then
+        info "Installing 'dialog'..."
+        if as_root apt-get update -qq && as_root apt-get install -y -qq dialog; then
+            info "'dialog' installed successfully."
+        else
+            warn "Failed to install 'dialog'. Falling back to line-by-line prompts."
+        fi
+    fi
+}
+
 configure_env() {
     header "Configuring WayWiseR environment"
     ensure_env_file
+
+    ensure_dialog
 
     if [[ -f "$ENV_FILE" ]]; then
         info "Using env file: $ENV_FILE"
@@ -353,6 +376,7 @@ configure_env() {
 
     local form_args=(
         "WAYWISER_VENV_PATH (empty = use default)"            "$(cfg_get WAYWISER_VENV_PATH "")"
+        "Build PX4/drone support (1/0)"                       "$(cfg_get WAYWISER_BUILD_PX4_DRONE 1)"
         "DDS middleware (fastdds|zenoh)"                      "$dds_default"
         "ROS_DOMAIN_ID (0-232)"                               "$(cfg_get ROS_DOMAIN_ID 0)"
         "RCUTILS_LOGGING_USE_STDOUT (1/0)"                    "$(cfg_get RCUTILS_LOGGING_USE_STDOUT 1)"
@@ -387,13 +411,13 @@ configure_env() {
         || return 1
 
     local new_rmw
-    case "${cfg_vals[1],,}" in
+    case "${cfg_vals[2],,}" in
         fastdds|fast|rmw_fastrtps_cpp)
             new_rmw="rmw_fastrtps_cpp" ;;
         zenoh|rmw_zenoh_cpp)
             new_rmw="rmw_zenoh_cpp" ;;
         *)
-            warn "Invalid DDS middleware '${cfg_vals[1]}'. Use fastdds or zenoh."
+            warn "Invalid DDS middleware '${cfg_vals[2]}'. Use fastdds or zenoh."
             return 1 ;;
     esac
 
@@ -403,36 +427,38 @@ configure_env() {
         env_set WAYWISER_SKIPPED_PACKAGES ""
     fi
     env_set WAYWISER_VENV_PATH                  "${cfg_vals[0]}"
-    env_set ROS_DOMAIN_ID                       "${cfg_vals[2]}"
+    env_set WAYWISER_BUILD_PX4_DRONE            "${cfg_vals[1]}"
+    env_set ROS_DOMAIN_ID                       "${cfg_vals[3]}"
     env_set RMW_IMPLEMENTATION                  "$new_rmw"
-    env_set RCUTILS_LOGGING_USE_STDOUT          "${cfg_vals[3]}"
-    env_set RCUTILS_LOGGING_BUFFERED_STREAM     "${cfg_vals[4]}"
-    env_set PYTHONUNBUFFERED                    "${cfg_vals[5]}"
-    env_set RCUTILS_COLORIZED_OUTPUT            "${cfg_vals[6]}"
-    env_set FASTDDS_USE_DISCOVERY_SERVER        "${cfg_vals[7]}"
-    env_set FASTDDS_REMOTE_DISCOVERY_SERVER_IP  "${cfg_vals[8]}"
-    env_set FASTDDS_REMOTE_DISCOVERY_CLIENT_IP  "${cfg_vals[9]}"
-    env_set FASTDDS_SUPER_CLIENT                "${cfg_vals[10]}"
-    env_set ZENOH_USE_LOCAL_ROUTER              "${cfg_vals[11]}"
-    env_set ZENOH_REMOTE_ROUTER_IP              "${cfg_vals[12]}"
-    env_set ZENOH_REMOTE_ROUTER_PORT            "${cfg_vals[13]}"
-    env_set ZENOH_ROUTER_CHECK_ATTEMPTS         "${cfg_vals[14]}"
-    env_set ZENOH_SESSION_CONFIG_URI            "${cfg_vals[15]}"
-    env_set ZENOH_CONFIG_OVERRIDE               "${cfg_vals[16]}"
-    env_set EMAIL_USER                          "${cfg_vals[17]}"
-    env_set EMAIL_PASSWORD                      "${cfg_vals[18]}"
-    env_set EMAIL_RECIPIENT                     "${cfg_vals[19]}"
-    env_set SMTP_SERVER                         "${cfg_vals[20]}"
-    env_set SMTP_PORT                           "${cfg_vals[21]}"
+    env_set RCUTILS_LOGGING_USE_STDOUT          "${cfg_vals[4]}"
+    env_set RCUTILS_LOGGING_BUFFERED_STREAM     "${cfg_vals[5]}"
+    env_set PYTHONUNBUFFERED                    "${cfg_vals[6]}"
+    env_set RCUTILS_COLORIZED_OUTPUT            "${cfg_vals[7]}"
+    env_set FASTDDS_USE_DISCOVERY_SERVER        "${cfg_vals[8]}"
+    env_set FASTDDS_REMOTE_DISCOVERY_SERVER_IP  "${cfg_vals[9]}"
+    env_set FASTDDS_REMOTE_DISCOVERY_CLIENT_IP  "${cfg_vals[10]}"
+    env_set FASTDDS_SUPER_CLIENT                "${cfg_vals[11]}"
+    env_set ZENOH_USE_LOCAL_ROUTER              "${cfg_vals[12]}"
+    env_set ZENOH_REMOTE_ROUTER_IP              "${cfg_vals[13]}"
+    env_set ZENOH_REMOTE_ROUTER_PORT            "${cfg_vals[14]}"
+    env_set ZENOH_ROUTER_CHECK_ATTEMPTS         "${cfg_vals[15]}"
+    env_set ZENOH_SESSION_CONFIG_URI            "${cfg_vals[16]}"
+    env_set ZENOH_CONFIG_OVERRIDE               "${cfg_vals[17]}"
+    env_set EMAIL_USER                          "${cfg_vals[18]}"
+    env_set EMAIL_PASSWORD                      "${cfg_vals[19]}"
+    env_set EMAIL_RECIPIENT                     "${cfg_vals[20]}"
+    env_set SMTP_SERVER                         "${cfg_vals[21]}"
+    env_set SMTP_PORT                           "${cfg_vals[22]}"
 
     if [[ " $new_skipped " != *" waywiser_carla "* ]]; then
-        env_set WAYWISER_CUSTOM_CARLA_ROOT      "${cfg_vals[22]}"
+        env_set WAYWISER_CUSTOM_CARLA_ROOT      "${cfg_vals[23]}"
     fi
 
     echo
     info "Saved to $ENV_FILE"
     info "  RMW_IMPLEMENTATION=$new_rmw"
-    info "  ROS_DOMAIN_ID=${cfg_vals[2]}"
+    info "  ROS_DOMAIN_ID=${cfg_vals[3]}"
+    info "  WAYWISER_BUILD_PX4_DRONE=${cfg_vals[1]}"
     if [[ -n "$new_skipped" ]]; then
         info "  WAYWISER_SKIPPED_PACKAGES=\"$new_skipped\""
     elif [[ -n "$REPO_DIR" ]]; then
