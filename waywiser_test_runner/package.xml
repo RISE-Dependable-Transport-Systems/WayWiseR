@@ -6,7 +6,7 @@
 
   <description>Package for orchestrating tests.</description>
 
-  <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
+  <maintainer email="waywiser@ri.se">DAS-RISE</maintainer>
   <license>GPLv3</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

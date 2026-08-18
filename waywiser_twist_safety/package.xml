@@ -16,7 +16,7 @@
     received on the "/emergency_stop" topic, the emergency stop is deactivated, allowing the
     commands to pass through from the input to the output twist topics.</description>
 
-  <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
+  <maintainer email="waywiser@ri.se">DAS-RISE</maintainer>
 
   <license>GPLv3</license>
 
