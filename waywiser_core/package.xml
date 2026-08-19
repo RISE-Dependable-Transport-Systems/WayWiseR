@@ -6,7 +6,7 @@
 
   <description>Package wraps WayWise in a ROS2 node</description>
 
-  <maintainer email="ramana.reddy.avula@ri.se">Ramana Avula</maintainer>
+  <maintainer email="waywiser@ri.se">DAS-RISE</maintainer>
 
   <license>GPLv3</license>
 

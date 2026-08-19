@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Integration of WayWise with ROS2 for connected, autonomous vehicles."
 readme = "README.md"
 authors = [
-    { name = "Ramana Avula", email = "r2avula@gmail.com" }
+    { name = "DAS-RISE", email = "waywiser@ri.se" }
 ]
 requires-python = ">=3.10"
 dependencies = [

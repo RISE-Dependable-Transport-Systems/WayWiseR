@@ -495,7 +495,7 @@ run_container() {
     local log_base
     local install_tmp
     local stage_dir
-    local maintainer="${WAYWISER_DEB_MAINTAINER:-Ramana Avula <r2avula@gmail.com>}"
+    local maintainer="${WAYWISER_DEB_MAINTAINER:-DAS-RISE <waywiser@ri.se>}"
     local version="${WAYWISER_DEB_VERSION:-}"
     local ubuntu_label="${WAYWISER_DEB_UBUNTU_LABEL:-ubuntu22-04}"
     local skipped_packages="${WAYWISER_SKIPPED_PACKAGES:-}"

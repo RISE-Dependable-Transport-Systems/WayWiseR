@@ -107,13 +107,13 @@ https://github.com/user-attachments/assets/139a8611-7e69-4d19-9e98-9aea803044eb
 
 Current maintainers are: (firstname.middlename.lastname@ri.se):
 
-- Ramana Reddy Avula
 - Aria Mirzai
 - Karl Lundgren
 - Ashfaq Farooqui
 
 Previous maintainers:
 
+- Ramana Reddy Avula
 - Marvin Damschen
 - Rickard Häll
 

@@ -31,7 +31,8 @@ WAYWISER_WS="${WAYWISER_WS:-$(cd "$REPO_DIR/../.." && pwd)}"
 #   3. /etc/waywiser/waywiser.env  (deb install conffile)
 if [[ -n "${WAYWISER_ENV_FILE:-}" ]]; then
     ENV_FILE="$WAYWISER_ENV_FILE"
-elif [[ -f "$REPO_DIR/.env" ]]; then
+elif [[ -f "$REPO_DIR/.env.example" ]]; then
+    # Source install: use repo-local .env (created from example on first run)
     ENV_FILE="$REPO_DIR/.env"
 else
     ENV_FILE="/etc/waywiser/waywiser.env"
