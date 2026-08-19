@@ -400,7 +400,16 @@ configure_env() {
         "SMTP_PORT"                                           "$(cfg_get SMTP_PORT 465)"
     )
 
-    if [[ " $new_skipped " != *" waywiser_carla "* ]]; then
+    local search_dir="${WAYWISER_WS:-$(cd "${REPO_DIR:-$PWD}"/../.. 2>/dev/null && pwd)}/src"
+    local carla_in_ws=false
+    if [[ -d "$search_dir" ]] && \
+       find "$search_dir" -maxdepth 4 -name package.xml ! -path '*/.git/*' \
+            -exec grep -qlm1 '<name>waywiser_carla</name>' {} \; -print -quit 2>/dev/null \
+       | grep -q .; then
+        carla_in_ws=true
+    fi
+
+    if [[ "$carla_in_ws" == true && " $new_skipped " != *" waywiser_carla "* ]]; then
         form_args+=( "WAYWISER_CUSTOM_CARLA_ROOT" "$(cfg_get WAYWISER_CUSTOM_CARLA_ROOT "")" )
     fi
 
@@ -450,7 +459,7 @@ configure_env() {
     env_set SMTP_SERVER                         "${cfg_vals[21]}"
     env_set SMTP_PORT                           "${cfg_vals[22]}"
 
-    if [[ " $new_skipped " != *" waywiser_carla "* ]]; then
+    if [[ "$carla_in_ws" == true && " $new_skipped " != *" waywiser_carla "* ]]; then
         env_set WAYWISER_CUSTOM_CARLA_ROOT      "${cfg_vals[23]}"
     fi
 
